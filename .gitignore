@@ -54,3 +54,4 @@ coverage/
 !modern/external/catch2/**/*.cmake
 modern/build/
 *.bak
+apks/*.apk
