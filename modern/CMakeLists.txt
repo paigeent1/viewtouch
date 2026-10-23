@@ -244,7 +244,7 @@ if(Qt6_FOUND)
     target_link_libraries(vtm_ui PUBLIC vtm_layout vtm_editor vtm_storage vtm_pos vtm_print vtm_net Qt6::Gui Qt6::Quick Qt6::QuickControls2)
 
     qt_add_executable(vtmodern main.cpp)
-    target_link_libraries(vtmodern PRIVATE vtm_ui vtm_uiplugin)
+    target_link_libraries(vtmodern PRIVATE -Wl,--whole-archive vtm_ui vtm_uiplugin -Wl,--no-whole-archive)
 
     if(ANDROID)
         # The tablet app: a terminal of a store (see main.cpp, Q_OS_ANDROID).
