@@ -45,10 +45,6 @@
 #include <QQmlApplicationEngine>
 #include <QtQml/qqmlextensionplugin.h>
 extern void     qml_register_types_ViewTouch();
-    Q_INIT_RESOURCE(qmake_ViewTouch);
-    Q_INIT_RESOURCE(vtm_ui_raw_qml_0);
-    Q_INIT_RESOURCE(seed);
-    Q_INIT_RESOURCE(textures);
 
 #include <QFile>
 static void vtmLoadModuleQml(QQmlApplicationEngine& eng, const char* name) {
@@ -436,6 +432,10 @@ std::unique_ptr<QQmlApplicationEngine> showUi(const Args &cli, const Options &o,
         {u"height"_s, height > 0 ? height : 720},
     });
     engine->loadFromModule("ViewTouch", "Main");
+    if (engine->rootObjects().isEmpty())
+        engine->load(QUrl(u"qrc:/qt/qml/ViewTouch/ui/qml/Main.qml"_s));
+    if (engine->rootObjects().isEmpty())
+        engine->load(QUrl(u"qrc:/ViewTouch/ui/qml/Main.qml"_s));
 
     auto *window = engine->rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine->rootObjects().first());
     if (!window)
@@ -493,6 +493,10 @@ std::optional<vt::net::Credentials> joinStore(const Args &cli, const Options &o,
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"join"_s, QVariant::fromValue(&join)}, {u"kiosk"_s, cli.isSet(o.kiosk)}});
     engine.loadFromModule("ViewTouch", "JoinWindow");
+    if (engine.rootObjects().isEmpty())
+        engine.load(QUrl(u"qrc:/qt/qml/ViewTouch/ui/qml/JoinWindow.qml"_s));
+    if (engine.rootObjects().isEmpty())
+        engine.load(QUrl(u"qrc:/ViewTouch/ui/qml/JoinWindow.qml"_s));
     auto *window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     if (!window)
         return std::nullopt;
@@ -1877,6 +1881,9 @@ int main(int argc, char *argv[])
 {
     prepareEnvironment(argc, argv);
     QGuiApplication app(argc, argv);
+    qml_register_types_ViewTouch();
+    Q_INIT_RESOURCE(qmake_ViewTouch);
+    Q_INIT_RESOURCE(vtm_ui_raw_qml_0);
     QGuiApplication::setApplicationVersion(vt::net::appBuild().version);   // 0.9.1283
     QGuiApplication::setApplicationName(u"ViewTouch"_s);
     QGuiApplication::setOrganizationName(u"ViewTouch"_s);
