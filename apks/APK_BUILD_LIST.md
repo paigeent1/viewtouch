@@ -7,3 +7,4 @@
 | v0.9.7 | modern-v0.9.7 | b3 | b01737c | 2026-10-23 15:32 | ViewTouch-v0.9.7-b3-b01737c-arm64-v8a.apk |
 | v0.9.8 | modern-v0.9.8 | b3 | 9ff2e11 | 2026-10-23 15:33 | ViewTouch-v0.9.8-b3-9ff2e11-arm64-v8a.apk |
 | v0.9.9 | modern-v0.9.9 | b3 | d2292f2 | 2026-10-23 15:35 | ViewTouch-v0.9.9-b3-d2292f2-arm64-v8a.apk |
+| **v0.9.10** | `modern-v0.9.10` | **b4** | `b63e511` | 2026-10-23 15:47 | `ViewTouch-v0.9.10-b4-b63e511-arm64-v8a.apk` |

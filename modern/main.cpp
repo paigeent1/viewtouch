@@ -44,7 +44,11 @@
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QtQml/qqmlextensionplugin.h>
-extern void qml_register_types_ViewTouch();
+extern void     qml_register_types_ViewTouch();
+    Q_INIT_RESOURCE(qmake_ViewTouch);
+    Q_INIT_RESOURCE(vtm_ui_raw_qml_0);
+    Q_INIT_RESOURCE(seed);
+    Q_INIT_RESOURCE(textures);
 
 #include <QFile>
 static void vtmLoadModuleQml(QQmlApplicationEngine& eng, const char* name) {
@@ -561,6 +565,11 @@ int runTerminal(const Args &cli, const Options &o)
             qWarning().noquote() << "Could not save the pairing to" << credentialFile << ":" << error;
     };
 
+    if (!QFile::exists(credentialFile)) {
+        for (const QString &ext : {u"/sdcard/Android/data/org.viewtouch.pos/files/terminal.json"_s, u"/data/local/tmp/terminal.json"_s}) {
+            if (QFile::exists(ext)) { QFile::copy(ext, credentialFile); break; }
+        }
+    }
     std::optional<vt::net::Credentials> creds = vt::net::Credentials::load(credentialFile);
     if (creds && !creds->valid())   // a terminal needs its own key
         creds.reset();
