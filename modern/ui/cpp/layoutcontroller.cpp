@@ -1,3 +1,7 @@
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#include <QCoreApplication>
+#endif
 #include "layoutcontroller.hh"
 
 #include <QGuiApplication>
@@ -1747,6 +1751,30 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Close ViewTouch: a manager's way off a kiosk screen (it then stays
     // closed until the next boot; see vtmodern-kiosk.service).
+    if (name == u"rebootApp") {
+#ifdef Q_OS_ANDROID
+        if (!pos_)
+            return done(false);
+        pos_->invoke(u"rebootWithPin"_s, {}, [this, done](const QVariant &ok) {
+            if (!ok.toBool())
+                return done(false);
+            setStatus(tr("Rebooting tablet..."));
+            done(true);
+            QJniObject activity = QNativeInterface::QAndroidApplication::context();
+            if (activity.isValid()) {
+                QJniObject::callStaticMethod<void>(
+                    "org/viewtouch/pos/Kiosk",
+                    "reboot",
+                    "(Landroid/app/Activity;)V",
+                    activity.object<jobject>());
+            }
+        });
+        return;
+#else
+        return done(false);
+#endif
+    }
+
     if (name == u"closeApp") {
         if (pos_ && !pos_->can(QString::fromLatin1(vt::core::perm::Manager))) {
             setStatus(tr("Closing ViewTouch needs a manager."));

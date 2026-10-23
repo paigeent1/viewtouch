@@ -67,6 +67,22 @@ object Kiosk {
         }
     }
 
+    // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
+    @JvmStatic
+    fun reboot(activity: Activity) {
+        val dpm = policy(activity)
+        val who = admin(activity)
+        if (dpm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                dpm.reboot(who)
+                return
+            } catch (e: Exception) {}
+        }
+        try {
+            Runtime.getRuntime().exec(arrayOf("sh", "-c", "svc power reboot || reboot"))
+        } catch (e: Exception) {}
+    }
+
     // Manager -> Close ViewTouch: the tablet is a tablet again until it restarts.
     @JvmStatic
     fun leave(activity: Activity) {

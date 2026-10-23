@@ -28,6 +28,20 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"textKey"_s, [](PosService &p, const QVariantList &a) { p.textKey(a.value(0).toString()); return QVariant(true); }},
         {u"clearEntry"_s, [](PosService &p, const QVariantList &) { p.clearEntry(); return QVariant(true); }},
         {u"login"_s, [](PosService &p, const QVariantList &) { return QVariant(p.login()); }},
+        {u"rebootWithPin"_s, [](PosService &p, const QVariantList &) {
+            const QString pin = p.pin_;
+            p.pin_.clear();
+            emit p.entryChanged();
+            if (pin.isEmpty()) {
+                if (p.user() && p.user()->can(perm::Manager))
+                    return QVariant(true);
+                return QVariant(p.fail(PosService::tr("Type a manager's PIN on the keypad first, then touch Reboot.")));
+            }
+            const Employee *e = p.employeeByPin(pin);
+            if (!e || !e->can(perm::Manager))
+                return QVariant(p.fail(PosService::tr("Rebooting needs a manager's PIN.")));
+            return QVariant(true);
+        }},
         {u"loginWithPin"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.loginWithPin(a.value(0).toString())); }},
         {u"logout"_s, [](PosService &p, const QVariantList &) { p.logout(); return QVariant(true); }},
         {u"clockIn"_s, [](PosService &p, const QVariantList &) { return QVariant(p.clockIn()); }},

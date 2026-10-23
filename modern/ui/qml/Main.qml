@@ -897,6 +897,24 @@ ApplicationWindow {
         onManagerExit: approvalPad.leavingKiosk = true
     }
 
+    // Android Tablet Only: Manager-PIN Reboot button on the Login screen
+    WidgetKey {
+        id: androidLoginRebootBtn
+        objectName: "androidLoginRebootBtn"
+        visible: Qt.platform.os === "android" && !root.editing && root.controller.pageKind === "login"
+        z: 50
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: Math.round(root.width * 0.02)
+        anchors.bottomMargin: Math.round(root.height * 0.065)
+        width: Math.round(root.width * 0.13)
+        height: Math.round(root.height * 0.105)
+        text: qsTr("Reboot")
+        baseColor: "#8a2c2c"
+        fontScale: 0.32
+        onClicked: root.controller.runCommand("rebootApp", ({}))
+    }
+
     // Screen saver: dimmed after no touches; the first touch only wakes it.
     Rectangle {
         id: screenSaver
