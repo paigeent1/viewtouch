@@ -1753,6 +1753,26 @@ void LayoutController::sendUnsentCards()
     });
 }
 
+#ifdef Q_OS_ANDROID
+static LayoutController *s_activeScannerController = nullptr;
+extern "C" JNIEXPORT void JNICALL
+Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring code)
+{
+    if (!s_activeScannerController || !code)
+        return;
+    const char *utf = env->GetStringUTFChars(code, nullptr);
+    const QString scannedCode = QString::fromUtf8(utf ? utf : "");
+    if (utf)
+        env->ReleaseStringUTFChars(code, utf);
+    if (!scannedCode.isEmpty()) {
+        QMetaObject::invokeMethod(s_activeScannerController, [c = scannedCode] {
+            if (s_activeScannerController)
+                s_activeScannerController->scanned(c);
+        }, Qt::QueuedConnection);
+    }
+}
+#endif
+
 void LayoutController::runCommand(const QString &name, const QVariantMap &args, Done done)
 {
     if (name == u"editMode")
