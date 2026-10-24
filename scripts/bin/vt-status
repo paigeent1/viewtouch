@@ -1,8 +1,13 @@
 #!/bin/bash
-cd /home/pi/viewtouch-main || exit 1
-+local=$(git rev-parse --short HEAD)
-ver=$(grep VTM_BUILD_VERSION modern/build/vtm_build_number.hh >/dev/null | awk '{print $3}' | tr -d '"')
-adb connect 192.168.1.220:5555 >/dev/null 2>&1adb connect 192.168.1.215:5555 >/dev/null 2>&1
-b1=$(adb -s 192.168.1.220:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
-b2=$(adb -s 192.168.1.215:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
-echo "Server: ${ver:-0.9.19} (Git: $local) | Bar1: ${b1:-Offline} | Bar2: ${b2:-Offline}"
+/usr/local/bin/vt-adb-ensure >/dev/null 2>&1 || true
+REPO="/home/pi/viewtouch-main"
+GIT_HASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LATEST=$(grep VTM_BUILD_VERSION "$REPO/modern/build/vtm_build_number.hh" 2>/dev/null | awk "{print \$3}" | tr -d "\"")
+SERVER_VER="${LATEST:-0.9.19}"
+SUBNET=$(hostname -I | awk "{print \$1}" | cut -d. -f1-3)
+SUBNET=${SUBNET:-192.168.1}
+adb connect "${SUBNET}.220:5555" >/dev/null 2>&1 || true
+adb connect "${SUBNET}.215:5555" >/dev/null 2>&1 || true
+B1=$(adb -s "${SUBNET}.220:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
+B2=$(adb -s "${SUBNET}.215:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
+echo "Server: ${SERVER_VER} (Git: ${GIT_HASH}) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline}"
