@@ -431,11 +431,8 @@ std::unique_ptr<QQmlApplicationEngine> showUi(const Args &cli, const Options &o,
         {u"width"_s, width > 0 ? width : 1280},
         {u"height"_s, height > 0 ? height : 720},
     });
-    engine->loadFromModule("ViewTouch", "Main");
-    if (engine->rootObjects().isEmpty())
-        engine->load(QUrl(u"qrc:/qt/qml/ViewTouch/ui/qml/Main.qml"_s));
-    if (engine->rootObjects().isEmpty())
-        engine->load(QUrl(u"qrc:/ViewTouch/ui/qml/Main.qml"_s));
+    engine->addImportPath(u"qrc:/"_s);
+    engine->load(QUrl(u"qrc:/ViewTouch/ui/qml/Main.qml"_s));
 
     auto *window = engine->rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine->rootObjects().first());
     if (!window)
@@ -443,7 +440,7 @@ std::unique_ptr<QQmlApplicationEngine> showUi(const Args &cli, const Options &o,
     present(window, cli, o);
     if (display == u"window" && controller.pos()) {
         engine->setInitialProperties({{u"pos"_s, QVariant::fromValue(controller.pos())}});
-        engine->loadFromModule("ViewTouch", "CustomerDisplayWindow");
+        engine->load(QUrl(u"qrc:/ViewTouch/ui/qml/CustomerDisplayWindow.qml"_s));
         auto *guest = qobject_cast<QQuickWindow *>(engine->rootObjects().constLast());
         const QList<QScreen *> screens = QGuiApplication::screens();
         if (guest && guest != window && screens.size() > 1) {
@@ -492,11 +489,8 @@ std::optional<vt::net::Credentials> joinStore(const Args &cli, const Options &o,
     JoinController join(suggestedTerminalName(cli, o), address, problem);
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"join"_s, QVariant::fromValue(&join)}, {u"kiosk"_s, cli.isSet(o.kiosk)}});
-    engine.loadFromModule("ViewTouch", "JoinWindow");
-    if (engine.rootObjects().isEmpty())
-        engine.load(QUrl(u"qrc:/qt/qml/ViewTouch/ui/qml/JoinWindow.qml"_s));
-    if (engine.rootObjects().isEmpty())
-        engine.load(QUrl(u"qrc:/ViewTouch/ui/qml/JoinWindow.qml"_s));
+    engine.addImportPath(u"qrc:/"_s);
+    engine.load(QUrl(u"qrc:/ViewTouch/ui/qml/JoinWindow.qml"_s));
     auto *window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     if (!window)
         return std::nullopt;
@@ -523,7 +517,8 @@ int runStation(const Args &cli, const Options &o)
     StationController station(dataDir, cli.isSet(o.config) ? cli.value(o.config) : QString(), cli.isSet(o.kiosk));
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"station"_s, QVariant::fromValue(&station)}, {u"kiosk"_s, cli.isSet(o.kiosk)}});
-    engine.loadFromModule("ViewTouch", "StationWindow");
+    engine.addImportPath(u"qrc:/"_s);
+    engine.load(QUrl(u"qrc:/ViewTouch/ui/qml/StationWindow.qml"_s));
     auto *window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     if (!window)
         return 1;
