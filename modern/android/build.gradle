@@ -24,6 +24,7 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     //noinspection GradleDependency
     implementation 'androidx.core:core:1.17.0'
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     // Stripe Terminal, for taking cards when the app runs on a Stripe smart
     // reader (Apps on Devices). See src/org/viewtouch/pos/StripeBridge.kt.
     implementation 'com.stripe:stripeterminal-core:6.0.0'

@@ -205,12 +205,74 @@ ColumnLayout {
     Component {
         id: textField
         TextField {
+            id: tfInput
             Layout.minimumHeight: fe.minHeight
             text: fe.mixed || !fe.isSet || fe.value == null ? "" : String(fe.value)
             placeholderText: fe.mixed ? qsTr("(mixed)") : (fe.resolved !== undefined ? String(fe.resolved) : "")
             selectByMouse: true
             readOnly: fe.readOnly
-            onEditingFinished: if (text !== (fe.isSet && fe.value != null ? String(fe.value) : "")) fe.commit(text)
+            property double lastKeyMs: 0
+            property int fastStreak: 0
+            property string lockedUpc: ""
+            Component.onCompleted: {
+                if (fe.field && fe.field.key === "upc")
+                    tfInput.lockedUpc = String(fe.value ?? "").trim()
+            }
+            Connections {
+                target: fe
+                function onValueChanged() {
+                    if (fe.field && fe.field.key === "upc" && !tfInput.activeFocus)
+                        tfInput.lockedUpc = String(fe.value ?? "").trim()
+                }
+            }
+            Keys.onPressed: (event) => {
+                if (fe.field && fe.field.key === "upc") {
+                    const now = Date.now()
+                    const dt = now - tfInput.lastKeyMs
+                    tfInput.lastKeyMs = now
+                    if (dt < 55 && event.text && event.text.length > 0)
+                        tfInput.fastStreak += 1
+                    else if (dt >= 55)
+                        tfInput.fastStreak = 0
+
+                    // If UPC was already populated, do NOT accept the keystroke here so Main.qml catches the scan
+                    // and jumps to the scanned item!
+                    if (tfInput.lockedUpc !== "" && (tfInput.fastStreak >= 2 || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                        tfInput.text = tfInput.lockedUpc
+                        event.accepted = false
+                        return
+                    }
+                }
+            }
+            onTextEdited: {
+                if (fe.field && fe.field.key === "upc") {
+                    if (tfInput.lockedUpc !== "" && tfInput.fastStreak >= 2) {
+                        tfInput.text = tfInput.lockedUpc
+                        return
+                    }
+                    // If the user manually cleared the UPC field via Backspace, unlock it for scanning
+                    if (tfInput.text.trim() === "")
+                        tfInput.lockedUpc = ""
+                }
+                if (text !== (fe.isSet && fe.value != null ? String(fe.value) : ""))
+                    fe.commit(text)
+            }
+            onAccepted: {
+                if (fe.field && fe.field.key === "upc" && tfInput.lockedUpc !== "" && tfInput.fastStreak >= 2) {
+                    tfInput.text = tfInput.lockedUpc
+                    return
+                }
+                if (text !== (fe.isSet && fe.value != null ? String(fe.value) : ""))
+                    fe.commit(text.trim())
+                if (fe.field && fe.field.key === "upc" && text.trim() !== "")
+                    tfInput.lockedUpc = text.trim()
+            }
+            onEditingFinished: {
+                if (text !== (fe.isSet && fe.value != null ? String(fe.value) : ""))
+                    fe.commit(text.trim())
+                if (fe.field && fe.field.key === "upc")
+                    tfInput.lockedUpc = text.trim()
+            }
         }
     }
 

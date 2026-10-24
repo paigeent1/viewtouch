@@ -7,6 +7,7 @@ import QtQuick.Layouts
 // the form's fields come from the service, like the page inspector.
 Item {
     id: w
+    focus: true
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
     readonly property string panel: zone && zone.props && zone.props.panel ? zone.props.panel : "menu"
@@ -99,7 +100,88 @@ Item {
     }
     // Saves may be answered by a server: react when the data changes.
     property string pending: ""   // "save-new" | "save" | "delete" while waiting
+    function gs1Fix(s) {
+        const c = String(s ?? "").trim()
+        if (!/^[0-9]{11}$/.test(c)) return c
+        let sum = 0
+        for (let i = 0; i < 11; ++i) sum += Number(c[10 - i]) * (i % 2 === 0 ? 3 : 1)
+        return c + String((10 - (sum % 10)) % 10)
+    }
+    // Unitech MS912+ Scanner: Jump to existing item if barcode exists, else fill empty UPC
+    property string scanBuf: ""
+    property double lastScanKeyMs: 0
+    function findMenuIndexByBarcode(raw) {
+        const c = String(raw ?? "").trim()
+        if (c.length < 4 || w.panel !== "menu") return -1
+        const c12 = /^[0-9]{11}$/.test(c) ? w.gs1Fix(c) : c
+        for (let i = 0; i < w.records.length; ++i) {
+            const r = w.records[i]
+            const codes = String(r.barcodes ?? ((r.upc ?? "") + "," + (r.altupc ?? ""))).split(",").map(s => s.trim()).filter(Boolean)
+            if (codes.includes(c) || codes.includes(c12)) return i
+        }
+        return -1
+    }
+    Keys.onPressed: (event) => {
+        if (w.panel !== "menu") return
+        const now = Date.now()
+        if (now - w.lastScanKeyMs > 180) w.scanBuf = ""
+        w.lastScanKeyMs = now
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (w.scanBuf.length >= 6) {
+                const code = w.scanBuf.trim()
+                w.scanBuf = ""
+                const existingIdx = w.findMenuIndexByBarcode(code)
+                if (existingIdx >= 0) {
+                    w.choose(existingIdx)
+                    event.accepted = true
+                    return
+                }
+                if (w.index !== -2 && w.draft && String(w.draft.upc ?? "").trim() === "") {
+                    const d = Object.assign({}, w.draft)
+                    d.upc = code; w.draft = d; w.dirty = true
+                    event.accepted = true
+                }
+            }
+            w.scanBuf = ""
+        } else if (event.text && /^[0-9A-Za-z-]$/.test(event.text)) {
+            w.scanBuf += event.text
+        }
+    }
+
+    Timer {
+        interval: 80
+        running: w.panel === "menu" && w.visible
+        repeat: true
+        onTriggered: {
+            if (!w.zone || !w.zone.controller) return
+            const scanned = w.zone.controller.take("adminScan")
+            if (!scanned) return
+            const code = String(scanned).trim()
+            if (code === "") return
+            const existingIdx = w.findMenuIndexByBarcode(code)
+            if (existingIdx >= 0) {
+                w.choose(existingIdx)
+                return
+            }
+            if (w.index !== -2 && w.draft && String(w.draft.upc ?? "").trim() === "") {
+                const d = w.copy(w.draft)
+                d.upc = code
+                w.dirty = true
+                w.draft = d
+            }
+        }
+    }
     function save() {
+        if (panel === "menu" && draft) {
+            const d = Object.assign({}, draft)
+            const u = gs1Fix(d.upc)
+            const a = String(d.altupc ?? "").split(",").map(x => gs1Fix(x)).filter(Boolean).join(", ")
+            if (u !== String(d.upc ?? "").trim() || a !== String(d.altupc ?? "").trim()) {
+                pos.adminSave(panel, index, draft)
+                d.upc = u; d.altupc = a; draft = d
+                return
+            }
+        }
         pending = index === -1 ? "save-new" : "save"
         pos.adminSave(panel, index, draft)
     }
@@ -418,6 +500,13 @@ Item {
                                 section: w.sectioned && w.query !== "" ? modelData.group : ""
                                 readOnly: modelData.readonlyExisting === true && w.index >= 0
                                 onCommit: v => {
+                                    if (w.panel === "menu" && modelData.path === "upc") {
+                                        const hit = w.findMenuIndexByBarcode(v)
+                                        if (hit >= 0 && hit !== w.index) {
+                                            Qt.callLater(() => w.choose(hit))
+                                            return
+                                        }
+                                    }
                                     const d = w.copy(w.draft)
                                     d[modelData.path] = v
                                     w.dirty = true   // first: the new draft may rebuild this form

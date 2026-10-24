@@ -1542,9 +1542,17 @@ void LayoutController::scanned(const QString &code)
     typedNumber_.clear();
     const auto *page = currentPage();
     const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier");
+    QString c12 = c;
+    if (c.size() == 11 && std::all_of(c.cbegin(), c.cend(), [](QChar ch) { return ch.isDigit(); })) {
+        int sum = 0;
+        for (int i = 0; i < 11; ++i)
+            sum += c.at(10 - i).digitValue() * (i % 2 == 0 ? 3 : 1);
+        c12 = c + QChar(u'0' + ((10 - (sum % 10)) % 10));
+    }
     for (const QVariant &v : pos_->menuItems()) {
         const QVariantMap m = v.toMap();
-        if (m.value(u"number"_s).toString() != c && !m.value(u"barcodes"_s).toString().split(u", "_s).contains(c))
+        const QStringList bcs = m.value(u"barcodes"_s).toString().split(u", "_s);
+        if (m.value(u"number"_s).toString() != c && !bcs.contains(c) && !bcs.contains(c12))
             continue;
         if (ordering)
             orderItem(m.value(u"id"_s).toString());
@@ -1752,6 +1760,25 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Close ViewTouch: a manager's way off a kiosk screen (it then stays
     // closed until the next boot; see vtmodern-kiosk.service).
+    if (name == u"scanCamera") {
+#ifdef Q_OS_ANDROID
+        s_activeScannerController = this;
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (activity.isValid()) {
+            QJniObject::callStaticMethod<void>(
+                "org/viewtouch/pos/BarcodeScanner",
+                "start",
+                "(Landroid/app/Activity;)V",
+                activity.object<jobject>());
+            return done(true);
+        }
+        return done(false);
+#else
+        setStatus(tr("Use the handheld barcode scanner, or touch Scan on a tablet."));
+        return done(true);
+#endif
+    }
+
     if (name == u"rebootApp") {
 #ifdef Q_OS_ANDROID
         if (!pos_)

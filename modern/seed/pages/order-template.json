@@ -221,7 +221,7 @@
       "rect": {
         "x": 592,
         "y": 16,
-        "w": 210,
+        "w": 156,
         "h": 72
       },
       "shape": "rect",
@@ -244,9 +244,9 @@
       "id": "tab-lunch",
       "kind": "button",
       "rect": {
-        "x": 810,
+        "x": 756,
         "y": 16,
-        "w": 210,
+        "w": 156,
         "h": 72
       },
       "shape": "rect",
@@ -269,9 +269,9 @@
       "id": "tab-dinner",
       "kind": "button",
       "rect": {
-        "x": 1028,
+        "x": 920,
         "y": 16,
-        "w": 210,
+        "w": 156,
         "h": 72
       },
       "shape": "rect",
@@ -289,6 +289,32 @@
           "fontSize": 26
         }
       }
+    },
+    {
+      "id": "tab-scan",
+      "kind": "button",
+      "label": "Scan",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1084,
+        "y": 16,
+        "w": 156,
+        "h": 72
+      },
+      "style": {
+        "normal": {
+          "fill": "#e6b800",
+          "text": "#101317",
+          "fontSize": 26
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "scanCamera"
+        }
+      ]
     },
     {
       "id": "tab-find",

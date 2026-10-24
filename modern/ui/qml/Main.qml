@@ -202,7 +202,11 @@ ApplicationWindow {
                                && root.scanBuffer.length >= 4) {
                         const code = root.scanBuffer
                         root.scanBuffer = ""
-                        root.controller.scanned(code)
+                        if (root.controller.pageId === "admin-menu" || root.controller.pageId === "menu-builder") {
+                            root.controller.keep("adminScan", code)
+                        } else {
+                            root.controller.scanned(code)
+                        }
                         event.accepted = true
                         return
                     } else {

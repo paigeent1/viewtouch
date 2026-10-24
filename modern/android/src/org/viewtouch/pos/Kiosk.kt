@@ -54,6 +54,9 @@ object Kiosk {
         setHome(activity, true)
         dpm.addPersistentPreferredActivity(who, homeFilter, home(activity))
         dpm.setKeyguardDisabled(who, true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            dpm.setPermissionGrantState(who, activity.packageName, android.Manifest.permission.CAMERA, DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
+        }
         dpm.setStatusBarDisabled(who, true)
         // Staff can't add users or accounts, or install apps from elsewhere. (A factory
         // reset stays possible after Close ViewTouch: it's how a tablet is let go for good.)

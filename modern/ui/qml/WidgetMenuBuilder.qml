@@ -11,6 +11,52 @@ import QtQuick.Layouts
 // time: categories, items, the card.
 Item {
     id: w
+    focus: true
+    // Unitech MS912+ Hands-Free Scanner: Jump to existing item if barcode exists, else fill empty UPC
+    property string scanBuf: ""
+    property double lastScanKeyMs: 0
+    function findExistingItemByBarcode(raw) {
+        const c = String(raw ?? "").trim()
+        if (c.length < 4) return null
+        let c12 = c
+        if (/^[0-9]{11}$/.test(c)) {
+            let s = 0
+            for (let i = 0; i < 11; ++i) s += Number(c[10 - i]) * (i % 2 === 0 ? 3 : 1)
+            c12 = c + String((10 - (s % 10)) % 10)
+        }
+        for (let i = 0; i < w.allItems.length; ++i) {
+            const it = w.allItems[i]
+            const codes = String(it.barcodes ?? ((it.upc ?? "") + "," + (it.altupc ?? ""))).split(",").map(s => s.trim()).filter(Boolean)
+            if (codes.includes(c) || codes.includes(c12)) return it
+        }
+        return null
+    }
+    Timer {
+        interval: 80
+        running: w.visible
+        repeat: true
+        onTriggered: {
+            if (!w.zone || !w.zone.controller) return
+            const scanned = w.zone.controller.take("adminScan")
+            if (!scanned) return
+            const code = String(scanned).trim()
+            if (code === "") return
+            const existing = w.findExistingItemByBarcode(code)
+            if (existing) {
+                w.choosingScope = false
+                w.builderScope = existing.isRetail ? "retail" : "hospitality"
+                w.categoryId = existing.family
+                w.editItem(existing)
+                return
+            }
+            if (w.editingItem && w.draft && String(w.draft.upc ?? "").trim() === "") {
+                w.set("upc", code)
+                const combined = [code, (w.draft.altupc ?? "").trim()].filter(Boolean).join(", ")
+                w.set("barcodes", combined)
+            }
+        }
+    }
+
     // Every button a finger's size.
     component TouchButton: MenuTouchButton {}
     property ZoneItem zone

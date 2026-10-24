@@ -275,7 +275,7 @@ QString PosService::barcodeProblem(const QStringList &codes, const std::string &
                     sum += d * ((i % 2 == 0) ? 3 : 1);
                 }
                 const int check = (10 - (sum % 10)) % 10;
-                return tr("UPC \"%1\" has 11 digits (missing check digit %2 -> use %1%2).").arg(c).arg(check);
+                return tr("UPC \"%1\" missing check digit %2 -> filled %1%2. Touch Save again to confirm.").arg(c).arg(check);
             }
             if (len == 8 || len == 12 || len == 13 || len == 14) {
                 int sum = 0;
