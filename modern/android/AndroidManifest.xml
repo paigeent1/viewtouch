@@ -50,9 +50,10 @@
         </activity>
         <!-- A tablet only for ViewTouch (Kiosk.kt): ViewTouch as its home screen
              (off except there), the device owner set once with adb, and the start. -->
-        <activity-alias
+        <activity
             android:name="org.viewtouch.pos.Home"
-            android:targetActivity="org.qtproject.qt.android.bindings.QtActivity"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
             android:enabled="false"
             android:exported="true">
             <intent-filter>
@@ -60,9 +61,7 @@
                 <category android:name="android.intent.category.HOME"/>
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
-            <meta-data android:name="android.app.lib_name" android:value="-- %%INSERT_APP_LIB_NAME%% --"/>
-            <meta-data android:name="android.app.arguments" android:value="-- %%INSERT_APP_ARGUMENTS%% --"/>
-        </activity-alias>
+        </activity>
         <receiver
             android:name="org.viewtouch.pos.KioskAdmin"
             android:permission="android.permission.BIND_DEVICE_ADMIN"

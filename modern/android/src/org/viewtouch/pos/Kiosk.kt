@@ -121,3 +121,13 @@ class KioskBoot : BroadcastReceiver() {
             Kiosk.boot(context)
     }
 }
+
+// Home screen trampoline: forwards Android's HOME intent directly to QtActivity
+// so QtActivity always launches under its own ComponentName and loads libvtmodern.so.
+class Home : Activity() {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        Kiosk.boot(this)
+        finish()
+    }
+}
