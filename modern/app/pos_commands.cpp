@@ -28,8 +28,9 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"textKey"_s, [](PosService &p, const QVariantList &a) { p.textKey(a.value(0).toString()); return QVariant(true); }},
         {u"clearEntry"_s, [](PosService &p, const QVariantList &) { p.clearEntry(); return QVariant(true); }},
         {u"login"_s, [](PosService &p, const QVariantList &) { return QVariant(p.login()); }},
-        {u"rebootWithPin"_s, [](PosService &p, const QVariantList &) {
-            const QString pin = p.pin_;
+        {u"rebootWithPin"_s, [](PosService &p, const QVariantList &a) {
+            const QString passed = a.value(0).toString().trimmed();
+            const QString pin = !passed.isEmpty() ? passed : p.pin_;
             p.pin_.clear();
             emit p.entryChanged();
             if (pin.isEmpty()) {

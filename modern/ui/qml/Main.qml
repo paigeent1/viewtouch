@@ -897,7 +897,7 @@ ApplicationWindow {
         onManagerExit: approvalPad.leavingKiosk = true
     }
 
-    // Android Tablet Only: Manager-PIN Reboot button on the Login screen
+    // Android Tablet Only: Manager-PIN Reboot button + 10s Timeout Modal on the Login screen
     WidgetKey {
         id: androidLoginRebootBtn
         objectName: "androidLoginRebootBtn"
@@ -912,7 +912,96 @@ ApplicationWindow {
         text: qsTr("Reboot")
         baseColor: "#8a2c2c"
         fontScale: 0.32
-        onClicked: root.controller.runCommand("rebootApp", ({}))
+        onClicked: rebootPinModal.openPrompt()
+    }
+
+    Rectangle {
+        id: rebootPinModal
+        objectName: "rebootPinModal"
+        anchors.fill: parent
+        z: 85
+        visible: false
+        color: "#b805080e"
+        property string enteredPin: ""
+        property int secondsLeft: 10
+
+        function openPrompt() {
+            enteredPin = ""; secondsLeft = 10; visible = true; rebootTimeoutTimer.restart()
+        }
+        function closePrompt() {
+            rebootTimeoutTimer.stop(); enteredPin = ""; visible = false
+        }
+        function pressDigit(d) {
+            if (enteredPin.length < 8) enteredPin += d
+            secondsLeft = 10
+        }
+
+        Timer {
+            id: rebootTimeoutTimer
+            interval: 1000; repeat: true
+            onTriggered: {
+                rebootPinModal.secondsLeft -= 1
+                if (rebootPinModal.secondsLeft <= 0) rebootPinModal.closePrompt()
+            }
+        }
+
+        MouseArea { anchors.fill: parent; onClicked: rebootPinModal.closePrompt() }
+
+        Rectangle {
+            width: Math.min(420, Math.round(root.width * 0.42))
+            height: Math.min(500, Math.round(root.height * 0.78))
+            anchors.centerIn: parent
+            radius: 12; color: "#18202c"; border.color: "#3a4b63"; border.width: 2
+            MouseArea { anchors.fill: parent }
+
+            Column {
+                anchors.fill: parent; anchors.margins: 18; spacing: 12
+                Text {
+                    width: parent.width; horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Manager PIN Required to Reboot (%1s)").arg(rebootPinModal.secondsLeft)
+                    color: "#f0f4f8"; font.pixelSize: 20; font.bold: true
+                }
+                Rectangle {
+                    width: parent.width; height: 52; radius: 8; color: "#0d121a"; border.color: "#2e3d52"
+                    Text {
+                        anchors.centerIn: parent
+                        text: rebootPinModal.enteredPin.length > 0 ? "•".repeat(rebootPinModal.enteredPin.length) : qsTr("Enter Manager PIN")
+                        color: rebootPinModal.enteredPin.length > 0 ? "#ffffff" : "#6c7d93"
+                        font.pixelSize: 26; font.bold: true
+                    }
+                }
+                Grid {
+                    anchors.horizontalCenter: parent.horizontalCenter; columns: 3; spacing: 10
+                    Repeater {
+                        model: ["1","2","3","4","5","6","7","8","9","Clear","0","⌫"]
+                        WidgetKey {
+                            width: 108; height: 62; text: modelData
+                            baseColor: modelData === "Clear" ? "#5a3535" : "#253244"; fontScale: 0.38
+                            onClicked: {
+                                if (modelData === "Clear") { rebootPinModal.enteredPin = ""; rebootPinModal.secondsLeft = 10 }
+                                else if (modelData === "⌫") { rebootPinModal.enteredPin = rebootPinModal.enteredPin.slice(0, -1); rebootPinModal.secondsLeft = 10 }
+                                else rebootPinModal.pressDigit(modelData)
+                            }
+                        }
+                    }
+                }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter; spacing: 14
+                    WidgetKey {
+                        width: 160; height: 54; text: qsTr("Cancel"); baseColor: "#374252"; fontScale: 0.36
+                        onClicked: rebootPinModal.closePrompt()
+                    }
+                    WidgetKey {
+                        width: 160; height: 54; text: qsTr("Reboot Now"); baseColor: "#8a2c2c"; fontScale: 0.36
+                        onClicked: {
+                            const p = rebootPinModal.enteredPin
+                            rebootPinModal.closePrompt()
+                            root.controller.runCommand("rebootApp", ({ pin: p }))
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Screen saver: dimmed after no touches; the first touch only wakes it.

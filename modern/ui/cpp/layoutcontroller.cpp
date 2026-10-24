@@ -1755,7 +1755,7 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 #ifdef Q_OS_ANDROID
         if (!pos_)
             return done(false);
-        pos_->invoke(u"rebootWithPin"_s, {}, [this, done](const QVariant &ok) {
+        pos_->invoke(u"rebootWithPin"_s, {args.value(u"pin"_s).toString()}, [this, done](const QVariant &ok) {
             if (!ok.toBool())
                 return done(false);
             setStatus(tr("Rebooting tablet..."));
