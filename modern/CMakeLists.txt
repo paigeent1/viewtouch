@@ -256,7 +256,7 @@ if(Qt6_FOUND)
         if(NOT VTM_COMMITS MATCHES "^[0-9]+$")
             set(VTM_COMMITS 0)
         endif()
-        set(VTM_ANDROID_BUILD 19)
+        set(VTM_ANDROID_BUILD ${VTM_COMMITS} CACHE STRING "Build number, part of the Android version code")
         math(EXPR VTM_VERSION_CODE
              "(${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100) * 100000 + ${VTM_ANDROID_BUILD}")
         set_target_properties(vtmodern PROPERTIES
