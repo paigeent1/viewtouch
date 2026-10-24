@@ -1041,15 +1041,26 @@ ApplicationWindow {
             id: screenSaverLogo
             objectName: "screenSaverLogo"
             anchors.horizontalCenter: parent.horizontalCenter
-            source: Qt.platform.os === "android"
-                    ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
-                    : "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
+            source: {
+                if (Qt.platform.os === "android") {
+                    return "file:///data/user/0/org.viewtouch.pos/files/logo.png"
+                }
+                return "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
+            }
             width: Math.round(root.height * 0.28)
             height: Math.round(root.height * 0.28)
             fillMode: Image.PreserveAspectFit
             mipmap: true
-            visible: true
+            visible: status === Image.Ready
+            onStatusChanged: {
+                if (status === Image.Error && Qt.platform.os === "android") {
+                    // Fallback to external scoped storage if internal path is unreachable
+                    source = "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
+                }
+            }
         }
+
+        
 
         
             // The store's logo (Store Settings), when there is one.
