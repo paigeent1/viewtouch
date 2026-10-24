@@ -89,7 +89,7 @@ object BarcodeScanner {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#181C24"))
             setPadding(24, 20, 24, 20)
-            val lp = FrameLayout.LayoutParams(780, 580, Gravity.CENTER)
+            val lp = FrameLayout.LayoutParams(380, 260, Gravity.TOP or Gravity.END)
             layoutParams = lp
         }
 
@@ -142,7 +142,7 @@ object BarcodeScanner {
         // Red laser guide line across the center
         val guideLine = FrameLayout(activity).apply {
             setBackgroundColor(Color.parseColor("#AAFF3333"))
-            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 4, Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 4, Gravity.TOP or Gravity.END)
         }
         previewBox.addView(guideLine)
 
@@ -165,7 +165,7 @@ object BarcodeScanner {
         // Auto-shutoff after 20 seconds if no barcode is scanned
         val r = Runnable { stop(activity) }
         timeoutRunnable = r
-        mainHandler.postDelayed(r, 20000)
+        mainHandler.postDelayed(r, 10000)
     }
 
     @SuppressLint("MissingPermission")
