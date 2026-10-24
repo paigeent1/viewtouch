@@ -260,7 +260,7 @@ public:
     // coupon or a gift card (PosService::scanCode).
     Q_INVOKABLE void scanned(const QString &code);
     // A command by name, as a button would run it ("holdCard").
-    Q_INVOKABLE void command(const QString &name) { runCommand(name, {}, [](bool) {}); }
+    Q_INVOKABLE void command(const QString &name, const QVariantMap &args = {}) { runCommand(name, args, [](bool) {}); }
 
     // Widget entry points.
     Q_INVOKABLE void selectTable(const QString &label);

@@ -897,6 +897,23 @@ ApplicationWindow {
         onManagerExit: approvalPad.leavingKiosk = true
     }
 
+    // Terminal Name in top-left of Login screen (same 28pt/1080 scale as Date & Time clock, in yellow)
+    Text {
+        id: loginTerminalNameBadge
+        objectName: "loginTerminalNameBadge"
+        readonly property string termName: root.controller.pos !== null ? ((root.controller.pos as PosService).terminalName ?? "") : ""
+        visible: !root.editing && root.controller.pageKind === "login" && termName !== ""
+        z: 50
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: Math.round(root.width * 0.02)
+        anchors.topMargin: Math.round(root.height * 0.035)
+        text: termName
+        color: "#ffd60a"
+        font.pixelSize: Math.max(16, Math.round(root.height * (28 / 1080)))
+        font.bold: true
+    }
+
     // Android Tablet Only: Manager-PIN Reboot button + 10s Timeout Modal on the Login screen
     WidgetKey {
         id: androidLoginRebootBtn
@@ -996,7 +1013,7 @@ ApplicationWindow {
                         onClicked: {
                             const p = rebootPinModal.enteredPin
                             rebootPinModal.closePrompt()
-                            root.controller.runCommand("rebootApp", ({ pin: p }))
+                            root.controller.command("rebootApp", ({ pin: p }))
                         }
                     }
                 }

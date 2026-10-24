@@ -29,7 +29,7 @@ namespace vt::app {
 class PosSession : public QObject {
     Q_OBJECT
 
-    Q_PROPERTY(QString terminalName READ terminalName CONSTANT)
+    Q_PROPERTY(QString terminalName READ terminalName NOTIFY sessionChanged)
     // False while a remote terminal has lost its server (always true locally).
     Q_PROPERTY(bool online READ online NOTIFY onlineChanged)
     // This screen's build against the store's: {build, storeBuild, behind,
