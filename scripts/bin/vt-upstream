@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+cd ~/viewtouch-main
+git fetch upstream --quiet
+git replace --graft 6d002668 d9ad3d0a 2>/dev/null || true
+
+CMD="${1:-list}"
+COMMIT="$2"
+
+case "$CMD" in
+  list)
+    echo "=== Official ViewTouch Commits Since Your Base Snapshot (d9ad3d0a - Oct 15, 2026) ==="
+    git log d9ad3d0a..upstream/main --oneline --no-merges
+    echo ""
+    echo "Commands:"
+    echo "  vt-upstream list            # List all upstream commits since Oct 15"
+    echo "  vt-upstream mydiff          # List all files YOU have customized since d9ad3d0a"
+    echo "  vt-upstream show <commit>   # Inspect an upstream commit's changes"
+    echo "  vt-upstream check <commit>  # Test if an upstream commit merges cleanly (3-way check)"
+    echo "  vt-upstream apply <commit>  # Apply an upstream commit using 3-way merge (keeps your code)"
+    ;;
+  mydiff)
+    echo "=== All Files Customized in Your Fork Compared to Official Base (d9ad3d0a) ==="
+    git diff --stat d9ad3d0a..HEAD -- modern/
+    ;;
+  show)
+    git show "$COMMIT"
+    ;;
+  check)
+    echo "Testing 3-way merge of upstream commit $COMMIT ($({ git log -1 --format='%s' "$COMMIT"; }))..."
+    if git show "$COMMIT" --format="" | git apply --3way --check 2>/dev/null; then
+        echo "  -> [SUCCESS] $COMMIT merges 100% cleanly via 3-way merge without any conflict!"
+    else
+        echo "  -> [INFO] $COMMIT depends on an earlier upstream commit or touches lines you edited:"
+        git show "$COMMIT" --format="" | git apply --3way --check 2>&1 | sed 's/^/     /'
+    fi
+    ;;
+  apply)
+    echo "Applying upstream commit $COMMIT via 3-way merge..."
+    git show "$COMMIT" --format="" | git apply --3way
+    echo "Done! Run 'git status' and 'git diff' to review."
+    ;;
+  *)
+    echo "Usage: vt-upstream [list | mydiff | show <hash> | check <hash> | apply <hash>]"
+    ;;
+esac

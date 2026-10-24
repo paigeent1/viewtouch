@@ -21,7 +21,8 @@ namespace perm {
 inline constexpr const char *Order = "order";            // take orders
 inline constexpr const char *Settle = "check.settle";    // take payments, close checks
 inline constexpr const char *Void = "order.void";        // void items already sent
-inline constexpr const char *Manager = "manager";        // manager pages
+inline constexpr const char *Manager = "manager";
+inline constexpr const char *Admin = "admin";        // manager pages
 inline constexpr const char *EditLayout = "layout.edit"; // edit pages
 inline constexpr const char *Discount = "check.discount"; // discounts and comps
 inline constexpr const char *OthersChecks = "check.others"; // open checks that are someone else's

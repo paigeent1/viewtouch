@@ -1,0 +1,6 @@
+#!/bin/bash
+for ip in 192.168.1.220 192.168.1.215; do
+  adb connect $ip:5555 >/dev/null 2>&1 || true
+  adb -s $ip:5555 shell am start -a android.settings.SYSTEM_UPDATE_SETTINGS >/dev/null 2>&1 || true
+done
+echo "Opened Android OS Update settings on Bar 1 & Bar 2 tablets."

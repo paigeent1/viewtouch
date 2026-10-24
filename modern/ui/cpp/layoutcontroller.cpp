@@ -1,3 +1,4 @@
+#include <QProcess>
 #ifdef Q_OS_ANDROID
 #include <QJniObject>
 #include <QCoreApplication>
@@ -1787,6 +1788,23 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Manager screens are pages ("admin-menu", "reports"...). Kept as a
     // command so buttons made before those pages existed still work.
+    if (name == u"vtSync") {
+        if (pos_ && !pos_->can(u"admin"_s)) {
+            setStatus(tr("Admin required."));
+            return done(false);
+        }
+        const QString m = args.value(u"mode"_s, u"status"_s).toString();
+        setStatus(u"Running vt-"_s + m + u"..."_s);
+        auto *proc = new QProcess(this);
+        connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+            QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+            out.replace(u'\n', u" | "_s);
+            if (!out.isEmpty()) setStatus(out);
+            proc->deleteLater();
+        });
+        proc->start(u"/usr/local/bin/vt-"_s + m, {});
+        return done(true);
+    }
     if (name == u"openAdmin") {
         static const QHash<QString, QString> pages = {
             {u"menu"_s, u"admin-menu"_s}, {u"employees"_s, u"admin-employees"_s},

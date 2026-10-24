@@ -273,7 +273,7 @@
       ]
     },
     {
-      "id": "admin-terminals",
+      "id": "system-config",
       "kind": "button",
       "rect": {
         "x": 484,
@@ -283,16 +283,19 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Terminals",
+      "label": "System Config",
       "actions": [
         {
-          "type": "command",
-          "name": "openAdmin",
-          "args": {
-            "panel": "terminals"
-          }
+          "type": "jump",
+          "mode": "push",
+          "page": "hardware-config"
         }
-      ]
+      ],
+      "style": {
+        "normal": {
+          "fill": "#1f6f73"
+        }
+      }
     },
     {
       "id": "admin-mealPeriods",

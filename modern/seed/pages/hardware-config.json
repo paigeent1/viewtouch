@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "id": "hardware-config",
+  "name": "Hardware Configuration",
+  "kind": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "role": "admin",
+  "permission": "admin",
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 160,
+        "y": 24,
+        "w": 1600,
+        "h": 100
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Hardware Configuration"
+    },
+    {
+      "id": "hw-terminals",
+      "kind": "button",
+      "rect": {
+        "x": 380,
+        "y": 170,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Terminals",
+      "actions": [
+        {
+          "type": "command",
+          "name": "openAdmin",
+          "args": {
+            "panel": "terminals"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#2b62b0"
+        }
+      }
+    },
+    {
+      "id": "hw-printers",
+      "kind": "button",
+      "rect": {
+        "x": 1000,
+        "y": 170,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Printers",
+      "actions": [
+        {
+          "type": "command",
+          "name": "openAdmin",
+          "args": {
+            "panel": "printers"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#2b62b0"
+        }
+      }
+    },
+    {
+      "id": "vt-status",
+      "kind": "button",
+      "rect": {
+        "x": 220,
+        "y": 370,
+        "w": 440,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Status",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "status"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      }
+    },
+    {
+      "id": "vt-server",
+      "kind": "button",
+      "rect": {
+        "x": 740,
+        "y": 370,
+        "w": 440,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Server",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "server"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#1f6f73"
+        }
+      }
+    },
+    {
+      "id": "vt-check",
+      "kind": "button",
+      "rect": {
+        "x": 1260,
+        "y": 370,
+        "w": 440,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Check Tablets",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "check-tablets"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#2b62b0"
+        }
+      }
+    },
+    {
+      "id": "vt-tablets",
+      "kind": "button",
+      "rect": {
+        "x": 380,
+        "y": 570,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "double",
+      "label": "Tablets (2x Tap Push)",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "tablets"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#b83232"
+        }
+      }
+    },
+    {
+      "id": "vt-os",
+      "kind": "button",
+      "rect": {
+        "x": 1000,
+        "y": 570,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "double",
+      "label": "Android OS Update (2x Tap)",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "os-update"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#8a5a1f"
+        }
+      }
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "rect": {
+        "x": 160,
+        "y": 940,
+        "w": 384,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "< Back",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "manager"
+        }
+      ]
+    }
+  ]
+}

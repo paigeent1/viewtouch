@@ -1,0 +1,4 @@
+#!/bin/bash
+MODE="${1:-status}"
+shift 2>/dev/null || true
+exec "/usr/local/bin/vt-${MODE}" "$@"

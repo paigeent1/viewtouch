@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+cd /home/pi/viewtouch-main
+cmake --build modern/build --target vtmodern -j2
+sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
+killall -9 vtmodern 2>/dev/null || true
+sleep 1
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 /home/pi/viewtouch-main/modern/build/vtmodern --serve >/dev/null 2>&1 &
+echo "Server rebuilt and restarted."

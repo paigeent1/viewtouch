@@ -1,0 +1,9 @@
+#!/bin/bash
+APK=$(ls -t /home/pi/viewtouch-main/apks/*.apk 2>/dev/null | head -n 1)
+for ip in 192.168.1.220 192.168.1.215; do
+  adb connect $ip:5555 >/dev/null 2>&1
+  adb -s $ip:5555 install -r "$APK" >/dev/null 2>&1
+  adb -s $ip:5555 shell am force-stop org.viewtouch.pos
+  adb -s $ip:5555 shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+done
+echo "Updated Bar 1 & Bar 2 to $(basename "$APK")"

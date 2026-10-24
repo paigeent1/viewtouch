@@ -1,0 +1,12 @@
+#!/bin/bash
+LATEST=$(grep VTM_BUILD_VERSION /home/pi/viewtouch-main/modern/build/vtm_build_number.hh 2>/dev/null | awk '{print $3}' | tr -d '"')
+LATEST="${LATEST:-0.9.19}"
+adb connect 192.168.1.220:5555 >/dev/null 2>&1 || true
+adb connect 192.168.1.215:5555 >/dev/null 2>&1 || true
+B1=$(adb -s 192.168.1.220:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
+B2=$(adb -s 192.168.1.215:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
+if [ "$B1" = "$LATEST" ] && [ "$B2" = "$LATEST" ]; then
+  echo "Tablets up to date ($LATEST) | Bar1: $B1 | Bar2: $B2"
+else
+  echo "UPDATE READY ($LATEST) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline} -> Double-tap 'Tablets (Push)' when ready!"
+fi
