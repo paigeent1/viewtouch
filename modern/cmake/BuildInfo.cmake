@@ -67,3 +67,7 @@ foreach(h IN LISTS hashes)
     string(APPEND history "${n}${sep}${v}${sep}${h}${sep}${about}\n")
 endforeach()
 write_if_changed("${HISTORY}" "R\"vtmhistory(${history})vtmhistory\"\n")
+
+
+set(NUMBER 19)
+set(VERSION "${MAJOR}.${MINOR}.19")

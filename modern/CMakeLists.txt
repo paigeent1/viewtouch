@@ -256,14 +256,14 @@ if(Qt6_FOUND)
         if(NOT VTM_COMMITS MATCHES "^[0-9]+$")
             set(VTM_COMMITS 0)
         endif()
-        set(VTM_ANDROID_BUILD ${VTM_COMMITS} CACHE STRING "Build number, part of the Android version code")
+        set(VTM_ANDROID_BUILD 19)
         math(EXPR VTM_VERSION_CODE
              "(${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100) * 100000 + ${VTM_ANDROID_BUILD}")
         set_target_properties(vtmodern PROPERTIES
             QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android
             QT_ANDROID_PACKAGE_NAME org.viewtouch.pos
             QT_ANDROID_APP_NAME "ViewTouch"
-            QT_ANDROID_VERSION_NAME ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${VTM_ANDROID_BUILD}
+            QT_ANDROID_VERSION_NAME 0.9.19
             QT_ANDROID_VERSION_CODE ${VTM_VERSION_CODE}
             QT_ANDROID_MIN_SDK_VERSION 28
             QT_ANDROID_TARGET_SDK_VERSION 35)
