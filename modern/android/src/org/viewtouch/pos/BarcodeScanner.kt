@@ -89,7 +89,7 @@ object BarcodeScanner {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#181C24"))
             setPadding(24, 20, 24, 20)
-            val lp = FrameLayout.LayoutParams(380, 260, Gravity.TOP or Gravity.END)
+            val lp = FrameLayout.LayoutParams(400, 520, Gravity.TOP or Gravity.END)
             layoutParams = lp
         }
 
