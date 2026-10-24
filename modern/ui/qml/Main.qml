@@ -1037,17 +1037,22 @@ ApplicationWindow {
             anchors.centerIn: parent
             spacing: 12
             opacity: 0.55
+        Image {
+            id: screenSaverLogo
+            objectName: "screenSaverLogo"
+            anchors.horizontalCenter: parent.horizontalCenter
+            source: Qt.platform.os === "android"
+                    ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
+                    : "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
+            width: Math.round(root.height * 0.28)
+            height: Math.round(root.height * 0.28)
+            fillMode: Image.PreserveAspectFit
+            mipmap: true
+            visible: true
+        }
+
+        
             // The store's logo (Store Settings), when there is one.
-            Image {
-                objectName: "screenSaverLogo"
-                readonly property var pos: root.controller.pos
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: status === Image.Ready
-                source: pos && screenSaver.visible ? (pos.imageRevision < 0 ? undefined : pos.imageUrl("logo:")) : ""
-                sourceSize.height: Math.min(root.width, root.height) * 0.3
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-            }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.controller.pos ? root.controller.pos.storeName : ""
