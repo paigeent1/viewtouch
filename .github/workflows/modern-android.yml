@@ -100,7 +100,7 @@ jobs:
           cp "$apk" "dist/ViewTouch-b${number}-${{ matrix.abi }}.apk"
           ls -l dist
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: ViewTouch-android-${{ matrix.abi }}
           path: dist/*.apk
