@@ -1028,10 +1028,10 @@ ApplicationWindow {
     Connections {
         target: root.controller
         function onAsleepChanged() {
-            root.controller.command("setAutoBrightness", ({ value: root.controller.asleep ? 100 : 255 }))
+            root.controller.command("setAutoBrightness", ({ value: root.controller.asleep ? 40 : 255 }))
         }
         Component.onCompleted: {
-            root.controller.command("setAutoBrightness", ({ value: root.controller.asleep ? 100 : 255 }))
+            root.controller.command("setAutoBrightness", ({ value: root.controller.asleep ? 40 : 255 }))
         }
     }
     // Screen saver: dimmed after no touches; the first touch only wakes it.
@@ -1041,7 +1041,7 @@ ApplicationWindow {
         anchors.fill: parent
         z: 90
         visible: root.controller.asleep
-        color: "#99050608"
+        color: "#f2050608"
         Column {
             anchors.centerIn: parent
             spacing: 12
