@@ -1282,177 +1282,205 @@ Item {
                                     placeholderText: qsTr("e.g. Fish Tacos")
                                     onTextEdited: w.set("name", text)
                                 }
-                                Label { text: qsTr("Retail Price") }
+                                                                // Item Classification Radio Buttons: Retail / F&B / Event
+                                Label { text: qsTr("Classification"); font.bold: true }
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    spacing: 12
-                                    TextField {
-                                        objectName: "builderPrice"
-                                        Layout.preferredWidth: 160
-                                        text: w.draft.price ?? ""
-                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                        placeholderText: "0.00"
-                                        onTextEdited: w.set("price", text)
-                                    }
-                                    Label { text: qsTr("Unit Cost") }
-                                    TextField {
-                                        id: costField
-                                        objectName: "builderCost"
-                                        Layout.preferredWidth: 160
-                                        text: w.draft.cost ?? ""
-                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                        placeholderText: "0.00"
-                                        onTextEdited: w.set("cost", text)
-                                    }
-                                    Label {
-                                        Layout.fillWidth: true
-                                        readonly property real pVal: Number(w.draft.price ?? 0)
-                                        readonly property real cVal: Number(w.draft.cost ?? 0)
-                                        readonly property real profit: pVal - cVal
-                                        readonly property real margin: pVal > 0 ? (profit / pVal) * 100.0 : 0
-                                        readonly property real markup: cVal > 0 ? (profit / cVal) * 100.0 : 0
-                                        text: (pVal > 0 && cVal > 0)
-                                            ? qsTr("Profit: $%1  |  Margin: %2%  |  Markup: %3%")
-                                                  .arg(profit.toFixed(2)).arg(margin.toFixed(1)).arg(markup.toFixed(1))
-                                            : qsTr("Enter Price & Cost to see Profit / Margin %")
-                                        color: (pVal > 0 && cVal > 0 && profit >= 0) ? "#7ee2a8" : "#f5b940"
-                                        font.bold: true
+                                    spacing: 20
+
+                                    RadioButton {
+                                        id: rbRetail
+                                        text: qsTr("🏷️ Retail")
                                         font.pixelSize: 15
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                                Label { text: qsTr("UPC / Barcodes") }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    TextField {
-                                        Layout.fillWidth: true
-                                        text: w.draft.upc ?? ""
-                                        placeholderText: qsTr("Primary UPC / EAN (12/13 digits)")
-                                        inputMethodHints: Qt.ImhNoPredictiveText
-                                        onTextEdited: {
-                                            w.set("upc", text)
-                                            const combined = [text.trim(), (w.draft.altupc ?? "").trim()].filter(Boolean).join(", ")
-                                            w.set("barcodes", combined)
-                                        }
-                                    }
-                                    Label { text: qsTr("Alt UPC") }
-                                    TextField {
-                                        Layout.fillWidth: true
-                                        text: w.draft.altupc ?? ""
-                                        placeholderText: qsTr("Secondary UPC(s), comma-separated")
-                                        inputMethodHints: Qt.ImhNoPredictiveText
-                                        onTextEdited: {
-                                            w.set("altupc", text)
-                                            const combined = [(w.draft.upc ?? "").trim(), text.trim()].filter(Boolean).join(", ")
-                                            w.set("barcodes", combined)
-                                        }
-                                    }
-                                    Label { text: qsTr("PLU #") }
-                                    TextField {
-                                        Layout.preferredWidth: 110
-                                        text: w.draft.number ?? ""
-                                        placeholderText: qsTr("e.g. 104")
-                                        inputMethodHints: Qt.ImhDigitsOnly
-                                        onTextEdited: w.set("number", text)
-                                    }
-                                }
-                                Label { text: qsTr("Item Type") }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 10
-                                    Switch {
-                                        checked: w.draft.isRetail ?? w.retailMode
+                                        checked: Boolean(w.draft.isRetail)
                                         onToggled: {
-                                            w.set("isRetail", checked)
-                                            if (checked && (w.draft.taxClass === "food" || !w.draft.taxClass)) {
+                                            if (checked) {
+                                                w.set("isRetail", true)
+                                                w.set("isEvent", false)
                                                 w.set("taxClass", "merchandise")
                                                 w.set("printer", "")
                                             }
                                         }
                                     }
-                                    Label {
-                                        text: (w.draft.isRetail ?? w.retailMode)
-                                            ? qsTr("🏷️ Retail Item (Cigars, Cigarettes, Merchandise)")
-                                            : qsTr("🍽️ Hospitality Item (Food & Beverage)")
-                                        font.bold: true
+
+                                    RadioButton {
+                                        id: rbFNB
+                                        text: qsTr("🍽️ F&B")
+                                        font.pixelSize: 15
+                                        checked: !Boolean(w.draft.isRetail) && !Boolean(w.draft.isEvent)
+                                        onToggled: {
+                                            if (checked) {
+                                                w.set("isRetail", false)
+                                                w.set("isEvent", false)
+                                                w.set("taxClass", "food")
+                                                w.set("printer", "kitchen")
+                                            }
+                                        }
+                                    }
+
+                                    RadioButton {
+                                        id: rbEvent
+                                        text: qsTr("🎟️ Event")
+                                        font.pixelSize: 15
+                                        checked: Boolean(w.draft.isEvent)
+                                        onToggled: {
+                                            if (checked) {
+                                                w.set("isRetail", false)
+                                                w.set("isEvent", true)
+                                                w.set("taxClass", "room")
+                                                w.set("printer", "")
+                                            }
+                                        }
                                     }
                                 }
-                                Label { visible: w.draft.isRetail ?? w.retailMode; text: qsTr("Parent / Box Link") }
-                                Rectangle {
-                                    visible: w.draft.isRetail ?? w.retailMode
-                                    Layout.fillWidth: true
-                                    implicitHeight: parentBoxCol.implicitHeight + 16
-                                    color: "#252c37"
-                                    radius: 8
-                                    border.color: "#3a4454"
-                                    border.width: 1
-                                    ColumnLayout {
-                                        id: parentBoxCol
-                                        anchors.fill: parent
-                                        anchors.margins: 8
-                                        spacing: 6
-                                        readonly property string pUpc: (w.draft.parentUpc ?? "").trim()
-                                        readonly property var parentItem: pUpc === "" ? null : w.allItems.find(x => (x.upc ?? "") === pUpc || (x.barcodes ?? "").split(",").map(s => s.trim()).includes(pUpc))
-                                        readonly property string myUpc: (w.draft.upc ?? "").trim()
-                                        readonly property var childItems: myUpc === "" ? [] : w.allItems.filter(x => x.id !== w.draft.id && (x.parentUpc ?? "") === myUpc)
 
-                                        RowLayout {
+                                // Cost, Target Margin %, and Retail Price Calculation
+                                Label { text: qsTr("Pricing & Margin"); font.bold: true }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    ColumnLayout {
+                                        Layout.preferredWidth: 150
+                                        Label { text: qsTr("Unit Cost ($)") }
+                                        TextField {
+                                            id: costInput
                                             Layout.fillWidth: true
-                                            spacing: 10
-                                            Label { text: qsTr("Parent Box/Carton UPC:") }
-                                            TextField {
-                                                objectName: "builderParentUpc"
-                                                Layout.preferredWidth: 200
-                                                text: w.draft.parentUpc ?? ""
-                                                placeholderText: qsTr("Scan/type Box or Carton UPC")
-                                                inputMethodHints: Qt.ImhNoPredictiveText
-                                                onTextEdited: w.set("parentUpc", text)
-                                            }
-                                            Label { text: qsTr("Units per Box/Carton:") }
-                                            TextField {
-                                                objectName: "builderPackSize"
-                                                Layout.preferredWidth: 90
-                                                text: w.draft.packSize ?? ""
-                                                placeholderText: qsTr("e.g. 20 or 10")
-                                                inputMethodHints: Qt.ImhDigitsOnly
-                                                onTextEdited: w.set("packSize", text)
-                                            }
-                                            TouchButton {
-                                                implicitHeight: 38
-                                                font.pixelSize: 13
-                                                enabled: parentBoxCol.parentItem !== null && Number(parentBoxCol.parentItem.cost ?? 0) > 0 && Number(w.draft.packSize ?? 0) > 0
-                                                text: qsTr("Compute Subunit Cost")
-                                                onClicked: {
-                                                    const pCost = Number(parentBoxCol.parentItem.cost ?? 0)
-                                                    const div = Math.max(1, Number(w.draft.packSize ?? 1))
-                                                    w.set("cost", (pCost / div).toFixed(2))
+                                            text: w.draft.cost ?? ""
+                                            placeholderText: "0.00"
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onTextEdited: {
+                                                w.set("cost", text)
+                                                if (targetMarginInput.text.trim() !== "") {
+                                                    const c = parseFloat(text) || 0
+                                                    const m = parseFloat(targetMarginInput.text) || 0
+                                                    if (c > 0 && m >= 0 && m < 100) {
+                                                        const p = c / (1.0 - (m / 100.0))
+                                                        priceInput.text = p.toFixed(2)
+                                                        w.set("price", p.toFixed(2))
+                                                    }
                                                 }
                                             }
                                         }
-                                        Label {
-                                            visible: parentBoxCol.pUpc !== ""
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.preferredWidth: 150
+                                        Label { text: qsTr("Target Margin (%)") }
+                                        TextField {
+                                            id: targetMarginInput
                                             Layout.fillWidth: true
-                                            font.pixelSize: 13
-                                            color: parentBoxCol.parentItem ? "#7ee2a8" : "#ff9a9e"
-                                            text: parentBoxCol.parentItem
-                                                ? qsTr("✓ Linked to Parent: %1 (Box/Carton Cost: $%2 ÷ %3 units = $%4 per subunit)")
-                                                      .arg(parentBoxCol.parentItem.name)
-                                                      .arg(Number(parentBoxCol.parentItem.cost || 0).toFixed(2))
-                                                      .arg(Math.max(1, Number(w.draft.packSize || 1)))
-                                                      .arg((Number(parentBoxCol.parentItem.cost || 0) / Math.max(1, Number(w.draft.packSize || 1))).toFixed(2))
-                                                : qsTr("No existing item found with UPC %1 yet (save the Parent Box/Carton item with that UPC first).").arg(parentBoxCol.pUpc)
+                                            placeholderText: "e.g. 50"
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onTextEdited: {
+                                                const m = parseFloat(text) || 0
+                                                const c = parseFloat(costInput.text) || 0
+                                                if (c > 0 && m >= 0 && m < 100) {
+                                                    const p = c / (1.0 - (m / 100.0))
+                                                    priceInput.text = p.toFixed(2)
+                                                    w.set("price", p.toFixed(2))
+                                                }
+                                            }
                                         }
-                                        Label {
-                                            visible: parentBoxCol.childItems.length > 0
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.preferredWidth: 150
+                                        Label { text: qsTr("Retail Price ($)") }
+                                        TextField {
+                                            id: priceInput
+                                            objectName: "builderPrice"
                                             Layout.fillWidth: true
-                                            wrapMode: Text.WordWrap
-                                            font.pixelSize: 13
-                                            color: "#7ec8ff"
-                                            text: qsTr("★ Parent Box/Carton — Saving a Cost ($%1) here automatically updates %2 child item(s): %3")
-                                                      .arg(Number(w.draft.cost || 0).toFixed(2))
-                                                      .arg(parentBoxCol.childItems.length)
-                                                      .arg(parentBoxCol.childItems.map(c => c.name + " (÷" + (c.packSize || 1) + " = $" + (Number(w.draft.cost || 0) / Math.max(1, Number(c.packSize || 1))).toFixed(2) + ")").join(", "))
+                                            text: w.draft.price ?? ""
+                                            placeholderText: "0.00"
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onTextEdited: w.set("price", text)
+                                        }
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        Layout.alignment: Qt.AlignVCenter
+                                        readonly property real pVal: Number(w.draft.price ?? 0)
+                                        readonly property real cVal: Number(w.draft.cost ?? 0)
+                                        readonly property real profit: pVal - cVal
+                                        readonly property real actualMargin: pVal > 0 ? (profit / pVal) * 100.0 : 0
+                                        text: (pVal > 0 && cVal > 0)
+                                            ? qsTr("Profit: $%1 | Margin: %2%").arg(profit.toFixed(2)).arg(actualMargin.toFixed(1))
+                                            : ""
+                                        color: profit >= 0 ? "#7ee2a8" : "#f5b940"
+                                        font.bold: true
+                                        font.pixelSize: 14
+                                    }
+                                }
+
+                                // Parent / Subunit Packaging Breakout
+                                Label { text: qsTr("Parent / Child Packaging"); font.bold: true }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: parentBoxCol.implicitHeight + 16
+                                    color: "#202630"
+                                    radius: 6
+                                    border.color: "#353e4d"
+
+                                    ColumnLayout {
+                                        id: parentBoxCol
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        spacing: 8
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 12
+
+                                            Label { text: qsTr("Parent Master UPC:") }
+                                            TextField {
+                                                Layout.preferredWidth: 180
+                                                text: w.draft.parentUpc ?? ""
+                                                placeholderText: qsTr("Box/Carton UPC")
+                                                onTextEdited: w.set("parentUpc", text)
+                                            }
+
+                                            Label { text: qsTr("Parent Unit:") }
+                                            TextField {
+                                                Layout.preferredWidth: 60
+                                                readOnly: true
+                                                text: "1"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                palette.base: "#181d24"
+                                            }
+
+                                            Label { text: qsTr("Subunit Count in Parent:") }
+                                            TextField {
+                                                id: subCountField
+                                                Layout.preferredWidth: 80
+                                                text: w.draft.packSize ?? "1"
+                                                placeholderText: qsTr("e.g. 25")
+                                                inputMethodHints: Qt.ImhDigitsOnly
+                                                onTextEdited: w.set("packSize", text)
+                                            }
+
+                                            TouchButton {
+                                                implicitHeight: 38
+                                                font.pixelSize: 13
+                                                text: qsTr("Compute Subunit Cost")
+                                                onClicked: {
+                                                    const parentItem = w.allItems.find(x => (x.upc ?? "") === (w.draft.parentUpc ?? "").trim())
+                                                    const pCost = parentItem ? Number(parentItem.cost || 0) : Number(costInput.text || 0)
+                                                    const subCount = Math.max(1, parseInt(subCountField.text) || 1)
+                                                    const computedUnitCost = (pCost / subCount).toFixed(4)
+                                                    costInput.text = computedUnitCost
+                                                    w.set("cost", computedUnitCost)
+                                                    if (targetMarginInput.text.trim() !== "") {
+                                                        const m = parseFloat(targetMarginInput.text) || 0
+                                                        if (m >= 0 && m < 100) {
+                                                            const p = parseFloat(computedUnitCost) / (1.0 - (m / 100.0))
+                                                            priceInput.text = p.toFixed(2)
+                                                            w.set("price", p.toFixed(2))
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
