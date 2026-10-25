@@ -1063,6 +1063,8 @@ ApplicationWindow {
         
 
         
+
+        
             // The store's logo (Store Settings), when there is one.
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
