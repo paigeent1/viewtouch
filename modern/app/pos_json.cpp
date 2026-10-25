@@ -1271,7 +1271,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.hostsTakePayments = o.value(u"hostsTakePayments").toBool(false);
     s.autoLogoutMinutes = std::clamp(o.value(u"autoLogoutMinutes").toInt(0), 0, 120);
     s.phoneLockSeconds = std::clamp(o.value(u"phoneLockSeconds").toInt(30), -1, 3600);
-    s.screenSaverMinutes = std::clamp(o.value(u"screenSaverMinutes").toInt(10), 0, 240);
+    s.screenSaverMinutes = std::clamp(o.value(u"screenSaverMinutes").toInt(3), 0, 240);
     s.replicaKey = ss(o.value(u"replicaKey").toString());
     s.language = ss(o.value(u"language").toString(u"en"_s));
     const QJsonObject starts = o.value(u"startPages").toObject();

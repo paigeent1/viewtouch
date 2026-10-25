@@ -1804,6 +1804,29 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 #endif
     }
 
+    if (name == u"setAutoBrightness") {
+        const int val = std::clamp(args.value(u"value"_s, 255).toInt(), 5, 255);
+#ifdef Q_OS_ANDROID
+        QJniObject a = QNativeInterface::QAndroidApplication::context();
+        if (a.isValid())
+            QJniObject::callStaticMethod<void>("org/viewtouch/pos/Kiosk", "setBrightnessRaw", "(Landroid/app/Activity;I)V", a.object<jobject>(), jint(val));
+#else
+        QDir blDir(u"/sys/class/backlight"_s);
+        for (const QString &dev : blDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+            QFile maxF(blDir.filePath(dev + u"/max_brightness"_s));
+            int maxB = 255;
+            if (maxF.open(QIODevice::ReadOnly)) maxB = std::max(1, maxF.readAll().trimmed().toInt());
+            const int scaled = std::clamp((val * maxB) / 255, 1, maxB);
+            QFile curF(blDir.filePath(dev + u"/brightness"_s));
+            if (curF.open(QIODevice::WriteOnly | QIODevice::Truncate))
+                curF.write(QByteArray::number(scaled));
+        }
+        QProcess::startDetached(u"sh"_s, {u"-c"_s, QStringLiteral(
+            "for o in $(xrandr --listmonitors 2>/dev/null | awk 'NR>1{print $4}'); do xrandr --output "$o" --brightness %1 2>/dev/null; done"
+        ).arg(val >= 250 ? u"1.0"_s : u"0.40"_s)});
+#endif
+        return done(true);
+    }
     if (name == u"rebootApp") {
 #ifdef Q_OS_ANDROID
         if (!pos_)

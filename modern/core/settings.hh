@@ -317,7 +317,7 @@ struct PosSettings {
     int phoneLockSeconds = 30;
     // Dim a screen nobody has touched for this long (0: never). Kitchen,
     // bar and expo screens and the self-order kiosk stay on.
-    int screenSaverMinutes = 10;
+    int screenSaverMinutes = 3;
     // A table seated longer than this is marked on the floor plan.
     int tableLongMinutes = 90;
     // Clock in only near a scheduled shift (managers excepted), from this
