@@ -77,7 +77,8 @@ Item {
     property string categoryId: ""
     readonly property var category: categories.find(c => c.id === categoryId) ?? null
     property bool choosingScope: true
-    property string builderScope: "hospitality"   // "hospitality" | "retail"
+    property string builderScope: "hospitality"
+    readonly property bool eventMode: builderScope === "event"   // "hospitality" | "retail"
     readonly property bool retailMode: builderScope === "retail"
     readonly property var items: allItems.filter(i => i.family === categoryId && Boolean(i.isRetail) === retailMode)
     property string itemId: ""        // "" + editingItem: a new one
@@ -2578,86 +2579,59 @@ Item {
                 text: qsTr("Select which catalog you want to manage right now. You can switch between Hospitality and Retail at any time.")
             }
 
-            RowLayout {
+                        RowLayout {
                 Layout.fillWidth: true
-                spacing: 20
+                spacing: 16
 
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
-                    Layout.preferredHeight: 230
-                    radius: 14
-                    color: "#26334d"
-                    border.color: "#4a6fa5"
+                    implicitHeight: 220
+                    radius: 12
+                    color: "#1a355e"
+                    border.color: "#3b77cc"
                     border.width: 2
                     ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 10
-                        Label { text: "🍽️"; font.pixelSize: 42; Layout.alignment: Qt.AlignHCenter }
-                        Label {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: qsTr("Hospitality (Food & Beverage)")
-                            font.pixelSize: 22
-                            font.bold: true
-                            wrapMode: Text.WordWrap
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WordWrap
-                            opacity: 0.85
-                            font.pixelSize: 14
-                            text: qsTr("Menu items, bar drinks, modifiers, choice groups, kitchen routing & prep times.")
-                        }
+                        anchors.fill: parent; anchors.margins: 18; spacing: 8
+                        Label { text: "🍽️"; font.pixelSize: 34; Layout.alignment: Qt.AlignHCenter }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: qsTr("Hospitality (F&B)"); font.pixelSize: 18; font.bold: true; color: "#ffffff" }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; opacity: 0.85; font.pixelSize: 12; color: "#ffffff"; text: qsTr("Menu items, bar drinks, modifiers, choice groups, kitchen routing & prep times.") }
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            w.builderScope = "hospitality"
-                            w.choosingScope = false
-                        }
-                    }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { w.builderScope = "hospitality"; w.choosingScope = false } }
                 }
 
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
-                    Layout.preferredHeight: 230
-                    radius: 14
-                    color: "#1c3b36"
-                    border.color: "#3caea3"
+                    implicitHeight: 220
+                    radius: 12
+                    color: "#0d4d43"
+                    border.color: "#1ba893"
                     border.width: 2
                     ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 10
-                        Label { text: "🏷️"; font.pixelSize: 42; Layout.alignment: Qt.AlignHCenter }
-                        Label {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: qsTr("Retail Inventory (UPC / Box & Pack)")
-                            font.pixelSize: 22
-                            font.bold: true
-                            wrapMode: Text.WordWrap
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WordWrap
-                            opacity: 0.85
-                            font.pixelSize: 14
-                            text: qsTr("Cigars, cigarettes & retail merchandise with UPC/EAN check-digit verification, unit cost, margin % & Parent/Child subunit costing.")
-                        }
+                        anchors.fill: parent; anchors.margins: 18; spacing: 8
+                        Label { text: "🏷️"; font.pixelSize: 34; Layout.alignment: Qt.AlignHCenter }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: qsTr("Retail Inventory"); font.pixelSize: 18; font.bold: true; color: "#ffffff" }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; opacity: 0.85; font.pixelSize: 12; color: "#ffffff"; text: qsTr("Cigars, goods, UPC/EAN barcodes, unit cost, margin % & Parent/Child box costing.") }
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            w.builderScope = "retail"
-                            w.choosingScope = false
-                        }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { w.builderScope = "retail"; w.choosingScope = false } }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    implicitHeight: 220
+                    radius: 12
+                    color: "#461b57"
+                    border.color: "#9938be"
+                    border.width: 2
+                    ColumnLayout {
+                        anchors.fill: parent; anchors.margins: 18; spacing: 8
+                        Label { text: "🎟️"; font.pixelSize: 34; Layout.alignment: Qt.AlignHCenter }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: qsTr("Events & Admissions"); font.pixelSize: 18; font.bold: true; color: "#ffffff" }
+                        Label { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; opacity: 0.85; font.pixelSize: 12; color: "#ffffff"; text: qsTr("Tastings, admissions, ticket pricing, seating reservations, and cover charges.") }
                     }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { w.builderScope = "event"; w.choosingScope = false } }
                 }
             }
         }

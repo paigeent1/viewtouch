@@ -192,6 +192,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetMenuGrid.qml
             ui/qml/WidgetMenuCategories.qml
             ui/qml/WidgetMenuBuilder.qml
+            ui/qml/WidgetRetailItemEditor.qml
             ui/qml/MenuBuilderImport.qml
             ui/qml/MenuBuilderCheck.qml
             ui/qml/MenuBuilderStarter.qml

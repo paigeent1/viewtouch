@@ -1775,6 +1775,11 @@ Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring
 
 void LayoutController::runCommand(const QString &name, const QVariantMap &args, Done done)
 {
+    if (name == u"editFloorPlan") {
+        navigate(Navigator::Mode::Push, u"tables"_s);
+        requestEditMode();
+        return done(true);
+    }
     if (name == u"editMode")
         return done(requestEditMode());
 

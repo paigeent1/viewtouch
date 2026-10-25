@@ -52,7 +52,7 @@
       }
     },
     {
-      "id": "hw-printers",
+      "id": "edit-layout",
       "kind": "button",
       "rect": {
         "x": 1000,
@@ -62,19 +62,21 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Printers",
+      "label": "Edit Layout",
       "actions": [
         {
+          "type": "jump",
+          "mode": "push",
+          "page": "tables"
+        },
+        {
           "type": "command",
-          "name": "openAdmin",
-          "args": {
-            "panel": "printers"
-          }
+          "name": "editMode"
         }
       ],
       "style": {
         "normal": {
-          "fill": "#2b62b0"
+          "fill": "#6b46c1"
         }
       }
     },
@@ -232,6 +234,36 @@
           "page": "manager"
         }
       ]
+    },
+    {
+      "id": "edit-layout",
+      "kind": "button",
+      "rect": {
+        "x": 484,
+        "y": 124,
+        "w": 300,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Edit Layout",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "tables"
+        },
+        {
+          "type": "command",
+          "name": "editMode"
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#6b46c1",
+          "fontSize": 20
+        }
+      }
     }
   ]
 }

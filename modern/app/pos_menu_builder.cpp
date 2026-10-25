@@ -701,6 +701,10 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
             item.barcodes.push_back(ss(c));
     }
     // Retail POS Cost & Parent/Child (Box/Carton <-> Pack/Single) relationship stored in item.recipe
+    if (card.contains(u"isEvent"_s)) {
+        std::erase_if(item.recipe, [](const RecipeLine &rl) { return rl.ingredientId == "__event__"; });
+        item.recipe.push_back({"__event__", card.value(u"isEvent"_s).toBool() ? 1.0 : 0.0});
+    }
     if (card.contains(u"isRetail"_s)) {
         std::erase_if(item.recipe, [](const RecipeLine &rl) { return rl.ingredientId == "__retail__"; });
         item.recipe.push_back({"__retail__", card.value(u"isRetail"_s).toBool() ? 1.0 : 0.0});

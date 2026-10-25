@@ -652,6 +652,13 @@ QVariantList PosService::menuItemsNow() const
                                {u"unit"_s, qs(m.weightUnit)}, {u"number"_s, qs(m.number)},
                                {u"barcodes"_s, [&m] { QStringList b; for (const std::string &x : m.barcodes) b << qs(x); return b.join(u", "_s); }()},
                                {u"upc"_s, m.barcodes.empty() ? QString() : qs(m.barcodes.front())},
+                               {u"isEvent"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe) {
+                                       if (rl.ingredientId == "__event__")
+                                           return rl.quantity > 0.5;
+                                   }
+                                   return m.family == "events";
+                               }()},
                                {u"isRetail"_s, [&m] {
                                    for (const RecipeLine &rl : m.recipe) {
                                        if (rl.ingredientId == "__retail__")

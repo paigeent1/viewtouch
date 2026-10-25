@@ -97,6 +97,31 @@
       ]
     },
     {
+      "id": "edit-layout",
+      "kind": "button",
+      "rect": {
+        "x": 808,
+        "y": 258,
+        "w": 300,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Edit Layout",
+      "actions": [
+        {
+          "type": "command",
+          "name": "editFloorPlan"
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#6b46c1",
+          "fontSize": 20
+        }
+      }
+    },
+    {
       "id": "admin-employees",
       "kind": "button",
       "rect": {
@@ -185,7 +210,7 @@
       ]
     },
     {
-      "id": "admin-printers",
+      "id": "edit-layout",
       "kind": "button",
       "rect": {
         "x": 808,
@@ -195,16 +220,23 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Printers",
+      "label": "Edit Layout",
       "actions": [
         {
+          "type": "jump",
+          "mode": "push",
+          "page": "tables"
+        },
+        {
           "type": "command",
-          "name": "openAdmin",
-          "args": {
-            "panel": "printers"
-          }
+          "name": "editMode"
         }
-      ]
+      ],
+      "style": {
+        "normal": {
+          "fill": "#6b46c1"
+        }
+      }
     },
     {
       "id": "admin-reports",
