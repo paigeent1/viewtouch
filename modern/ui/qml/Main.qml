@@ -1025,6 +1025,13 @@ ApplicationWindow {
         }
     }
 
+    Item {
+        id: lbc; anchors.fill: parent; z: 9999; visible: Qt.platform.os === "android"
+        readonly property bool onLogin: !root.editing && root.controller.pageKind === "login"
+        onOnLoginChanged: { root.controller.command("setAutoBrightness", ({value: 255})); if (onLogin) dt.restart(); else dt.stop() }
+        Timer { id: dt; interval: 60000; running: lbc.visible && lbc.onLogin; onTriggered: if (lbc.onLogin) root.controller.command("setAutoBrightness", ({value: 100})) }
+        PointHandler { acceptedButtons: Qt.AllButtons; grabPermissions: PointerHandler.ApprovesTakeOverByAnything | PointerHandler.ApprovesCancellation; onActiveChanged: if (active) { root.controller.command("setAutoBrightness", ({value: 255})); if (lbc.onLogin) dt.restart() } }
+    }
     // Screen saver: dimmed after no touches; the first touch only wakes it.
     Rectangle {
         id: screenSaver
@@ -1041,11 +1048,16 @@ ApplicationWindow {
             id: screenSaverLogo
             objectName: "screenSaverLogo"
             anchors.horizontalCenter: parent.horizontalCenter
-            source: {
-                if (Qt.platform.os === "android") {
-                    return "file:///data/user/0/org.viewtouch.pos/files/logo.png"
-                }
-                return "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
+            source: Qt.platform.os === "android" 
+                    ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
+                    : Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
+            width: Math.round(root.height * 0.28)
+            height: Math.round(root.height * 0.28)
+            fillMode: Image.PreserveAspectFit
+            mipmap: true
+            visible: true
+        }
+                return Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
             }
             width: Math.round(root.height * 0.28)
             height: Math.round(root.height * 0.28)

@@ -72,6 +72,11 @@ object Kiosk {
 
     // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
     @JvmStatic
+    fun setBrightnessRaw(activity: Activity, value: Int) {
+        val v = value.coerceIn(5, 255)
+        activity.runOnUiThread { val lp = activity.window.attributes; lp.screenBrightness = v / 255.0f; activity.window.attributes = lp }
+    }
+    @JvmStatic
     fun reboot(activity: Activity) {
         val dpm = policy(activity)
         val who = admin(activity)

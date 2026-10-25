@@ -1828,6 +1828,13 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 #endif
     }
 
+    if (name == u"setAutoBrightness") {
+#ifdef Q_OS_ANDROID
+        QJniObject a = QNativeInterface::QAndroidApplication::context();
+        if (a.isValid()) QJniObject::callStaticMethod<void>("org/viewtouch/pos/Kiosk", "setBrightnessRaw", "(Landroid/app/Activity;I)V", a.object<jobject>(), jint(args.value(u"value"_s, 255).toInt()));
+#endif
+        return done(true);
+    }
     if (name == u"closeApp") {
         if (pos_ && !pos_->can(QString::fromLatin1(vt::core::perm::Manager))) {
             setStatus(tr("Closing ViewTouch needs a manager."));
