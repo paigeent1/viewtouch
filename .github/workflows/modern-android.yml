@@ -29,7 +29,6 @@ jobs:
       matrix:
         include:
           - { abi: arm64-v8a,   qt_arch: android_arm64_v8a }   # most tablets
-          - { abi: armeabi-v7a, qt_arch: android_armv7 }       # older / budget tablets
     steps:
       - uses: actions/checkout@v5
         with:
