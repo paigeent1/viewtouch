@@ -210,35 +210,6 @@
       ]
     },
     {
-      "id": "edit-layout",
-      "kind": "button",
-      "rect": {
-        "x": 808,
-        "y": 258,
-        "w": 300,
-        "h": 120
-      },
-      "shape": "rect",
-      "behavior": "blink",
-      "label": "Edit Layout",
-      "actions": [
-        {
-          "type": "jump",
-          "mode": "push",
-          "page": "tables"
-        },
-        {
-          "type": "command",
-          "name": "editMode"
-        }
-      ],
-      "style": {
-        "normal": {
-          "fill": "#6b46c1"
-        }
-      }
-    },
-    {
       "id": "admin-reports",
       "kind": "button",
       "rect": {

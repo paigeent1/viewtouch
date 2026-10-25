@@ -8,7 +8,7 @@
     "h": 1080
   },
   "grid": 8,
-  "role": "manager",
+  "role": "hardware-config",
   "permission": "manager",
   "zones": [
     {

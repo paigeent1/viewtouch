@@ -19,7 +19,8 @@
   "hiddenZones": [
     "tab-breakfast",
     "tab-lunch",
-    "tab-dinner"
+    "tab-dinner",
+    "tab-scan"
   ],
   "zones": [
     {
