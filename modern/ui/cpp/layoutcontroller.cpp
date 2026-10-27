@@ -1564,9 +1564,21 @@ void LayoutController::scanned(const QString &code)
         const QString k = kind.toString();
         if (k == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))
             navigate(Navigator::Mode::Push, u"gift-card"_s);
-        else if (k.isEmpty()) {
+        else if (k == u"unrecognized" || k.isEmpty()) {
             setStatus(QString());
             emit unrecognizedBarcode(c);
+        }
+    });
+}
+
+void LayoutController::submitScanAddPin(const QString &pin, const QString &code)
+{
+    if (!pos_) return;
+    pos_->invoke(u"verifyScanAddPin"_s, {pin}, [this, code](const QVariant &ok) {
+        if (ok.toBool()) {
+            openNewItemWithBarcode(code);
+        } else {
+            setStatus(tr("Invalid or unauthorized PIN."));
         }
     });
 }
@@ -1575,6 +1587,7 @@ void LayoutController::openNewItemWithBarcode(const QString &code)
 {
     setWidgetState(u"pendingNewBarcode"_s, code.trimmed());
     navigate(Navigator::Mode::Push, u"admin-menu"_s);
+}
 
 void LayoutController::orderItem(const QString &itemId, bool clearTyped)
 {

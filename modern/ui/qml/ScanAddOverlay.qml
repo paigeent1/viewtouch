@@ -10,7 +10,7 @@ Rectangle {
     property string pin: ""
     property string errorText: ""
     readonly property var posObj: controller ? controller.pos : null
-    readonly property string permMode: (posObj && posObj.scanAddPermission) ? String(posObj.scanAddPermission) : "manager"
+    readonly property string permMode: (controller && controller.pos && controller.pos.scanAddPermission) ? String(controller.pos.scanAddPermission) : "manager"
     function promptFor(c) { barcode = String(c ?? "").trim(); step = "ask"; pin = ""; errorText = "" }
     function closeOverlay() { barcode = ""; step = "ask"; pin = ""; errorText = "" }
     function chooseYes() {
@@ -18,12 +18,10 @@ Rectangle {
         else { step = "pin"; pin = ""; errorText = "" }
     }
     function submitPin() {
-        if (!posObj || pin.length === 0) return
-        const c = barcode
-        posObj.invoke("verifyScanAddPin", [pin], function(ok) {
-            if (ok) { closeOverlay(); controller.openNewItemWithBarcode(c) }
-            else { pin = ""; errorText = qsTr("Invalid or unauthorized PIN.") }
-        })
+        if (!controller || pin.length === 0) return
+        const c = barcode; const p = pin
+        closeOverlay()
+        controller.submitScanAddPin(p, c)
     }
     MouseArea { anchors.fill: parent; hoverEnabled: true }
     Rectangle {

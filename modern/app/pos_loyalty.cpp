@@ -238,8 +238,7 @@ QString PosService::scanCode(const QString &code)
         return applyCoupon(c) ? u"coupon"_s : QString();
     if (s_->giftCard(ss(c)))
         return lookupGiftCard(c) ? u"giftCard"_s : QString();
-    fail(tr("Nothing has the code %1.").arg(c));
-    return {};
+    return u"unrecognized"_s;
 }
 
 void PosService::countCouponUses(const Check &c, int by)

@@ -1866,6 +1866,7 @@ bool PosService::closePractice(Check &c)
     return true;
 }
 
+QString PosService::nameOf(const Employee &e) const { return e.id == "maintainer" ? tr("Maintainer") : qs(e.name); }
 QString PosService::userName() const { return user() ? nameOf(*user()) : QString(); }
 QString PosService::userRole() const { return user() ? qs(user()->role) : QString(); }
 QString PosService::storeName() const { return qs(s_->settings.storeName); }
