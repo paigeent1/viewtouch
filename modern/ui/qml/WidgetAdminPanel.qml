@@ -220,6 +220,18 @@ Item {
         query = ""
         sectionOpen = false
         dirty = false
+        if (panel === "menu" && zone && zone.controller) {
+            const pendingBc = String(zone.controller.widgetState("pendingNewBarcode") ?? "").trim()
+            if (pendingBc !== "") {
+                zone.controller.setWidgetState("pendingNewBarcode", "")
+                choose(-1)
+                const d = copy(draft)
+                d.upc = pendingBc
+                draft = d
+                dirty = true
+                return
+            }
+        }
         const one = panel === "taxes" || panel === "store"
         if (one) choose(0)
         else index = -2

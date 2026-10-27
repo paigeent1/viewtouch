@@ -1449,9 +1449,11 @@ ApplicationWindow {
         MouseArea { anchors.fill: parent; onClicked: root.controller.clearExplanation() }
     }
 
+    ScanAddOverlay { id: scanAddOverlay; controller: root.controller }
     Connections {
         target: root.controller
         function onStatusChanged() { root.toast(root.controller.statusText) }
+        function onUnrecognizedBarcode(code) { if (root.pageId !== "admin-menu") scanAddOverlay.promptFor(code) }
     }
     Connections {
         target: root.editor

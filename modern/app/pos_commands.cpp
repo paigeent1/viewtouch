@@ -187,6 +187,15 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"chargeHold"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.chargeHold(a.value(0).toLongLong(), a.value(1).toLongLong())); }},
         {u"releaseHold"_s, [](PosService &p, const QVariantList &) { return QVariant(p.releaseHold()); }},
+        {u"verifyScanAddPin"_s, [](PosService &p, const QVariantList &a) {
+            const QString m = QString::fromStdString(p.settings().scanAddPermission);
+            if (m == u"none") return QVariant(true);
+            const Employee *e = p.employeeByPin(a.value(0).toString().trimmed());
+            if (!e) return QVariant(p.fail(PosService::tr("Invalid PIN.")));
+            if (m == u"admin" && e->role != "admin") return QVariant(p.fail(PosService::tr("Requires Admin PIN.")));
+            if (m == u"manager" && !e->can(perm::Manager) && e->role != "admin") return QVariant(p.fail(PosService::tr("Requires Manager PIN.")));
+            return QVariant(true);
+        }},
         {u"scanCode"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.scanCode(a.value(0).toString())); }},
         {u"applyCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.applyCoupon(a.value(0).toString())); }},
         {u"removeCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeCoupon(a.value(0).toString())); }},

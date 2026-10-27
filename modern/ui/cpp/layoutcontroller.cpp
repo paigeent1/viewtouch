@@ -1560,11 +1560,21 @@ void LayoutController::scanned(const QString &code)
             setStatus(tr("%1: ring it in on the order screen.").arg(m.value(u"name"_s).toString()));
         return;
     }
-    call(u"scanCode"_s, {c}, [this](const QVariant &kind) {
-        if (kind.toString() == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))
+    call(u"scanCode"_s, {c}, [this, c](const QVariant &kind) {
+        const QString k = kind.toString();
+        if (k == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))
             navigate(Navigator::Mode::Push, u"gift-card"_s);
+        else if (k.isEmpty()) {
+            setStatus(QString());
+            emit unrecognizedBarcode(c);
+        }
     });
 }
+
+void LayoutController::openNewItemWithBarcode(const QString &code)
+{
+    setWidgetState(u"pendingNewBarcode"_s, code.trimmed());
+    navigate(Navigator::Mode::Push, u"admin-menu"_s);
 
 void LayoutController::orderItem(const QString &itemId, bool clearTyped)
 {

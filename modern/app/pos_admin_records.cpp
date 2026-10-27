@@ -159,7 +159,7 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"hostsTakePayments"_s, s_->settings.hostsTakePayments},
              {u"autoLogoutMinutes"_s, s_->settings.autoLogoutMinutes},
              {u"phoneLockSeconds"_s, s_->settings.phoneLockSeconds},
-             {u"screenSaverMinutes"_s, s_->settings.screenSaverMinutes},
+             {u"screenSaverMinutes"_s, s_->settings.screenSaverMinutes}, {u"scanAddPermission"_s, qs(s_->settings.scanAddPermission)},
              {u"topRibbonEnabled"_s, s_->settings.topRibbonEnabled},
              {u"topRibbonShowTime"_s, s_->settings.topRibbonShowTime},
              {u"topRibbonShowBattery"_s, s_->settings.topRibbonShowBattery},

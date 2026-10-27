@@ -266,6 +266,7 @@ public:
     // an item's barcode or number rings it in on the order screens; else a
     // coupon or a gift card (PosService::scanCode).
     Q_INVOKABLE void scanned(const QString &code);
+    Q_INVOKABLE void openNewItemWithBarcode(const QString &code);
     // A command by name, as a button would run it ("holdCard").
     Q_INVOKABLE void command(const QString &name, const QVariantMap &args = {}) { runCommand(name, args, [](bool) {}); }
 
@@ -293,6 +294,7 @@ signals:
     void formFactorChanged();
     // A manager asked to close ViewTouch (the closeApp command).
     void closeRequested();
+    void unrecognizedBarcode(const QString &code);
     void statusChanged();
     void explanationChanged();
     void editingChanged();

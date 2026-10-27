@@ -439,6 +439,7 @@ QVariantList PosService::adminFields(const QString &panel)
             with(with(field(u"screenSaverMinutes"_s, tr("Dim the screen after (minutes)"), u"int"_s,
                             tr("Untouched screens dim; a touch wakes them (and does nothing else). 0 = never. "
                                "Kitchen, bar and expo screens stay on.")), u"min"_s, 0), u"max"_s, 240),
+            with(field(u"scanAddPermission"_s, tr("Add unrecognized scanned item requires"), u"enum"_s, tr("Who can approve adding a new item when an unrecognized barcode is scanned.")), u"options"_s, options({{"manager", "Manager PIN"}, {"admin", "Admin PIN"}, {"staff", "Any Staff PIN"}, {"none", "No PIN required"}})),
             field(u"topRibbonEnabled"_s, tr("Show top status ribbon"), u"bool"_s,
                   tr("Display the status bar ribbon across the top of all screens except Touch to Wake.")),
             with(field(u"topRibbonShowTime"_s, tr("Ribbon: Current time"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),

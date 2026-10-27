@@ -110,6 +110,7 @@ class PosSession : public QObject {
     Q_PROPERTY(int autoLogoutMinutes READ autoLogoutMinutes NOTIFY adminChanged)
     Q_PROPERTY(int phoneLockSeconds READ phoneLockSeconds NOTIFY adminChanged)
     Q_PROPERTY(int screenSaverMinutes READ screenSaverMinutes NOTIFY adminChanged)
+    Q_PROPERTY(QString scanAddPermission READ scanAddPermission NOTIFY adminChanged)
     Q_PROPERTY(bool topRibbonEnabled READ topRibbonEnabled NOTIFY adminChanged)
     Q_PROPERTY(bool topRibbonShowTime READ topRibbonShowTime NOTIFY adminChanged)
     Q_PROPERTY(bool topRibbonShowBattery READ topRibbonShowBattery NOTIFY adminChanged)
@@ -328,6 +329,7 @@ public:
     // "Logo Final.PNG" -> "store:logo-final.png" ("" if not a picture type).
     static QString storeImageRef(const QString &fileName);
     virtual int screenSaverMinutes() const = 0;
+    virtual QString scanAddPermission() const = 0;
     virtual bool topRibbonEnabled() const = 0;
     virtual bool topRibbonShowTime() const = 0;
     virtual bool topRibbonShowBattery() const = 0;

@@ -144,6 +144,7 @@ public:
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
     int imageRevision() const override { return adminRevision() + imageRevision_; }
     int screenSaverMinutes() const override { return v(u"screenSaverMinutes").toInt(); }
+    QString scanAddPermission() const override { const QString s = v(u"scanAddPermission").toString(); return s.isEmpty() ? QStringLiteral("manager") : s; }
     bool topRibbonEnabled() const override { const QVariant x = v(u"topRibbonEnabled"); return x.isValid() ? x.toBool() : true; }
     bool topRibbonShowTime() const override { const QVariant x = v(u"topRibbonShowTime"); return x.isValid() ? x.toBool() : true; }
     bool topRibbonShowBattery() const override { const QVariant x = v(u"topRibbonShowBattery"); return x.isValid() ? x.toBool() : true; }

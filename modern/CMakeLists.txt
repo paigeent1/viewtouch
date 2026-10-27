@@ -170,6 +170,7 @@ if(Qt6_FOUND)
             ui/qml/ReasonSheet.qml
             ui/qml/TouchKeyboard.qml
             ui/qml/ApprovalPad.qml
+        ui/qml/ScanAddOverlay.qml
             ui/qml/MessageBanner.qml
             ui/qml/WidgetMessageComposer.qml
             ui/qml/WidgetCustomerLookup.qml

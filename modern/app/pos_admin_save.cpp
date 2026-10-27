@@ -329,6 +329,7 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             if (!tips.empty())
                 s_->settings.tipPercents = tips;
         }
+        if (record.contains(u"screenSaverMinutes"_s))if (record.contains(u"scanAddPermission"_s)) s_->settings.scanAddPermission = ss(record.value(u"scanAddPermission"_s).toString());
         if (record.contains(u"screenSaverMinutes"_s))
             s_->settings.screenSaverMinutes = std::clamp(record.value(u"screenSaverMinutes"_s).toInt(), 0, 240);
         if (record.contains(u"topRibbonEnabled"_s))

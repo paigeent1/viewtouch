@@ -318,6 +318,7 @@ struct PosSettings {
     // Dim a screen nobody has touched for this long (0: never). Kitchen,
     // bar and expo screens and the self-order kiosk stay on.
     int screenSaverMinutes = 3;
+    std::string scanAddPermission = "manager";
     bool topRibbonEnabled = true;
     bool topRibbonShowTime = true;
     bool topRibbonShowBattery = true;

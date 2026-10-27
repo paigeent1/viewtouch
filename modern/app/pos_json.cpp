@@ -1007,7 +1007,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"backupKey"_s, qs(s.backupKey)}, {u"backupSalt"_s, qs(s.backupSalt)},
         {u"waitMinutesPerParty"_s, s.waitMinutesPerParty}, {u"hostsTakePayments"_s, s.hostsTakePayments},
         {u"autoLogoutMinutes"_s, s.autoLogoutMinutes}, {u"phoneLockSeconds"_s, s.phoneLockSeconds}, {u"tableLongMinutes"_s, s.tableLongMinutes},
-        {u"screenSaverMinutes"_s, s.screenSaverMinutes},
+        {u"screenSaverMinutes"_s, s.screenSaverMinutes}, {u"scanAddPermission"_s, qs(s.scanAddPermission)},
         {u"topRibbonEnabled"_s, s.topRibbonEnabled},
         {u"topRibbonShowTime"_s, s.topRibbonShowTime},
         {u"topRibbonShowBattery"_s, s.topRibbonShowBattery},

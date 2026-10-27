@@ -434,6 +434,7 @@ public:
     const core::PosSettings &settings() const { return s_->settings; }
     const core::Check *currentCheck() const;
     const core::Employee *user() const;
+    QString nameOf(const core::Employee &e) const;
     const core::MenuItem *findItem(const QString &idOrName) const;
     // Barcodes typed in a field ("012345678905, 4006381333931"), and why
     // they can't be item `itemId`'s (empty: they can).
@@ -928,6 +929,7 @@ public:
     int autoLogoutMinutes() const override { return s_->settings.autoLogoutMinutes; }
     int phoneLockSeconds() const override { return s_->settings.phoneLockSeconds; }
     int screenSaverMinutes() const override { return s_->settings.screenSaverMinutes; }
+    QString scanAddPermission() const override { return QString::fromStdString(s_->settings.scanAddPermission); }
     bool topRibbonEnabled() const override { return s_->settings.topRibbonEnabled; }
     bool topRibbonShowTime() const override { return s_->settings.topRibbonShowTime; }
     bool topRibbonShowBattery() const override { return s_->settings.topRibbonShowBattery; }
