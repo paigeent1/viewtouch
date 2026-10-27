@@ -1571,24 +1571,16 @@ void LayoutController::scanned(const QString &code)
     });
 }
 
-void LayoutController::submitScanAddPin(const QString &pin, const QString &code)
-{
+void LayoutController::submitScanAddPin(const QString &pin, const QString &code, const QString &itemType) {
     if (!pos_) return;
-    pos_->invoke(u"verifyScanAddPin"_s, {pin}, [this, code](const QVariant &ok) {
-        if (ok.toBool()) {
-            openNewItemWithBarcode(code);
-        } else {
-            setStatus(tr("Invalid or unauthorized PIN."));
-        }
+    pos_->invoke(u"verifyScanAddPin"_s, {pin}, [this, code, itemType](const QVariant &ok) {
+        if (ok.toBool()) openNewItemWithBarcode(code, itemType); else setStatus(tr("Invalid or unauthorized PIN."));
     });
 }
-
-void LayoutController::openNewItemWithBarcode(const QString &code)
-{
-    setWidgetState(u"pendingNewBarcode"_s, code.trimmed());
-    navigate(Navigator::Mode::Push, u"admin-menu"_s);
+void LayoutController::openNewItemWithBarcode(const QString &code, const QString &itemType) {
+    setWidgetState(u"pendingNewBarcode"_s, code.trimmed()); setWidgetState(u"pendingNewItemType"_s, itemType.trimmed().isEmpty() ? u"retail"_s : itemType.trimmed());
+    navigate(Navigator::Mode::Push, activeLayout().page(u"menu-builder"_s) ? u"menu-builder"_s : u"admin-menu"_s);
 }
-
 void LayoutController::orderItem(const QString &itemId, bool clearTyped)
 {
     if (editing() || busy())

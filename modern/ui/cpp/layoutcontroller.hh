@@ -266,8 +266,8 @@ public:
     // an item's barcode or number rings it in on the order screens; else a
     // coupon or a gift card (PosService::scanCode).
     Q_INVOKABLE void scanned(const QString &code);
-    Q_INVOKABLE void openNewItemWithBarcode(const QString &code);
-    Q_INVOKABLE void submitScanAddPin(const QString &pin, const QString &code);
+    Q_INVOKABLE void openNewItemWithBarcode(const QString &code, const QString &itemType = QStringLiteral("retail"));
+    Q_INVOKABLE void submitScanAddPin(const QString &pin, const QString &code, const QString &itemType = QStringLiteral("retail"));
     // A command by name, as a button would run it ("holdCard").
     Q_INVOKABLE void command(const QString &name, const QVariantMap &args = {}) { runCommand(name, args, [](bool) {}); }
 

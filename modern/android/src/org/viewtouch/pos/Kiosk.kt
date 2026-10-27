@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.UserManager
@@ -80,6 +82,31 @@ object Kiosk {
         for ((k, v) in listOf("adb_enabled" to "1", "adb_wifi_enabled" to "1", "adb_allowed_connection_time" to "0", "stay_on_while_plugged_in" to "7", "wifi_sleep_policy" to "2"))
             try { dpm.setGlobalSetting(who, k, v) } catch (_: Exception) {}
         try { dpm.setSystemSetting(who, "screen_off_timeout", "2147483647") } catch (_: Exception) {}
+    }
+    @JvmStatic
+    fun batteryInfo(activity: Activity): Int {
+        return try {
+            val i = activity.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val lvl = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scl = i?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val bm = activity.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val pct = if (lvl >= 0 && scl > 0) (lvl * 100) / scl else (bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 0)
+            val st = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val chg = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL || (i?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+            pct.coerceIn(0, 100) + (if (chg) 1000 else 0)
+        } catch (_: Exception) { 0 }
+    }
+    @JvmStatic
+    fun wifiInfo(activity: Activity): Int {
+        return try {
+            val cm = activity.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+            val sig = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && caps != null) caps.signalStrength else Int.MIN_VALUE
+            val wm = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val rssi = if (sig > -120 && sig < 0) sig else (wm?.connectionInfo?.rssi ?: -127)
+            if (rssi <= -100) (if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) 85 else 0)
+            else if (rssi >= -50) 100 else (rssi + 100) * 2
+        } catch (_: Exception) { 85 }
     }
     @JvmStatic
     fun reboot(activity: Activity) {

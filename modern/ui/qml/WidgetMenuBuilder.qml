@@ -10,6 +10,18 @@ import QtQuick.Layouts
 // Light, Extra, On the side then work everywhere). On a phone, one at a
 // time: categories, items, the card.
 Item {
+    function checkPendingScanAdd() {
+        const ctrl = w.zone ? w.zone.controller : null; if (!ctrl) return
+        const bc = String(ctrl.widgetState("pendingNewBarcode") ?? "").trim()
+        if (bc === "") return
+        const tp = String(ctrl.widgetState("pendingNewItemType") ?? "retail").trim()
+        ctrl.setWidgetState("pendingNewBarcode", ""); ctrl.setWidgetState("pendingNewItemType", "")
+        w.builderScope = (tp === "hospitality" || tp === "event" || tp === "retail") ? tp : "retail"; w.choosingScope = false
+        if (typeof w.startNewItem === "function") w.startNewItem(); else { w.editingCategory = false; w.editingItem = true; w.draft = w.newItemDraft ? w.newItemDraft() : {} }
+        w.set("upc", bc); w.set("barcodes", bc); w.set("isRetail", tp === "retail"); w.set("isEvent", tp === "event")
+        w.set("taxClass", tp === "retail" ? "merchandise" : (tp === "event" ? "room" : "food")); w.set("printer", tp === "hospitality" ? "kitchen" : "")
+    }
+
     id: w
     focus: true
     // Unitech MS912+ Hands-Free Scanner: Jump to existing item if barcode exists, else fill empty UPC
@@ -113,7 +125,7 @@ Item {
         pos.changeMenuItems(selected, changes)
     }
 
-    Component.onCompleted: {
+    Component.onCompleted: { Qt.callLater(w.checkPendingScanAdd); 
         if (categories.length) categoryId = categories[0].id
         // Sent from the order screen's quick card (All Settings…): that item.
         const open = zone && zone.controller ? zone.controller.take("menuBuilderOpen") : undefined
