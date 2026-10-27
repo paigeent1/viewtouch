@@ -28,7 +28,11 @@ Item {
     property bool dirty: false
     property bool armDelete: false
 
-    function copy(o) { return JSON.parse(JSON.stringify(o)) }
+    function copy(o) { return o ? JSON.parse(JSON.stringify(o)) : ({}) }
+    onRecordsChanged: {
+        if (single && records.length > 0 && (!dirty || Object.keys(draft).length <= 2))
+            choose(0)
+    }
     function choose(i) {
         index = i
         draft = copy(i >= 0 ? records[i] : pos.adminNewRecord(panel))
