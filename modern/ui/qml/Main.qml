@@ -138,7 +138,7 @@ ApplicationWindow {
     ColumnLayout {
         id: pageColumn
         anchors.left: parent.left
-        anchors.top: parent.top
+        anchors.top: topStatusRibbon.visible ? topStatusRibbon.bottom : parent.top
         anchors.bottom: parent.bottom
         width: root.posWidth
         spacing: 0
@@ -1039,7 +1039,7 @@ ApplicationWindow {
         id: topStatusRibbon
         objectName: "topStatusRibbon"
         anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
-        height: Math.max(28, Math.round(root.height * 0.032))
+        height: Math.max(22, Math.round(root.height * 0.026))
         z: 85
         readonly property var posObj: root.controller ? root.controller.pos : null
         readonly property bool ribbonEnabled: posObj ? Boolean(posObj.topRibbonEnabled) : true
