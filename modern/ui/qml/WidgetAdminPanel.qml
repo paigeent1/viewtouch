@@ -319,6 +319,11 @@ Item {
                     text: qsTr("Pair a Standby Computer")
                     onClicked: w.pos.startPairing(true)
                 }
+                Button {
+                    visible: !(w.pos && w.pos.pairing.active)
+                    text: qsTr("+ USB Tablet")
+                    onClicked: if (w.zone && w.zone.controller) w.zone.controller.command("vtSync", ({ mode: "add-tablet", name: String(w.draft.name ?? "") }))
+                }
             }
         }
 
