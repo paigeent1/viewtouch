@@ -791,17 +791,17 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Bar",
+      "label": "\ud83d\udcfa DIRECTV",
       "actions": [
         {
           "type": "jump",
-          "mode": "replace",
-          "page": "floor-bar"
+          "mode": "push",
+          "page": "directv"
         }
       ],
       "style": {
         "normal": {
-          "fill": "#2a313d"
+          "fill": "#0284c7"
         }
       }
     },

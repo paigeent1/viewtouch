@@ -1,0 +1,1135 @@
+{
+  "schemaVersion": 1,
+  "id": "directv-tune-front",
+  "name": "Tune BAR FRONT",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "t",
+      "kind": "label",
+      "label": "\ud83d\udcfa Tuning: BAR FRONT (192.168.6.70)",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 24,
+        "y": 16,
+        "w": 1872,
+        "h": 64
+      }
+    },
+    {
+      "id": "fh",
+      "kind": "label",
+      "label": "\u2b50 FREQUENTLY USED",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 24,
+        "y": 88,
+        "w": 430,
+        "h": 52
+      }
+    },
+    {
+      "id": "fq-0",
+      "kind": "button",
+      "label": "#1  ESPN (206)  [5x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 148,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "206"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-1",
+      "kind": "button",
+      "label": "#2  NFL Net (212)  [4x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 242,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "212"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-2",
+      "kind": "button",
+      "label": "#3  FS1 (219)  [4x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 336,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "219"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-3",
+      "kind": "button",
+      "label": "#4  YES Net (631)  [3x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 430,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "631"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-4",
+      "kind": "button",
+      "label": "#5  SNY (639)  [3x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 524,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "639"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-5",
+      "kind": "button",
+      "label": "#6  ESPN2 (209)  [2x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 618,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "209"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-6",
+      "kind": "button",
+      "label": "#7  NESN (628)  [2x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 712,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "628"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fq-7",
+      "kind": "button",
+      "label": "#8  TNT (245)  [1x]",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 806,
+        "w": 430,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "245"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-206",
+      "kind": "button",
+      "label": "ESPN\n206",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 148,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "206"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-209",
+      "kind": "button",
+      "label": "ESPN2\n209",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 730,
+        "y": 148,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "209"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-219",
+      "kind": "button",
+      "label": "FS1\n219",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 976,
+        "y": 148,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "219"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-212",
+      "kind": "button",
+      "label": "NFL Net\n212",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1222,
+        "y": 148,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "212"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-213",
+      "kind": "button",
+      "label": "MLB Net\n213",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 296,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "213"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-216",
+      "kind": "button",
+      "label": "NBA TV\n216",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 730,
+        "y": 296,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "216"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-215",
+      "kind": "button",
+      "label": "NHL Net\n215",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 976,
+        "y": 296,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "215"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-221",
+      "kind": "button",
+      "label": "CBS Sports\n221",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1222,
+        "y": 296,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "221"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-631",
+      "kind": "button",
+      "label": "YES Net\n631",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 444,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "631"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-639",
+      "kind": "button",
+      "label": "SNY\n639",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 730,
+        "y": 444,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "639"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-634",
+      "kind": "button",
+      "label": "MSG\n634",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 976,
+        "y": 444,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "634"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-628",
+      "kind": "button",
+      "label": "NESN\n628",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1222,
+        "y": 444,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "628"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-245",
+      "kind": "button",
+      "label": "TNT\n245",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 592,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "245"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-247",
+      "kind": "button",
+      "label": "TBS\n247",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 730,
+        "y": 592,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "247"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-242",
+      "kind": "button",
+      "label": "USA\n242",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 976,
+        "y": 592,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "242"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-218",
+      "kind": "button",
+      "label": "Golf\n218",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1222,
+        "y": 592,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "218"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-703",
+      "kind": "button",
+      "label": "RedZone\n703",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 740,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "703"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-610",
+      "kind": "button",
+      "label": "BTN\n610",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 730,
+        "y": 740,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "610"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-202",
+      "kind": "button",
+      "label": "CNN\n202",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 976,
+        "y": 740,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "202"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c-360",
+      "kind": "button",
+      "label": "Fox News\n360",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1222,
+        "y": 740,
+        "w": 232,
+        "h": 132
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "tune",
+            "val": "360"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-chanup",
+      "kind": "button",
+      "label": "CH \u25b2",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 148,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "chanup"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-chandown",
+      "kind": "button",
+      "label": "CH \u25bc",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 242,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "chandown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-prev",
+      "kind": "button",
+      "label": "PREV",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 336,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#d97706"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "prev"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-guide",
+      "kind": "button",
+      "label": "GUIDE",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 430,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#2b62b0"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "guide"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-exit",
+      "kind": "button",
+      "label": "EXIT",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 524,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "exit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-info",
+      "kind": "button",
+      "label": "INFO",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 618,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "info"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-select",
+      "kind": "button",
+      "label": "SELECT",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 712,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#2b62b0"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "select"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-power",
+      "kind": "button",
+      "label": "POWER",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 806,
+        "w": 400,
+        "h": 82
+      },
+      "style": {
+        "normal": {
+          "fill": "#b83232"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "front",
+            "op": "key",
+            "val": "power"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bk-b",
+      "kind": "button",
+      "label": "\u2039 Select Box",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 924,
+        "w": 430,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#b83232"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "directv",
+          "target": "directv"
+        }
+      ]
+    },
+    {
+      "id": "bk-t",
+      "kind": "button",
+      "label": "\u2039 Tables",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 924,
+        "w": 430,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "tables",
+          "target": "tables"
+        }
+      ]
+    }
+  ]
+}

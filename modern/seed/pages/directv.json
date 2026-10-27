@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "id": "directv",
+  "name": "DIRECTV",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "label": "\ud83d\udcfa DIRECTV \u2014 Select Receiver",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 40,
+        "y": 24,
+        "w": 1840,
+        "h": 80
+      }
+    },
+    {
+      "id": "b-bar1",
+      "kind": "button",
+      "label": "\ud83d\udcfa BAR 1\n(192.168.6.74)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 100,
+        "y": 150,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-bar1",
+          "target": "directv-tune-bar1"
+        }
+      ]
+    },
+    {
+      "id": "b-bar2",
+      "kind": "button",
+      "label": "\ud83d\udcfa BAR 2\n(192.168.6.71)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 690,
+        "y": 150,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-bar2",
+          "target": "directv-tune-bar2"
+        }
+      ]
+    },
+    {
+      "id": "b-front",
+      "kind": "button",
+      "label": "\ud83d\udcfa BAR FRONT\n(192.168.6.70)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1280,
+        "y": 150,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-front",
+          "target": "directv-tune-front"
+        }
+      ]
+    },
+    {
+      "id": "b-72",
+      "kind": "button",
+      "label": "\ud83d\udcfa BOX .72\n(192.168.6.72)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 100,
+        "y": 420,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-box72",
+          "target": "directv-tune-box72"
+        }
+      ]
+    },
+    {
+      "id": "b-vip",
+      "kind": "button",
+      "label": "\ud83d\udcfa VIP\n(192.168.6.73)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 690,
+        "y": 420,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#6b46c1"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-vip",
+          "target": "directv-tune-vip"
+        }
+      ]
+    },
+    {
+      "id": "b-all",
+      "kind": "button",
+      "label": "\ud83d\udcfa ALL 5 BOXES",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1280,
+        "y": 420,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "directv-tune-all",
+          "target": "directv-tune-all"
+        }
+      ]
+    },
+    {
+      "id": "back-t",
+      "kind": "button",
+      "label": "\u2039 Back to Tables",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 100,
+        "y": 920,
+        "w": 420,
+        "h": 110
+      },
+      "style": {
+        "normal": {
+          "fill": "#b83232"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "tables",
+          "target": "tables"
+        }
+      ]
+    }
+  ]
+}

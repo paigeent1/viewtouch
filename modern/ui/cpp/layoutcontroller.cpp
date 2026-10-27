@@ -1903,6 +1903,15 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         proc->start(u"/usr/local/bin/vt-"_s + m, {});
         return done(true);
     }
+    if (name == u"directv") {
+        QProcess proc;
+        QStringList a{args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(), args.value(u"val"_s, u"206"_s).toString()};
+        proc.start(u"/usr/local/bin/vt-directv"_s, a);
+        proc.waitForFinished(4000);
+        const QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+        setStatus(out.isEmpty() ? u"DIRECTV command sent."_s : out);
+        return done(true);
+    }
     if (name == u"openAdmin") {
         static const QHash<QString, QString> pages = {
             {u"menu"_s, u"admin-menu"_s}, {u"employees"_s, u"admin-employees"_s},

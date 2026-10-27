@@ -237,6 +237,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         if (name.isEmpty())
             return fail(tr("The store needs a name."));
         s_->settings.storeName = ss(name);
+        if (record.contains(u"storeZip"_s)) s_->settings.storeZip = ss(clean(record.value(u"storeZip"_s).toString()));
+        if (record.contains(u"topRibbonShowWeather"_s)) s_->settings.topRibbonShowWeather = record.value(u"topRibbonShowWeather"_s).toBool();
         s_->settings.currencySymbol = ss(record.value(u"currencySymbol"_s).toString());
         s_->settings.receiptHeader = ss(record.value(u"receiptHeader"_s).toString());
         s_->settings.receiptFooter = ss(record.value(u"receiptFooter"_s).toString());

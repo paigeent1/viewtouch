@@ -1047,8 +1047,31 @@ ApplicationWindow {
         readonly property bool showBattery: (Qt.platform.os === "android") && (posObj ? Boolean(posObj.topRibbonShowBattery) : true)
         readonly property bool showWifi: posObj ? Boolean(posObj.topRibbonShowWifi) : true
         readonly property bool showCustomerCount: posObj ? Boolean(posObj.topRibbonShowCustomerCount) : true
+        readonly property bool showWeather: posObj ? Boolean(posObj.topRibbonShowWeather) : true
+        readonly property string zipCode: posObj && posObj.storeZip ? String(posObj.storeZip).trim() : "06810"
+        property string weatherText: "⛅ --°F"
+        property string lastZip: ""
+        property double lastWeatherFetch: 0
+        onZipCodeChanged: { lastWeatherFetch = 0; fetchWeather() }
+        function fetchWeather() {
+            var z = (zipCode.match(/\b\d{5}\b/) || ["06810"])[0], now = Date.now()
+            if (z === lastZip && now - lastWeatherFetch < 600000 && weatherText !== "⛅ --°F") return
+            lastZip = z; lastWeatherFetch = now
+            var g = new XMLHttpRequest(); g.open("GET", "https://api.zippopotam.us/us/" + z)
+            g.onreadystatechange = function() {
+                if (g.readyState !== XMLHttpRequest.DONE) return
+                var lat = "41.3948", lon = "-73.4540"
+                if (g.status === 200) { try { var pl = JSON.parse(g.responseText).places[0]; lat = pl.latitude; lon = pl.longitude } catch(e) {} }
+                var w = new XMLHttpRequest(); w.open("GET", "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,weather_code&temperature_unit=fahrenheit")
+                w.onreadystatechange = function() {
+                    if (w.readyState === XMLHttpRequest.DONE && w.status === 200) {
+                        try { var c = JSON.parse(w.responseText).current, k = c.weather_code, s = k===0?"☀️ Clear":k<=2?"⛅ Partly Cloudy":k===3?"☁️ Overcast":k<=48?"🌫️ Fog":k<=57?"🌦️ Drizzle":k<=67?"🌧️ Rain":k<=77?"❄️ Snow":k<=82?"🌧️ Showers":"⛈️ Storm"; topStatusRibbon.weatherText = s.split(" ")[0] + " " + Math.round(c.temperature_2m) + "°F " + s.split(" ").slice(1).join(" ") } catch(e) {}
+                    }
+                }; w.send()
+            }; g.send()
+        }
         readonly property int customerCount: (posObj && posObj.closedChecks) ? posObj.closedChecks.length : 0
-        visible: !root.controller.asleep && ribbonEnabled && (showTime || showBattery || showWifi || showCustomerCount)
+        visible: !root.controller.asleep && ribbonEnabled && (showTime || showWeather || showBattery || showWifi || showCustomerCount)
         color: "#e611161d"
         property string currentTimeText: Qt.formatDateTime(new Date(), "ddd MMM d  h:mm AP")
         Timer {
@@ -1056,6 +1079,7 @@ ApplicationWindow {
             onTriggered: {
                 topStatusRibbon.currentTimeText = Qt.formatDateTime(new Date(), "ddd MMM d  h:mm AP")
                 if (root.controller) root.controller.pollSysStatus()
+                topStatusRibbon.fetchWeather()
             }
         }
         Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: "#2e3846" }
@@ -1068,7 +1092,16 @@ ApplicationWindow {
                 font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
             }
             Rectangle {
-                visible: topStatusRibbon.showTime && (topStatusRibbon.showBattery || topStatusRibbon.showWifi || topStatusRibbon.showCustomerCount)
+                visible: topStatusRibbon.showTime && (topStatusRibbon.showWeather || topStatusRibbon.showBattery || topStatusRibbon.showWifi || topStatusRibbon.showCustomerCount)
+                width: 1; height: Math.round(topStatusRibbon.height * 0.55); anchors.verticalCenter: parent.verticalCenter; color: "#394454"
+            }
+            Text {
+                visible: topStatusRibbon.showWeather; anchors.verticalCenter: parent.verticalCenter
+                text: topStatusRibbon.weatherText; color: "#fde047"
+                font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
+            }
+            Rectangle {
+                visible: topStatusRibbon.showWeather && (topStatusRibbon.showBattery || topStatusRibbon.showWifi || topStatusRibbon.showCustomerCount)
                 width: 1; height: Math.round(topStatusRibbon.height * 0.55); anchors.verticalCenter: parent.verticalCenter; color: "#394454"
             }
             Text {

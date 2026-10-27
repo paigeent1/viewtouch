@@ -67,6 +67,8 @@ public:
     QStringList permissions() const override { return v(u"permissions").toStringList(); }
     bool clockedIn() const override { return v(u"clockedIn").toBool(); }
     QString clockedInSince() const override { return v(u"clockedInSince").toString(); }
+    QString storeZip() const override { return QStringLiteral("06810"); }
+    bool topRibbonShowWeather() const override { const QVariant x = v(u"topRibbonShowWeather"); return x.isValid() ? x.toBool() : true; }
     QString storeName() const override { return v(u"storeName").toString(); }
     QString currencySymbol() const override { return v(u"currencySymbol").toString(); }
     QStringList customColors() const override { return v(u"customColors").toStringList(); }

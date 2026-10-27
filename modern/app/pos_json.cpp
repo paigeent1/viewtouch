@@ -946,7 +946,7 @@ QJsonObject toJson(const PosSettings &s)
         mealPeriods.append(QJsonObject{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"start"_s, clockText(m.start)}});
     return {
         {u"schemaVersion"_s, PosSchemaVersion},
-        {u"storeName"_s, qs(s.storeName)}, {u"setupDone"_s, s.setupDone},
+        {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
         {u"currencySymbol"_s, qs(s.currencySymbol)},
         {u"customColors"_s, [&s] { QJsonArray a; for (const std::string &c : s.customColors) a.append(qs(c)); return a; }()},
         {u"priceChanges"_s, [&s] {

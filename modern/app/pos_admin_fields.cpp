@@ -296,6 +296,7 @@ QVariantList PosService::adminFields(const QString &panel)
     if (panel == u"store") {
         return storeSections({
             field(u"storeName"_s, tr("Store name"), u"string"_s),
+            field(u"storeZip"_s, tr("Store ZIP code (for weather)"), u"string"_s),
             with(field(u"language"_s, tr("Language"), u"enum"_s,
                        tr("For screens nobody is logged in to, the customer display, receipts and tickets. "
                           "Each person can have their own (Employees).")),
@@ -445,6 +446,7 @@ QVariantList PosService::adminFields(const QString &panel)
             with(field(u"topRibbonShowTime"_s, tr("Ribbon: Current time"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
             with(field(u"topRibbonShowBattery"_s, tr("Ribbon: Battery status (tablets)"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
             with(field(u"topRibbonShowWifi"_s, tr("Ribbon: Wi-Fi strength"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
+            with(field(u"topRibbonShowWeather"_s, tr("Ribbon: Weather & temperature"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
             with(field(u"topRibbonShowCustomerCount"_s, tr("Ribbon: Customer count (checks closed today)"), u"bool"_s,
                        tr("Shows total checks closed today, titled Customer Count for retail and hospitality screens.")), u"when"_s, u"topRibbonEnabled"_s),
             with(with(field(u"autoLogoutMinutes"_s, tr("Log out idle screens after (minutes)"), u"int"_s,

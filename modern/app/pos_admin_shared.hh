@@ -139,7 +139,7 @@ inline QVariantList storeSections(const QVariantList &fields)
         std::initializer_list<const char *> paths;
     };
     const Section sections[] = {
-        {"store", PosService::tr("The store"), {"storeName", "language", "currencySymbol", "displayLogo"}},
+        {"store", PosService::tr("The store"), {"storeName", "storeZip", "topRibbonShowWeather", "language", "currencySymbol", "displayLogo"}},
         {"receipts", PosService::tr("Receipts"), {"receiptHeader", "receiptFooter", "receiptLogo", "receiptFreeChoices"}},
         {"startPages", PosService::tr("Start pages"),
          {"startPage.server", "startPage.bartender", "startPage.cashier", "startPage.host", "startPage.manager"}},

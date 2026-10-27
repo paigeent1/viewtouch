@@ -43,6 +43,8 @@ class PosSession : public QObject {
     Q_PROPERTY(bool clockedIn READ clockedIn NOTIFY sessionChanged)
     Q_PROPERTY(QString clockedInSince READ clockedInSince NOTIFY sessionChanged)
     Q_PROPERTY(QString storeName READ storeName NOTIFY adminChanged)
+    Q_PROPERTY(QString storeZip READ storeZip NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonShowWeather READ topRibbonShowWeather NOTIFY adminChanged)
     Q_PROPERTY(QString currencySymbol READ currencySymbol NOTIFY adminChanged)
     Q_PROPERTY(QStringList customColors READ customColors NOTIFY adminChanged)
     Q_PROPERTY(QVariantList priceChanges READ priceChanges NOTIFY adminChanged)
@@ -262,6 +264,8 @@ public:
     virtual bool clockedIn() const = 0;
     virtual QString clockedInSince() const = 0;
     virtual QString storeName() const = 0;
+    virtual QString storeZip() const = 0;
+    virtual bool topRibbonShowWeather() const = 0;
     virtual QString currencySymbol() const = 0;
     virtual QStringList customColors() const = 0;
     // Price changes set for later: [{id, when ("Mon Oct 12, 6:00 AM"), label, count}].

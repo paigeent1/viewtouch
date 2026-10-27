@@ -757,6 +757,8 @@ public:
     bool clockedIn() const override;
     QString clockedInSince() const override;
     QString storeName() const override;
+    QString storeZip() const override { return QString::fromStdString(s_->settings.storeZip); }
+    bool topRibbonShowWeather() const override { return s_->settings.topRibbonShowWeather; }
     QString currencySymbol() const override;
     QStringList customColors() const override;
     QVariantList priceChanges() const override;
