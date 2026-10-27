@@ -1114,41 +1114,20 @@ ApplicationWindow {
             anchors.centerIn: parent
             spacing: 12
             opacity: 0.55
-        Image {
-            id: screenSaverLogo
-            objectName: "screenSaverLogo"
-            anchors.horizontalCenter: parent.horizontalCenter
-            source: {
-                if (Qt.platform.os === "android") {
-                    return "file:///data/user/0/org.viewtouch.pos/files/logo.png"
-                }
-                return "file:///home/pi/.local/share/ViewTouch/ViewTouch/logo.png"
-            }
-            width: Math.round(root.height * 0.28)
-            height: Math.round(root.height * 0.28)
-            fillMode: Image.PreserveAspectFit
-            mipmap: true
-            visible: status === Image.Ready
-            onStatusChanged: {
-                if (status === Image.Error && Qt.platform.os === "android") {
-                    // Fallback to external scoped storage if internal path is unreachable
-                    source = "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
-                }
-            }
-        }
-
-        
-
-        
-
-        
             // The store's logo (Store Settings), when there is one.
-            Text {
+            Image {
+                id: screenSaverLogo
+                objectName: "screenSaverLogo"
+                readonly property var pos: root.controller.pos
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: root.controller.pos ? root.controller.pos.storeName : ""
-                color: "white"
-                font.pixelSize: Math.min(root.width, root.height) * 0.06
-                font.bold: true
+                visible: status === Image.Ready
+                source: pos && screenSaver.visible ? (pos.imageRevision < 0 ? undefined : pos.imageUrl("logo:")) : ""
+                sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
+                width: Math.round(root.height * 0.28)
+                height: Math.round(root.height * 0.28)
+                fillMode: Image.PreserveAspectFit
+                mipmap: true
+                asynchronous: true
             }
             Text {
                 id: saverClock

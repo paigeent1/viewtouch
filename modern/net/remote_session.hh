@@ -144,11 +144,11 @@ public:
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
     int imageRevision() const override { return adminRevision() + imageRevision_; }
     int screenSaverMinutes() const override { return v(u"screenSaverMinutes").toInt(); }
-    bool topRibbonEnabled() const override { return v(u"topRibbonEnabled").toBool(); }
-    bool topRibbonShowTime() const override { return v(u"topRibbonShowTime").toBool(); }
-    bool topRibbonShowBattery() const override { return v(u"topRibbonShowBattery").toBool(); }
-    bool topRibbonShowWifi() const override { return v(u"topRibbonShowWifi").toBool(); }
-    bool topRibbonShowCustomerCount() const override { return v(u"topRibbonShowCustomerCount").toBool(); }
+    bool topRibbonEnabled() const override { const QVariant x = v(u"topRibbonEnabled"); return x.isValid() ? x.toBool() : true; }
+    bool topRibbonShowTime() const override { const QVariant x = v(u"topRibbonShowTime"); return x.isValid() ? x.toBool() : true; }
+    bool topRibbonShowBattery() const override { const QVariant x = v(u"topRibbonShowBattery"); return x.isValid() ? x.toBool() : true; }
+    bool topRibbonShowWifi() const override { const QVariant x = v(u"topRibbonShowWifi"); return x.isValid() ? x.toBool() : true; }
+    bool topRibbonShowCustomerCount() const override { const QVariant x = v(u"topRibbonShowCustomerCount"); return x.isValid() ? x.toBool() : true; }
     QVariantList kitchenStations() const override { return v(u"kitchenStations").toList(); }
     QString kitchenStation() const override { return v(u"kitchenStation").toString(); }
     QVariantList messages() const override { return v(u"messages").toList(); }

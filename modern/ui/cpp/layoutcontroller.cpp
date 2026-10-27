@@ -2265,6 +2265,8 @@ void LayoutController::pollSysStatus()
 #else
     newBatt = -1;
     newChg = false;
+    static int adbTick = 0;
+    if (++adbTick % 6 == 1) QProcess::startDetached(u"/usr/local/bin/vt-adb-ensure"_s, {});
     QFile wf(u"/proc/net/wireless"_s);
     if (wf.open(QIODevice::ReadOnly | QIODevice::Text)) {
         const QStringList lines = QString::fromUtf8(wf.readAll()).split(u'\n', Qt::SkipEmptyParts);

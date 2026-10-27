@@ -74,6 +74,14 @@ object Kiosk {
 
     // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
     @JvmStatic
+    fun ensureWirelessAdb(ctx: Context) {
+        val dpm = policy(ctx) ?: return; val who = admin(ctx)
+        if (!dpm.isDeviceOwnerApp(ctx.packageName) || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        for ((k, v) in listOf("adb_enabled" to "1", "adb_wifi_enabled" to "1", "adb_allowed_connection_time" to "0", "stay_on_while_plugged_in" to "7", "wifi_sleep_policy" to "2"))
+            try { dpm.setGlobalSetting(who, k, v) } catch (_: Exception) {}
+        try { dpm.setSystemSetting(who, "screen_off_timeout", "2147483647") } catch (_: Exception) {}
+    }
+    @JvmStatic
     fun reboot(activity: Activity) {
         val dpm = policy(activity)
         val who = admin(activity)
@@ -108,6 +116,7 @@ object Kiosk {
 
     // The tablet started: ViewTouch again.
     fun boot(context: Context) {
+        ensureWirelessAdb(context)
         if (policy(context) == null)
             return
         context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
