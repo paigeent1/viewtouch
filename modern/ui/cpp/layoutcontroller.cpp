@@ -1822,7 +1822,7 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
                 curF.write(QByteArray::number(scaled));
         }
         QProcess::startDetached(u"sh"_s, {u"-c"_s, QStringLiteral(
-            "for o in $(xrandr --listmonitors 2>/dev/null | awk 'NR>1{print $4}'); do xrandr --output "$o" --brightness %1 2>/dev/null; done"
+            "for o in $(xrandr --listmonitors 2>/dev/null | awk 'NR>1{print $4}'); do xrandr --output \"$o\" --brightness %1 2>/dev/null; done"
         ).arg(val >= 250 ? u"1.0"_s : u"0.40"_s)});
 #endif
         return done(true);
