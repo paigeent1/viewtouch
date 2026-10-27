@@ -1,56 +1,82 @@
 {
-  "schemaVersion": 1,
-  "id": "check-list",
-  "name": "Open Checks",
-  "kind": "custom",
   "canvas": {
-    "w": 1920,
-    "h": 1080
+    "h": 1080,
+    "w": 1920
   },
   "grid": 8,
+  "id": "check-list",
+  "kind": "custom",
+  "name": "Open Checks",
   "role": "checkList",
+  "schemaVersion": 1,
   "zones": [
     {
+      "behavior": "none",
       "id": "title",
       "kind": "label",
+      "label": "Open checks",
       "rect": {
-        "x": 16,
-        "y": 16,
+        "h": 80,
         "w": 1440,
-        "h": 80
+        "x": 16,
+        "y": 16
       },
-      "shape": "rect",
-      "behavior": "none",
-      "label": "Open checks"
+      "shape": "rect"
     },
     {
+      "behavior": "none",
       "id": "list",
       "kind": "checkList",
       "rect": {
-        "x": 16,
-        "y": 112,
+        "h": 952,
         "w": 1440,
-        "h": 952
+        "x": 16,
+        "y": 112
       },
-      "shape": "rect",
-      "behavior": "none"
+      "shape": "rect"
     },
     {
+      "actions": [
+        {
+          "mode": "back",
+          "type": "jump"
+        }
+      ],
+      "behavior": "blink",
       "id": "back",
       "kind": "button",
+      "label": "\u2039 Back",
       "rect": {
-        "x": 1472,
-        "y": 914,
+        "h": 150,
         "w": 432,
-        "h": 150
+        "x": 1472,
+        "y": 914
       },
+      "shape": "rect"
+    },
+    {
+      "id": "retail-mode-btn",
+      "kind": "button",
+      "label": "\ud83c\udff7\ufe0f Retail Mode",
       "shape": "rect",
       "behavior": "blink",
-      "label": "\u2039 Back",
+      "rect": {
+        "x": 744,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7"
+        }
+      },
       "actions": [
         {
           "type": "jump",
-          "mode": "back"
+          "mode": "replace",
+          "page": "retail-entry",
+          "target": "retail-entry"
         }
       ]
     }

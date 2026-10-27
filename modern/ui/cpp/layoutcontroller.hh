@@ -209,6 +209,7 @@ public:
     Q_INVOKABLE QVariant widgetState(const QString &key) const { return widgetState_.value(key); }
     Q_INVOKABLE void setWidgetState(const QString &key, const QVariant &value) { widgetState_.insert(key, value); }
     Q_INVOKABLE void goBack();
+    Q_INVOKABLE void jumpToPage(const QString &pageId);
     Q_INVOKABLE void goHome();
     Q_INVOKABLE bool jumpTo(const QString &pageId);
     // A category's items: the menu page (role "menu", else "menu-all") on it.

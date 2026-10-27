@@ -741,7 +741,7 @@
         "h": 120
       },
       "shape": "rect",
-      "behavior": "blink",
+      "behavior": "double",
       "label": "Self-Order Kiosk",
       "actions": [
         {

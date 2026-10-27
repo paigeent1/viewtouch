@@ -1,0 +1,1020 @@
+{
+  "id": "retail-entry",
+  "name": "Retail POS Entry",
+  "kind": "order",
+  "role": "order",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "retail-check",
+      "kind": "orderList",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 640,
+        "h": 656
+      }
+    },
+    {
+      "id": "hosp-mode",
+      "kind": "button",
+      "label": "\ud83c\udf7d\ufe0f Hospitality Mode",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1600,
+        "y": 16,
+        "w": 304,
+        "h": 72
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "tables"
+        }
+      ]
+    },
+    {
+      "id": "item-lookup",
+      "kind": "button",
+      "label": "\ud83d\udd0d Item / UPC Builder",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1272,
+        "y": 16,
+        "w": 312,
+        "h": 72
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "menu-builder"
+        }
+      ]
+    },
+    {
+      "id": "rtl-discounts",
+      "kind": "button",
+      "label": "DISCOUNTS",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 16,
+        "y": 688,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#ef4444",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "discounts"
+        }
+      ]
+    },
+    {
+      "id": "rtl-email",
+      "kind": "button",
+      "label": "ADD EMAIL",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 344,
+        "y": 688,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#fde047",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "customers"
+        }
+      ]
+    },
+    {
+      "id": "rtl-nosale",
+      "kind": "button",
+      "label": "NO SALE",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 16,
+        "y": 784,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#60a5fa",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "openDrawer"
+        }
+      ]
+    },
+    {
+      "id": "rtl-scale",
+      "kind": "button",
+      "label": "SCALE ITEMS",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 344,
+        "y": 784,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#2563eb",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "find-item"
+        }
+      ]
+    },
+    {
+      "id": "rtl-gift",
+      "kind": "button",
+      "label": "Gift Cards",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 16,
+        "y": 880,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#fb923c",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "gift-cards"
+        }
+      ]
+    },
+    {
+      "id": "rtl-boxstick",
+      "kind": "button",
+      "label": "\ud83d\udce6 BOX \u2194 STICK",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 344,
+        "y": 880,
+        "w": 312,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "menu-builder"
+        }
+      ]
+    },
+    {
+      "id": "rtl-exit",
+      "kind": "button",
+      "label": "Exit POS",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 16,
+        "y": 976,
+        "w": 312,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#2563eb",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "logout"
+        }
+      ]
+    },
+    {
+      "id": "rtl-cust",
+      "kind": "button",
+      "label": "Cust LookUp",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 344,
+        "y": 976,
+        "w": 312,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#2dd4bf",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "customers"
+        }
+      ]
+    },
+    {
+      "id": "rtl-logon",
+      "kind": "button",
+      "label": "LOG ON/Off",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 260,
+        "w": 140,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#d4af37",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "logout"
+        }
+      ]
+    },
+    {
+      "id": "rtl-duty",
+      "kind": "button",
+      "label": "CASHIER DUTY",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 832,
+        "y": 260,
+        "w": 140,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#a855f7",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "drawer"
+        }
+      ]
+    },
+    {
+      "id": "rtl-reprint",
+      "kind": "button",
+      "label": "Reprint Receipt",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 984,
+        "y": 260,
+        "w": 150,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#a855f7",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "printReceipt"
+        }
+      ]
+    },
+    {
+      "id": "rtl-cancel",
+      "kind": "button",
+      "label": "CANCEL SALE",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1146,
+        "y": 260,
+        "w": 190,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#ef4444",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "cancelCheck"
+        }
+      ]
+    },
+    {
+      "id": "rtl-return",
+      "kind": "button",
+      "label": "ITEM RETURN",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1348,
+        "y": 260,
+        "w": 180,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#ef4444",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "reasons"
+        }
+      ]
+    },
+    {
+      "id": "rtl-void",
+      "kind": "button",
+      "label": "VOID PREV ITEM",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1540,
+        "y": 260,
+        "w": 180,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#ef4444",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "removeLine"
+        }
+      ]
+    },
+    {
+      "id": "rtl-clock",
+      "kind": "button",
+      "label": "TIME CLOCK",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1732,
+        "y": 260,
+        "w": 172,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#67e8f9",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "timeclock"
+        }
+      ]
+    },
+    {
+      "id": "rtl-lighter",
+      "kind": "button",
+      "label": "Lighter Refill",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 364,
+        "w": 140,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#60a5fa",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "order"
+        }
+      ]
+    },
+    {
+      "id": "rtl-emptybox",
+      "kind": "button",
+      "label": "EMPTY BOX",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 832,
+        "y": 364,
+        "w": 140,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#4ade80",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "order"
+        }
+      ]
+    },
+    {
+      "id": "rtl-mgr",
+      "kind": "button",
+      "label": "Manager",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 984,
+        "y": 364,
+        "w": 150,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "manager"
+        }
+      ]
+    },
+    {
+      "id": "rtl-pcheck",
+      "kind": "button",
+      "label": "PRICE CHECK",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1146,
+        "y": 364,
+        "w": 160,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#fde047",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "find-item"
+        }
+      ]
+    },
+    {
+      "id": "rtl-alpha",
+      "kind": "button",
+      "label": "ALPHA LOOK UP",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1318,
+        "y": 364,
+        "w": 210,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#fde047",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "find-item"
+        }
+      ]
+    },
+    {
+      "id": "rtl-misc",
+      "kind": "button",
+      "label": "MISC TXBL",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1540,
+        "y": 364,
+        "w": 180,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "order"
+        }
+      ]
+    },
+    {
+      "id": "rtl-suspend",
+      "kind": "button",
+      "label": "SUSPEND",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1732,
+        "y": 364,
+        "w": 172,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#c084fc",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "releaseCheck"
+        }
+      ]
+    },
+    {
+      "id": "rtl-resume",
+      "kind": "button",
+      "label": "RESUME",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1640,
+        "y": 468,
+        "w": 264,
+        "h": 112
+      },
+      "style": {
+        "normal": {
+          "fill": "#c084fc",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "check-list",
+          "target": "check-list"
+        }
+      ]
+    },
+    {
+      "id": "rtl-clear",
+      "kind": "button",
+      "label": "CLEAR",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1640,
+        "y": 596,
+        "w": 264,
+        "h": 112
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "clear"
+        }
+      ]
+    },
+    {
+      "id": "rtl-subtotal",
+      "kind": "button",
+      "label": "SUB TOTAL\n(PAY)",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1640,
+        "y": 724,
+        "w": 264,
+        "h": 340
+      },
+      "style": {
+        "normal": {
+          "fill": "#4ade80",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "settle"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-7",
+      "kind": "button",
+      "label": "7",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 468,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "7"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-8",
+      "kind": "button",
+      "label": "8",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 990,
+        "y": 468,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "8"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-9",
+      "kind": "button",
+      "label": "9",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1300,
+        "y": 468,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "9"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-4",
+      "kind": "button",
+      "label": "4",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 620,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "4"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-5",
+      "kind": "button",
+      "label": "5",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 990,
+        "y": 620,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "5"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-6",
+      "kind": "button",
+      "label": "6",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1300,
+        "y": 620,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "6"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-1",
+      "kind": "button",
+      "label": "1",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 772,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "1"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-2",
+      "kind": "button",
+      "label": "2",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 990,
+        "y": 772,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "2"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-3",
+      "kind": "button",
+      "label": "3",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1300,
+        "y": 772,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "3"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-0",
+      "kind": "button",
+      "label": "0",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 924,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "0"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-00",
+      "kind": "button",
+      "label": "00",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 990,
+        "y": 924,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "00"
+        }
+      ]
+    },
+    {
+      "id": "rtl-key-.",
+      "kind": "button",
+      "label": ".",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1300,
+        "y": 924,
+        "w": 290,
+        "h": 136
+      },
+      "style": {
+        "normal": {
+          "fill": "#e2e8f0",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "."
+        }
+      ]
+    }
+  ]
+}

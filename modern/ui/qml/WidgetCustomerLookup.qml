@@ -154,17 +154,18 @@ Item {
             // --- the customer ---
             Flickable {
                 id: form
+                TapHandler { onTapped: { form.forceActiveFocus(); Qt.inputMethod.hide() } }
                 visible: !w.narrow || w.showing
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 contentHeight: details.implicitHeight
                 clip: true
-                ScrollBar.vertical: TouchScrollBar { id: formBar }
+                ScrollBar.vertical: TouchScrollBar { id: formBar; parent: form; x: form.width - width; height: form.height }
 
                 ColumnLayout {
                     id: details
-                    width: form.width - formBar.room
-                    spacing: 8
+                    width: form.width - (formBar.visible ? formBar.room + 16 : 12)
+                    spacing: 4
                     visible: w.creating || (w.chosen.id ?? "") !== ""
 
                     Button {
@@ -302,38 +303,12 @@ Item {
                     }
 
                     RowLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 6
-                        spacing: 10
-                        Button {
-                            text: qsTr("Save")
-                            implicitHeight: 52
-                            implicitWidth: 140
-                            highlighted: true
-                            onClicked: w.save()
-                        }
-                        // Privacy laws: a guest may ask to be forgotten (managers; touch twice).
-                        Button {
-                            id: forget
-                            property bool armed: false
-                            visible: !w.creating && w.pos !== null && w.pos.can("manager")
-                            text: armed ? qsTr("Touch again to forget them") : qsTr("Forget This Customer…")
-                            implicitHeight: 52
-                            palette.button: armed ? "#8b2c2c" : palette.button
-                            onClicked: {
-                                if (!armed) { armed = true; disarm.restart(); return }
-                                armed = false
-                                w.pos.forgetCustomer(w.chosen.id)
-                            }
-                            Timer { id: disarm; interval: 4000; onTriggered: forget.armed = false }
-                        }
-                        Button {
-                            text: (w.chosen.onCheck ?? false) ? qsTr("On this check ✓") : qsTr("Put on This Check")
-                            implicitHeight: 52
-                            enabled: w.pos !== null && w.pos.hasCheck && !w.creating && !(w.chosen.onCheck ?? false)
-                            onClicked: w.pos.useCustomer(w.chosen.id)
-                        }
+                        Layout.fillWidth: true; Layout.maximumWidth: details.width; spacing: 8
+                        Button { text: qsTr("Save"); Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 44; highlighted: true; onClicked: w.save() }
+                        Button { text: (w.chosen.onCheck ?? false) ? qsTr("On Check ✓") : qsTr("Put on Check"); Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 44; enabled: w.pos !== null && w.pos.hasCheck && !w.creating && !(w.chosen.onCheck ?? false); onClicked: w.pos.useCustomer(w.chosen.id) }
+                        Button { id: forget; property bool armed: false; visible: !w.creating && w.pos !== null && w.pos.can("manager"); text: armed ? qsTr("Confirm") : qsTr("Forget…"); Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 44; onClicked: { if (!armed) { armed = true; disarm.restart(); return } armed = false; w.pos.forgetCustomer(w.chosen.id) } Timer { id: disarm; interval: 4000; onTriggered: forget.armed = false } }
                     }
+
                 }
 
                 Label {

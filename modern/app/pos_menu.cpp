@@ -686,6 +686,46 @@ QVariantList PosService::menuItemsNow() const
                                            return QString::number(int(rl.quantity > 0 ? rl.quantity : 1));
                                    return QString();
                                }()},
+                               {u"buydown"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId == "__buydown__" && rl.quantity > 0.0)
+                                           return QString::number(rl.quantity, 'f', 2);
+                                   return QString();
+                               }()},
+                               {u"buydownGroup"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId.starts_with("__buydown_grp__:"))
+                                           return qs(rl.ingredientId.substr(16));
+                                   return QString();
+                               }()},
+                               {u"buydownMultiQty"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId == "__buydown_multi_qty__" && rl.quantity > 0.0)
+                                           return QString::number(int(rl.quantity));
+                                   return QString();
+                               }()},
+                               {u"buydownMultiAmt"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId == "__buydown_multi_amt__" && rl.quantity > 0.0)
+                                           return QString::number(rl.quantity, 'f', 2);
+                                   return QString();
+                               }()},
+                               {u"buydownStart"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId == "__buydown_start__" && rl.quantity >= 19700101.0) {
+                                           const QString s = QString::number(int(rl.quantity));
+                                           return s.size() == 8 ? (s.sliced(0, 4) + u"-"_s + s.sliced(4, 2) + u"-"_s + s.sliced(6, 2)) : QString();
+                                       }
+                                   return QString();
+                               }()},
+                               {u"buydownEnd"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId == "__buydown_end__" && rl.quantity >= 19700101.0) {
+                                           const QString s = QString::number(int(rl.quantity));
+                                           return s.size() == 8 ? (s.sliced(0, 4) + u"-"_s + s.sliced(4, 2) + u"-"_s + s.sliced(6, 2)) : QString();
+                                       }
+                                   return QString();
+                               }()},
                                {u"altupc"_s, [&m] { QStringList b; for (std::size_t i = 1; i < m.barcodes.size(); ++i) b << qs(m.barcodes[i]); return b.join(u", "_s); }()},
                                {u"buttonColor"_s, qs(m.buttonColor)},
                                // The Menu Builder's card.

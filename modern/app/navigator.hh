@@ -48,6 +48,7 @@ public:
     QString mealPeriod() const { return mealPeriod_; }
     int depth() const { return int(stack_.size()); }
     bool canGoBack() const { return !stack_.isEmpty(); }
+    QString previous() const { return stack_.isEmpty() ? QString() : stack_.last(); }
 
     // Change the home page without moving (e.g. the login page was renamed).
     void setHome(const QString &homePageId) { home_ = homePageId; }

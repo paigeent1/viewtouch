@@ -112,20 +112,23 @@ Document receipt(const Check &check, const TicketContext &ctx)
             continue;   // kitchen notes are not for the guest
         if (l.isShare()) {   // its part of the whole, the choices under it unpriced
             d.columns(l.displayName(), ctx.money(l.total()));
-            for (const Modifier &m : l.modifiers)
-                if (true)
-                    d.text("  " + m.displayName());
+            {
+            std::string modLine;
+            for (const Modifier &m : l.modifiers) modLine += (modLine.empty() ? "  " : ", ") + m.displayName();
+            if (!modLine.empty()) d.text(modLine);
+        }
             continue;
         }
         const std::string qty = l.quantity > 1 ? std::to_string(l.quantity) + " x " : "";
-        d.columns(qty + l.displayName(), ctx.money(qualifiedPrice(l.unitPrice, l.qualifier) * l.quantity));
+        d.columns(qty + l.displayName(), ctx.money(l.total()));
         // A fee says what it is (fee laws: it mustn't look like a tip).
         if (l.itemId == "fee:delivery")
             d.text("  " + (ctx.settings.deliveryFeeToDriver ? ctx.tr("Goes to the driver.")
                                                              : ctx.tr("Store's fee, not the driver's tip.")));
-        for (const Modifier &m : l.modifiers) {
-            // Always print all choices on guest receipt   // No onion, Medium rare: the kitchen's, not the guest's
-            d.columns("  " + m.displayName(), m.price().cents() ? ctx.money(m.price() * l.quantity) : "");
+        {
+            std::string modLine;
+            for (const Modifier &m : l.modifiers) modLine += (modLine.empty() ? "  " : ", ") + m.displayName();
+            if (!modLine.empty()) d.text(modLine);
         }
     }
     d.rule();

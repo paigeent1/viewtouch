@@ -530,8 +530,10 @@ void LayoutController::openCheck(qint64 checkId)
     if (!pos_ || editing() || busy())
         return;
     call(u"openCheck"_s, {checkId}, [this](const QVariant &ok) {
-        if (ok.toBool())
-            navigate(Navigator::Mode::Index);
+        if (ok.toBool()) {
+            if (nav_.previous() == u"retail-entry"_s) goBack();
+            else navigate(Navigator::Mode::Index);
+        }
     });
 }
 
@@ -1541,7 +1543,7 @@ void LayoutController::scanned(const QString &code)
         return;
     typedNumber_.clear();
     const auto *page = currentPage();
-    const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier");
+    const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier" || page->kind == u"order" || page->id == u"retail-entry");
     QString c12 = c;
     if (c.size() == 11 && std::all_of(c.cbegin(), c.cend(), [](QChar ch) { return ch.isDigit(); })) {
         int sum = 0;
@@ -1554,8 +1556,14 @@ void LayoutController::scanned(const QString &code)
         const QStringList bcs = m.value(u"barcodes"_s).toString().split(u", "_s);
         if (m.value(u"number"_s).toString() != c && !bcs.contains(c) && !bcs.contains(c12))
             continue;
-        if (ordering)
-            orderItem(m.value(u"id"_s).toString());
+        if (ordering) {
+            const QString itemId = m.value(u"id"_s).toString();
+            if (!pos_->hasCheck()) {
+                call(u"quickOrder"_s, {}, [this, itemId](const QVariant &) { orderItem(itemId); });
+            } else {
+                orderItem(itemId);
+            }
+        }
         else
             setStatus(tr("%1: ring it in on the order screen.").arg(m.value(u"name"_s).toString()));
         return;
@@ -2306,3 +2314,5 @@ void LayoutController::pollSysStatus()
         emit sysStatusChanged();
     }
 }
+
+void LayoutController::jumpToPage(const QString &p) { if (!p.isEmpty()) navigate(Navigator::Mode::Replace, p); }

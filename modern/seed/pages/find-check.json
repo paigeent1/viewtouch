@@ -41,7 +41,7 @@
       "rect": {
         "x": 16,
         "y": 944,
-        "w": 432,
+        "w": 200,
         "h": 120
       },
       "shape": "rect",
@@ -51,6 +51,32 @@
         {
           "type": "jump",
           "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "retail-mode-btn",
+      "kind": "button",
+      "label": "\ud83c\udff7\ufe0f Retail Mode",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 744,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "retail-entry",
+          "target": "retail-entry"
         }
       ]
     }

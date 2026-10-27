@@ -763,6 +763,7 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
             }
         }
     }
+    #include "pos_buydown_save.inc"
     // Other prices: empty is the regular price.
     const auto otherPrice = [&](const QVariant &v, Money &into) {
         const QString t = v.toString().trimmed();
