@@ -318,6 +318,11 @@ struct PosSettings {
     // Dim a screen nobody has touched for this long (0: never). Kitchen,
     // bar and expo screens and the self-order kiosk stay on.
     int screenSaverMinutes = 3;
+    bool topRibbonEnabled = true;
+    bool topRibbonShowTime = true;
+    bool topRibbonShowBattery = true;
+    bool topRibbonShowWifi = true;
+    bool topRibbonShowCustomerCount = true;
     // A table seated longer than this is marked on the floor plan.
     int tableLongMinutes = 90;
     // Clock in only near a scheduled shift (managers excepted), from this

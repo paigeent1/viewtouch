@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.UserManager
 
 // A tablet only for ViewTouch, like the store's register: ViewTouch is the
@@ -132,5 +134,25 @@ class Home : Activity() {
         super.onCreate(savedInstanceState)
         Kiosk.boot(this)
         finish()
+    }
+
+    @JvmStatic
+    fun batteryInfo(activity: Activity): Int {
+        return try {
+            val bm = activity.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val lvl = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            val charging = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) bm.isCharging else false
+            (if (charging) 1000 else 0) + lvl.coerceIn(0, 100)
+        } catch (e: Exception) { -1 }
+    }
+
+    @JvmStatic
+    fun wifiInfo(activity: Activity): Int {
+        return try {
+            val wm = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val info = wm.connectionInfo
+            if (info == null || info.networkId == -1) -1
+            else WifiManager.calculateSignalLevel(info.rssi, 101).coerceIn(0, 100)
+        } catch (e: Exception) { -1 }
     }
 }

@@ -1008,6 +1008,11 @@ QJsonObject toJson(const PosSettings &s)
         {u"waitMinutesPerParty"_s, s.waitMinutesPerParty}, {u"hostsTakePayments"_s, s.hostsTakePayments},
         {u"autoLogoutMinutes"_s, s.autoLogoutMinutes}, {u"phoneLockSeconds"_s, s.phoneLockSeconds}, {u"tableLongMinutes"_s, s.tableLongMinutes},
         {u"screenSaverMinutes"_s, s.screenSaverMinutes},
+        {u"topRibbonEnabled"_s, s.topRibbonEnabled},
+        {u"topRibbonShowTime"_s, s.topRibbonShowTime},
+        {u"topRibbonShowBattery"_s, s.topRibbonShowBattery},
+        {u"topRibbonShowWifi"_s, s.topRibbonShowWifi},
+        {u"topRibbonShowCustomerCount"_s, s.topRibbonShowCustomerCount},
         {u"replicaKey"_s, qs(s.replicaKey)}, {u"language"_s, qs(s.language)},
         {u"startPages"_s, [&] {
              QJsonObject o;
@@ -1272,6 +1277,11 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.autoLogoutMinutes = std::clamp(o.value(u"autoLogoutMinutes").toInt(0), 0, 120);
     s.phoneLockSeconds = std::clamp(o.value(u"phoneLockSeconds").toInt(30), -1, 3600);
     s.screenSaverMinutes = std::clamp(o.value(u"screenSaverMinutes").toInt(3), 0, 240);
+    s.topRibbonEnabled = o.value(u"topRibbonEnabled").toBool(true);
+    s.topRibbonShowTime = o.value(u"topRibbonShowTime").toBool(true);
+    s.topRibbonShowBattery = o.value(u"topRibbonShowBattery").toBool(true);
+    s.topRibbonShowWifi = o.value(u"topRibbonShowWifi").toBool(true);
+    s.topRibbonShowCustomerCount = o.value(u"topRibbonShowCustomerCount").toBool(true);
     s.replicaKey = ss(o.value(u"replicaKey").toString());
     s.language = ss(o.value(u"language").toString(u"en"_s));
     const QJsonObject starts = o.value(u"startPages").toObject();

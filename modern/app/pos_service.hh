@@ -928,6 +928,11 @@ public:
     int autoLogoutMinutes() const override { return s_->settings.autoLogoutMinutes; }
     int phoneLockSeconds() const override { return s_->settings.phoneLockSeconds; }
     int screenSaverMinutes() const override { return s_->settings.screenSaverMinutes; }
+    bool topRibbonEnabled() const override { return s_->settings.topRibbonEnabled; }
+    bool topRibbonShowTime() const override { return s_->settings.topRibbonShowTime; }
+    bool topRibbonShowBattery() const override { return s_->settings.topRibbonShowBattery; }
+    bool topRibbonShowWifi() const override { return s_->settings.topRibbonShowWifi; }
+    bool topRibbonShowCustomerCount() const override { return s_->settings.topRibbonShowCustomerCount; }
 
     // --- practice (training) --------------------------------------------------------
     // This screen's checks are practice: the person is in training, or a

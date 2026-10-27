@@ -1034,6 +1034,74 @@ ApplicationWindow {
             root.controller.command("setAutoBrightness", ({ value: root.controller.asleep ? 40 : 255 }))
         }
     }
+    // Top Status Ribbon: configurable in Manager -> Settings, hidden on Touch to Wake
+    Rectangle {
+        id: topStatusRibbon
+        objectName: "topStatusRibbon"
+        anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+        height: Math.max(28, Math.round(root.height * 0.032))
+        z: 85
+        readonly property var posObj: root.controller ? root.controller.pos : null
+        readonly property bool ribbonEnabled: posObj ? Boolean(posObj.topRibbonEnabled) : true
+        readonly property bool showTime: posObj ? Boolean(posObj.topRibbonShowTime) : true
+        readonly property bool showBattery: (Qt.platform.os === "android") && (posObj ? Boolean(posObj.topRibbonShowBattery) : true)
+        readonly property bool showWifi: posObj ? Boolean(posObj.topRibbonShowWifi) : true
+        readonly property bool showCustomerCount: posObj ? Boolean(posObj.topRibbonShowCustomerCount) : true
+        readonly property int customerCount: (posObj && posObj.closedChecks) ? posObj.closedChecks.length : 0
+        visible: !root.controller.asleep && ribbonEnabled && (showTime || showBattery || showWifi || showCustomerCount)
+        color: "#e611161d"
+        property string currentTimeText: Qt.formatDateTime(new Date(), "ddd MMM d  h:mm AP")
+        Timer {
+            interval: 10000; running: topStatusRibbon.visible; repeat: true; triggeredOnStart: true
+            onTriggered: {
+                topStatusRibbon.currentTimeText = Qt.formatDateTime(new Date(), "ddd MMM d  h:mm AP")
+                if (root.controller) root.controller.pollSysStatus()
+            }
+        }
+        Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: "#2e3846" }
+        Row {
+            anchors.left: parent.left; anchors.leftMargin: Math.round(root.width * 0.012)
+            anchors.verticalCenter: parent.verticalCenter; spacing: Math.round(root.width * 0.018)
+            Text {
+                visible: topStatusRibbon.showTime; anchors.verticalCenter: parent.verticalCenter
+                text: "🕒 " + topStatusRibbon.currentTimeText; color: "#f2f4f7"
+                font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
+            }
+            Rectangle {
+                visible: topStatusRibbon.showTime && (topStatusRibbon.showBattery || topStatusRibbon.showWifi || topStatusRibbon.showCustomerCount)
+                width: 1; height: Math.round(topStatusRibbon.height * 0.55); anchors.verticalCenter: parent.verticalCenter; color: "#394454"
+            }
+            Text {
+                visible: topStatusRibbon.showBattery; anchors.verticalCenter: parent.verticalCenter
+                readonly property int lvl: root.controller ? root.controller.batteryLevel : -1
+                readonly property bool chg: root.controller ? root.controller.batteryCharging : false
+                text: (chg ? "⚡ " : "🔋 ") + (lvl >= 0 ? (lvl + "%") : "--%")
+                color: chg ? "#4ade80" : (lvl <= 20 ? "#ff6b6b" : (lvl <= 40 ? "#f5b940" : "#f2f4f7"))
+                font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
+            }
+            Rectangle {
+                visible: topStatusRibbon.showBattery && (topStatusRibbon.showWifi || topStatusRibbon.showCustomerCount)
+                width: 1; height: Math.round(topStatusRibbon.height * 0.55); anchors.verticalCenter: parent.verticalCenter; color: "#394454"
+            }
+            Text {
+                visible: topStatusRibbon.showWifi; anchors.verticalCenter: parent.verticalCenter
+                readonly property int wifi: root.controller ? root.controller.wifiStrength : 100
+                text: "📶 Wi-Fi " + wifi + "%"
+                color: wifi <= 25 ? "#ff6b6b" : (wifi <= 50 ? "#f5b940" : "#7ec8ff")
+                font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
+            }
+            Rectangle {
+                visible: topStatusRibbon.showWifi && topStatusRibbon.showCustomerCount
+                width: 1; height: Math.round(topStatusRibbon.height * 0.55); anchors.verticalCenter: parent.verticalCenter; color: "#394454"
+            }
+            Text {
+                visible: topStatusRibbon.showCustomerCount; anchors.verticalCenter: parent.verticalCenter
+                text: "👥 " + qsTr("Customer Count: ") + topStatusRibbon.customerCount; color: "#4ade80"
+                font.pixelSize: Math.round(topStatusRibbon.height * 0.54); font.bold: true
+            }
+        }
+    }
+
     // Screen saver: dimmed after no touches; the first touch only wakes it.
     Rectangle {
         id: screenSaver

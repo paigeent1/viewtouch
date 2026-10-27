@@ -144,6 +144,11 @@ public:
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
     int imageRevision() const override { return adminRevision() + imageRevision_; }
     int screenSaverMinutes() const override { return v(u"screenSaverMinutes").toInt(); }
+    bool topRibbonEnabled() const override { return v(u"topRibbonEnabled").toBool(); }
+    bool topRibbonShowTime() const override { return v(u"topRibbonShowTime").toBool(); }
+    bool topRibbonShowBattery() const override { return v(u"topRibbonShowBattery").toBool(); }
+    bool topRibbonShowWifi() const override { return v(u"topRibbonShowWifi").toBool(); }
+    bool topRibbonShowCustomerCount() const override { return v(u"topRibbonShowCustomerCount").toBool(); }
     QVariantList kitchenStations() const override { return v(u"kitchenStations").toList(); }
     QString kitchenStation() const override { return v(u"kitchenStation").toString(); }
     QVariantList messages() const override { return v(u"messages").toList(); }

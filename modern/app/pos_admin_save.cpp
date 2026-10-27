@@ -331,6 +331,16 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         }
         if (record.contains(u"screenSaverMinutes"_s))
             s_->settings.screenSaverMinutes = std::clamp(record.value(u"screenSaverMinutes"_s).toInt(), 0, 240);
+        if (record.contains(u"topRibbonEnabled"_s))
+            s_->settings.topRibbonEnabled = record.value(u"topRibbonEnabled"_s).toBool();
+        if (record.contains(u"topRibbonShowTime"_s))
+            s_->settings.topRibbonShowTime = record.value(u"topRibbonShowTime"_s).toBool();
+        if (record.contains(u"topRibbonShowBattery"_s))
+            s_->settings.topRibbonShowBattery = record.value(u"topRibbonShowBattery"_s).toBool();
+        if (record.contains(u"topRibbonShowWifi"_s))
+            s_->settings.topRibbonShowWifi = record.value(u"topRibbonShowWifi"_s).toBool();
+        if (record.contains(u"topRibbonShowCustomerCount"_s))
+            s_->settings.topRibbonShowCustomerCount = record.value(u"topRibbonShowCustomerCount"_s).toBool();
         if (record.contains(u"autoLogoutMinutes"_s))
             s_->settings.autoLogoutMinutes = std::clamp(record.value(u"autoLogoutMinutes"_s).toInt(), 0, 120);
         if (record.contains(u"phoneLockSeconds"_s))

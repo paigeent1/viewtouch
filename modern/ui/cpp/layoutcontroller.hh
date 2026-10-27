@@ -54,6 +54,9 @@ class LayoutController : public QObject {
     Q_PROPERTY(bool editing READ editing NOTIFY editingChanged)
     // Screen saver: dimmed after no touches for a while (Store Settings).
     Q_PROPERTY(bool asleep READ asleep NOTIFY asleepChanged)
+    Q_PROPERTY(int batteryLevel READ batteryLevel NOTIFY sysStatusChanged)
+    Q_PROPERTY(bool batteryCharging READ batteryCharging NOTIFY sysStatusChanged)
+    Q_PROPERTY(int wifiStrength READ wifiStrength NOTIFY sysStatusChanged)
     Q_PROPERTY(EditorController *editor READ editor NOTIFY editorChanged)
     Q_PROPERTY(vt::app::PosSession *pos READ pos NOTIFY posChanged)
     // This terminal's card reader (Manager -> Terminals -> Card reader).
@@ -114,6 +117,10 @@ public:
     QString statusText() const { return status_; }
     bool editing() const { return editing_; }
     bool asleep() const { return asleep_; }
+    int batteryLevel() const { return batteryLevel_; }
+    bool batteryCharging() const { return batteryCharging_; }
+    int wifiStrength() const { return wifiStrength_; }
+    Q_INVOKABLE void pollSysStatus();
     // The touch that wakes the screen does nothing else (Main.qml's dim layer takes it).
     Q_INVOKABLE void wake();
     void setScreenSaverForTesting(int ms) { sleepOverrideMs_ = ms; restartSleep(); }
@@ -290,6 +297,7 @@ signals:
     void explanationChanged();
     void editingChanged();
     void asleepChanged();
+    void sysStatusChanged();
     void mealPeriodChanged();
     void statusColorsChanged();
     void menuCategoryChanged();
@@ -365,6 +373,9 @@ private:
     QString afterLogin_;
     QSet<QString> installedFonts_;   // by content hash
     bool asleep_ = false;
+    int batteryLevel_ = -1;
+    bool batteryCharging_ = false;
+    int wifiStrength_ = 100;
     int sleepOverrideMs_ = 0;
     void restartSleep();
     void sleepTimeout();

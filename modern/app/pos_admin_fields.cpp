@@ -439,6 +439,13 @@ QVariantList PosService::adminFields(const QString &panel)
             with(with(field(u"screenSaverMinutes"_s, tr("Dim the screen after (minutes)"), u"int"_s,
                             tr("Untouched screens dim; a touch wakes them (and does nothing else). 0 = never. "
                                "Kitchen, bar and expo screens stay on.")), u"min"_s, 0), u"max"_s, 240),
+            field(u"topRibbonEnabled"_s, tr("Show top status ribbon"), u"bool"_s,
+                  tr("Display the status bar ribbon across the top of all screens except Touch to Wake.")),
+            with(field(u"topRibbonShowTime"_s, tr("Ribbon: Current time"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
+            with(field(u"topRibbonShowBattery"_s, tr("Ribbon: Battery status (tablets)"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
+            with(field(u"topRibbonShowWifi"_s, tr("Ribbon: Wi-Fi strength"), u"bool"_s), u"when"_s, u"topRibbonEnabled"_s),
+            with(field(u"topRibbonShowCustomerCount"_s, tr("Ribbon: Customer count (checks closed today)"), u"bool"_s,
+                       tr("Shows total checks closed today, titled Customer Count for retail and hospitality screens.")), u"when"_s, u"topRibbonEnabled"_s),
             with(with(field(u"autoLogoutMinutes"_s, tr("Log out idle screens after (minutes)"), u"int"_s,
                             tr("0 = never. Kitchen, bar and expo screens don't need a login.")), u"min"_s, 0), u"max"_s, 120),
             with(with(field(u"phoneLockSeconds"_s, tr("Handhelds: ask for the PIN after the screen was off (seconds)"), u"int"_s,

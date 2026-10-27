@@ -2239,3 +2239,53 @@ void LayoutController::setStatus(const QString &text)
     status_ = text;
     emit statusChanged();
 }
+
+
+void LayoutController::pollSysStatus()
+{
+    int newBatt = batteryLevel_;
+    bool newChg = batteryCharging_;
+    int newWifi = wifiStrength_;
+
+#ifdef Q_OS_ANDROID
+    QJniObject activity = QNativeInterface::QAndroidApplication::context();
+    if (activity.isValid()) {
+        jint b = QJniObject::callStaticMethod<jint>(
+            "org/viewtouch/pos/Kiosk", "batteryInfo",
+            "(Landroid/app/Activity;)I", activity.object<jobject>());
+        if (b >= 0) {
+            newChg = (b >= 1000);
+            newBatt = b % 1000;
+        }
+        jint w = QJniObject::callStaticMethod<jint>(
+            "org/viewtouch/pos/Kiosk", "wifiInfo",
+            "(Landroid/app/Activity;)I", activity.object<jobject>());
+        newWifi = (w >= 0) ? int(w) : 0;
+    }
+#else
+    newBatt = -1;
+    newChg = false;
+    QFile wf(u"/proc/net/wireless"_s);
+    if (wf.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        const QStringList lines = QString::fromUtf8(wf.readAll()).split(u'\n', Qt::SkipEmptyParts);
+        if (lines.size() >= 3) {
+            const QStringList parts = lines.at(2).simplified().split(u' ');
+            if (parts.size() >= 3) {
+                QString linkStr = parts.at(2);
+                linkStr.remove(u'.');
+                const int link = linkStr.toInt();
+                newWifi = std::clamp((link * 100) / 70, 0, 100);
+            }
+        } else {
+            newWifi = 100;
+        }
+    }
+#endif
+
+    if (newBatt != batteryLevel_ || newChg != batteryCharging_ || newWifi != wifiStrength_) {
+        batteryLevel_ = newBatt;
+        batteryCharging_ = newChg;
+        wifiStrength_ = newWifi;
+        emit sysStatusChanged();
+    }
+}

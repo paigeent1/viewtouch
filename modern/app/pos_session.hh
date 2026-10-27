@@ -110,6 +110,11 @@ class PosSession : public QObject {
     Q_PROPERTY(int autoLogoutMinutes READ autoLogoutMinutes NOTIFY adminChanged)
     Q_PROPERTY(int phoneLockSeconds READ phoneLockSeconds NOTIFY adminChanged)
     Q_PROPERTY(int screenSaverMinutes READ screenSaverMinutes NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonEnabled READ topRibbonEnabled NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonShowTime READ topRibbonShowTime NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonShowBattery READ topRibbonShowBattery NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonShowWifi READ topRibbonShowWifi NOTIFY adminChanged)
+    Q_PROPERTY(bool topRibbonShowCustomerCount READ topRibbonShowCustomerCount NOTIFY adminChanged)
     Q_PROPERTY(QVariantList kitchenStations READ kitchenStations NOTIFY adminChanged)
     Q_PROPERTY(QString kitchenStation READ kitchenStation NOTIFY adminChanged)
     // Messages between screens, the last hour's, newest first.
@@ -323,6 +328,11 @@ public:
     // "Logo Final.PNG" -> "store:logo-final.png" ("" if not a picture type).
     static QString storeImageRef(const QString &fileName);
     virtual int screenSaverMinutes() const = 0;
+    virtual bool topRibbonEnabled() const = 0;
+    virtual bool topRibbonShowTime() const = 0;
+    virtual bool topRibbonShowBattery() const = 0;
+    virtual bool topRibbonShowWifi() const = 0;
+    virtual bool topRibbonShowCustomerCount() const = 0;
     virtual QVariantList kitchenStations() const = 0;
     virtual QString kitchenStation() const = 0;
     virtual QVariantList messages() const = 0;

@@ -160,6 +160,11 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"autoLogoutMinutes"_s, s_->settings.autoLogoutMinutes},
              {u"phoneLockSeconds"_s, s_->settings.phoneLockSeconds},
              {u"screenSaverMinutes"_s, s_->settings.screenSaverMinutes},
+             {u"topRibbonEnabled"_s, s_->settings.topRibbonEnabled},
+             {u"topRibbonShowTime"_s, s_->settings.topRibbonShowTime},
+             {u"topRibbonShowBattery"_s, s_->settings.topRibbonShowBattery},
+             {u"topRibbonShowWifi"_s, s_->settings.topRibbonShowWifi},
+             {u"topRibbonShowCustomerCount"_s, s_->settings.topRibbonShowCustomerCount},
              {u"tableLongMinutes"_s, s_->settings.tableLongMinutes},
              {u"loyaltyEnabled"_s, s_->settings.loyaltyEnabled}, {u"pointsPerDollar"_s, s_->settings.pointsPerDollar},
              {u"rewards"_s, [&] {
