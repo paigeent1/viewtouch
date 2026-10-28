@@ -1154,7 +1154,7 @@ ApplicationWindow {
                 readonly property var pos: root.controller.pos
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: status === Image.Ready
-                source: pos && screenSaver.visible ? (pos.imageRevision < 0 ? undefined : pos.imageUrl("logo:")) : ""
+                source: (root.controller.pos && root.controller.pos.storeLogo ? root.controller.pos.imageUrl("logo:") : Qt.resolvedUrl("logo.png"))
                 sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
                 width: Math.round(root.height * 0.28)
                 height: Math.round(root.height * 0.28)
