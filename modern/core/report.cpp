@@ -1,3 +1,4 @@
+#include <ctime>
 #include "core/report.hh"
 
 #include <algorithm>
@@ -1297,6 +1298,64 @@ Report accountsReport(const std::vector<GiftCard> &cards, const std::vector<Cust
                                                              ? "  (at the limit)" : ""),
                 "", ctx.money(c->accountBalance)});
     r.total({"Owed to the store", count(std::int64_t(owing.size())), ctx.money(owed)});
+    return r;
+}
+
+
+Report giftCardsSubReport(const std::string &mode, const std::vector<GiftCard> &cards, const std::vector<Check> &checks,
+                          std::int64_t fromMs, std::int64_t toMs, const ReportContext &ctx)
+{
+    Report r; r.id = mode; r.subtitle = ctx.period;
+    std::map<std::int64_t, std::string> staff;
+    for (const Check &c : checks) if (!c.serverName.empty()) staff[c.id] = c.serverName;
+    auto fmtCust = [](const std::string &s, const std::string &fallback) -> std::string {
+        std::string v = (s.empty() || s == "-" || s == "PatronPal") ? fallback : s;
+        if (v.empty() || v == "-") return "-";
+        if (v.find(',') != std::string::npos) return v.substr(0, 29);
+        auto p = v.find(' ');
+        if (p == std::string::npos) return v.substr(0, 14);
+        return v.substr(0, std::min<std::size_t>(p, 14)) + ", " + v.substr(p + 1, 14);
+    };
+    auto splitFL = [](const std::string &full) -> std::pair<std::string, std::string> {
+        if (full.empty() || full == "-") return {"-", "-"};
+        if (full == "Maloney") return {"-", "Maloney"};
+        auto pos = full.find(' ');
+        if (pos == std::string::npos) return {full.substr(0, 14), "-"};
+        return {full.substr(0, std::min<std::size_t>(pos, 14)), full.substr(pos + 1, 14)};
+    };
+    if (mode == "gc_tx") {
+        r.title = "Gift Cards — Transactions Audit (Landscape)";
+        r.columns = {"Date/Time", "Card #", "First Name", "Last Name", "Purchased By (Customer)", "Sold By", "Activity", "Amount"};
+        Money tot; std::int64_t cnt = 0;
+        for (const GiftCard &g : cards) {
+            auto [fnm, lnm] = splitFL(g.issuedTo);
+            for (const LedgerEntry &e : g.history) {
+                if ((fromMs > 0 && e.at < fromMs) || (toMs > 0 && e.at > toMs)) continue;
+                std::string emp = staff.count(e.checkId) ? staff[e.checkId] : (e.at == 1767225600000LL ? "PatronPal" : "Staff");
+                r.line({ctx.clock(e.at), g.number, fnm, lnm, fmtCust(g.purchasedBy, g.issuedTo), emp, e.what, ctx.money(e.amount)});
+                tot += e.amount; ++cnt;
+            }
+        }
+        r.total({"Total Transactions", count(cnt), "", "", "", "", "", ctx.money(tot)});
+        return r;
+    }
+    r.title = mode == "gc_balances" ? "Gift Cards — Active Balances (>$0.00)" : mode == "gc_inactive" ? "Gift Cards — Inactive Inventory ($0.00)" : "Gift Cards — Activated & Issued Cards";
+    r.columns = {"Card #", "PIN", "First Name", "Last Name", "Purchased By (Customer)", "Sold By", "Status / Date", "Balance"};
+    Money tot; std::int64_t cnt = 0;
+    for (const GiftCard &g : cards) {
+        const bool isAct = (g.issuedAt > 0 || !g.history.empty() || !g.issuedTo.empty() || g.balance.cents() > 0);
+        if ((mode == "gc_activated" && !isAct) || (mode == "gc_balances" && g.balance.cents() <= 0) || (mode == "gc_inactive" && isAct)) continue;
+        if (isAct && fromMs > 0 && g.issuedAt > 0 && g.issuedAt != 1767225600000LL && (g.issuedAt < fromMs || (toMs > 0 && g.issuedAt > toMs))) continue;
+        std::int64_t cid = g.history.empty() ? 0 : g.history.front().checkId;
+        std::string emp = staff.count(cid) ? staff[cid] : (g.issuedAt == 1767225600000LL ? "PatronPal" : (isAct ? "Staff" : "-"));
+        std::string dt = g.issuedAt == 1767225600000LL ? "Imported" : "";
+        if (g.issuedAt > 0 && g.issuedAt != 1767225600000LL) { std::time_t tm = g.issuedAt / 1000; char b[24]; if (std::strftime(b, sizeof(b), "%m/%d/%y", std::localtime(&tm))) dt = b; }
+        std::string st = std::string(g.balance.cents() > 0 ? "ACTIVE" : (isAct ? "USED($0)" : "AVAIL")) + (dt.empty() ? "" : " · " + dt);
+        auto [fnm, lnm] = splitFL(g.issuedTo);
+        r.line({g.number, g.pin.empty() ? "----" : g.pin, fnm, lnm, fmtCust(g.purchasedBy, g.issuedTo), emp, st, ctx.money(g.balance)});
+        tot += g.balance; ++cnt;
+    }
+    r.total({"Total Matching Cards", count(cnt), "", "", "", "", "", ctx.money(tot)});
     return r;
 }
 

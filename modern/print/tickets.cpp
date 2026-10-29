@@ -10,6 +10,13 @@ using namespace vt::core;
 namespace vt::print {
 
 namespace {
+static std::string fmtCustomerFirstLast(const std::string &name) {
+    if (name.empty() || name.find(',') != std::string::npos) return name;
+    auto pos = name.find(' ');
+    if (pos == std::string::npos) return name;
+    return name.substr(0, pos) + ", " + name.substr(pos + 1);
+}
+
 
 std::vector<std::string> splitLines(const std::string &s)
 {
@@ -202,7 +209,7 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
     d.center(upper(ctx.tr("Your order number")), true);
     d.center(std::to_string(check.id), true, true);
     if (!check.customer.name.empty())
-        d.center(check.customer.name, true, true);
+        d.center(fmtCustomerFirstLast(check.customer.name), true, true);
     d.center(check.type == CheckType::DineIn ? ctx.tr("For here") : ctx.tr("To go"));
     d.center(ctx.dateTime(ctx.now));
     d.rule();
@@ -218,6 +225,9 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
         }
         const std::string qty = l.quantity > 1 ? std::to_string(l.quantity) + " x " : "";
         d.columns(qty + l.displayName(), ctx.money(qualifiedPrice(l.unitPrice, l.qualifier) * l.quantity));
+        if (l.isGiftCard()) {
+            d.text("  Card #: " + l.giftCardNumber());
+        }
         for (const Modifier &m : l.modifiers) {
             // Always print all choices on guest receipt
             d.columns("  " + m.displayName(), m.price().cents() ? ctx.money(m.price() * l.quantity) : "");

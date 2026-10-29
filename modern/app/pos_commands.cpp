@@ -222,7 +222,7 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"forgetCustomer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.forgetCustomer(a.value(0).toString())); }},
         {u"saveCustomer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveCustomer(a.value(0).toMap())); }},
         {u"sellGiftCard"_s, [](PosService &p, const QVariantList &a) {
-             return QVariant(p.sellGiftCard(a.value(0).toString(), a.value(1).toLongLong())); }},
+             return QVariant(p.sellGiftCard(a.value(0).toString(), a.value(1).toLongLong(), a.value(2).toString(), a.value(3).toString())); }},
         {u"lookupGiftCard"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.lookupGiftCard(a.value(0).toString())); }},
         {u"cashOutGiftCard"_s, [](PosService &p, const QVariantList &) { return QVariant(p.cashOutGiftCard()); }},
         {u"payWithGiftCard"_s, [](PosService &p, const QVariantList &a) {

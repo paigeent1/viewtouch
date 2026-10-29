@@ -278,6 +278,33 @@ ApplicationWindow {
         }
     }
 
+    // Floating Keyboard Collapse Button at top-right in banner below topStatusRibbon (double-tap hits underlying button)
+    Rectangle {
+        id: kbTopCollapseBtn
+        parent: Overlay.overlay
+        visible: touchKeys.visible || kbForwardTimer.running
+        z: 1002; width: 78; height: 42; radius: 8
+        x: root.posWidth - width - 10
+        y: (topStatusRibbon.visible ? topStatusRibbon.height : 0) + 6
+        color: kbCollapseTap.pressed ? "#4a7bd8" : "#2a313d"
+        border.color: "#90cdf4"; border.width: 1
+        opacity: touchKeys.visible ? 0.95 : 0.0
+        Text { anchors.centerIn: parent; text: "⌨▾"; color: "white"; font.pixelSize: 22; font.bold: true }
+        Timer { id: kbForwardTimer; interval: 260; repeat: false }
+        function clickUnderlying(scenePt) {
+            for (let it = pageColumn.childAt(scenePt.x, scenePt.y - pageColumn.y); it; it = it.childAt ? it.childAt(it.mapFromScene(scenePt).x, it.mapFromScene(scenePt).y) : null) {
+                if (typeof it.clicked === "function") { it.clicked(); return }
+            }
+        }
+        TapHandler {
+            id: kbCollapseTap
+            onTapped: (eventPoint, button) => {
+                if (touchKeys.visible) { keyboard.dismissed(); kbForwardTimer.restart() }
+                else { kbForwardTimer.stop(); kbTopCollapseBtn.clickUnderlying(eventPoint.scenePressPosition) }
+            }
+        }
+    }
+
     // --- keyboard --------------------------------------------------------------
     // Text fields take their own editing keys first (Qt shortcut override), so
     // Delete/arrows in the inspector edit text instead of zones.
@@ -1154,7 +1181,7 @@ ApplicationWindow {
                 readonly property var pos: root.controller.pos
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: status === Image.Ready
-                source: (root.controller.pos && root.controller.pos.storeLogo ? root.controller.pos.imageUrl("logo:") : Qt.resolvedUrl("logo.png"))
+                source: (Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : (root.controller.pos ? root.controller.pos.imageUrl("logo:") : ""))
                 sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
                 width: Math.round(root.height * 0.28)
                 height: Math.round(root.height * 0.28)

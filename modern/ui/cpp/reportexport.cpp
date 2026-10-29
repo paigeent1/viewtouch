@@ -89,6 +89,8 @@ QString exportReportPdf(const QVariantMap &report, const QString &dir, QString *
         return {};
     QPdfWriter pdf(file);
     pdf.setPageSize(QPageSize(QPageSize::Letter));
+    if (report.value(u"columns"_s).toStringList().size() >= 4)
+        pdf.setPageOrientation(QPageLayout::Landscape);
     pdf.setResolution(150);
     pdf.setTitle(report.value(u"title"_s).toString());
     pdf.setCreator(u"ViewTouch"_s);
@@ -101,7 +103,7 @@ QString exportReportPdf(const QVariantMap &report, const QString &dir, QString *
     const int margin = 90;   // 0.6 in at 150 dpi
     const int width = pdf.width() - 2 * margin;
     const int bottom = pdf.height() - margin;
-    QFont body(u"DejaVu Sans"_s, 10);
+    QFont body(u"DejaVu Sans"_s, report.value(u"columns"_s).toStringList().size() >= 6 ? 8 : 10);
     QFont bold = body;
     bold.setBold(true);
     QFont title = bold;

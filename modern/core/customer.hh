@@ -87,7 +87,11 @@ struct GiftCard {
     std::string number;
     Money balance;
     std::int64_t issuedAt = 0;
-    std::vector<Entry> history;    // oldest first
+    std::vector<Entry> history;
+    std::string pin;
+    std::string purchasedBy;
+    std::string issuedTo;
+    std::string typeCode;    // oldest first
 
     void post(std::int64_t at, Money amount, std::string what, std::int64_t checkId, std::string kind)
     {

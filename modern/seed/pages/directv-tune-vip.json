@@ -857,7 +857,7 @@
         "x": 1490,
         "y": 148,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -884,9 +884,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 242,
+        "y": 232,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -913,9 +913,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 336,
+        "y": 316,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -942,9 +942,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 430,
+        "y": 400,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -971,9 +971,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 524,
+        "y": 484,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -1000,9 +1000,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 618,
+        "y": 568,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -1029,9 +1029,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 712,
+        "y": 652,
         "w": 400,
-        "h": 82
+        "h": 74
       },
       "style": {
         "normal": {
@@ -1051,16 +1051,45 @@
       ]
     },
     {
-      "id": "rk-power",
+      "id": "rk-poweron",
       "kind": "button",
-      "label": "POWER",
+      "label": "TV on",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
         "x": 1490,
-        "y": 806,
+        "y": 736,
         "w": 400,
-        "h": 82
+        "h": 74
+      },
+      "style": {
+        "normal": {
+          "fill": "#15803d"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "vip",
+            "op": "key",
+            "val": "poweron"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-poweroff",
+      "kind": "button",
+      "label": "TV off",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 820,
+        "w": 400,
+        "h": 74
       },
       "style": {
         "normal": {
@@ -1074,7 +1103,7 @@
           "args": {
             "box": "vip",
             "op": "key",
-            "val": "power"
+            "val": "poweroff"
           }
         }
       ]

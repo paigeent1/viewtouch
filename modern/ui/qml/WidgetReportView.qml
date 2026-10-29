@@ -53,6 +53,15 @@ Item {
         { id: "drivers", label: qsTr("Drivers") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
+    readonly property bool isGiftCardReport: reportId === "accounts" || reportId.indexOf("gc_") === 0
+    readonly property var gcModes: [
+        { id: "accounts", label: qsTr("Summary") },
+        { id: "gc_activated", label: qsTr("Activated Cards") },
+        { id: "gc_balances", label: qsTr("Active Balances (>$0)") },
+        { id: "gc_inactive", label: qsTr("Inactive Cards") },
+        { id: "gc_tx", label: qsTr("Transactions (Staff / Buyer / Recipient)") }
+    ]
+    readonly property var colWeights: [0.105, 0.045, 0.14, 0.15, 0.15, 0.11, 0.16, 0.07]
     property int dayIndex: 0
     readonly property var days: pos ? pos.days : []
     readonly property var day: days[Math.min(dayIndex, days.length - 1)] ?? { id: 0, label: "" }
@@ -125,7 +134,32 @@ Item {
                     Layout.fillHeight: true
                     text: modelData.label
                     fontScale: 0.36
-                    baseColor: w.reportId === modelData.id ? "#2f6fd6" : "#343c49"
+                    baseColor: (w.reportId === modelData.id || (modelData.id === "accounts" && w.isGiftCardReport)) ? "#2f6fd6" : "#343c49"
+                    onClicked: w.reportId = modelData.id
+                }
+            }
+        }
+
+        // Gift Cards 5-button submenu row
+        GridLayout {
+            visible: w.isGiftCardReport
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.minimumHeight: w.keyH
+            Layout.maximumHeight: w.keyH
+            Layout.fillHeight: false
+            columns: 5
+            rowSpacing: w.unit * 0.3
+            columnSpacing: w.unit * 0.3
+            Repeater {
+                model: w.gcModes
+                delegate: WidgetKey {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: modelData.label
+                    fontScale: 0.33
+                    baseColor: w.reportId === modelData.id ? "#1f8a4c" : "#2b3340"
                     onClicked: w.reportId = modelData.id
                 }
             }
@@ -299,21 +333,35 @@ Item {
 
         // Column headings (reports with more than one value column)
         RowLayout {
+            id: hdrRow
             visible: (w.report.columns ?? []).length > 2
             Layout.fillWidth: true
+            Layout.rightMargin: 28
             Layout.fillHeight: false
+            spacing: 6
             Repeater {
                 model: w.report.columns ?? []
                 delegate: Text {
                     required property string modelData
                     required property int index
-                    Layout.fillWidth: index === 0
-                    Layout.preferredWidth: index === 0 ? -1 : w.unit * 7
-                    horizontalAlignment: index === 0 ? Text.AlignLeft : Text.AlignRight
+                    readonly property int colCount: (w.report.columns ?? []).length
+                    readonly property bool wide: colCount >= 6
+                    readonly property string colName: (w.report.columns ?? [])[index] ?? ""
+                    readonly property bool isCardCol: wide && colName === "Card #"
+                    readonly property bool isPinCol: wide && colName === "PIN"
+                    readonly property bool isName14Col: wide && (colName === "First Name" || colName === "Last Name")
+                    readonly property bool isAmtCol: wide && index === colCount - 1
+                    Layout.fillWidth: wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
+                    Layout.minimumWidth: isCardCol ? w.unit * 7.2 : (isPinCol ? w.unit * 2.8 : (isName14Col ? w.unit * 5.8 : 0))
+                    Layout.preferredWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
+                    Layout.maximumWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : 9999)))
+                    horizontalAlignment: (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
                     text: modelData
-                    color: "#8a94a6"
+                    color: "#90cdf4"
                     font.family: w.face
-                    font.pixelSize: w.unit * 0.8
+                    font.bold: true
+                    font.pixelSize: wide ? w.unit * 0.78 : w.unit * 0.8
+                    elide: Text.ElideRight
                 }
             }
         }
@@ -330,8 +378,8 @@ Item {
                 required property var modelData
                 readonly property bool section: modelData.kind === "section"
                 readonly property bool total: modelData.kind === "total"
-                width: ListView.view.width - rowsBar.room
-                height: (section ? w.unit * 2.4 : w.unit * 1.6)
+                width: ListView.view.width - Math.max(28, rowsBar.room + 14)
+                height: (section ? w.unit * 2.4 : w.unit * 1.65)
 
                 Rectangle {
                     visible: row.total
@@ -341,20 +389,31 @@ Item {
                     color: "#3a4250"
                 }
                 RowLayout {
+                    id: cellRow
                     anchors.fill: parent
                     anchors.topMargin: row.section ? w.unit * 0.8 : 0
+                    spacing: 6
                     Repeater {
                         model: row.modelData.cells
                         delegate: Text {
                             required property string modelData
                             required property int index
-                            Layout.fillWidth: index === 0
-                            Layout.preferredWidth: index === 0 ? -1 : w.unit * 7
-                            horizontalAlignment: index === 0 ? Text.AlignLeft : Text.AlignRight
+                            readonly property int colCount: (row.modelData.cells ?? []).length
+                            readonly property bool wide: colCount >= 6
+                    readonly property string colName: (w.report.columns ?? [])[index] ?? ""
+                    readonly property bool isCardCol: wide && colName === "Card #"
+                    readonly property bool isPinCol: wide && colName === "PIN"
+                    readonly property bool isName14Col: wide && (colName === "First Name" || colName === "Last Name")
+                    readonly property bool isAmtCol: wide && index === colCount - 1
+                    Layout.fillWidth: wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
+                    Layout.minimumWidth: isCardCol ? w.unit * 7.2 : (isPinCol ? w.unit * 2.8 : (isName14Col ? w.unit * 5.8 : 0))
+                    Layout.preferredWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
+                    Layout.maximumWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : 9999)))
+                            horizontalAlignment: (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
                             text: modelData
                             color: row.modelData.kind === "note" ? "#8a94a6" : w.ink
                             font.family: w.face
-                            font.pixelSize: row.section ? w.unit * 1.1 : w.unit
+                            font.pixelSize: row.section ? w.unit * 1.05 : (wide ? w.unit * 0.78 : w.unit)
                             font.bold: row.section || row.total
                             font.italic: row.modelData.kind === "note"
                             elide: Text.ElideRight

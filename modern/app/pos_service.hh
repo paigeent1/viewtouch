@@ -989,7 +989,7 @@ public:
     bool forgetCustomer(const QString &id);
     // Sell or reload a card on the check (a Quick check if none is open);
     // no number: a new one. Amount 0: the keypad. Live once the check is paid.
-    bool sellGiftCard(const QString &number, qint64 amountCents = 0);
+    bool sellGiftCard(const QString &number, qint64 amountCents = 0, const QString &purchasedBy = {}, const QString &issuedTo = {});
     bool lookupGiftCard(const QString &number);
     // Pay from a card (default: the looked-up one); 0 = keypad, else as much as it covers.
     bool payWithGiftCard(const QString &number = {}, qint64 amountCents = 0);

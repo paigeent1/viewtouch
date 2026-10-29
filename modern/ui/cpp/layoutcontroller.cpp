@@ -669,6 +669,11 @@ void LayoutController::exportReport(const QVariantMap &report, const QString &fo
     QString error;
     const QString file = format == u"pdf" ? exportReportPdf(report, dir, &error) : exportReportCsv(report, dir, &error);
     setStatus(file.isEmpty() ? tr("Could not save the report: %1").arg(error) : tr("Saved to %1").arg(file));
+    if (!file.isEmpty() && format == u"pdf") {
+        QProcess::startDetached(u"/bin/sh"_s, {u"-c"_s,
+            u"mkdir -p ~/Desktop/Reports && cp -f \"%1\" ~/Desktop/Reports/ ; "
+            u"(command -v chromium >/dev/null && chromium --new-window --app=\"file://%1\" || xdg-open \"%1\") >/dev/null 2>&1 &"_s.arg(file)});
+    }
 }
 
 namespace {

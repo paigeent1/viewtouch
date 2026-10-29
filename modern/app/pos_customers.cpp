@@ -350,20 +350,37 @@ void PosService::rememberCustomer(Check &c)
 
 QVariantMap PosService::giftCardInfo() const
 {
-    if (!user() || giftCardNumber_.isEmpty())
-        return {};
+    if (!user() || giftCardNumber_.isEmpty()) return {};
+    auto cardMap = [this](const GiftCard &c) -> QVariantMap {
+        return {{u"number"_s, qs(c.number)}, {u"pin"_s, qs(c.pin)}, {u"issuedTo"_s, qs(c.issuedTo)},
+                {u"purchasedBy"_s, qs(c.purchasedBy)}, {u"balance"_s, format(c.balance)},
+                {u"balanceCents"_s, qint64(c.balance.cents())}, {u"issued"_s, whenText(c.issuedAt)}};
+    };
     const GiftCard *g = s_->giftCard(ss(giftCardNumber_));
-    QVariantMap m{{u"number"_s, giftCardNumber_}, {u"found"_s, g != nullptr},
-                  {u"display"_s, lastFour(ss(giftCardNumber_))}};
-    if (!g)
-        return m;
-    m.insert(u"balance"_s, format(g->balance));
-    m.insert(u"balanceCents"_s, qint64(g->balance.cents()));
-    m.insert(u"issued"_s, whenText(g->issuedAt));
+    QVariantList matches;
+    if (!g) {
+        QString qClean = giftCardNumber_.toLower(); qClean.replace(u',' , u' '); const QStringList toks = qClean.simplified().split(u' ', Qt::SkipEmptyParts);
+        std::vector<const GiftCard *> hits;
+        for (const GiftCard &c : s_->giftCards) {
+            const QString hay = (qs(c.number) + u" "_s + qs(c.pin) + u" "_s + qs(c.issuedTo) + u" "_s + qs(c.purchasedBy)).toLower();
+            bool ok = !toks.isEmpty();
+            for (const QString &tk : toks) if (!hay.contains(tk)) { ok = false; break; }
+            if (ok) hits.push_back(&c);
+        }
+        std::sort(hits.begin(), hits.end(), [](const GiftCard *a, const GiftCard *b) {
+            return (a->balance.cents() > 0) != (b->balance.cents() > 0) ? a->balance.cents() > b->balance.cents() : a->number < b->number;
+        });
+        for (std::size_t i = 0; i < std::min<std::size_t>(hits.size(), 100); ++i) matches.append(cardMap(*hits[i]));
+        if (hits.size() == 1) g = hits[0];
+    } else { matches.append(cardMap(*g)); }
+    QVariantMap m{{u"number"_s, g ? qs(g->number) : giftCardNumber_}, {u"found"_s, g != nullptr},
+                  {u"display"_s, lastFour(g ? g->number : ss(giftCardNumber_))}, {u"matches"_s, matches}};
+    if (!g) return m;
+    m.insert(u"pin"_s, qs(g->pin)); m.insert(u"issuedTo"_s, qs(g->issuedTo)); m.insert(u"purchasedBy"_s, qs(g->purchasedBy));
+    m.insert(u"balance"_s, format(g->balance)); m.insert(u"balanceCents"_s, qint64(g->balance.cents())); m.insert(u"issued"_s, whenText(g->issuedAt));
     QVariantList history;
     for (auto it = g->history.rbegin(); it != g->history.rend() && history.size() < 12; ++it)
-        history.append(QVariantMap{{u"at"_s, whenText(it->at)}, {u"amount"_s, format(it->amount)},
-                                   {u"what"_s, qs(it->what)}});
+        history.append(QVariantMap{{u"at"_s, whenText(it->at)}, {u"amount"_s, format(it->amount)}, {u"what"_s, qs(it->what)}});
     m.insert(u"history"_s, history);
     const std::int64_t below = s_->settings.giftCardCashBelowCents;
     m.insert(u"cashOut"_s, below > 0 && g->balance.cents() > 0 && g->balance.cents() < below);
@@ -413,20 +430,16 @@ bool PosService::cashOutGiftCard()
 
 bool PosService::lookupGiftCard(const QString &number)
 {
-    if (!require(perm::Order, tr("Gift cards")))
-        return false;
-    const QString n = cleanNumber(number);
-    if (n.size() < 4)
-        return fail(tr("Enter or swipe the card number."));
-    giftCardNumber_ = n;
-    const GiftCard *g = s_->giftCard(ss(n));
-    emit notice(g ? tr("Gift card %1: %2").arg(lastFour(ss(n)), format(g->balance))
-                  : tr("Gift card %1 is new").arg(lastFour(ss(n))));
+    if (!require(perm::Order, tr("Gift cards"))) return false;
+    const QString q = number.trimmed();
+    if (q.isEmpty()) { giftCardNumber_.clear(); emit checkChanged(); return false; }
+    const QString digits = cleanNumber(q);
+    giftCardNumber_ = (digits.size() == q.size() && digits.size() >= 4) ? digits : q;
     emit checkChanged();
     return true;
 }
 
-bool PosService::sellGiftCard(const QString &number, qint64 amountCents)
+bool PosService::sellGiftCard(const QString &number, qint64 amountCents, const QString &purchasedBy, const QString &issuedTo)
 {
     if (!require(perm::Order, tr("Selling gift cards")))
         return false;
@@ -460,6 +473,11 @@ bool PosService::sellGiftCard(const QString &number, qint64 amountCents)
     card.taxClass = TaxClass::None;
     card.family = "giftcards";
     OrderLine &l = c->addItem(card);
+    if (GiftCard *g = s_->giftCard(ss(n))) {
+        if (!purchasedBy.trimmed().isEmpty()) g->purchasedBy = ss(purchasedBy.trimmed());
+        if (!issuedTo.trimmed().isEmpty()) g->issuedTo = ss(issuedTo.trimmed());
+        saveGiftCardRecord(*g);
+    }
     selectedLine_ = l.id;
     giftCardNumber_ = n;
     entry_.clear();

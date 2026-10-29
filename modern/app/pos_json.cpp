@@ -1599,8 +1599,9 @@ CustomerRecord customerFromJson(const QJsonObject &o)
 
 QJsonObject toJson(const GiftCard &g)
 {
-    return {{u"number"_s, qs(g.number)}, {u"balance"_s, qint64(g.balance.cents())},
-            {u"issuedAt"_s, qint64(g.issuedAt)}, {u"history"_s, ledgerJson(g.history)}};
+    return {{u"number"_s, qs(g.number)}, {u"pin"_s, qs(g.pin)}, {u"typeCode"_s, qs(g.typeCode)},
+            {u"purchasedBy"_s, qs(g.purchasedBy)}, {u"issuedTo"_s, qs(g.issuedTo)},
+            {u"balance"_s, qint64(g.balance.cents())}, {u"issuedAt"_s, qint64(g.issuedAt)}, {u"history"_s, ledgerJson(g.history)}};
 }
 
 GiftCard giftCardFromJson(const QJsonObject &o)
@@ -1609,6 +1610,10 @@ GiftCard giftCardFromJson(const QJsonObject &o)
     g.number = ss(o.value(u"number").toString());
     g.balance = money(o.value(u"balance"));
     g.issuedAt = i64(o.value(u"issuedAt"));
+    g.pin = ss(o.value(u"pin").toString());
+    g.typeCode = ss(o.value(u"typeCode").toString());
+    g.purchasedBy = ss(o.value(u"purchasedBy").toString());
+    g.issuedTo = ss(o.value(u"issuedTo").toString());
     g.history = ledgerFromJson(o.value(u"history").toArray());
     return g;
 }

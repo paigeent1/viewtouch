@@ -11,6 +11,7 @@ Item {
     readonly property PosService pos: zone ? zone.pos : null
     readonly property var card: pos ? pos.giftCard : ({})
     readonly property bool found: card.found ?? false
+    property bool askingCustomer: false
     property int amountCents: 0
 
     function lookUp() {
@@ -40,7 +41,7 @@ Item {
                 Layout.fillHeight: !w.narrow
                 spacing: 10
 
-                Label { text: qsTr("Card number"); opacity: 0.8 }
+                Label { text: qsTr("Search Card #, Purchased By, or Purchased For…"); opacity: 0.8 }
                 RowLayout {
                     Layout.fillWidth: true
                     TextField {
@@ -49,7 +50,7 @@ Item {
                         Layout.fillWidth: true
                         font.pixelSize: 22
                         placeholderText: qsTr("Type or swipe…")
-                        inputMethodHints: Qt.ImhDigitsOnly
+                        onTextEdited: w.pos.lookupGiftCard(text.trim())
                         focus: true
                         // A card reader types the number and Enter.
                         onAccepted: w.lookUp()
@@ -113,13 +114,15 @@ Item {
                     text: qsTr("No number? A new one is made and printed on the receipt. A card works once its check is paid.")
                 }
                 Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 64
-                    font.pixelSize: 18
-                    highlighted: true
+                    visible: !w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 18; highlighted: true
                     enabled: w.found && (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
                     text: qsTr("Pay the Check from This Card")
-                    onClicked: w.pos.payWithGiftCard(w.card.number, 0)
+                    onClicked: { if ((w.pos.check.customerId ?? "") !== "" || (w.pos.check.customerName ?? "") !== "") w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
+                }
+                RowLayout {
+                    visible: w.askingCustomer; Layout.fillWidth: true; spacing: 8
+                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…"); onClicked: { w.askingCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
+                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; text: qsTr("Bypass & Pay Now"); onClicked: { w.askingCustomer = false; w.pos.payWithGiftCard(w.card.number, 0) } }
                 }
                 // State law (California: under $10): a small balance in cash, when the guest asks.
                 Button {
@@ -154,8 +157,12 @@ Item {
                     font.bold: true
                     color: "#7ee2a8"
                 }
-                Label { visible: w.found; text: qsTr("Since %1").arg(w.card.issued ?? ""); opacity: 0.6 }
-                ListView {
+                Label { visible: w.found; text: qsTr("Since %1  |  PIN: %2  |  For: %3  |  By: %4").arg(w.card.issued ?? "").arg(w.card.pin ?? "----").arg(w.card.issuedTo || "—").arg(w.card.purchasedBy || "—"); opacity: 0.6 }
+                Label { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); text: qsTr("Matching Gift Cards (%1) — Tap a card:").arg((w.card.matches ?? []).length); font.bold: true; color: "#90cdf4" }
+                ListView { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6; model: w.card.matches ?? []
+                    delegate: WidgetKey { required property var modelData; width: ListView.view.width - 12; height: 58; fontScale: 0.32; baseColor: "#2b3340"; text: modelData.number + "   |   PIN: " + (modelData.pin || "----") + "   |   " + modelData.balance + "\n    For: " + (modelData.issuedTo || "—") + "   |   By: " + (modelData.purchasedBy || "—"); onClicked: { number.text = modelData.number; w.pos.lookupGiftCard(modelData.number) } }
+                }
+                ListView { visible: w.found && (w.card.matches ?? []).length <= 1
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true

@@ -591,9 +591,9 @@ public:
     Q_INVOKABLE void useCustomer(const QString &id = {}) { invoke(QStringLiteral("useCustomer"), {id}); }
     Q_INVOKABLE void forgetCustomer(const QString &id) { invoke(QStringLiteral("forgetCustomer"), {id}); }
     Q_INVOKABLE void saveCustomer(const QVariantMap &record) { invoke(QStringLiteral("saveCustomer"), {record}); }
-    Q_INVOKABLE void sellGiftCard(const QString &number, qint64 amountCents = 0)
+    Q_INVOKABLE void sellGiftCard(const QString &number, qint64 amountCents = 0, const QString &purchasedBy = {}, const QString &issuedTo = {})
     {
-        invoke(QStringLiteral("sellGiftCard"), {number, amountCents});
+        invoke(QStringLiteral("sellGiftCard"), {number, amountCents, purchasedBy, issuedTo});
     }
     Q_INVOKABLE void lookupGiftCard(const QString &number) { invoke(QStringLiteral("lookupGiftCard"), {number}); }
     Q_INVOKABLE void cashOutGiftCard() { invoke(QStringLiteral("cashOutGiftCard")); }

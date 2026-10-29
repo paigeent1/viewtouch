@@ -21,28 +21,28 @@ Rectangle {
         ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
         ["a", "s", "d", "f", "g", "h", "j", "k", "l", "'"],
         ["shift", "z", "x", "c", "v", "b", "n", "m", "back"],
-        ["?123", "@", "space", ".", "-", "enter", "hide"],
+        ["?123", "@", "space", ".", "-", "enter"],
     ]
     readonly property var marks: [
         ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
         ["!", "#", "$", "%", "&", "*", "(", ")", "/", "+"],
         [":", ";", "\"", ",", "?", "_", "=", "<", ">", "'"],
         ["abc", "~", "[", "]", "{", "}", "\\", "|", "back"],
-        ["abc", "@", "space", ".", "-", "enter", "hide"],
+        ["abc", "@", "space", ".", "-", "enter"],
     ]
     readonly property var digits: [
-        ["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "back"], ["-", "enter", "hide"],
+        ["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], [".", "0", "back"], ["-", "enter"],
     ]
     // A phone held upright: a bottom row with room for fingers (@ and - are
     // on the symbols page).
     readonly property bool narrow: width < 600
-    readonly property var narrowLetters: letters.slice(0, 4).concat([["?123", ",", "space", ".", "enter", "hide"]])
+    readonly property var narrowLetters: letters.slice(0, 4).concat([["?123", ",", "space", ".", "enter"]])
     readonly property var narrowMarks: [
         ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
         ["@", "#", "$", "%", "&", "*", "-", "+", "(", ")"],
         ["!", "\"", "'", ":", ";", "/", "?", "_", "="],
         ["~", "[", "]", "{", "}", "<", ">", "|", "back"],
-        ["abc", ".", "space", "enter", "hide"],
+        ["abc", ".", "space", "enter"],
     ]
     readonly property var rows: numeric ? digits : symbols ? (narrow ? narrowMarks : marks)
                                                            : (narrow ? narrowLetters : letters)
@@ -123,7 +123,7 @@ Rectangle {
                         id: key
                         required property string modelData
                         readonly property bool wide: modelData === "space"
-                        readonly property bool special: ["shift", "back", "enter", "hide", "?123", "abc"].includes(modelData)
+                        readonly property bool special: ["shift", "back", "enter", "?123", "abc"].includes(modelData)
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.horizontalStretchFactor: wide ? 5 : special && !kb.numeric ? 2 : 1
