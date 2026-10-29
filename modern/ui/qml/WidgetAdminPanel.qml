@@ -540,7 +540,8 @@ Item {
                     }
                 }
 
-                RowLayout {
+                Flow {
+                    spacing: 6
                     // Not on About (nothing there to change), unless changes elsewhere wait.
                     visible: w.index !== -2 && !(w.sectioned && w.query === "" && w.sectionShown === "about" && !w.dirty)
                     Layout.fillWidth: true
