@@ -1,0 +1,4 @@
+  File "/tmp/apply_changes.py", line 12
+    r'text=f"Do you want to save changes to\s*
+    ^
+SyntaxError: unterminated string literal (detected at line 12)
