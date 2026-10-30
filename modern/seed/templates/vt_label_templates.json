@@ -1,0 +1,468 @@
+{
+  "2X1VINYL W/BARCODE": {
+    "width_in": 2.0,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.04,
+        "y": 0.03,
+        "w": 0.62,
+        "h": 0.14,
+        "size": 9,
+        "bold": false,
+        "align": "left"
+      },
+      {
+        "id": "upc_txt",
+        "field": "upc",
+        "x": 0.58,
+        "y": 0.03,
+        "w": 0.84,
+        "h": 0.14,
+        "size": 10,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "date",
+        "field": "date_yymmdd",
+        "x": 1.44,
+        "y": 0.03,
+        "w": 0.52,
+        "h": 0.14,
+        "size": 9,
+        "bold": true,
+        "align": "right"
+      },
+      {
+        "id": "barcode",
+        "field": "barcode_img",
+        "x": 0.22,
+        "y": 0.18,
+        "w": 1.38,
+        "h": 0.22,
+        "size": 10,
+        "bold": false,
+        "align": "center"
+      },
+      {
+        "id": "code26",
+        "field": "year_short",
+        "x": 1.62,
+        "y": 0.2,
+        "w": 0.32,
+        "h": 0.18,
+        "size": 12,
+        "bold": true,
+        "align": "right"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 0.193,
+        "y": 0.339,
+        "w": 1.7,
+        "h": 0.34,
+        "size": 19,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.06,
+        "y": 0.77,
+        "w": 1.88,
+        "h": 0.19,
+        "size": 7,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "DYMO LABEL BAND": {
+    "width_in": 2.5,
+    "height_in": 0.75,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.06,
+        "y": 0.04,
+        "w": 0.8,
+        "h": 0.14,
+        "size": 8,
+        "bold": false,
+        "align": "left"
+      },
+      {
+        "id": "barcode",
+        "field": "barcode_img",
+        "x": 0.2,
+        "y": 0.18,
+        "w": 1.25,
+        "h": 0.24,
+        "size": 10,
+        "bold": false,
+        "align": "center"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 1.5,
+        "y": 0.14,
+        "w": 0.9,
+        "h": 0.3,
+        "size": 16,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.08,
+        "y": 0.5,
+        "w": 2.34,
+        "h": 0.2,
+        "size": 8,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "3X2 VINYL SHELF": {
+    "width_in": 3.0,
+    "height_in": 2.0,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.1,
+        "y": 0.08,
+        "w": 1.3,
+        "h": 0.22,
+        "size": 12,
+        "bold": true,
+        "align": "left"
+      },
+      {
+        "id": "date",
+        "field": "date_yymmdd",
+        "x": 1.9,
+        "y": 0.08,
+        "w": 1.0,
+        "h": 0.22,
+        "size": 10,
+        "bold": false,
+        "align": "right"
+      },
+      {
+        "id": "barcode",
+        "field": "barcode_img",
+        "x": 0.5,
+        "y": 0.34,
+        "w": 2.0,
+        "h": 0.36,
+        "size": 10,
+        "bold": false,
+        "align": "center"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 0.25,
+        "y": 0.8,
+        "w": 2.5,
+        "h": 0.6,
+        "size": 38,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.12,
+        "y": 1.52,
+        "w": 2.76,
+        "h": 0.34,
+        "size": 13,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "2X1VINYL W/BARCODE DBL CIGAR": {
+    "width_in": 2.0,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.05,
+        "y": 0.04,
+        "w": 0.65,
+        "h": 0.14,
+        "size": 8,
+        "bold": true,
+        "align": "left"
+      },
+      {
+        "id": "upc_txt",
+        "field": "upc",
+        "x": 0.65,
+        "y": 0.04,
+        "w": 0.9,
+        "h": 0.14,
+        "size": 9,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "barcode",
+        "field": "barcode_img",
+        "x": 0.25,
+        "y": 0.18,
+        "w": 1.5,
+        "h": 0.22,
+        "size": 10,
+        "bold": false,
+        "align": "center"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 0.2,
+        "y": 0.43,
+        "w": 1.6,
+        "h": 0.3,
+        "size": 22,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.06,
+        "y": 0.76,
+        "w": 1.88,
+        "h": 0.19,
+        "size": 9,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "1.5X1VINYL PR LABEL": {
+    "width_in": 1.5,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.08,
+        "y": 0.06,
+        "w": 1.34,
+        "h": 0.16,
+        "size": 8,
+        "bold": false,
+        "align": "center"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 0.1,
+        "y": 0.28,
+        "w": 1.3,
+        "h": 0.38,
+        "size": 24,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.06,
+        "y": 0.72,
+        "w": 1.38,
+        "h": 0.2,
+        "size": 8,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "DATE LABEL 2UP MR": {
+    "width_in": 2.0,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "date_L",
+        "field": "date_yymmdd",
+        "x": 0.05,
+        "y": 0.08,
+        "w": 0.88,
+        "h": 0.22,
+        "size": 11,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "mfg_L",
+        "field": "manufacturer",
+        "x": 0.05,
+        "y": 0.34,
+        "w": 0.88,
+        "h": 0.2,
+        "size": 9,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "price_L",
+        "field": "price_fmt",
+        "x": 0.05,
+        "y": 0.58,
+        "w": 0.88,
+        "h": 0.32,
+        "size": 16,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "date_R",
+        "field": "date_yymmdd",
+        "x": 1.07,
+        "y": 0.08,
+        "w": 0.88,
+        "h": 0.22,
+        "size": 11,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "mfg_R",
+        "field": "manufacturer",
+        "x": 1.07,
+        "y": 0.34,
+        "w": 0.88,
+        "h": 0.2,
+        "size": 9,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "price_R",
+        "field": "price_fmt",
+        "x": 1.07,
+        "y": 0.58,
+        "w": 0.88,
+        "h": 0.32,
+        "size": 16,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "DATE LABEL 2UP": {
+    "width_in": 2.0,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "date_L",
+        "field": "date_yymmdd",
+        "x": 0.05,
+        "y": 0.14,
+        "w": 0.88,
+        "h": 0.3,
+        "size": 14,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "year_L",
+        "field": "year_short",
+        "x": 0.05,
+        "y": 0.52,
+        "w": 0.88,
+        "h": 0.34,
+        "size": 18,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "date_R",
+        "field": "date_yymmdd",
+        "x": 1.07,
+        "y": 0.14,
+        "w": 0.88,
+        "h": 0.3,
+        "size": 14,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "year_R",
+        "field": "year_short",
+        "x": 1.07,
+        "y": 0.52,
+        "w": 0.88,
+        "h": 0.34,
+        "size": 18,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  },
+  "DESCRIPTION LABEL": {
+    "width_in": 2.0,
+    "height_in": 1.0,
+    "elements": [
+      {
+        "id": "mfg",
+        "field": "manufacturer",
+        "x": 0.06,
+        "y": 0.06,
+        "w": 1.25,
+        "h": 0.18,
+        "size": 10,
+        "bold": true,
+        "align": "left"
+      },
+      {
+        "id": "date",
+        "field": "date_yymmdd",
+        "x": 1.35,
+        "y": 0.06,
+        "w": 0.58,
+        "h": 0.18,
+        "size": 9,
+        "bold": false,
+        "align": "right"
+      },
+      {
+        "id": "desc",
+        "field": "name",
+        "x": 0.06,
+        "y": 0.28,
+        "w": 1.88,
+        "h": 0.34,
+        "size": 13,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "price",
+        "field": "price_fmt",
+        "x": 0.15,
+        "y": 0.64,
+        "w": 1.7,
+        "h": 0.3,
+        "size": 20,
+        "bold": true,
+        "align": "center"
+      }
+    ]
+  }
+}
