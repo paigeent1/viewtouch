@@ -14,25 +14,24 @@ python3 /tmp/apply_changes.py 2>&1 | tee /tmp/output.txt
     echo ""
     echo "=== AUTO-DIAGNOSTIC FOOTER ($(date +'%Y-%m-%d %H:%M:%S')) ==="
     echo "--- Active Processes ---"
-    ps aux | grep -E "[v]t_label_utility|[v]t_barcode_wizard|[v]tmodern" || true
+    ps aux | grep -E "[v]tmodern" || true
     echo "--- Git Status ---"
     git -C /home/pi/viewtouch-main status -sb 2>/dev/null || true
 } >> /tmp/output.txt
-echo "3. Syncing output.txt to Google Drive..."
-rclone copy /tmp/output.txt "gdrive:POS project tmp/"
 rclone copy /home/pi/viewtouch-main/modern/tools/vt_label_utility.py "gdrive:POS project tmp/" 2>/dev/null || true
-rclone copy /home/pi/viewtouch-main/modern/tools/vt_barcode_wizard.py "gdrive:POS project tmp/" 2>/dev/null || true
+echo "3. Syncing output.txt, vt_barcode_wizard.py, and 'done' marker to Google Drive..."
+rclone copy /tmp/output.txt "gdrive:POS project tmp/"
 date +"COMPLETED %Y-%m-%d %H:%M:%S" > /tmp/done
 rclone copy /tmp/done "gdrive:POS project tmp/"
 echo "✓ Done! Uploaded output.txt and 'done' marker to Google Drive!"
 
-# --- 4. PLAY LOUD AUDIO DIRECTLY TO HDMI SINK & ALSA HARDWARE ---
-# Generate 48kHz WAV audio matching PipeWire native rate (48000Hz)
+# --- 4. AUDIO ALERT ROUTED THROUGH HDMI ---
+# Generate 3 loud 880Hz sine beeps into a temporary wav file
 python3 -c '
 import math, struct, wave
-sample_rate = 48000
+sample_rate = 44100
 freq = 880.0
-dur = 0.22
+dur = 0.16
 samples = int(sample_rate * dur)
 fade = int(sample_rate * 0.01)
 buf = bytearray()
@@ -40,40 +39,42 @@ for i in range(samples):
     val = math.sin(2.0 * math.pi * freq * (i / sample_rate))
     if i < fade: val *= (i / fade)
     elif i > samples - fade: val *= ((samples - i) / fade)
-    # 2 channels stereo
-    s = struct.pack("<h", int(val * 32767))
-    buf += s + s
-silence = (struct.pack("<h", 0) * 2) * int(sample_rate * 0.08)
+    buf += struct.pack("<h", int(val * 32767))
+silence = struct.pack("<h", 0) * int(sample_rate * 0.09)
 full = (bytes(buf) + bytes(silence)) * 3
 
 with wave.open("/tmp/vt_beep.wav", "wb") as w:
-    w.setnchannels(2)
+    w.setnchannels(1)
     w.setsampwidth(2)
     w.setframerate(sample_rate)
     w.writeframes(full)
 ' 2>/dev/null
 
-# Generate speech audio file if espeak is present
-if command -v espeak-ng >/dev/null 2>&1; then
-    espeak-ng "Pi is done" -w /tmp/pi_done.wav 2>/dev/null || true
-elif command -v espeak >/dev/null 2>&1; then
-    espeak "Pi is done" -w /tmp/pi_done.wav 2>/dev/null || true
-fi
-
-# 1. Play directly to PipeWire sinks (Sink 56 is HDMI-0, Sink 57 is HDMI-1)
-for sink in 56 57 $(pactl list short sinks 2>/dev/null | awk '{print $1}'); do
-    pactl set-sink-mute "$sink" 0 2>/dev/null || true
-    pactl set-sink-volume "$sink" 100% 2>/dev/null || true
-    paplay --device="$sink" /tmp/vt_beep.wav 2>/dev/null || true
-    if [ -f /tmp/pi_done.wav ]; then
-        paplay --device="$sink" /tmp/pi_done.wav 2>/dev/null || true
-    fi
+# Detect all HDMI audio playback sinks/devices and broadcast the beeps across HDMI
+# Try pipewire / pulseaudio / ALSA direct to HDMI cards (vc4hdmi0 / vc4hdmi1 / bcm2835_hdmi)
+paplay /tmp/vt_beep.wav 2>/dev/null || true
+aplay -q -D default /tmp/vt_beep.wav 2>/dev/null || true
+for hdmi_dev in $(aplay -l 2>/dev/null | grep -i "hdmi" | awk '{print $2}' | tr -d ':'); do
+    aplay -q -D "plughw:${hdmi_dev},0" /tmp/vt_beep.wav 2>/dev/null || true
+done
+for card in 0 1 2 3; do
+    aplay -q -D "plughw:${card},0" /tmp/vt_beep.wav 2>/dev/null || true
+    aplay -q -D "hw:${card},0" /tmp/vt_beep.wav 2>/dev/null || true
 done
 
-# 2. Play directly to ALSA card hardware (vc4hdmi0 is hw:0,0 and vc4hdmi1 is hw:1,0)
-aplay -q -D "plughw:0,0" /tmp/vt_beep.wav 2>/dev/null || true
-aplay -q -D "plughw:1,0" /tmp/vt_beep.wav 2>/dev/null || true
+# Text to speech "Pi is done" across default and HDMI cards
+if command -v espeak-ng >/dev/null 2>&1; then
+    espeak-ng "Pi is done" --stdout 2>/dev/null > /tmp/pi_done.wav
+elif command -v espeak >/dev/null 2>&1; then
+    espeak "Pi is done" --stdout 2>/dev/null > /tmp/pi_done.wav
+elif command -v festival >/dev/null 2>&1; then
+    echo "Pi is done" | text2wave -o /tmp/pi_done.wav 2>/dev/null || true
+fi
+
 if [ -f /tmp/pi_done.wav ]; then
-    aplay -q -D "plughw:0,0" /tmp/pi_done.wav 2>/dev/null || true
-    aplay -q -D "plughw:1,0" /tmp/pi_done.wav 2>/dev/null || true
+    paplay /tmp/pi_done.wav 2>/dev/null || true
+    aplay -q -D default /tmp/pi_done.wav 2>/dev/null || true
+    for hdmi_dev in $(aplay -l 2>/dev/null | grep -i "hdmi" | awk '{print $2}' | tr -d ':'); do
+        aplay -q -D "plughw:${hdmi_dev},0" /tmp/pi_done.wav 2>/dev/null || true
+    done
 fi

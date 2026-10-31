@@ -1807,10 +1807,10 @@ Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring
 
 void LayoutController::runCommand(const QString &name, const QVariantMap &args, Done done)
 {
-    if (name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s) || name == u"openBarcodeWizard"_s || name.startsWith(u"openBarcodeWizard:"_s)) {
+    if (name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s) || name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s)) {
         QStringList procArgs;
         QString upc;
-        for (const QString &prefix : {u"openLabelUtility:"_s, u"openBarcodeWizard:"_s}) {
+        for (const QString &prefix : {u"openLabelUtility:"_s, u"openLabelUtility:"_s}) {
             if (name.startsWith(prefix)) {
                 upc = name.mid(prefix.size()).trimmed();
                 break;
@@ -2235,7 +2235,7 @@ QString LayoutController::describeAction(const Action &a) const
     if (type == u"command") {
         static const QHash<QString, const char *> plain{
             {u"openLabelUtility"_s, QT_TR_NOOP("Opens the ViewTouch Label Utility & Report Designer.")},
-            {u"openBarcodeWizard"_s, QT_TR_NOOP("Opens the ViewTouch Label Utility & Report Designer.")},
+            {u"openLabelUtility"_s, QT_TR_NOOP("Opens the ViewTouch Label Utility & Report Designer.")},
             {u"sendOrder"_s, QT_TR_NOOP("Sends the new items to the kitchen and bar.")},
             {u"voidItem"_s, QT_TR_NOOP("Takes the touched item off the check (after it was sent: a void, which may need a manager).")},
             {u"printReceipt"_s, QT_TR_NOOP("Prints the check for the guest.")},
