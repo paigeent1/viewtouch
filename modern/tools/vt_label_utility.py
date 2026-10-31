@@ -168,23 +168,71 @@ def _unused_old_discover_all_printers():
     return printers
 
 def load_templates():
-    if os.path.exists(TEMPLATE_FILE):
-        try:
-            with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for k, v in DEFAULT_TEMPLATES.items():
-                    if k not in data:
-                        data[k] = v
-                    ensure_box_dims(data[k])
-                return data
-        except Exception:
-            pass
-    return json.loads(json.dumps(DEFAULT_TEMPLATES))
+    tpl_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
+    user_file = os.path.expanduser("~/.local/share/ViewTouch/vt_label_templates_v2.json")
+    seed_file = os.path.join(tpl_dir, "vt_label_templates_v2.json")
+    
+    data = {}
+    for src in (seed_file, user_file):
+        if os.path.exists(src):
+            try:
+                with open(src, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data.update(loaded)
+            except Exception:
+                pass
+                
+    for k, v in DEFAULT_TEMPLATES.items():
+        if k not in data:
+            data[k] = v
+
+    # If Date_Label_2up_MR was renamed to 'Receiving Label' in file manager,
+    # rename any existing 'DATE LABEL 2UP MR' key in data to 'RECEIVING LABEL'!
+    if "DATE LABEL 2UP MR" in data:
+        data["RECEIVING LABEL"] = data.pop("DATE LABEL 2UP MR")
+
+    # Scan file manager folder (~/viewtouch-main/modern/seed/templates) for template files
+    if os.path.exists(tpl_dir):
+        for entry in sorted(os.listdir(tpl_dir)):
+            full_p = os.path.join(tpl_dir, entry)
+            if not os.path.isfile(full_p) or entry.startswith("."):
+                continue
+            base, ext = os.path.splitext(entry)
+            ext = ext.lower()
+            if ext in (".prn", ".nlbl", ".slnx"):
+                tpl_key = base.strip().upper()
+                if tpl_key not in data:
+                    base_ref = data.get("RECEIVING LABEL") or data.get("2X1VINYL W/BARCODE") or list(data.values())[0]
+                    data[tpl_key] = json.loads(json.dumps(base_ref))
+            elif ext == ".json" and entry not in ("vt_label_templates.json", "vt_label_templates_v2.json"):
+                tpl_key = base.strip().upper()
+                try:
+                    with open(full_p, "r", encoding="utf-8") as jf:
+                        single_data = json.load(jf)
+                        if isinstance(single_data, dict):
+                            data[tpl_key] = single_data
+                except Exception:
+                    pass
+
+    for k in data:
+        ensure_box_dims(data[k])
+    return data
 
 def save_templates(tpls):
-    os.makedirs(SANDBOX_DIR, exist_ok=True)
-    with open(TEMPLATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(tpls, f, indent=2)
+    user_dir = os.path.expanduser("~/.local/share/ViewTouch")
+    seed_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
+    os.makedirs(user_dir, exist_ok=True)
+    os.makedirs(seed_dir, exist_ok=True)
+    for p in (
+        os.path.join(user_dir, "vt_label_templates_v2.json"),
+        os.path.join(seed_dir, "vt_label_templates_v2.json")
+    ):
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(tpls, f, indent=2)
+        except Exception:
+            pass
 
 def calc_gs1_check_digit(digits_11):
     total = 0
@@ -1759,7 +1807,7 @@ class VTLabelUtility(tk.Tk):
             filetypes=[("Label Templates", "*.json *.prn *.nlbl *.slnx"), ("All Files", "*.*")]
         )
         if not path: return
-        chosen_tpl = None
+        file_stem = os.path.splitext(os.path.basename(path))[0].strip().upper()
         if path.endswith(".json"):
             try:
                 loaded = json.load(open(path, "r", encoding="utf-8"))
@@ -1770,8 +1818,12 @@ class VTLabelUtility(tk.Tk):
             except Exception as e:
                 messagebox.showerror("Error", f"Could not load JSON: {e}"); return
         else:
-            fn = os.path.basename(path).upper()
-            chosen_tpl = "DATE LABEL 2UP MR" if ("2UP" in fn and "MR" in fn) else ("DATE LABEL 2UP" if "2UP" in fn else ("DESCRIPTION LABEL" if "DESC" in fn else list(self.templates.keys())[-1]))
+            chosen_tpl = file_stem
+            if chosen_tpl not in self.templates:
+                base_ref = self.templates.get("RECEIVING LABEL") or list(self.templates.values())[0]
+                self.templates[chosen_tpl] = json.loads(json.dumps(base_ref))
+                save_templates(self.templates)
+
         if chosen_tpl and chosen_tpl in self.templates:
             self.came_from_step = self.current_step
             self.show_step(4)
@@ -1889,6 +1941,11 @@ class VTLabelUtility(tk.Tk):
             "#0284c7", "#b45309", "#0e7490", "#334155", "#1e293b"
         ]
 
+        active_tpl_names = list(self.templates.keys())
+        if "RECEIVING LABEL" in active_tpl_names:
+            active_tpl_names.remove("RECEIVING LABEL")
+            active_tpl_names.insert(0, "RECEIVING LABEL")
+
         for slot in range(9):
             row_idx = slot // 3
             col_idx = slot % 3
@@ -1898,9 +1955,14 @@ class VTLabelUtility(tk.Tk):
                 w_in = t_data.get("width_in", 2.0)
                 h_in = t_data.get("height_in", 1.0)
                 p_dest = t_data.get("default_printer", "Auto")
-                short_name = t_name.replace("VINYL", "").replace("W/BARCODE", "").strip() or t_name
+                # Pull description directly from the template name matching the file in file manager
+                desc_name = t_name.strip()
+                words = desc_name.split()
+                if len(desc_name) > 14 and len(words) > 1:
+                    mid = (len(words) + 1) // 2
+                    desc_name = " ".join(words[:mid]) + "\n" + " ".join(words[mid:])
                 prn_short = p_dest.split("(")[0].replace("VT TCP:", "").strip()
-                lbl_text = f"{short_name}\n{w_in} in x {h_in} in\n[{prn_short}]"
+                lbl_text = f"{desc_name}\n{w_in} in x {h_in} in\n[{prn_short}]"
                 c_bg = tpl_colors[slot % len(tpl_colors)]
 
                 tbtn = make_vt_btn(

@@ -293,79 +293,6 @@
       }
     ]
   },
-  "DATE LABEL 2UP MR": {
-    "width_in": 2.2,
-    "height_in": 0.75,
-    "elements": [
-      {
-        "id": "rec_left",
-        "field": "static:RECEIVED",
-        "x": 0.0,
-        "y": 0.0,
-        "w": 1.066,
-        "h": 0.242,
-        "size": 16,
-        "bold": true,
-        "align": "center"
-      },
-      {
-        "id": "init_left",
-        "field": "emp_initials",
-        "x": 0.037,
-        "y": 0.207,
-        "w": 0.98,
-        "h": 0.18,
-        "size": 13,
-        "bold": true,
-        "align": "center"
-      },
-      {
-        "id": "date_left",
-        "field": "date_slash",
-        "x": 0.0,
-        "y": 0.466,
-        "w": 1.08,
-        "h": 0.279,
-        "size": 19,
-        "bold": true,
-        "align": "center"
-      },
-      {
-        "id": "rec_left",
-        "field": "static:RECEIVED",
-        "x": 1.12,
-        "y": 0.0,
-        "w": 1.066,
-        "h": 0.242,
-        "size": 16,
-        "bold": true,
-        "align": "center"
-      },
-      {
-        "id": "init_left",
-        "field": "emp_initials",
-        "x": 1.157,
-        "y": 0.207,
-        "w": 0.98,
-        "h": 0.18,
-        "size": 13,
-        "bold": true,
-        "align": "center"
-      },
-      {
-        "id": "date_left",
-        "field": "date_slash",
-        "x": 1.12,
-        "y": 0.466,
-        "w": 1.08,
-        "h": 0.279,
-        "size": 19,
-        "bold": true,
-        "align": "center"
-      }
-    ],
-    "default_printer": "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]"
-  },
   "DATE LABEL 2UP": {
     "width_in": 2.0,
     "height_in": 1.0,
@@ -465,5 +392,78 @@
         "align": "center"
       }
     ]
+  },
+  "RECEIVING LABEL": {
+    "width_in": 2.2,
+    "height_in": 0.75,
+    "elements": [
+      {
+        "id": "rec_left",
+        "field": "static:RECEIVED",
+        "x": 0.0,
+        "y": 0.0,
+        "w": 1.066,
+        "h": 0.242,
+        "size": 16,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "init_left",
+        "field": "emp_initials",
+        "x": 0.037,
+        "y": 0.207,
+        "w": 0.98,
+        "h": 0.18,
+        "size": 13,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "date_left",
+        "field": "date_slash",
+        "x": 0.0,
+        "y": 0.466,
+        "w": 1.08,
+        "h": 0.279,
+        "size": 19,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "rec_left",
+        "field": "static:RECEIVED",
+        "x": 1.12,
+        "y": 0.0,
+        "w": 1.066,
+        "h": 0.242,
+        "size": 16,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "init_left",
+        "field": "emp_initials",
+        "x": 1.157,
+        "y": 0.207,
+        "w": 0.98,
+        "h": 0.18,
+        "size": 13,
+        "bold": true,
+        "align": "center"
+      },
+      {
+        "id": "date_left",
+        "field": "date_slash",
+        "x": 1.12,
+        "y": 0.466,
+        "w": 1.08,
+        "h": 0.279,
+        "size": 19,
+        "bold": true,
+        "align": "center"
+      }
+    ],
+    "default_printer": "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]"
   }
 }
