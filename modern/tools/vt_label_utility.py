@@ -1065,133 +1065,135 @@ class ReportDesignerWindow(tk.Toplevel):
 
     def _build_ui(self):
         # Row 1 Toolbar: Save, Undo/Redo, Element Selector, Data Source Dropdown, Font, Bold/Italic, Align, Close
-        tbar1 = tk.Frame(self, bg="#1e242d", bd=1, relief="raised")
+        tbar1 = tk.Frame(self, bg="#0c1017", bd=0, relief="flat", pady=4)
         tbar1.pack(fill="x", side="top")
 
-        make_vt_btn(tbar1, text="💾 Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), command=self.save_and_close).pack(side="left", padx=4, pady=4)
-        make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), command=self.undo).pack(side="left", padx=2)
-        make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), command=self.redo).pack(side="left", padx=2)
+        # 1. PACK CLOSE ON THE RIGHT FIRST SO IT IS PERMANENTLY ANCHORED AT TOP-RIGHT!
+        make_vt_btn(tbar1, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=12, pady=6, radius=12, command=self.on_close_request).pack(side="right", padx=8, pady=2)
 
-        tk.Label(tbar1, text="Object:", bg="#1e242d", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(6, 2))
+        make_vt_btn(tbar1, text="💾 Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
+        make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.undo).pack(side="left", padx=2, pady=2)
+        make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.redo).pack(side="left", padx=2, pady=2)
+
+        tk.Label(tbar1, text="Object:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2))
         self.el_var = tk.StringVar()
-        self.el_cb = ttk.Combobox(tbar1, textvariable=self.el_var, state="readonly", width=16, font=("Sans", 10, "bold"))
-        self.el_cb.pack(side="left", padx=2)
+        self.el_cb = ttk.Combobox(tbar1, textvariable=self.el_var, state="readonly", width=12, font=("Sans", 9, "bold"))
+        self.el_cb.pack(side="left", padx=2, ipady=2)
         self.el_cb.bind("<<ComboboxSelected>>", self.on_pick_element)
 
-        tk.Label(tbar1, text="Data Field:", bg="#1e242d", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(6, 2))
+        tk.Label(tbar1, text="Field:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2))
         self.ftype_var = tk.StringVar()
-        self.ftype_cb = ttk.Combobox(tbar1, textvariable=self.ftype_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=25, font=("Sans", 10))
-        self.ftype_cb.pack(side="left", padx=2)
+        self.ftype_cb = ttk.Combobox(tbar1, textvariable=self.ftype_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=18, font=("Sans", 9))
+        self.ftype_cb.pack(side="left", padx=2, ipady=2)
         self.ftype_cb.bind("<<ComboboxSelected>>", self.on_change_field_type)
 
-        tk.Label(tbar1, text="Text:", bg="#1e242d", fg="#cbd5e1", font=("Sans", 10)).pack(side="left", padx=(4, 2))
+        tk.Label(tbar1, text="Text:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(4, 2))
         self.custom_text_var = tk.StringVar(value="")
-        ct_ent = tk.Entry(tbar1, textvariable=self.custom_text_var, width=11, font=("Sans", 10, "bold"))
-        ct_ent.pack(side="left", padx=2)
+        ct_ent = tk.Entry(tbar1, textvariable=self.custom_text_var, width=9, font=("Sans", 9, "bold"), bd=0, highlightthickness=1, highlightbackground="#334155")
+        ct_ent.pack(side="left", padx=2, ipady=2)
         ct_ent.bind("<Return>", self.apply_custom_text)
         ct_ent.bind("<FocusOut>", self.apply_custom_text)
 
-        tk.Label(tbar1, text="Font:", bg="#1e242d", fg="#cbd5e1", font=("Sans", 10)).pack(side="left", padx=(4, 2))
+        tk.Label(tbar1, text="Font:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(4, 2))
         self.font_fam_var = tk.StringVar(value="Sans")
-        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=font_family_choices(), state="readonly", width=16)
-        ff_cb.pack(side="left", padx=2); ff_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
+        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=["Sans", "Serif", "Mono"], state="readonly", width=6, font=("Sans", 9))
+        ff_cb.pack(side="left", padx=2, ipady=2)
+        ff_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
 
         self.size_var = tk.StringVar(value="12")
-        sz_spin = tk.Spinbox(tbar1, from_=5, to=72, textvariable=self.size_var, width=3, font=("Sans", 10), command=self.apply_prop_change)
-        sz_spin.pack(side="left", padx=2)
+        sz_spin = tk.Spinbox(tbar1, from_=5, to=72, textvariable=self.size_var, width=3, font=("Sans", 9, "bold"), command=self.apply_prop_change)
+        sz_spin.pack(side="left", padx=2, ipady=2)
         sz_spin.bind("<Return>", lambda _e: self.apply_prop_change())
 
         self.bold_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(tbar1, text="B", variable=self.bold_var, bg="#1e242d", fg="white", selectcolor="#0f172a", font=("Sans", 10, "bold"), command=self.apply_prop_change).pack(side="left", padx=1)
+        tk.Checkbutton(tbar1, text="B", variable=self.bold_var, bg="#0c1017", fg="white", selectcolor="#1e293b", activebackground="#0c1017", activeforeground="white", bd=0, highlightthickness=0, font=("Sans", 9, "bold"), command=self.apply_prop_change).pack(side="left", padx=2)
         self.italic_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(tbar1, text="I", variable=self.italic_var, bg="#1e242d", fg="white", selectcolor="#0f172a", font=("Sans", 10, "italic"), command=self.apply_prop_change).pack(side="left", padx=1)
+        tk.Checkbutton(tbar1, text="I", variable=self.italic_var, bg="#0c1017", fg="white", selectcolor="#1e293b", activebackground="#0c1017", activeforeground="white", bd=0, highlightthickness=0, font=("Sans", 9, "italic"), command=self.apply_prop_change).pack(side="left", padx=2)
 
         self.align_var = tk.StringVar(value="center")
-        al_cb = ttk.Combobox(tbar1, textvariable=self.align_var, values=["left", "center", "right"], state="readonly", width=6)
-        al_cb.pack(side="left", padx=2)
+        al_cb = ttk.Combobox(tbar1, textvariable=self.align_var, values=["left", "center", "right"], state="readonly", width=5, font=("Sans", 9))
+        al_cb.pack(side="left", padx=2, ipady=2)
         al_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
 
-        make_vt_btn(tbar1, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), command=self.on_close_request).pack(side="right", padx=6)
-
-        # Row 2 Toolbar: ILSA-Style Component Palette (Click Icon -> Click Label Canvas to Drop Component)
-        tbar_pal = tk.Frame(self, bg="#0f172a", bd=1, relief="raised")
+        # Row 2 Toolbar: Component Palette (3x3 Matrix Button Style!)
+        tbar_pal = tk.Frame(self, bg="#14171c", bd=0, relief="flat", pady=3)
         tbar_pal.pack(fill="x", side="top")
-        tk.Label(tbar_pal, text="🧰 Component Palette (Click Tool, Then Click Label):", bg="#0f172a", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=8, pady=3)
+        tk.Label(tbar_pal, text="🧰 Palette (Tap Tool -> Tap Label):", bg="#14171c", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=8, pady=3)
         palette_items = [
-            ("🔤 Label", "static_label"),
-            ("🏷️ DBText (Desc)", "name"),
-            ("💲 DBText (Price)", "price_fmt"),
-            ("🏭 DBText (Brand)", "manufacturer"),
-            ("🔢 DBText (UPC)", "upc"),
-            ("📅 SysVar (Date)", "date_yymmdd"),
-            ("👤 SysVar (Emp)", "emp_initials"),
-            ("📝 Variable", "variable_text"),
-            ("🧮 DBCalc", "db_calc"),
-            ("║▌ DBBarCode (128)", "barcode_img"),
-            ("║▌ UPC-A", "barcode_upca"),
+            ("🔤 Label", "static_label", "#1d4ed8"),
+            ("🏷️ DBText (Desc)", "name", "#047857"),
+            ("💲 DBText (Price)", "price_fmt", "#0f766e"),
+            ("🏭 DBText (Brand)", "manufacturer", "#4338ca"),
+            ("🔢 DBText (UPC)", "upc", "#0284c7"),
+            ("📅 SysVar (Date)", "date_yymmdd", "#b45309"),
+            ("👤 SysVar (Emp)", "emp_initials", "#0e7490"),
+            ("📝 Variable", "variable_text", "#7c3aed"),
+            ("🧮 DBCalc", "db_calc", "#334155"),
+            ("║▌ Code 128", "barcode_img", "#1e293b"),
+            ("║▌ UPC-A", "barcode_upca", "#1e293b"),
         ]
-        for btn_lbl, fk in palette_items:
-            tk.Button(
-                tbar_pal, text=btn_lbl, bg="#1e293b", fg="#f8fafc", activebackground="#2563eb", activeforeground="white",
-                font=("Sans", 9, "bold"), padx=5, pady=1,
+        for btn_lbl, fk, pal_bg in palette_items:
+            make_vt_btn(
+                tbar_pal, text=btn_lbl, bg=pal_bg, fg="#ffffff",
+                font=("Sans", 9, "bold"), padx=6, pady=4, radius=10,
                 command=lambda k=fk, l=btn_lbl: self.arm_palette_tool(k, l)
             ).pack(side="left", padx=2, pady=2)
 
         # Row 3 Toolbar: Box Dimensions, WordWrap, Auto-Fit, Layer Order, Duplicate, Rotate, Delete, Label Size
-        tbar2 = tk.Frame(self, bg="#14171c", bd=1, relief="raised")
+        tbar2 = tk.Frame(self, bg="#0c1017", bd=0, relief="flat", pady=4)
         tbar2.pack(fill="x", side="top")
 
-        tk.Label(tbar2, text="📐 Box W:", bg="#14171c", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2), pady=3)
-        self.box_w_var = tk.StringVar(value="1.00")
-        bw_spin = tk.Spinbox(tbar2, from_=0.10, to=4.00, increment=0.05, format="%.2f", textvariable=self.box_w_var, width=5, font=("Sans", 10), command=self.apply_box_spin_change)
-        bw_spin.pack(side="left", padx=2)
-        bw_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
-
-        tk.Label(tbar2, text="Box H:", bg="#14171c", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2))
-        self.box_h_var = tk.StringVar(value="0.20")
-        bh_spin = tk.Spinbox(tbar2, from_=0.08, to=3.00, increment=0.02, format="%.2f", textvariable=self.box_h_var, width=5, font=("Sans", 10), command=self.apply_box_spin_change)
-        bh_spin.pack(side="left", padx=2)
-        bh_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
-
-        self.autofit_font_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(tbar2, text="AutoSize Font", variable=self.autofit_font_var, bg="#14171c", fg="#f8fafc", selectcolor="#0f172a", font=("Sans", 9, "bold"), command=self.on_toggle_autofit).pack(side="left", padx=6)
-
-        self.word_wrap_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(tbar2, text="WordWrap (2-Line)", variable=self.word_wrap_var, bg="#14171c", fg="#f8fafc", selectcolor="#0f172a", font=("Sans", 9, "bold"), command=self.toggle_word_wrap).pack(side="left", padx=4)
-
-        make_vt_btn(tbar2, text="⬆ Front", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), command=self.bring_to_front).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="⬇ Back", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), command=self.send_to_back).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="🔄 Rotate", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), command=self.rotate_selected).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="📑 Dup", bg="#d97706", fg="#ffffff", font=("Sans", 9, "bold"), command=self.duplicate_selected).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="🗑️ Del", bg="#dc2626", fg="#ffffff", font=("Sans", 9, "bold"), command=self.delete_field).pack(side="left", padx=2)
-
-        make_vt_btn(tbar2, text="Apply Size", bg="#0d9488", fg="#ffffff", font=("Sans", 9, "bold"), command=self.resize_label).pack(side="right", padx=4)
+        # Right-side controls packed first so they stay visible
+        make_vt_btn(tbar2, text="Apply Size", bg="#0f766e", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.resize_label).pack(side="right", padx=4)
         self.lh_var = tk.StringVar(value=str(self.tpl["height_in"]))
         self.lw_var = tk.StringVar(value=str(self.tpl["width_in"]))
-        tk.Entry(tbar2, textvariable=self.lh_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1)
-        tk.Label(tbar2, text="x", bg="#14171c", fg="white").pack(side="right")
-        tk.Entry(tbar2, textvariable=self.lw_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1)
+        tk.Entry(tbar2, textvariable=self.lh_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1, ipady=2)
+        tk.Label(tbar2, text="x", bg="#0c1017", fg="white").pack(side="right")
+        tk.Entry(tbar2, textvariable=self.lw_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1, ipady=2)
 
-        # Media Stock Preset Selector in Designer
         cur_w, cur_h = float(self.tpl.get("width_in", 2.0)), float(self.tpl.get("height_in", 1.0))
         init_media = next((m[0] for m in MEDIA_STOCK_PRESETS if m[1] == cur_w and m[2] == cur_h), self.tpl.get("media_stock", "Custom Size (W x H in)"))
         self.media_var = tk.StringVar(value=init_media)
-        media_cb = ttk.Combobox(tbar2, textvariable=self.media_var, values=MEDIA_STOCK_LABELS, state="readonly", width=22, font=("Sans", 9, "bold"))
-        media_cb.pack(side="right", padx=4)
+        media_cb = ttk.Combobox(tbar2, textvariable=self.media_var, values=MEDIA_STOCK_LABELS, state="readonly", width=18, font=("Sans", 9, "bold"))
+        media_cb.pack(side="right", padx=4, ipady=2)
         media_cb.bind("<<ComboboxSelected>>", self.on_pick_media_preset)
-        tk.Label(tbar2, text="📏 Stock:", bg="#14171c", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
+        tk.Label(tbar2, text="📏 Stock:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
 
-        # Target Printer Selector in Designer (Saved directly with this Label Template!)
         avail_printers = discover_all_printers()
         saved_p = self.tpl.get("default_printer", "")
         if not saved_p or saved_p not in avail_printers:
             saved_p = avail_printers[0] if avail_printers else "PDF Preview (Desktop)"
             self.tpl["default_printer"] = saved_p
         self.designer_printer_var = tk.StringVar(value=saved_p)
-        prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=28, font=("Sans", 9, "bold"))
-        prn_cb.pack(side="right", padx=4)
+        prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=22, font=("Sans", 9, "bold"))
+        prn_cb.pack(side="right", padx=4, ipady=2)
         prn_cb.bind("<<ComboboxSelected>>", self.on_pick_designer_printer)
-        tk.Label(tbar2, text="🖨️ Target Printer:", bg="#14171c", fg="#14b8a6", font=("Sans", 9, "bold")).pack(side="right", padx=(8, 2))
+        tk.Label(tbar2, text="🖨️ Target:", bg="#0c1017", fg="#14b8a6", font=("Sans", 9, "bold")).pack(side="right", padx=(6, 2))
+
+        # Left-side box dimension & tool buttons
+        tk.Label(tbar2, text="📐 Box W:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2), pady=3)
+        self.box_w_var = tk.StringVar(value="1.00")
+        bw_spin = tk.Spinbox(tbar2, from_=0.10, to=4.00, increment=0.05, format="%.2f", textvariable=self.box_w_var, width=4, font=("Sans", 9, "bold"), command=self.apply_box_spin_change)
+        bw_spin.pack(side="left", padx=2, ipady=2)
+        bw_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
+
+        tk.Label(tbar2, text="H:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(4, 2))
+        self.box_h_var = tk.StringVar(value="0.20")
+        bh_spin = tk.Spinbox(tbar2, from_=0.08, to=3.00, increment=0.02, format="%.2f", textvariable=self.box_h_var, width=4, font=("Sans", 9, "bold"), command=self.apply_box_spin_change)
+        bh_spin.pack(side="left", padx=2, ipady=2)
+        bh_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
+
+        self.autofit_font_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(tbar2, text="AutoFont", variable=self.autofit_font_var, bg="#0c1017", fg="#f8fafc", selectcolor="#1e293b", activebackground="#0c1017", activeforeground="white", bd=0, highlightthickness=0, font=("Sans", 9, "bold"), command=self.on_toggle_autofit).pack(side="left", padx=4)
+
+        self.word_wrap_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(tbar2, text="Wrap", variable=self.word_wrap_var, bg="#0c1017", fg="#f8fafc", selectcolor="#1e293b", activebackground="#0c1017", activeforeground="white", bd=0, highlightthickness=0, font=("Sans", 9, "bold"), command=self.toggle_word_wrap).pack(side="left", padx=4)
+
+        make_vt_btn(tbar2, text="⬆ Front", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.bring_to_front).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="⬇ Back", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.send_to_back).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="🔄 Rotate", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.rotate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="📋 Dup", bg="#b45309", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.duplicate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="🗑️ Del", bg="#dc2626", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.delete_field).pack(side="left", padx=2)
 
         # Designer Gray Workspace
         work = tk.Frame(self, bg="#808080")
