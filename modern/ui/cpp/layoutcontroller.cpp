@@ -217,6 +217,10 @@ void LayoutController::screenOn()
 
 void LayoutController::idleTimeout()
 {
+    if (QProcess::execute(u"pgrep"_s, {u"-f"_s, u"vt_label_utility.py"_s}) == 0) {
+        restartIdle();
+        return;
+    }
     // Not while a page is being edited (the editor guards its own changes).
     if (!pos_ || !pos_->loggedIn() || editing())
         return;
@@ -1803,6 +1807,22 @@ Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring
 
 void LayoutController::runCommand(const QString &name, const QVariantMap &args, Done done)
 {
+    if (name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s) || name == u"openBarcodeWizard"_s || name.startsWith(u"openBarcodeWizard:"_s)) {
+        QStringList procArgs;
+        if (name.startsWith(u"openBarcodeWizard:"_s)) {
+            const QString upc = name.mid(18).trimmed();
+            if (!upc.isEmpty())
+                procArgs << u"--upc"_s << upc;
+        } else {
+            const QString upc = args.value(u"upc"_s).toString().trimmed();
+            if (!upc.isEmpty())
+                procArgs << u"--upc"_s << upc;
+        }
+        setStatus(tr("Opening Label Utility..."));
+        QProcess::startDetached(u"/usr/local/bin/vt-label-utility"_s, procArgs);
+        return done(true);
+    }
+
     if (name == u"editFloorPlan") {
         navigate(Navigator::Mode::Push, u"tables"_s);
         requestEditMode();

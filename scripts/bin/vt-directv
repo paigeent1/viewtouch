@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+import sys, json, pathlib, sqlite3, urllib.request, urllib.error
+
+BOXES = {
+    "front": {"ip": "192.168.6.70", "name": "BAR FRONT"},
+    "bar1":  {"ip": "192.168.6.74", "name": "BAR 1"},
+    "bar2":  {"ip": "192.168.6.71", "name": "BAR 2"},
+    "box72": {"ip": "192.168.6.72", "name": "BOX .72 (192.168.6.72)"},
+    "vip":   {"ip": "192.168.6.73", "name": "VIP"},
+}
+CHANNELS = {
+    "206": "ESPN", "209": "ESPN2", "219": "FS1", "212": "NFL Net",
+    "213": "MLB Net", "216": "NBA TV", "215": "NHL Net", "221": "CBS Sports",
+    "631": "YES Net", "639": "SNY", "634": "MSG", "628": "NESN",
+    "245": "TNT", "247": "TBS", "242": "USA", "218": "Golf",
+    "703": "RedZone", "610": "BTN", "202": "CNN", "360": "Fox News"
+}
+
+BASE = pathlib.Path("/home/pi/.local/share/ViewTouch/ViewTouch")
+FREQ_FILE = BASE / "directv_freq.json"
+DB_FILE   = BASE / "viewtouch.db"
+CACHE_FILE = BASE / "pages-cache.json"
+SEED_DIR  = pathlib.Path("/home/pi/viewtouch-main/modern/seed/pages")
+
+def load_freq():
+    if FREQ_FILE.exists():
+        try: return json.loads(FREQ_FILE.read_text())
+        except Exception: pass
+    return {"206": 5, "219": 4, "212": 4, "631": 3, "639": 3, "628": 2, "209": 2, "245": 1}
+
+def call_shef(ip, path):
+    try:
+        r = urllib.request.urlopen(f"http://{ip}:8080{path}", timeout=2.0)
+        return json.loads(r.read().decode("utf-8", errors="ignore"))
+    except urllib.error.HTTPError as e: return {"status": {"code": e.code, "msg": e.reason}}
+    except Exception as e: return {"status": {"code": 500, "msg": str(e)}}
+
+def btn(zid, lbl, x, y, w, h, fill, acts):
+    return {"id": zid, "kind": "button", "label": lbl, "shape": "rect", "behavior": "blink",
+            "rect": {"x": x, "y": y, "w": w, "h": h}, "style": {"normal": {"fill": fill}}, "actions": acts}
+def jmp(mode, pg):
+    return [{"type": "jump", "mode": mode, "page": pg, "target": pg}]
+
+def build_pages():
+    freq = load_freq()
+    top8 = sorted(freq.items(), key=lambda kv: (-kv[1], int(kv[0]) if kv[0].isdigit() else 9999))[:8]
+    pages = {}
+    dz = [
+        {"id": "title", "kind": "label", "label": "📺 DIRECTV — Select Receiver", "shape": "rect", "behavior": "none", "rect": {"x": 40, "y": 24, "w": 1840, "h": 80}},
+        btn("b-bar1",  "📺 BAR 1\n(192.168.6.74)",   100, 150, 540, 220, "#1e3a8a", jmp("push", "directv-tune-bar1")),
+        btn("b-bar2",  "📺 BAR 2\n(192.168.6.71)",   690, 150, 540, 220, "#1e3a8a", jmp("push", "directv-tune-bar2")),
+        btn("b-front", "📺 BAR FRONT\n(192.168.6.70)", 1280, 150, 540, 220, "#1e3a8a", jmp("push", "directv-tune-front")),
+        btn("b-72",    "📺 BOX .72\n(192.168.6.72)", 100, 420, 540, 220, "#0284c7", jmp("push", "directv-tune-box72")),
+        btn("b-vip",   "📺 VIP\n(192.168.6.73)",     690, 420, 540, 220, "#6b46c1", jmp("push", "directv-tune-vip")),
+        btn("b-all",   "📺 ALL 5 BOXES",             1280, 420, 540, 220, "#1f8a4c", jmp("push", "directv-tune-all")),
+        btn("back-t",  "‹ Back to Tables",           100, 920, 420, 110, "#b83232", jmp("replace", "tables")),
+    ]
+    pages["directv"] = {"schemaVersion": 1, "id": "directv", "name": "DIRECTV", "kind": "custom", "canvas": {"w": 1920, "h": 1080}, "grid": 8, "zones": dz}
+
+    tgts = list(BOXES.items()) + [("all", {"ip": "ALL", "name": "ALL 5 BOXES"})]
+    g_chs = list(CHANNELS.keys())
+    r_keys = [("CH ▲", "chanup", "#1f8a4c"), ("CH ▼", "chandown", "#1f8a4c"), ("PREV", "prev", "#d97706"),
+              ("GUIDE", "guide", "#2b62b0"), ("EXIT", "exit", "#475569"), ("INFO", "info", "#475569"),
+              ("SELECT", "select", "#2b62b0"), ("TV on", "poweron", "#15803d"), ("TV off", "poweroff", "#b83232")]
+    for bkey, binfo in tgts:
+        pid = f"directv-tune-{bkey}"
+        z = [{"id": "t", "kind": "label", "label": f"📺 Tuning: {binfo['name']} ({binfo['ip']})", "shape": "rect", "behavior": "none", "rect": {"x": 24, "y": 16, "w": 1872, "h": 64}},
+             {"id": "fh", "kind": "label", "label": "⭐ FREQUENTLY USED", "shape": "rect", "behavior": "none", "rect": {"x": 24, "y": 88, "w": 430, "h": 52}}]
+        for idx, (ch, cnt) in enumerate(top8):
+            lbl = f"#{idx+1}  {CHANNELS.get(ch, ch)} ({ch})  [{cnt}x]"
+            z.append(btn(f"fq-{idx}", lbl, 24, 148 + idx*94, 430, 82, "#0f766e", [{"type": "command", "name": "directv", "args": {"box": bkey, "op": "tune", "val": ch}}]))
+        for i, ch in enumerate(g_chs):
+            r, c = divmod(i, 4)
+            z.append(btn(f"c-{ch}", f"{CHANNELS[ch]}\n{ch}", 484 + c*246, 148 + r*148, 232, 132, "#1e3a8a", [{"type": "command", "name": "directv", "args": {"box": bkey, "op": "tune", "val": ch}}]))
+        for idx, (kl, kv, kc) in enumerate(r_keys):
+            z.append(btn(f"rk-{kv}", kl, 1490, 148 + idx*84, 400, 74, kc, [{"type": "command", "name": "directv", "args": {"box": bkey, "op": "key", "val": kv}}]))
+        z.append(btn("bk-b", "‹ Select Box", 24, 924, 430, 120, "#b83232", jmp("replace", "directv")))
+        z.append(btn("bk-t", "‹ Tables", 484, 924, 430, 120, "#334155", jmp("replace", "tables")))
+        pages[pid] = {"schemaVersion": 1, "id": pid, "name": f"Tune {binfo['name']}", "kind": "custom", "canvas": {"w": 1920, "h": 1080}, "grid": 8, "zones": z}
+
+    SEED_DIR.mkdir(parents=True, exist_ok=True)
+    for pid, pdata in pages.items():
+        (SEED_DIR / f"{pid}.json").write_text(json.dumps(pdata, indent=2) + "\n")
+    con = sqlite3.connect(str(DB_FILE), timeout=10); cur = con.cursor()
+    for pid, pdata in pages.items():
+        js = json.dumps(pdata)
+        if cur.execute("SELECT 1 FROM layout_pages WHERE id=?", (pid,)).fetchone():
+            cur.execute("UPDATE layout_pages SET json=? WHERE id=?", (js, pid))
+        else:
+            mp = cur.execute("SELECT COALESCE(MAX(position), 0) FROM layout_pages").fetchone()[0]
+            cur.execute("INSERT INTO layout_pages (id, position, json) VALUES (?, ?, ?)", (pid, mp + 1, js))
+    con.commit(); con.close()
+    if CACHE_FILE.exists(): CACHE_FILE.unlink()
+
+if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] == "--init-pages":
+        build_pages(); print("✓ Built directv pages in viewtouch.db!"); sys.exit(0)
+    box, op, val = (sys.argv[1] if len(sys.argv)>1 else "bar1"), (sys.argv[2] if len(sys.argv)>2 else "tune"), (sys.argv[3] if len(sys.argv)>3 else "206")
+    tgts = list(BOXES.keys()) if box == "all" else ([box] if box in BOXES else ["bar1"])
+    msgs = []
+    for t in tgts:
+        path = f"/tv/tune?major={val}" if op == "tune" else f"/remote/processKey?key={val}"
+        res = call_shef(BOXES[t]["ip"], path); code = res.get("status", {}).get("code", 500)
+        msgs.append(f"{BOXES[t]['name']}: {'Locked' if code==403 else (f'-> {CHANNELS.get(val,val)} ({val})' if code==200 else res.get('status',{}).get('msg','Err'))}")
+    if op == "tune" and val.isdigit():
+        freq = load_freq(); freq[val] = freq.get(val, 0) + 1; FREQ_FILE.write_text(json.dumps(freq, indent=2)); build_pages()
+    print(" | ".join(msgs))

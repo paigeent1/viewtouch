@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+USB=$(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1; exit}')
+[ -z "$USB" ] && { echo "Plug new tablet into Pi USB port with USB Debugging ON first!"; exit 1; }
+COUNT=$(( $(wc -l < ~/.config/viewtouch_tablets.list 2>/dev/null || echo 3) + 1) )
+NAME="${1:-Bar ${COUNT} Tablet}"
+IP="${2:-$(adb -s "$USB" shell ip -f inet addr show wlan0 | awk '/inet / {split($2,a,"/"); print a[1]; exit}' | tr -d '\r')}"
+APK=$(ls -t /home/pi/viewtouch-main/apks/*.apk | head -n 1)
+adb -s "$USB" install -r "$APK" >/dev/null
+adb -s "$USB" shell dpm set-device-owner org.viewtouch.pos/.KioskAdmin >/dev/null 2>&1 || true
+adb -s "$USB" shell "settings put system accelerometer_rotation 0; settings put system user_rotation 1; settings put system screen_off_timeout 2147483647; settings put global adb_wifi_enabled 1; settings put global stay_on_while_plugged_in 7; settings put global wifi_sleep_policy 2"
+CODE=$(QT_QPA_PLATFORM=offscreen /home/pi/viewtouch-main/modern/build/vtmodern --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
+rm -rf /tmp/vt_pair && mkdir -p /tmp/vt_pair
+QT_QPA_PLATFORM=offscreen /home/pi/viewtouch-main/modern/build/vtmodern --data-dir /tmp/vt_pair --connect 192.168.1.219:7719 --pair "$CODE" --terminal "$NAME" --pair-only >/dev/null 2>&1
+adb -s "$USB" push $(find /tmp/vt_pair -name "terminal.json" | head -n 1) /data/local/tmp/terminal.json >/dev/null
+adb -s "$USB" tcpip 5555 >/dev/null 2>&1 && sleep 2
+[ -n "$IP" ] && { adb connect "$IP:5555" >/dev/null 2>&1 || true; mkdir -p ~/.config; grep -qxF "$IP" ~/.config/viewtouch_tablets.list 2>/dev/null || echo "$IP" >> ~/.config/viewtouch_tablets.list; }
+adb -s "$USB" shell am force-stop org.viewtouch.pos
+adb -s "$USB" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+echo "✓ Provisioned & paired '$NAME' ($IP) and added to fleet!"
+adb -s "$USB" shell "mkdir -p /sdcard/Android/data/org.viewtouch.pos/files" >/dev/null 2>&1 || true
+CODE=$(QT_QPA_PLATFORM=offscreen /home/pi/viewtouch-main/modern/build/vtmodern --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
+rm -rf /tmp/vt_pair && mkdir -p /tmp/vt_pair
+QT_QPA_PLATFORM=offscreen /home/pi/viewtouch-main/modern/build/vtmodern --data-dir /tmp/vt_pair --connect 192.168.1.219:7719 --pair "$CODE" --terminal "$NAME" --pair-only >/dev/null 2>&1
+adb -s "$USB" push $(find /tmp/vt_pair -name "terminal.json" | head -n 1) /data/local/tmp/terminal.json >/dev/null
+adb -s "$USB" tcpip 5555 >/dev/null 2>&1 && sleep 2
+[ -n "$IP" ] && { adb connect "$IP:5555" >/dev/null 2>&1 || true; mkdir -p /home/pi/.config; grep -qxF "$IP" /home/pi/.config/viewtouch_tablets.list 2>/dev/null || echo "$IP" >> /home/pi/.config/viewtouch_tablets.list; }
+adb -s "$USB" shell am force-stop org.viewtouch.pos && adb -s "$USB" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+echo "✓ Provisioned & paired '$NAME' ($IP) and added to fleet!"

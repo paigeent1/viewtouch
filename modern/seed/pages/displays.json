@@ -1,0 +1,123 @@
+{
+  "id": "displays",
+  "name": "Displays",
+  "kind": "manager",
+  "permission": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "header",
+      "kind": "label",
+      "label": "Displays",
+      "behavior": "none",
+      "rect": {
+        "x": 160,
+        "y": 16,
+        "w": 1600,
+        "h": 80
+      },
+      "shape": "rect"
+    },
+    {
+      "id": "kitchen-display",
+      "kind": "button",
+      "label": "Kitchen Display",
+      "rect": {
+        "x": 160,
+        "y": 258,
+        "w": 460,
+        "h": 180
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a",
+          "fontSize": 24
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "kitchen"
+        }
+      ]
+    },
+    {
+      "id": "bar-display",
+      "kind": "button",
+      "label": "Bar Display",
+      "rect": {
+        "x": 730,
+        "y": 258,
+        "w": 460,
+        "h": 180
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#0f766e",
+          "fontSize": 24
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "bar-display"
+        }
+      ]
+    },
+    {
+      "id": "expo-display",
+      "kind": "button",
+      "label": "Expo Display",
+      "rect": {
+        "x": 1300,
+        "y": 258,
+        "w": 460,
+        "h": 180
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#6b46c1",
+          "fontSize": 24
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "expo"
+        }
+      ]
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "label": "\u2039 Manager",
+      "rect": {
+        "x": 16,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

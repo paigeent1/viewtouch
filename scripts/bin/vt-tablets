@@ -1,9 +1,20 @@
 #!/bin/bash
+/usr/local/bin/vt-adb-ensure
 APK=$(ls -t /home/pi/viewtouch-main/apks/*.apk 2>/dev/null | head -n 1)
-for ip in 192.168.1.220 192.168.1.215; do
-  adb connect $ip:5555 >/dev/null 2>&1
-  adb -s $ip:5555 install -r "$APK" >/dev/null 2>&1
-  adb -s $ip:5555 shell am force-stop org.viewtouch.pos
-  adb -s $ip:5555 shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+if [ -z "$APK" ]; then echo "No APK found in ~/viewtouch-main/apks/"; exit 1; fi
+mkdir -p /home/pi/.local/share/ViewTouch/ViewTouch/updates
+cp -f "$APK" /home/pi/.local/share/ViewTouch/ViewTouch/updates/
+echo "=== Pushing $(basename "$APK") to Bar 1, Bar 2 & Bar 3 ==="
+for entry in "Bar 1:192.168.1.220" "Bar 2:192.168.1.215" "Bar 3:192.168.1.210"; do
+    NAME="${entry%%:*}"; IP="${entry##*:}"
+    echo -n "[$NAME - $IP] "
+    adb connect "${IP}:5555" >/dev/null 2>&1 || true
+    if adb -s "${IP}:5555" install -r -d "$APK" >/tmp/adb_inst.log 2>&1; then
+        adb -s "${IP}:5555" shell am force-stop org.viewtouch.pos >/dev/null 2>&1 || true
+        adb -s "${IP}:5555" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1 || true
+        VC=$(adb -s "${IP}:5555" shell dumpsys package org.viewtouch.pos | awk -F= '/versionCode/{print $2; exit}' | tr -d '\r ')
+        echo "✅ PASS (Installed & Restarted -> versionCode=$VC)"
+    else
+        echo "❌ FAIL ($(tr '\n' ' ' < /tmp/adb_inst.log))"
+    fi
 done
-echo "Updated Bar 1 & Bar 2 to $(basename "$APK")"

@@ -1,3 +1,4 @@
+#include <QFile>
 #include "app/pos_service.hh"
 
 #include "app/i18n.hh"
@@ -745,6 +746,7 @@ bool PosService::loginWithPin(const QString &pin)
     emit loggedInChanged(true);
     if (!hasCheck())
         emit notice(tr("Welcome, %1").arg(nameOf(*e)));
+    { QFile f(u"/tmp/vt_active_employee.txt"_s); if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) f.write(nameOf(*e).toUtf8()); }
     return true;
 }
 

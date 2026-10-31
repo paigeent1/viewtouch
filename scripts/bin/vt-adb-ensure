@@ -1,0 +1,28 @@
+#!/bin/bash
+export ADB_MDNS_OPENSCREEN=1
+adb start-server >/dev/null 2>&1
+# 1. If any tablet is on mDNS TLS Wireless Debugging, flip it to port 5555 automatically
+while read -r line; do
+    addr=$(echo "$line" | awk '{print $3}')
+    ip="${addr%:*}"
+    if [ -n "$addr" ]; then
+        adb connect "$addr" >/dev/null 2>&1 || true
+        adb -s "$addr" tcpip 5555 >/dev/null 2>&1 || true
+    fi
+done < <(adb mdns services 2>/dev/null | grep "_adb-tls-connect")
+
+# 2. Only flip USB device to tcpip 5555 if fewer than 3 Wi-Fi tablets are connected
+if [ $(adb devices | grep -c ":5555[[:space:]]*device") -lt 3 ]; then
+    for u in $(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1}'); do
+        adb -s "$u" shell "settings put global adb_wifi_enabled 1; settings put global stay_on_while_plugged_in 7; settings put global wifi_sleep_policy 2" >/dev/null 2>&1 || true
+        adb -s "$u" tcpip 5555 >/dev/null 2>&1 || true
+        sleep 2
+    done
+fi
+
+for ip in 192.168.1.220 192.168.1.215 192.168.1.210; do
+    if adb devices | grep -q "^${ip}:5555[[:space:]]*offline"; then
+        adb disconnect "${ip}:5555" >/dev/null 2>&1 || true
+    fi
+    adb connect "${ip}:5555" >/dev/null 2>&1 || true
+done

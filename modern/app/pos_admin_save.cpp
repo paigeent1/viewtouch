@@ -106,7 +106,10 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         }
     } else if (panel == u"vendors") {
         auto &list = s_->settings.vendors;
-        const QString name = record.value(u"name"_s).toString().trimmed();
+        const QString fn = record.value(u"firstName"_s).toString().trimmed();
+    const QString ln = record.value(u"lastName"_s).toString().trimmed();
+    const QString combined = (fn + u" "_s + ln).trimmed();
+    const QString name = !combined.isEmpty() ? combined : record.value(u"name"_s).toString().trimmed();
         if (name.isEmpty())
             return fail(tr("The vendor needs a name."));
         if (index >= int(list.size()))
@@ -741,7 +744,7 @@ bool PosService::saveEmployeeRecord(int index, const QVariantMap &record)
     const QString role = record.value(u"role"_s).toString();
     const bool active = record.value(u"active"_s, true).toBool();
     if (name.isEmpty())
-        return fail(tr("The employee needs a name."));
+        return fail(tr("Enter the employee's first and last name."));
     if (!QStringList{u"server"_s, u"bartender"_s, u"cashier"_s, u"host"_s, u"busser"_s, u"driver"_s, u"manager"_s, u"admin"_s}
              .contains(role))
         return fail(tr("Choose a role."));

@@ -1,0 +1,79 @@
+#!/bin/bash
+rm -f /tmp/apply_changes.py /tmp/output.txt /tmp/done
+rclone deletefile "gdrive:POS project tmp/done" 2>/dev/null || true
+echo "1. Pulling apply_changes.py from Google Drive..."
+rclone copy "gdrive:POS project tmp/apply_changes.py" /tmp/
+if [ ! -f /tmp/apply_changes.py ]; then
+    echo "ERROR: apply_changes.py not found in gdrive:POS project tmp/" | tee /tmp/output.txt
+    rclone copy /tmp/output.txt "gdrive:POS project tmp/"
+    exit 1
+fi
+echo "2. Running apply_changes.py..."
+python3 /tmp/apply_changes.py 2>&1 | tee /tmp/output.txt
+{
+    echo ""
+    echo "=== AUTO-DIAGNOSTIC FOOTER ($(date +'%Y-%m-%d %H:%M:%S')) ==="
+    echo "--- Active Processes ---"
+    ps aux | grep -E "[v]t_label_utility|[v]t_barcode_wizard|[v]tmodern" || true
+    echo "--- Git Status ---"
+    git -C /home/pi/viewtouch-main status -sb 2>/dev/null || true
+} >> /tmp/output.txt
+echo "3. Syncing output.txt to Google Drive..."
+rclone copy /tmp/output.txt "gdrive:POS project tmp/"
+rclone copy /home/pi/viewtouch-main/modern/tools/vt_label_utility.py "gdrive:POS project tmp/" 2>/dev/null || true
+rclone copy /home/pi/viewtouch-main/modern/tools/vt_barcode_wizard.py "gdrive:POS project tmp/" 2>/dev/null || true
+date +"COMPLETED %Y-%m-%d %H:%M:%S" > /tmp/done
+rclone copy /tmp/done "gdrive:POS project tmp/"
+echo "✓ Done! Uploaded output.txt and 'done' marker to Google Drive!"
+
+# --- 4. PLAY LOUD AUDIO DIRECTLY TO HDMI SINK & ALSA HARDWARE ---
+# Generate 48kHz WAV audio matching PipeWire native rate (48000Hz)
+python3 -c '
+import math, struct, wave
+sample_rate = 48000
+freq = 880.0
+dur = 0.22
+samples = int(sample_rate * dur)
+fade = int(sample_rate * 0.01)
+buf = bytearray()
+for i in range(samples):
+    val = math.sin(2.0 * math.pi * freq * (i / sample_rate))
+    if i < fade: val *= (i / fade)
+    elif i > samples - fade: val *= ((samples - i) / fade)
+    # 2 channels stereo
+    s = struct.pack("<h", int(val * 32767))
+    buf += s + s
+silence = (struct.pack("<h", 0) * 2) * int(sample_rate * 0.08)
+full = (bytes(buf) + bytes(silence)) * 3
+
+with wave.open("/tmp/vt_beep.wav", "wb") as w:
+    w.setnchannels(2)
+    w.setsampwidth(2)
+    w.setframerate(sample_rate)
+    w.writeframes(full)
+' 2>/dev/null
+
+# Generate speech audio file if espeak is present
+if command -v espeak-ng >/dev/null 2>&1; then
+    espeak-ng "Pi is done" -w /tmp/pi_done.wav 2>/dev/null || true
+elif command -v espeak >/dev/null 2>&1; then
+    espeak "Pi is done" -w /tmp/pi_done.wav 2>/dev/null || true
+fi
+
+# 1. Play directly to PipeWire sinks (Sink 56 is HDMI-0, Sink 57 is HDMI-1)
+for sink in 56 57 $(pactl list short sinks 2>/dev/null | awk '{print $1}'); do
+    pactl set-sink-mute "$sink" 0 2>/dev/null || true
+    pactl set-sink-volume "$sink" 100% 2>/dev/null || true
+    paplay --device="$sink" /tmp/vt_beep.wav 2>/dev/null || true
+    if [ -f /tmp/pi_done.wav ]; then
+        paplay --device="$sink" /tmp/pi_done.wav 2>/dev/null || true
+    fi
+done
+
+# 2. Play directly to ALSA card hardware (vc4hdmi0 is hw:0,0 and vc4hdmi1 is hw:1,0)
+aplay -q -D "plughw:0,0" /tmp/vt_beep.wav 2>/dev/null || true
+aplay -q -D "plughw:1,0" /tmp/vt_beep.wav 2>/dev/null || true
+if [ -f /tmp/pi_done.wav ]; then
+    aplay -q -D "plughw:0,0" /tmp/pi_done.wav 2>/dev/null || true
+    aplay -q -D "plughw:1,0" /tmp/pi_done.wav 2>/dev/null || true
+fi

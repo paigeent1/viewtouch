@@ -182,7 +182,8 @@ QVariantList PosService::adminFields(const QString &panel)
     }
     if (panel == u"employees") {
         return {
-            field(u"name"_s, tr("Name"), u"string"_s), readonlyId,
+            field(u"firstName"_s, tr("First name"), u"string"_s),
+            field(u"lastName"_s, tr("Last name"), u"string"_s), readonlyId,
             with(field(u"role"_s, tr("Role"), u"enum"_s), u"options"_s,
                  options({{"server", "Server"}, {"bartender", "Bartender"}, {"cashier", "Cashier"}, {"host", "Host"},
                           {"busser", "Busser"}, {"driver", "Delivery driver"}, {"manager", "Manager"}, {"admin", "Admin"}})),

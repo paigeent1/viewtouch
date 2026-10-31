@@ -43,7 +43,11 @@ QVariantList PosService::adminRecords(const QString &panel)
                     + (m.available ? QString() : tr(" · SOLD OUT")));
     } else if (panel == u"employees") {
         for (const Employee &e : s_->employees) {
-            QVariantMap r{{u"id"_s, qs(e.id)}, {u"name"_s, qs(e.name)}, {u"role"_s, qs(e.role)},
+            const QString fullName = qs(e.name).trimmed();
+            const int sp = fullName.indexOf(u' ');
+            const QString firstName = sp > 0 ? fullName.left(sp).trimmed() : fullName;
+            const QString lastName  = sp > 0 ? fullName.mid(sp + 1).trimmed() : QString();
+            QVariantMap r{{u"id"_s, qs(e.id)}, {u"firstName"_s, firstName}, {u"lastName"_s, lastName}, {u"name"_s, fullName}, {u"role"_s, qs(e.role)},
                           {u"active"_s, e.active}, {u"training"_s, e.training}, {u"pin"_s, QString()}, {u"cashMode"_s, qs(e.cashMode)}, {u"requireName"_s, qs(e.requireName)}, {u"language"_s, qs(e.language)},
                           {u"textSize"_s, QString::number(e.textSize)}, {u"leftHanded"_s, e.leftHanded}, {u"startPage"_s, qs(e.startPage)},
                           {u"payRate"_s, e.payRate.cents() / 100.0}, {u"otherJobs"_s, [&] {
@@ -308,7 +312,7 @@ QVariantMap PosService::adminNewRecord(const QString &panel)
                 {u"kioskHide"_s, false}, {u"description"_s, QString()}, {u"image"_s, QString()},
                 {u"takeoutPrice"_s, 0.0}, {u"deliveryPrice"_s, 0.0}, {u"noDiscount"_s, false}, {u"noStaffDiscount"_s, false}};
     if (panel == u"employees")
-        return {{u"id"_s, QString()}, {u"name"_s, QString()}, {u"role"_s, u"server"_s}, {u"pin"_s, QString()},
+        return {{u"id"_s, QString()}, {u"firstName"_s, QString()}, {u"lastName"_s, QString()}, {u"name"_s, QString()}, {u"role"_s, u"server"_s}, {u"pin"_s, QString()},
                 {u"active"_s, true}, {u"training"_s, false}, {u"cashMode"_s, QString()}, {u"requireName"_s, QString()}, {u"checkout"_s, QString()}, {u"blindCount"_s, QString()}, {u"reasons"_s, QString()}, {u"look"_s, QString()}, {u"tipPool"_s, QString()},
                 {u"payRate"_s, 0.0}, {u"otherJobs"_s, QString()}, {u"language"_s, QString()},
                 {u"textSize"_s, u"100"_s}, {u"leftHanded"_s, false}, {u"startPage"_s, QString()},

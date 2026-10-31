@@ -87,6 +87,19 @@ std::string TicketContext::money(Money m) const
     return s.front() == '-' ? "-" + settings.currencySymbol + s.substr(1) : settings.currencySymbol + s;
 }
 
+static std::string serverFirstLastInitial(const std::string &full)
+{
+    auto start = full.find_first_not_of(" \t");
+    if (start == std::string::npos) return full;
+    auto sp = full.find(' ', start);
+    if (sp == std::string::npos) return full.substr(start);
+    std::string first = full.substr(start, sp - start);
+    auto lastStart = full.find_last_of(' ');
+    if (lastStart != std::string::npos && lastStart + 1 < full.size())
+        return first + " " + static_cast<char>(std::toupper(static_cast<unsigned char>(full[lastStart + 1])));
+    return first;
+}
+
 Document receipt(const Check &check, const TicketContext &ctx)
 {
     const Totals t = check.totals(ctx.settings.tax);
@@ -98,7 +111,7 @@ Document receipt(const Check &check, const TicketContext &ctx)
         d.center(l);
     d.blank();
     d.columns(ctx.tr("Check #%1", {std::to_string(check.id)}), check.label, true);
-    d.columns(ctx.tr("Server: %1", {check.serverName}), ctx.tr("Guests: %1", {std::to_string(check.guests)}));
+    d.columns(ctx.tr("Server: %1", {serverFirstLastInitial(check.serverName)}), ctx.tr("Guests: %1", {std::to_string(check.guests)}));
     {
         const std::string op = check.openedAt ? ctx.dateTime(check.openedAt) : ctx.dateTime(ctx.now);
         const std::string cl = check.closedAt ? " - " + ctx.tr("closed %1", {ctx.dateTime(check.closedAt)}) : "";

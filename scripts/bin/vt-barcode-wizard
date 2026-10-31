@@ -1,0 +1,5 @@
+#!/bin/bash
+export DISPLAY=${DISPLAY:-:0}
+export WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
+export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/1000}
+exec /usr/bin/python3 /home/pi/viewtouch-main/modern/tools/vt_label_utility.py "$@"
