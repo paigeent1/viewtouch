@@ -429,6 +429,13 @@ def render_label_pil_image(tpl, item, dpi=203):
     def get_ttf(fam, bold, italic, px):
         px = max(8, int(px))
         candidates = []
+        if fam not in ("Sans", "Serif", "Mono"):
+            _p = resolve_font_file(fam, bold, italic)
+            if _p:
+                try:
+                    return ImageFont.truetype(_p, px)
+                except Exception:
+                    pass
         if fam == "Mono":
             candidates = [
                 "/home/pi/viewtouch-main/modern/assets/fonts/LiberationMono-Bold.ttf" if bold else "/home/pi/viewtouch-main/modern/assets/fonts/LiberationMono-Regular.ttf",
@@ -664,7 +671,7 @@ def export_pdf_labels(items_to_print, tpl, out_pdf):
                         ("Serif",0,0):"Times-Roman",("Serif",1,0):"Times-Bold",("Serif",0,1):"Times-Italic",("Serif",1,1):"Times-BoldItalic",
                         ("Mono",0,0):"Courier",("Mono",1,0):"Courier-Bold",("Mono",0,1):"Courier-Oblique",("Mono",1,1):"Courier-BoldOblique"
                     }
-                    font_name = fmap.get((ff, int(bd), int(it)), "Helvetica-Bold")
+                    font_name = fmap.get((ff, int(bd), int(it))) or pdf_font_name_for(ff, bd, it) or "Helvetica-Bold"
                     c.setFont(font_name, sz)
                     align = el.get("align", "center")
                     do_wrap = bool(el.get("word_wrap", f_type == "name"))
@@ -702,6 +709,996 @@ def fit_text_into_box(text, box_w_px, box_h_px, max_font_px=None, bold=True, ita
         if f.measure(text) <= (box_w_px - 6) and f.metrics("linespace") <= (box_h_px - 2): return px, text
     return 8, text
 
+def draw_code128_on_tk_canvas(canvas_widget, value, x, y, w, h, tag=None):
+    """Draw a Code 128 barcode as black bars inside the box (x, y, w, h) on a Tk canvas."""
+    tags = (tag,) if tag else ()
+    value = str(value or "").strip() or "0"
+    try:
+        pattern = code128.Code128(value).decomposed
+        total_units = sum(int(c) for c in pattern)
+    except Exception:
+        canvas_widget.create_text(x + w // 2, y + h // 2, text=value,
+                                  font=("Monospace", -10), fill="#000000", tags=tags)
+        return
+    quiet = 10
+    unit = w / float(total_units + 2 * quiet)
+    pos = x + quiet * unit
+    for i, c in enumerate(pattern):
+        width = int(c) * unit
+        if i % 2 == 0:
+            canvas_widget.create_rectangle(pos, y, pos + width, y + h,
+                                           fill="#000000", outline="", tags=tags)
+        pos += width
+
+
+def render_label_on_tk_canvas(canvas_widget, tpl, item, ox=28, oy=28, scale=420, selected_idx=None, show_boxes=False):
+    canvas_widget.delete("all")
+    w_px, h_px = int(float(tpl.get("width_in", 2.0)) * scale), int(float(tpl.get("height_in", 1.0)) * scale)
+    canvas_widget.create_rectangle(ox+4, oy+4, ox+w_px+4, oy+h_px+4, fill="#0f172a", outline="")
+    canvas_widget.create_rectangle(ox, oy, ox+w_px, oy+h_px, fill="#ffffff", outline="#111827", width=2, tags=("bg_card",))
+    if show_boxes and ox >= 26 and oy >= 26:
+        canvas_widget.create_rectangle(ox, oy-22, ox+w_px, oy-2, fill="#f1f5f9", outline="#94a3b8")
+        canvas_widget.create_rectangle(ox-24, oy, ox-2, oy+h_px, fill="#f1f5f9", outline="#94a3b8")
+        for s in range(int(round(float(tpl.get("width_in", 2.0)) * 8)) + 1):
+            tx, th = int(ox + (s / 8.0) * scale), (10 if s % 8 == 0 else (6 if s % 4 == 0 else 3))
+            canvas_widget.create_line(tx, oy-2, tx, oy-2-th, fill="#334155")
+            if s % 8 == 0: canvas_widget.create_text(tx+8, oy-12, text=str(s//8)+"in", font=("Sans", 8, "bold"), fill="#0f172a")
+        for s in range(int(round(float(tpl.get("height_in", 1.0)) * 8)) + 1):
+            ty, tw = int(oy + (s / 8.0) * scale), (10 if s % 8 == 0 else (6 if s % 4 == 0 else 3))
+            canvas_widget.create_line(ox-2, ty, ox-2-tw, ty, fill="#334155")
+            if s % 8 == 0 and s > 0: canvas_widget.create_text(ox-13, ty, text=str(s//8)+"in", font=("Sans", 8, "bold"), fill="#0f172a")
+    sel_set = selected_idx if isinstance(selected_idx, (set, list, tuple)) else ({selected_idx} if selected_idx is not None else set())
+    for idx, el in enumerate(tpl.get("elements", [])):
+        bx, by = int(ox + float(el.get("x", 0.05)) * scale), int(oy + float(el.get("y", 0.05)) * scale)
+        bw, bh = max(24, int(float(el.get("w", 0.8)) * scale)), max(16, int(float(el.get("h", 0.2)) * scale))
+        is_sel = (idx in sel_set)
+        canvas_widget.create_rectangle(bx, by, bx+bw, by+bh, fill="#ffffff", outline="#2563eb" if is_sel else ("#94a3b8" if show_boxes else ""), width=2 if is_sel else (1 if show_boxes else 0), dash=(4, 2) if (is_sel or show_boxes) else (), tags=(f"el_{idx}",))
+        field = el.get("field", "name")
+        if str(field).startswith("barcode"):
+            b_val = format_item_field(item, "upc") or "000000000000"
+            if field == "barcode_upca": b_val = normalize_upc(b_val)[:12].zfill(12)
+            elif field == "barcode_upce": b_val = (item.get("upce") or normalize_upc(b_val)[:8]).zfill(8)
+            elif field == "barcode_code39": b_val = f"*{str(b_val).upper()}*"
+            draw_code128_on_tk_canvas(canvas_widget, b_val, bx, by, bw, bh, tag=f"el_{idx}")
+            if field in ("barcode_upca", "barcode_upce", "barcode_code39"):
+                canvas_widget.create_rectangle(bx+4, by+bh-13, bx+bw-4, by+bh-1, fill="#ffffff", outline="", tags=(f"el_{idx}",))
+                canvas_widget.create_text(bx+bw//2, by+bh-7, text=b_val, font=("Monospace", -9, "bold"), fill="#000000", tags=(f"el_{idx}",))
+        else:
+            raw_txt = format_item_field(item, field, el)
+            if not str(raw_txt).strip(): raw_txt = "RECEIVED" if field == "variable_text" else f"[{field}]"
+            rot = int(el.get("rotate", 0)) % 360
+            fam = {"Sans": "Liberation Sans", "Serif": "Liberation Serif", "Mono": "Liberation Mono"}.get(el.get("font_family", "Sans"), el.get("font_family", "Sans"))
+            eff_w, eff_h = (bh, bw) if rot in (90, 270) else (bw, bh)
+            do_wrap = bool(el.get("word_wrap", field == "name"))
+            fit_px, wrapped = fit_text_into_box(raw_txt, eff_w, eff_h, bold=el.get("bold", True), italic=el.get("italic", False), family=fam, allow_wrap=do_wrap) if el.get("auto_font", True) else (max(8, int(float(el.get("size", 12)) * (scale / 72.0))), split_two_lines(raw_txt) if (do_wrap and len(str(raw_txt)) > 18 and " " in str(raw_txt)) else str(raw_txt))
+            align = el.get("align", "center")
+            tx = bx + bw // 2 if rot in (90, 270) else (bx + 4 if align == "left" else (bx + bw - 4 if align == "right" else bx + bw // 2))
+            anc = "center" if rot in (90, 270) else ("w" if align == "left" else ("e" if align == "right" else "center"))
+            sty = ("bold" if el.get("bold", True) else "normal") + (" italic" if el.get("italic", False) else "")
+            canvas_widget.create_text(tx, by + bh // 2, text=wrapped, justify=align if align in ("left","center","right") else "center", angle=rot, font=(fam, -fit_px, sty), fill="#000000", anchor=anc, tags=(f"el_{idx}",))
+        if is_sel and len(sel_set) == 1:
+            for hn, hx, hy in [("nw",bx,by),("n",bx+bw//2,by),("ne",bx+bw,by),("e",bx+bw,by+bh//2),("se",bx+bw,by+bh),("s",bx+bw//2,by+bh),("sw",bx,by+bh),("w",bx,by+bh//2)]:
+                canvas_widget.create_rectangle(hx-6, hy-6, hx+6, hy+6, fill="#2563eb", outline="#ffffff", width=1, tags=(f"hdl_{hn}",))
+
+class ReportDesignerWindow(tk.Toplevel):
+    def __init__(self, master, tpl_name, tpl_data, sample_item, on_save_callback):
+        super().__init__(master)
+        self.title(f"Label Utility — Report Designer - [{tpl_name}]")
+        self.geometry("1920x1080+0+0"); self.transient(master); self.attributes("-fullscreen", True); self.attributes("-topmost", True); self.lift(); self.focus_force()
+        self.configure(bg="#808080")
+        self.tpl_name = tpl_name
+        self.tpl = ensure_box_dims(json.loads(json.dumps(tpl_data)))
+        self._orig_tpl_json = json.dumps(self.tpl, sort_keys=True)
+        self.protocol("WM_DELETE_WINDOW", self.on_close_request)
+        self.sample_item = sample_item
+        self.on_save_callback = on_save_callback
+        self.scale = 210.0
+        self.selected_idx = 0
+        self.selected_set = {0}
+        self.undo_stack = []
+        self.redo_stack = []
+        self.clipboard_els = []
+        self.pending_tool = None
+        self.interaction = {"mode": None, "start_x": 0, "start_y": 0, "orig_box": None, "undo_pushed": False}
+        self._build_ui()
+        self._orig_tpl_json = json.dumps(self.tpl, sort_keys=True)
+        self.after(80, self._redraw_canvas)
+        self._redraw_canvas()
+
+    def _redraw_canvas(self, _e=None):
+        self.update_idletasks()
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw < 200 or ch < 150: cw, ch = 1080, 520
+        w_in = max(0.5, float(self.tpl.get("width_in", 2.0)))
+        h_in = max(0.4, float(self.tpl.get("height_in", 1.0)))
+        self.scale = max(80, int(min((cw - 100) / w_in, (ch - 80) / h_in)))
+        self.ox = max(36, int((cw - w_in * self.scale) // 2))
+        self.oy = max(36, int((ch - h_in * self.scale) // 2))
+        sel = (set(getattr(self, "selected_set", set())) | {self.selected_idx}) if self.tpl.get("elements") else set()
+        render_label_on_tk_canvas(self.canvas, self.tpl, self.sample_item, ox=self.ox, oy=self.oy, scale=self.scale, selected_idx=sel, show_boxes=True)
+
+    def _push_undo(self):
+        snap = json.dumps(self.tpl)
+        if not self.undo_stack or self.undo_stack[-1] != snap:
+            self.undo_stack.append(snap)
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+        self.redo_stack.clear()
+
+    def undo(self, _e=None):
+        if not self.undo_stack:
+            self.status_var.set("Nothing to undo.")
+            return
+        self.redo_stack.append(json.dumps(self.tpl))
+        self.tpl = json.loads(self.undo_stack.pop())
+        if self.tpl.get("elements"):
+            self.selected_idx = min(self.selected_idx, len(self.tpl["elements"]) - 1)
+            self.selected_set = {self.selected_idx}
+        else:
+            self.selected_idx = 0; self.selected_set = set()
+        self._refresh_element_combo()
+        self._redraw_canvas()
+        self.status_var.set("↶ Undid last change.")
+
+    def redo(self, _e=None):
+        if not self.redo_stack:
+            self.status_var.set("Nothing to redo.")
+            return
+        self.undo_stack.append(json.dumps(self.tpl))
+        self.tpl = json.loads(self.redo_stack.pop())
+        if self.tpl.get("elements"):
+            self.selected_idx = min(self.selected_idx, len(self.tpl["elements"]) - 1)
+            self.selected_set = {self.selected_idx}
+        self._refresh_element_combo()
+        self._redraw_canvas()
+        self.status_var.set("↷ Redid change.")
+
+    def arm_palette_tool(self, field_key, label_name):
+        self.pending_tool = (field_key, label_name)
+        self.canvas.config(cursor="crosshair")
+        self.status_var.set(f"➕ Tool Armed: [{label_name}] — Click anywhere on the white label card to place this component (or press Esc to cancel).")
+
+    def cancel_palette_tool(self, _e=None):
+        self.pending_tool = None
+        self.canvas.config(cursor="")
+        self._load_selected_props()
+
+    def add_field(self):
+        dlg = tk.Toplevel(self); dlg.title("Add Field to Label"); dlg.geometry("420x200+750+400"); dlg.configure(bg="#1e242d"); dlg.transient(self); dlg.attributes("-topmost", True)
+        tk.Label(dlg, text="Choose Component / Field to Add:", bg="#1e242d", fg="#f2f4f7", font=("Sans", 11, "bold")).pack(pady=(14, 6))
+        f_var = tk.StringVar(value=GLOBAL_FIELD_LABELS[0])
+        ttk.Combobox(dlg, textvariable=f_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=36, font=("Sans", 10)).pack(pady=4)
+        def do_add():
+            self._push_undo()
+            fk = f_var.get().split(" — ")[0].strip()
+            ny = round(min(float(self.tpl.get("height_in", 1.0)) - 0.22, 0.06 + 0.18 * (len(self.tpl["elements"]) % 4)), 3)
+            ne = {"id": fk, "field": fk, "x": 0.10, "y": ny, "w": 0.95, "h": 0.20, "size": 12, "bold": True, "align": "center", "auto_font": True, "word_wrap": (fk == "name")}
+            if fk in ("variable_text", "static_label"):
+                ne["text"] = globals().get("GLOBAL_VAR_TEXT", "RECEIVED") if fk == "variable_text" else "TEXT"
+            self.tpl["elements"].append(ne); self.selected_idx = len(self.tpl["elements"]) - 1; self.selected_set = {self.selected_idx}
+            self._refresh_element_combo(); self._redraw_canvas(); dlg.destroy()
+        make_vt_btn(dlg, text="➕ Add Field", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=14, command=do_add).pack(pady=14)
+        dlg.update_idletasks(); dlg.lift(); dlg.focus_force()
+
+    def delete_field(self, _e=None):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        sel = sorted(getattr(self, "selected_set", {self.selected_idx}) or {self.selected_idx}, reverse=True)
+        for idx in sel:
+            if 0 <= idx < len(self.tpl["elements"]):
+                self.tpl["elements"].pop(idx)
+        self.selected_idx = max(0, min(self.selected_idx, len(self.tpl["elements"]) - 1))
+        self.selected_set = {self.selected_idx} if self.tpl["elements"] else set()
+        self._refresh_element_combo(); self._redraw_canvas()
+
+    def duplicate_selected(self, _e=None):
+        if not self.tpl.get("elements"): return
+        self._push_undo(); src = getattr(self, "selected_set", {self.selected_idx}) or {self.selected_idx}; new_s = set()
+        for i in sorted(src):
+            if 0 <= i < len(self.tpl["elements"]):
+                c = dict(self.tpl["elements"][i])
+                c["x"] = round(min(float(self.tpl.get("width_in", 2.0)) - 0.2, float(c.get("x", 0.04)) + 0.08), 3)
+                c["y"] = round(min(float(self.tpl.get("height_in", 1.0)) - 0.1, float(c.get("y", 0.04)) + 0.08), 3)
+                self.tpl["elements"].append(c); new_s.add(len(self.tpl["elements"]) - 1)
+        if new_s:
+            self.selected_set = new_s; self.selected_idx = max(new_s)
+            self._refresh_element_combo(); self._redraw_canvas()
+
+    def bring_to_front(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"].pop(self.selected_idx)
+        self.tpl["elements"].append(el)
+        self.selected_idx = len(self.tpl["elements"]) - 1
+        self.selected_set = {self.selected_idx}
+        self._refresh_element_combo(); self._redraw_canvas()
+
+    def send_to_back(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"].pop(self.selected_idx)
+        self.tpl["elements"].insert(0, el)
+        self.selected_idx = 0
+        self.selected_set = {0}
+        self._refresh_element_combo(); self._redraw_canvas()
+
+    def toggle_word_wrap(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        el["word_wrap"] = not bool(el.get("word_wrap", el.get("field") == "name"))
+        self.word_wrap_var.set(bool(el["word_wrap"]))
+        self._load_selected_props(); self._redraw_canvas()
+
+    def toggle_autofit_ctx(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        el["auto_font"] = not bool(el.get("auto_font", True))
+        self.autofit_font_var.set(bool(el["auto_font"]))
+        self._load_selected_props(); self._redraw_canvas()
+
+    def select_all_fields(self, _e=None):
+        self.selected_set = set(range(len(self.tpl.get("elements", [])))); self._redraw_canvas()
+
+    def rotate_selected(self, _e=None):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        for i in (getattr(self, "selected_set", {self.selected_idx}) or {self.selected_idx}):
+            el = self.tpl["elements"][i]; el["rotate"] = (int(el.get("rotate", 0)) + 90) % 360
+            el["w"], el["h"] = round(float(el.get("h", 0.24)), 3), round(float(el.get("w", 0.90)), 3)
+        self._load_selected_props(); self._redraw_canvas()
+
+    def nudge_selected(self, dx_in, dy_in):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        for i in (getattr(self, "selected_set", {self.selected_idx}) or {self.selected_idx}):
+            if 0 <= i < len(self.tpl["elements"]):
+                el = self.tpl["elements"][i]
+                el["x"] = round(max(0.0, min(float(self.tpl["width_in"]) - 0.05, float(el["x"]) + dx_in)), 3)
+                el["y"] = round(max(0.0, min(float(self.tpl["height_in"]) - 0.05, float(el["y"]) + dy_in)), 3)
+        self._load_selected_props(); self._redraw_canvas()
+
+    def copy_selected(self, *_a):
+        if not self.tpl.get("elements"): return
+        sel = sorted(getattr(self, "selected_set", {self.selected_idx}) or {self.selected_idx})
+        self.clipboard_els = [json.loads(json.dumps(self.tpl["elements"][i])) for i in sel if 0 <= i < len(self.tpl["elements"])]
+        self.status_var.set(f"Copied {len(self.clipboard_els)} component(s) to clipboard.")
+
+    def cut_selected(self, *_a):
+        self.copy_selected()
+        self.delete_field()
+
+    def paste_clipboard(self, *_a):
+        if not getattr(self, "clipboard_els", None): return
+        self._push_undo()
+        new_s = set()
+        for c in self.clipboard_els:
+            clone = json.loads(json.dumps(c))
+            clone["x"] = round(min(float(self.tpl.get("width_in", 2.0)) - 0.15, float(clone.get("x", 0.05)) + 0.06), 3)
+            clone["y"] = round(min(float(self.tpl.get("height_in", 1.0)) - 0.10, float(clone.get("y", 0.05)) + 0.06), 3)
+            self.tpl["elements"].append(clone)
+            new_s.add(len(self.tpl["elements"]) - 1)
+        if new_s:
+            self.selected_set = new_s; self.selected_idx = max(new_s)
+            self._refresh_element_combo(); self._redraw_canvas()
+
+    def on_right_click(self, event):
+        if not self.tpl.get("elements"): return
+        ox, oy, sc = getattr(self, "ox", 24), getattr(self, "oy", 24), self.scale
+        for idx in range(len(self.tpl["elements"]) - 1, -1, -1):
+            el = self.tpl["elements"][idx]
+            bx1, by1 = ox + float(el.get("x", 0)) * sc, oy + float(el.get("y", 0)) * sc
+            bx2, by2 = bx1 + max(18, float(el.get("w", 0.5)) * sc), by1 + max(12, float(el.get("h", 0.15)) * sc)
+            if (bx1 - 4) <= event.x <= (bx2 + 4) and (by1 - 4) <= event.y <= (by2 + 4):
+                self.selected_idx = idx
+                self.selected_set = {idx}
+                self.el_cb.current(idx)
+                self._load_selected_props()
+                self._redraw_canvas()
+                break
+        el = self.tpl["elements"][self.selected_idx]
+        ww = "✓ " if el.get("word_wrap", el.get("field") == "name") else "    "
+        af = "✓ " if el.get("auto_font", True) else "    "
+        menu = tk.Menu(self, tearoff=0, bg="#1e293b", fg="#f8fafc", activebackground="#2563eb", activeforeground="white", font=("Sans", 10, "bold"))
+        menu.add_command(label="Bring to Front", command=self.bring_to_front)
+        menu.add_command(label="Send to Back", command=self.send_to_back)
+        menu.add_separator()
+        menu.add_command(label=f"{af}AutoSize / Auto-Fit Font", command=self.toggle_autofit_ctx)
+        menu.add_command(label=f"{ww}WordWrap (2-Line Text)", command=self.toggle_word_wrap)
+        menu.add_separator()
+        menu.add_command(label="Position / Properties...", command=lambda: self.on_canvas_double_click(None))
+        menu.add_command(label="Duplicate (Ctrl+D)", command=self.duplicate_selected)
+        menu.add_command(label="Rotate 90° (R)", command=self.rotate_selected)
+        menu.add_separator()
+        menu.add_command(label="Delete Component (Del)", fg="#fca5a5", command=self.delete_field)
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def on_canvas_double_click(self, event=None):
+        if not self.tpl.get("elements"): return
+        if event is not None:
+            for iid in reversed(self.canvas.find_overlapping(event.x-3, event.y-3, event.x+3, event.y+3)):
+                for tag in self.canvas.gettags(iid):
+                    if tag.startswith("el_"):
+                        self.selected_idx = int(tag.split("_", 1)[1]); self.selected_set = {self.selected_idx}
+                        self.el_cb.current(self.selected_idx); self._load_selected_props(); self._redraw_canvas(); break
+        el = self.tpl["elements"][self.selected_idx]
+        fk_cur = el.get("field", "name")
+        dlg = tk.Toplevel(self); dlg.title(f"Component Properties — {fk_cur}"); dlg.geometry("480x360+720+340"); dlg.configure(bg="#1e293b"); dlg.transient(self); dlg.attributes("-topmost", True)
+        tk.Label(dlg, text=f"Editing Component #{self.selected_idx + 1} Properties", bg="#1e293b", fg="#38bdf8", font=("Sans", 12, "bold")).pack(pady=(12, 8))
+        frm = tk.Frame(dlg, bg="#1e293b"); frm.pack(fill="x", padx=20)
+        tk.Label(frm, text="Data Field / Type:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=0, column=0, sticky="w", pady=6)
+        cur_lbl = next((x for x in GLOBAL_FIELD_LABELS if x.startswith(fk_cur + " ")), GLOBAL_FIELD_LABELS[0])
+        f_var = tk.StringVar(value=cur_lbl)
+        ttk.Combobox(frm, textvariable=f_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=32, font=("Sans", 10)).grid(row=0, column=1, sticky="w", padx=8, pady=6)
+        tk.Label(frm, text="Custom / Static Text:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=1, column=0, sticky="w", pady=6)
+        tv = tk.StringVar(value=str(el.get("text") or globals().get("GLOBAL_VAR_TEXT", "RECEIVED")))
+        ent = tk.Entry(frm, textvariable=tv, font=("Sans", 11, "bold"), width=26, bg="white", fg="black"); ent.grid(row=1, column=1, sticky="w", padx=8, pady=6)
+        tk.Label(frm, text="Left / Top (in):", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=2, column=0, sticky="w", pady=6)
+        pos_f = tk.Frame(frm, bg="#1e293b"); pos_f.grid(row=2, column=1, sticky="w", padx=8, pady=6)
+        xv = tk.StringVar(value=f"{float(el.get('x', 0.0)):.3f}")
+        yv = tk.StringVar(value=f"{float(el.get('y', 0.0)):.3f}")
+        tk.Entry(pos_f, textvariable=xv, width=7, font=("Sans", 10, "bold")).pack(side="left", padx=(0, 6))
+        tk.Entry(pos_f, textvariable=yv, width=7, font=("Sans", 10, "bold")).pack(side="left")
+        tk.Label(frm, text="Rotation (deg):", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=3, column=0, sticky="w", pady=6)
+        rv = tk.StringVar(value=str(int(el.get("rotate", 0)) % 360))
+        ttk.Combobox(frm, textvariable=rv, values=["0", "90", "180", "270"], state="readonly", width=10, font=("Sans", 10)).grid(row=3, column=1, sticky="w", padx=8, pady=6)
+        def save_props(_e=None):
+            self._push_undo(); new_fk = f_var.get().split(" — ")[0].strip(); el["field"] = new_fk; el["id"] = new_fk
+            if new_fk in ("variable_text", "static_label", "db_calc"):
+                val = tv.get().strip() or ("RECEIVED" if new_fk == "variable_text" else "TEXT")
+                el["text"] = val
+                if new_fk == "variable_text": globals()["GLOBAL_VAR_TEXT"] = val.upper()
+            try:
+                el["x"] = round(max(0.0, float(xv.get())), 3)
+                el["y"] = round(max(0.0, float(yv.get())), 3)
+            except ValueError:
+                pass
+            old_r, new_r = int(el.get("rotate", 0)) % 360, int(rv.get()) % 360
+            if (old_r in (90, 270)) != (new_r in (90, 270)): el["w"], el["h"] = round(float(el.get("h", 0.24)), 3), round(float(el.get("w", 0.90)), 3)
+            el["rotate"] = new_r; self._refresh_element_combo(); self._load_selected_props(); self._redraw_canvas(); dlg.destroy()
+        ent.bind("<Return>", save_props); btn_f = tk.Frame(dlg, bg="#1e293b"); btn_f.pack(pady=16)
+        make_vt_btn(btn_f, text="✓ Save Properties", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=16, command=save_props).pack(side="left", padx=8)
+        make_vt_btn(btn_f, text="Cancel", bg="#64748b", fg="#ffffff", font=("Sans", 10, "bold"), width=10, command=dlg.destroy).pack(side="left", padx=8)
+        dlg.update_idletasks(); dlg.lift(); ent.focus_set()
+
+    def _build_ui(self):
+        # Row 1 Toolbar: Save, Undo/Redo, Element Selector, Data Source Dropdown, Font, Bold/Italic, Align, Close
+        tbar1 = tk.Frame(self, bg="#1e242d", bd=1, relief="raised")
+        tbar1.pack(fill="x", side="top")
+
+        make_vt_btn(tbar1, text="💾 Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), command=self.save_and_close).pack(side="left", padx=4, pady=4)
+        make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), command=self.undo).pack(side="left", padx=2)
+        make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), command=self.redo).pack(side="left", padx=2)
+
+        tk.Label(tbar1, text="Object:", bg="#1e242d", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(6, 2))
+        self.el_var = tk.StringVar()
+        self.el_cb = ttk.Combobox(tbar1, textvariable=self.el_var, state="readonly", width=16, font=("Sans", 10, "bold"))
+        self.el_cb.pack(side="left", padx=2)
+        self.el_cb.bind("<<ComboboxSelected>>", self.on_pick_element)
+
+        tk.Label(tbar1, text="Data Field:", bg="#1e242d", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(6, 2))
+        self.ftype_var = tk.StringVar()
+        self.ftype_cb = ttk.Combobox(tbar1, textvariable=self.ftype_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=25, font=("Sans", 10))
+        self.ftype_cb.pack(side="left", padx=2)
+        self.ftype_cb.bind("<<ComboboxSelected>>", self.on_change_field_type)
+
+        tk.Label(tbar1, text="Text:", bg="#1e242d", fg="#cbd5e1", font=("Sans", 10)).pack(side="left", padx=(4, 2))
+        self.custom_text_var = tk.StringVar(value="")
+        ct_ent = tk.Entry(tbar1, textvariable=self.custom_text_var, width=11, font=("Sans", 10, "bold"))
+        ct_ent.pack(side="left", padx=2)
+        ct_ent.bind("<Return>", self.apply_custom_text)
+        ct_ent.bind("<FocusOut>", self.apply_custom_text)
+
+        tk.Label(tbar1, text="Font:", bg="#1e242d", fg="#cbd5e1", font=("Sans", 10)).pack(side="left", padx=(4, 2))
+        self.font_fam_var = tk.StringVar(value="Sans")
+        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=font_family_choices(), state="readonly", width=16)
+        ff_cb.pack(side="left", padx=2); ff_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
+
+        self.size_var = tk.StringVar(value="12")
+        sz_spin = tk.Spinbox(tbar1, from_=5, to=72, textvariable=self.size_var, width=3, font=("Sans", 10), command=self.apply_prop_change)
+        sz_spin.pack(side="left", padx=2)
+        sz_spin.bind("<Return>", lambda _e: self.apply_prop_change())
+
+        self.bold_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(tbar1, text="B", variable=self.bold_var, bg="#1e242d", fg="white", selectcolor="#0f172a", font=("Sans", 10, "bold"), command=self.apply_prop_change).pack(side="left", padx=1)
+        self.italic_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(tbar1, text="I", variable=self.italic_var, bg="#1e242d", fg="white", selectcolor="#0f172a", font=("Sans", 10, "italic"), command=self.apply_prop_change).pack(side="left", padx=1)
+
+        self.align_var = tk.StringVar(value="center")
+        al_cb = ttk.Combobox(tbar1, textvariable=self.align_var, values=["left", "center", "right"], state="readonly", width=6)
+        al_cb.pack(side="left", padx=2)
+        al_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
+
+        make_vt_btn(tbar1, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), command=self.on_close_request).pack(side="right", padx=6)
+
+        # Row 2 Toolbar: ILSA-Style Component Palette (Click Icon -> Click Label Canvas to Drop Component)
+        tbar_pal = tk.Frame(self, bg="#0f172a", bd=1, relief="raised")
+        tbar_pal.pack(fill="x", side="top")
+        tk.Label(tbar_pal, text="🧰 Component Palette (Click Tool, Then Click Label):", bg="#0f172a", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=8, pady=3)
+        palette_items = [
+            ("🔤 Label", "static_label"),
+            ("🏷️ DBText (Desc)", "name"),
+            ("💲 DBText (Price)", "price_fmt"),
+            ("🏭 DBText (Brand)", "manufacturer"),
+            ("🔢 DBText (UPC)", "upc"),
+            ("📅 SysVar (Date)", "date_yymmdd"),
+            ("👤 SysVar (Emp)", "emp_initials"),
+            ("📝 Variable", "variable_text"),
+            ("🧮 DBCalc", "db_calc"),
+            ("║▌ DBBarCode (128)", "barcode_img"),
+            ("║▌ UPC-A", "barcode_upca"),
+        ]
+        for btn_lbl, fk in palette_items:
+            tk.Button(
+                tbar_pal, text=btn_lbl, bg="#1e293b", fg="#f8fafc", activebackground="#2563eb", activeforeground="white",
+                font=("Sans", 9, "bold"), padx=5, pady=1,
+                command=lambda k=fk, l=btn_lbl: self.arm_palette_tool(k, l)
+            ).pack(side="left", padx=2, pady=2)
+
+        # Row 3 Toolbar: Box Dimensions, WordWrap, Auto-Fit, Layer Order, Duplicate, Rotate, Delete, Label Size
+        tbar2 = tk.Frame(self, bg="#14171c", bd=1, relief="raised")
+        tbar2.pack(fill="x", side="top")
+
+        tk.Label(tbar2, text="📐 Box W:", bg="#14171c", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2), pady=3)
+        self.box_w_var = tk.StringVar(value="1.00")
+        bw_spin = tk.Spinbox(tbar2, from_=0.10, to=4.00, increment=0.05, format="%.2f", textvariable=self.box_w_var, width=5, font=("Sans", 10), command=self.apply_box_spin_change)
+        bw_spin.pack(side="left", padx=2)
+        bw_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
+
+        tk.Label(tbar2, text="Box H:", bg="#14171c", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2))
+        self.box_h_var = tk.StringVar(value="0.20")
+        bh_spin = tk.Spinbox(tbar2, from_=0.08, to=3.00, increment=0.02, format="%.2f", textvariable=self.box_h_var, width=5, font=("Sans", 10), command=self.apply_box_spin_change)
+        bh_spin.pack(side="left", padx=2)
+        bh_spin.bind("<Return>", lambda _e: self.apply_box_spin_change())
+
+        self.autofit_font_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(tbar2, text="AutoSize Font", variable=self.autofit_font_var, bg="#14171c", fg="#f8fafc", selectcolor="#0f172a", font=("Sans", 9, "bold"), command=self.on_toggle_autofit).pack(side="left", padx=6)
+
+        self.word_wrap_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(tbar2, text="WordWrap (2-Line)", variable=self.word_wrap_var, bg="#14171c", fg="#f8fafc", selectcolor="#0f172a", font=("Sans", 9, "bold"), command=self.toggle_word_wrap).pack(side="left", padx=4)
+
+        make_vt_btn(tbar2, text="⬆ Front", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), command=self.bring_to_front).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="⬇ Back", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), command=self.send_to_back).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="🔄 Rotate", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), command=self.rotate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="📑 Dup", bg="#d97706", fg="#ffffff", font=("Sans", 9, "bold"), command=self.duplicate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="🗑️ Del", bg="#dc2626", fg="#ffffff", font=("Sans", 9, "bold"), command=self.delete_field).pack(side="left", padx=2)
+
+        make_vt_btn(tbar2, text="Apply Size", bg="#0d9488", fg="#ffffff", font=("Sans", 9, "bold"), command=self.resize_label).pack(side="right", padx=4)
+        self.lh_var = tk.StringVar(value=str(self.tpl["height_in"]))
+        self.lw_var = tk.StringVar(value=str(self.tpl["width_in"]))
+        tk.Entry(tbar2, textvariable=self.lh_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1)
+        tk.Label(tbar2, text="x", bg="#14171c", fg="white").pack(side="right")
+        tk.Entry(tbar2, textvariable=self.lw_var, width=4, font=("Sans", 9, "bold")).pack(side="right", padx=1)
+
+        # Media Stock Preset Selector in Designer
+        cur_w, cur_h = float(self.tpl.get("width_in", 2.0)), float(self.tpl.get("height_in", 1.0))
+        init_media = next((m[0] for m in MEDIA_STOCK_PRESETS if m[1] == cur_w and m[2] == cur_h), self.tpl.get("media_stock", "Custom Size (W x H in)"))
+        self.media_var = tk.StringVar(value=init_media)
+        media_cb = ttk.Combobox(tbar2, textvariable=self.media_var, values=MEDIA_STOCK_LABELS, state="readonly", width=22, font=("Sans", 9, "bold"))
+        media_cb.pack(side="right", padx=4)
+        media_cb.bind("<<ComboboxSelected>>", self.on_pick_media_preset)
+        tk.Label(tbar2, text="📏 Stock:", bg="#14171c", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
+
+        # Target Printer Selector in Designer (Saved directly with this Label Template!)
+        avail_printers = discover_all_printers()
+        saved_p = self.tpl.get("default_printer", "")
+        if not saved_p or saved_p not in avail_printers:
+            saved_p = avail_printers[0] if avail_printers else "PDF Preview (Desktop)"
+            self.tpl["default_printer"] = saved_p
+        self.designer_printer_var = tk.StringVar(value=saved_p)
+        prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=28, font=("Sans", 9, "bold"))
+        prn_cb.pack(side="right", padx=4)
+        prn_cb.bind("<<ComboboxSelected>>", self.on_pick_designer_printer)
+        tk.Label(tbar2, text="🖨️ Target Printer:", bg="#14171c", fg="#14b8a6", font=("Sans", 9, "bold")).pack(side="right", padx=(8, 2))
+
+        # Designer Gray Workspace
+        work = tk.Frame(self, bg="#808080")
+        work.pack(fill="both", expand=True, padx=16, pady=12)
+
+        self.canvas = tk.Canvas(work, bg="#808080", bd=0, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.canvas.bind("<Configure>", self._redraw_canvas)
+        self.canvas.bind("<ButtonPress-1>", self.on_canvas_down)
+        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_canvas_up)
+        self.canvas.bind("<Double-Button-1>", self.on_canvas_double_click)
+        self.canvas.bind("<ButtonPress-3>", self.on_right_click)
+
+        for seq, fn in [
+            ("<Control-z>", self.undo), ("<Control-Z>", self.undo),
+            ("<Control-y>", self.redo), ("<Control-Y>", self.redo),
+            ("<Control-a>", self.select_all_fields), ("<Control-A>", self.select_all_fields),
+            ("<Control-c>", self.copy_selected), ("<Control-C>", self.copy_selected),
+            ("<Control-x>", self.cut_selected), ("<Control-X>", self.cut_selected),
+            ("<Control-v>", self.paste_clipboard), ("<Control-V>", self.paste_clipboard),
+            ("<Control-d>", self.duplicate_selected), ("<Control-D>", self.duplicate_selected),
+            ("<Delete>", self.delete_field), ("<Escape>", self.cancel_palette_tool),
+            ("<r>", self.rotate_selected), ("<R>", self.rotate_selected),
+            ("<Left>", lambda _e: self.nudge_selected(-0.01, 0.0)),
+            ("<Right>", lambda _e: self.nudge_selected(0.01, 0.0)),
+            ("<Up>", lambda _e: self.nudge_selected(0.0, -0.01)),
+            ("<Down>", lambda _e: self.nudge_selected(0.0, 0.01)),
+            ("<Shift-Left>", lambda _e: self.nudge_selected(-0.05, 0.0)),
+            ("<Shift-Right>", lambda _e: self.nudge_selected(0.05, 0.0)),
+            ("<Shift-Up>", lambda _e: self.nudge_selected(0.0, -0.05)),
+            ("<Shift-Down>", lambda _e: self.nudge_selected(0.0, 0.05)),
+        ]:
+            self.bind(seq, fn)
+
+        self.status_var = tk.StringVar(value="Ready — Click any component to move/resize, right-click for context menu, or click a Palette tool above to drop a new field.")
+        sbar = tk.Label(self, textvariable=self.status_var, bg="#0f172a", fg="#38bdf8", anchor="w", font=("Monospace", 10, "bold"), padx=10, pady=5)
+        sbar.pack(fill="x", side="bottom")
+
+        self._refresh_element_combo()
+
+    def _refresh_element_combo(self):
+        names = [f"{idx+1}: " + re.sub(r"_(left|right)$", "", str(el.get("field","")).replace("static:",""), flags=re.I) for idx, el in enumerate(self.tpl["elements"])]
+        self.el_cb["values"] = names
+        if names:
+            self.selected_idx = min(self.selected_idx, len(names) - 1)
+            self.el_cb.current(self.selected_idx)
+            self._load_selected_props()
+
+    def _load_selected_props(self):
+        if not self.tpl.get("elements"):
+            return
+        el = self.tpl["elements"][self.selected_idx]
+        self.size_var.set(str(el.get("size", 12)))
+        cur_f = el.get("field", "name")
+        match = [f"{k} — {lbl}" for k, lbl in GLOBAL_FIELD_CATALOG if k == cur_f]
+        self.ftype_var.set(match[0] if match else cur_f)
+        self.custom_text_var.set(str(el.get("text", "") or (globals().get("GLOBAL_VAR_TEXT", "RECEIVED") if cur_f == "variable_text" else "")))
+        self.autofit_font_var.set(bool(el.get("auto_font", True)))
+        self.word_wrap_var.set(bool(el.get("word_wrap", cur_f == "name")))
+        self.bold_var.set(bool(el.get("bold", True)))
+        self.italic_var.set(bool(el.get("italic", False)))
+        self.font_fam_var.set(el.get("font_family", "Sans"))
+        self.align_var.set(el.get("align", "center"))
+        self.box_w_var.set(f"{float(el.get('w', 1.0)):.2f}")
+        self.box_h_var.set(f"{float(el.get('h', 0.2)):.2f}")
+        lx = float(el.get("x", 0.0))
+        ly = float(el.get("y", 0.0))
+        lw = float(el.get("w", 1.0))
+        lh = float(el.get("h", 0.2))
+        self.status_var.set(
+            f"Object: #{self.selected_idx+1} ({cur_f})   |   Left: {lx:.3f} in   Top: {ly:.3f} in   Width: {lw:.3f} in   Height: {lh:.3f} in   |   Font: {el.get('size', 10)}pt   |   Ctrl+Z Undo | Right-Click Menu"
+        )
+
+    def on_pick_element(self, _e=None):
+        self.selected_idx = self.el_cb.current()
+        self.selected_set = {self.selected_idx}
+        self._load_selected_props()
+        self._redraw_canvas()
+
+    def on_toggle_autofit(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        el["auto_font"] = bool(self.autofit_font_var.get())
+        if el["auto_font"] and not str(el["field"]).startswith("barcode"):
+            el["size"] = max(6, min(72, int(round(float(el.get("h", 0.2)) * 58))))
+        self._load_selected_props()
+        self._redraw_canvas()
+
+    def apply_custom_text(self, _e=None):
+        if not self.tpl.get("elements"): return
+        el = self.tpl["elements"][self.selected_idx]
+        val = self.custom_text_var.get().strip()
+        if val != str(el.get("text", "")):
+            self._push_undo()
+            el["text"] = val
+            if el.get("field") == "variable_text" and val:
+                globals()["GLOBAL_VAR_TEXT"] = val.upper()
+            self._redraw_canvas()
+
+    def apply_prop_change(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        try:
+            new_sz = max(5, int(self.size_var.get()))
+            if new_sz != int(el.get("size", 12)):
+                el["auto_font"] = False
+                self.autofit_font_var.set(False)
+            el["size"] = new_sz
+        except ValueError:
+            pass
+        el["bold"] = bool(self.bold_var.get())
+        el["italic"] = bool(self.italic_var.get())
+        el["font_family"] = self.font_fam_var.get()
+        el["align"] = self.align_var.get()
+        self._load_selected_props()
+        self._redraw_canvas()
+
+    def apply_box_spin_change(self):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        try:
+            el["w"] = round(max(0.10, float(self.box_w_var.get())), 3)
+            el["h"] = round(max(0.08, float(self.box_h_var.get())), 3)
+            if self.autofit_font_var.get() and not str(el["field"]).startswith("barcode"):
+                el["size"] = max(6, min(64, int(round(el["h"] * 68))))
+        except ValueError:
+            pass
+        self._load_selected_props()
+        self._redraw_canvas()
+
+    def on_pick_designer_printer(self, _e=None):
+        self._push_undo()
+        chosen_p = self.designer_printer_var.get().strip()
+        self.tpl["default_printer"] = chosen_p
+        self.status_var.set(f"🖨️ Target Printer for '{self.tpl_name}' set to: {chosen_p} (Save report to lock in)")
+
+    def on_pick_media_preset(self, _e=None):
+        choice = self.media_var.get()
+        self.tpl["media_stock"] = choice
+        for lbl, mw, mh, mtype in MEDIA_STOCK_PRESETS:
+            if lbl == choice and mw is not None and mh is not None:
+                self._push_undo()
+                self.lw_var.set(str(mw))
+                self.lh_var.set(str(mh))
+                self.tpl["width_in"] = float(mw)
+                self.tpl["height_in"] = float(mh)
+                self.tpl["media_type"] = mtype
+                self._redraw_canvas()
+                self.status_var.set(f"📏 Media Stock set to: {choice} ({mw} in x {mh} in)")
+                break
+
+    def resize_label(self):
+        try:
+            self._push_undo()
+            self.tpl["width_in"] = max(0.5, float(self.lw_var.get()))
+            self.tpl["height_in"] = max(0.4, float(self.lh_var.get()))
+            self.tpl["media_stock"] = f"{self.tpl['width_in']} x {self.tpl['height_in']} in"
+            self._redraw_canvas()
+        except ValueError:
+            pass
+
+    def on_change_field_type(self, _e=None):
+        if not self.tpl.get("elements"): return
+        self._push_undo()
+        el = self.tpl["elements"][self.selected_idx]
+        raw_choice = self.ftype_var.get().split(" — ")[0].strip()
+        if raw_choice:
+            el["field"] = raw_choice
+            el["id"] = raw_choice
+            if raw_choice == "static_label" and not el.get("text"):
+                el["text"] = "TEXT"
+            elif raw_choice == "variable_text" and not el.get("text"):
+                el["text"] = globals().get("GLOBAL_VAR_TEXT", "RECEIVED")
+            self._refresh_element_combo()
+            self._load_selected_props()
+            self._redraw_canvas()
+
+    def on_canvas_down(self, event):
+        self.canvas.focus_set()
+        ox, oy, sc = getattr(self, "ox", 24), getattr(self, "oy", 24), self.scale
+
+        if self.pending_tool is not None:
+            fk, _lbl = self.pending_tool
+            self.pending_tool = None
+            self.canvas.config(cursor="")
+            self._push_undo()
+            cx = round(max(0.02, min(float(self.tpl["width_in"]) - 0.30, (event.x - ox) / sc)), 3)
+            cy = round(max(0.02, min(float(self.tpl["height_in"]) - 0.14, (event.y - oy) / sc)), 3)
+            def_w = 1.25 if str(fk).startswith("barcode") else (1.50 if fk == "name" else 0.70)
+            def_h = 0.22 if str(fk).startswith("barcode") else 0.18
+            ne = {
+                "id": fk, "field": fk,
+                "x": cx, "y": cy,
+                "w": round(min(def_w, float(self.tpl["width_in"]) - cx), 3),
+                "h": def_h,
+                "size": 11, "bold": True, "align": "center", "auto_font": True,
+                "word_wrap": (fk == "name")
+            }
+            if fk == "static_label": ne["text"] = "TEXT"
+            elif fk == "variable_text": ne["text"] = globals().get("GLOBAL_VAR_TEXT", "RECEIVED")
+            self.tpl["elements"].append(ne)
+            self.selected_idx = len(self.tpl["elements"]) - 1
+            self.selected_set = {self.selected_idx}
+            self._refresh_element_combo()
+            self._redraw_canvas()
+            return
+
+        ctrl_or_shift = bool(event.state & 0x0004) or bool(event.state & 0x0001)
+        if not ctrl_or_shift:
+            for item_id in reversed(self.canvas.find_overlapping(event.x - 7, event.y - 7, event.x + 7, event.y + 7)):
+                for tag in self.canvas.gettags(item_id):
+                    if tag.startswith("hdl_"):
+                        h_dir = tag.split("_", 1)[1]
+                        el = self.tpl["elements"][self.selected_idx]
+                        self.interaction = {"mode": f"resize_{h_dir}", "start_x": event.x, "start_y": event.y, "orig_box": (float(el["x"]), float(el["y"]), float(el["w"]), float(el["h"])), "undo_pushed": False}
+                        return
+        hit_idx = None
+        for idx in range(len(self.tpl["elements"]) - 1, -1, -1):
+            el = self.tpl["elements"][idx]
+            bx1, by1 = ox + float(el.get("x", 0)) * sc, oy + float(el.get("y", 0)) * sc
+            bx2, by2 = bx1 + max(18, float(el.get("w", 0.5)) * sc), by1 + max(12, float(el.get("h", 0.15)) * sc)
+            if (bx1 - 4) <= event.x <= (bx2 + 4) and (by1 - 4) <= event.y <= (by2 + 4):
+                hit_idx = idx; break
+        if hit_idx is not None:
+            if not hasattr(self, "selected_set"): self.selected_set = {self.selected_idx}
+            if ctrl_or_shift:
+                if hit_idx in self.selected_set and len(self.selected_set) > 1: self.selected_set.remove(hit_idx)
+                else: self.selected_set.add(hit_idx)
+                self.selected_idx = hit_idx
+            elif hit_idx not in self.selected_set:
+                self.selected_set = {hit_idx}
+                self.selected_idx = hit_idx
+            else:
+                self.selected_idx = hit_idx
+            self.el_cb.current(self.selected_idx); self._load_selected_props(); self._redraw_canvas()
+            el = self.tpl["elements"][self.selected_idx]
+            orig_group = {i: (float(self.tpl["elements"][i]["x"]), float(self.tpl["elements"][i]["y"])) for i in self.selected_set if i < len(self.tpl["elements"])}
+            self.interaction = {"mode": "move", "start_x": event.x, "start_y": event.y, "orig_box": (float(el["x"]), float(el["y"]), float(el["w"]), float(el["h"])), "orig_group": orig_group, "undo_pushed": False}
+            return
+        if not ctrl_or_shift: self.selected_set = set()
+        self._redraw_canvas()
+        self.interaction = {"mode": "lasso", "start_x": event.x, "start_y": event.y, "base_set": set(getattr(self, "selected_set", set())), "undo_pushed": True}
+
+    def on_canvas_drag(self, event):
+        if not self.tpl.get("elements") or not self.interaction.get("mode"):
+            return
+        mode = self.interaction["mode"]
+        ox_c, oy_c, sc = getattr(self, "ox", 24), getattr(self, "oy", 24), self.scale
+
+        if mode == "lasso":
+            x1, y1 = min(self.interaction["start_x"], event.x), min(self.interaction["start_y"], event.y)
+            x2, y2 = max(self.interaction["start_x"], event.x), max(self.interaction["start_y"], event.y)
+            hits = set(self.interaction.get("base_set", set()))
+            for idx, el in enumerate(self.tpl["elements"]):
+                bx1 = ox_c + float(el.get("x", 0)) * sc
+                by1 = oy_c + float(el.get("y", 0)) * sc
+                bx2 = bx1 + max(18, float(el.get("w", 0.5)) * sc)
+                by2 = by1 + max(12, float(el.get("h", 0.15)) * sc)
+                if not (bx2 < x1 or bx1 > x2 or by2 < y1 or by1 > y2):
+                    hits.add(idx)
+            self.selected_set = hits
+            if hits:
+                self.selected_idx = min(hits)
+            self._redraw_canvas()
+            self.canvas.create_rectangle(x1, y1, x2, y2, outline="#2563eb", fill="#93c5fd", stipple="gray25", width=2, dash=(4, 2), tags=("lasso_rect",))
+            return
+
+        if not self.interaction.get("undo_pushed") and (abs(event.x - self.interaction["start_x"]) > 2 or abs(event.y - self.interaction["start_y"]) > 2):
+            self._push_undo()
+            self.interaction["undo_pushed"] = True
+
+        dx = (event.x - self.interaction["start_x"]) / sc
+        dy = (event.y - self.interaction["start_y"]) / sc
+        ox, oy, ow, oh = self.interaction["orig_box"]
+        el = self.tpl["elements"][self.selected_idx]
+
+        if mode == "move":
+            for gi, (gx, gy) in self.interaction.get("orig_group", {self.selected_idx: (ox, oy)}).items():
+                if 0 <= gi < len(self.tpl["elements"]):
+                    self.tpl["elements"][gi]["x"] = round(max(0.0, min(self.tpl["width_in"] - 0.05, gx + dx)), 3)
+                    self.tpl["elements"][gi]["y"] = round(max(0.0, min(self.tpl["height_in"] - 0.05, gy + dy)), 3)
+        elif mode.startswith("resize_"):
+            h_dir = mode.split("_", 1)[1]
+            nx, ny, nw, nh = ox, oy, ow, oh
+            min_w, min_h = 0.12, 0.08
+            if "e" in h_dir: nw = max(min_w, ow + dx)
+            if "s" in h_dir: nh = max(min_h, oh + dy)
+            if "w" in h_dir: nw = max(min_w, ow - dx); nx = ox + (ow - nw)
+            if "n" in h_dir: nh = max(min_h, oh - dy); ny = oy + (oh - nh)
+            el["x"], el["y"], el["w"], el["h"] = round(max(0.0, nx), 3), round(max(0.0, ny), 3), round(nw, 3), round(nh, 3)
+            if el.get("auto_font", True) and not str(el["field"]).startswith("barcode"):
+                el["size"] = max(6, min(64, int(round(nh * 68))))
+        self._load_selected_props()
+        self._redraw_canvas()
+
+    def on_canvas_up(self, _event):
+        self.interaction["mode"] = None
+        self.canvas.delete("lasso_rect")
+        self._redraw_canvas()
+
+    def on_close_request(self, *a):
+        if json.dumps(self.tpl, sort_keys=True) == getattr(self, "_orig_tpl_json", ""):
+            self.destroy()
+            return
+        dlg = tk.Toplevel(self)
+        dlg.title("Save Changes?")
+        dlg.geometry("460x190+730+420")
+        dlg.configure(bg="#1e293b")
+        dlg.transient(self)
+        dlg.attributes("-topmost", True)
+        tk.Label(dlg, text=f"Do you want to save changes to '{self.tpl_name}' before closing?", bg="#1e293b", fg="#f8fafc", font=("Sans", 12, "bold"), wraplength=420, justify="center").pack(pady=(22, 18))
+        bf = tk.Frame(dlg, bg="#1e293b")
+        bf.pack(pady=6)
+        tk.Button(bf, text="💾 Yes, Save", bg="#16a34a", fg="white", font=("Sans", 11, "bold"), width=12, command=lambda: (dlg.destroy(), self.on_save_callback(self.tpl_name, self.tpl), self.destroy())).pack(side="left", padx=6)
+        tk.Button(bf, text="✖ No, Discard", bg="#dc2626", fg="white", font=("Sans", 11, "bold"), width=12, command=lambda: (dlg.destroy(), self.destroy())).pack(side="left", padx=6)
+        make_vt_btn(bf, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=9, command=dlg.destroy).pack(side="left", padx=6)
+        dlg.update_idletasks()
+        dlg.lift()
+        dlg.focus_force()
+
+    def save_and_close(self):
+        self.on_save_callback(self.tpl_name, self.tpl)
+        self._orig_tpl_json = json.dumps(self.tpl, sort_keys=True)
+        self.status_var.set(f"✓ Saved '{self.tpl_name}'! Click ✖ Close when finished.")
+        self.canvas.focus_set()
+        self._redraw_canvas()
+
+# --- Main 4-Step ViewTouch Label Utility ---
+class VTRoundedButton(tk.Canvas):
+    """ViewTouch-style rounded button with drop shadow, tactile press, and instant touchscreen response."""
+    def __init__(self, parent, text="", command=None, bg="#1d4ed8", border=None,
+                 fg="#ffffff", font=("Sans", 10, "bold"), radius=12,
+                 shadow_color="#05070b", shadow_offset=4, active_bg=None,
+                 active_border="#ffffff", is_active=False, width=None, height=None,
+                 padx=10, pady=6, state="normal"):
+        try:
+            p_bg = parent.cget("bg")
+        except Exception:
+            p_bg = "#0c1017"
+
+        import tkinter.font as tkfont
+        try:
+            f_obj = tkfont.Font(font=font)
+            lines = str(text or "").splitlines() or [""]
+            txt_w = max(f_obj.measure(ln) for ln in lines)
+            txt_h = f_obj.metrics("linespace") * len(lines)
+        except Exception:
+            txt_w = len(str(text or "")) * 8
+            txt_h = 20
+
+        req_w = int(width * 9 + padx * 2 + 8) if width is not None else int(txt_w + padx * 2 + 16)
+        req_h = int(height * 22 + pady * 2 + 8) if height is not None else int(txt_h + pady * 2 + 12)
+
+        super().__init__(parent, width=max(36, req_w), height=max(32, req_h), bg=p_bg, bd=0, highlightthickness=0, cursor="hand2")
+        self.text = text
+        self.command = command
+        self.bg_color = bg
+        self.border_color = border if border is not None else bg
+        self.fg_color = fg
+        self.disabled_fg = "#64748b"
+        self.font = font
+        self.radius = radius
+        self.shadow_color = shadow_color
+        self.shadow_offset = shadow_offset
+        self.active_bg = active_bg or bg
+        self.active_border = active_border
+        self.is_active = is_active
+        self.btn_state = state
+        self.pressed = False
+
+        self.bind("<Configure>", lambda _e: self.draw())
+        self.bind("<ButtonPress-1>", self._on_press)
+        self.bind("<ButtonRelease-1>", self._on_release)
+
+    def configure(self, cnf=None, **kw):
+        if isinstance(cnf, dict):
+            kw.update(cnf)
+        redraw = False
+        if "text" in kw:
+            self.text = kw.pop("text"); redraw = True
+        if "bg" in kw:
+            self.bg_color = kw.pop("bg")
+            self.active_bg = self.bg_color
+            self.border_color = self.bg_color
+            redraw = True
+        if "activebackground" in kw:
+            self.active_bg = kw.pop("activebackground"); redraw = True
+        if "fg" in kw:
+            self.fg_color = kw.pop("fg"); redraw = True
+        if "activeforeground" in kw:
+            kw.pop("activeforeground", None)
+        if "state" in kw:
+            self.btn_state = kw.pop("state"); redraw = True
+        if "command" in kw:
+            self.command = kw.pop("command")
+        for ignore_k in ("relief", "bd", "highlightbackground", "highlightcolor", "highlightthickness"):
+            kw.pop(ignore_k, None)
+        if kw:
+            super().configure(**kw)
+        if redraw:
+            self.draw()
+
+    config = configure
+
+    def __getitem__(self, key):
+        if key == "state":
+            return self.btn_state
+        if key == "text":
+            return self.text
+        if key == "bg":
+            return self.bg_color
+        return super().__getitem__(key)
+
+    def __setitem__(self, key, value):
+        self.configure(**{key: value})
+
+    def _on_press(self, _event=None):
+        if self.btn_state == "disabled":
+            return "break"
+        self.pressed = True
+        self.draw()
+        if self.command:
+            cmd = self.command
+            self.after(35, lambda: self._finish_press(cmd))
+        return "break"
+
+    def _finish_press(self, cmd):
+        if self.pressed:
+            self.pressed = False
+            if self.winfo_exists():
+                self.draw()
+        cmd()
+
+    def _on_release(self, _event=None):
+        if self.pressed:
+            self.pressed = False
+            if self.winfo_exists():
+                self.draw()
+        return "break"
+
+    def _draw_rounded_rect(self, x1, y1, x2, y2, r, fill, outline=""):
+        r = max(2, min(r, int((x2 - x1) / 2), int((y2 - y1) / 2)))
+        self.create_arc(x1, y1, x1 + 2*r, y1 + 2*r, start=90, extent=90, fill=fill, outline=outline)
+        self.create_arc(x2 - 2*r, y1, x2, y1 + 2*r, start=0, extent=90, fill=fill, outline=outline)
+        self.create_arc(x1, y2 - 2*r, x1 + 2*r, y2, start=180, extent=90, fill=fill, outline=outline)
+        self.create_arc(x2 - 2*r, y2 - 2*r, x2, y2, start=270, extent=90, fill=fill, outline=outline)
+        self.create_rectangle(x1 + r, y1, x2 - r, y2, fill=fill, outline=outline)
+        self.create_rectangle(x1, y1 + r, x2, y2 - r, fill=fill, outline=outline)
+
+    def draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w < 10 or h < 10:
+            w = int(self.cget("width") or 80)
+            h = int(self.cget("height") or 36)
+
+        pad = 2
+        r = max(5, min(self.radius, int(min(w, h) / 2.8)))
+        so = self.shadow_offset
+
+        if not self.pressed and so > 0:
+            self._draw_rounded_rect(pad + so, pad + so, w - pad, h - pad, r, fill=self.shadow_color)
+
+        shift = 2 if self.pressed else 0
+        bx1 = pad + shift
+        by1 = pad + shift
+        bx2 = w - pad - (so if not self.pressed else shift)
+        by2 = h - pad - (so if not self.pressed else shift)
+
+        cur_fill = "#1e293b" if self.btn_state == "disabled" else (self.active_bg if self.is_active else self.bg_color)
+        cur_fg = self.disabled_fg if self.btn_state == "disabled" else self.fg_color
+
+        self._draw_rounded_rect(bx1, by1, bx2, by2, r, fill=cur_fill)
+
+        if not self.pressed and self.btn_state != "disabled" and (bx2 - bx1) > 2 * r + 4:
+            self.create_line(bx1 + r, by1 + 1, bx2 - r, by1 + 1, fill="#ffffff", stipple="gray25")
+
+        cx = (bx1 + bx2) / 2.0
+        cy = (by1 + by2) / 2.0
+        self.create_text(cx, cy, text=self.text, font=self.font, fill=cur_fg, justify="center")
+
+
+def make_vt_btn(parent, text, command=None, bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=None, height=None, padx=10, pady=6, state="normal", radius=12):
+    return VTRoundedButton(
+        parent,
+        text=text,
+        command=command,
+        bg=bg,
+        fg=fg,
+        font=font,
+        width=width,
+        height=height,
+        padx=padx,
+        pady=pady,
+        state=state,
+        radius=radius,
+        shadow_offset=4,
+    )
+
+
 class VTLabelUtility(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -728,16 +1725,16 @@ class VTLabelUtility(tk.Tk):
         bbar = tk.Frame(self, bg="#0c1017", height=54)
         bbar.pack(fill="x", side="bottom", padx=12, pady=6)
 
-        self.close_btn = make_vt_btn(bbar, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.destroy)
+        self.close_btn = make_vt_btn(bbar, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.destroy)
         self.close_btn.pack(side="left", padx=(4, 6), pady=4)
 
-        self.reload_btn = make_vt_btn(bbar, text="↻ Reload viewtouch.db", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=20, pady=8, command=self.reload_vt_db)
+        self.reload_btn = make_vt_btn(bbar, text="↻ Reload viewtouch.db", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=20, pady=8, radius=12, command=self.reload_vt_db)
         self.reload_btn.pack(side="left", padx=6, pady=4)
 
-        self.next_btn = make_vt_btn(bbar, text="Next >>", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.go_next)
+        self.next_btn = make_vt_btn(bbar, text="Next >>", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.go_next)
         self.next_btn.pack(side="right", padx=(6, 4), pady=4)
 
-        self.prev_btn = make_vt_btn(bbar, text="<< Previous", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.go_prev)
+        self.prev_btn = make_vt_btn(bbar, text="<< Previous", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.go_prev)
         self.prev_btn.pack(side="right", padx=6, pady=4)
 
         self.show_step(1)
@@ -850,24 +1847,10 @@ class VTLabelUtility(tk.Tk):
             self.mode_var_val = m_val
             for k, (btn, bg_c, act_c) in self.mode_btn_widgets.items():
                 use_c = act_c if k == m_val else bg_c
-                btn.configure(
-                    bg=use_c, activebackground=use_c,
-                    relief="flat", bd=0,
-                    highlightbackground=use_c, highlightcolor=use_c, highlightthickness=0
-                )
+                btn.configure(bg=use_c)
 
-        mode_active_colors = {
-            "tree": "#16a34a",
-            "retail": "#0284c7",
-            "rcv": "#2563eb",
-            "all": "#334155",
-        }
-        mode_dim_colors = {
-            "tree": "#14532d",
-            "retail": "#0369a1",
-            "rcv": "#1e3a8a",
-            "all": "#1e293b",
-        }
+        mode_active_colors = {"tree": "#16a34a", "retail": "#0284c7", "rcv": "#2563eb", "all": "#334155"}
+        mode_dim_colors = {"tree": "#14532d", "retail": "#0369a1", "rcv": "#1e3a8a", "all": "#1e293b"}
 
         for col_idx, (m_val, m_label, _m_bg) in enumerate(modes):
             is_active = (cur_mode == m_val)
@@ -880,6 +1863,7 @@ class VTLabelUtility(tk.Tk):
                 font=("Sans", 10, "bold"),
                 bg=init_c,
                 fg="#ffffff",
+                radius=12,
                 command=lambda v=m_val: select_mode(v)
             )
             b.grid(row=0, column=col_idx, sticky="nsew", padx=4, pady=3)
