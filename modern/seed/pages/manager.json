@@ -764,9 +764,9 @@
       ]
     },
     {
-      "id": "barcode-labels",
+      "id": "label-utility",
       "kind": "button",
-      "label": "\ud83c\udff7\ufe0f Barcode Labels",
+      "label": "Label Utility",
       "rect": {
         "x": 1456,
         "y": 526,
@@ -784,7 +784,7 @@
       "actions": [
         {
           "type": "command",
-          "name": "openBarcodeWizard"
+          "name": "openLabelUtility"
         }
       ]
     }

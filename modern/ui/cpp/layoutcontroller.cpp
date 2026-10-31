@@ -1809,17 +1809,32 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 {
     if (name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s) || name == u"openBarcodeWizard"_s || name.startsWith(u"openBarcodeWizard:"_s)) {
         QStringList procArgs;
-        if (name.startsWith(u"openBarcodeWizard:"_s)) {
-            const QString upc = name.mid(18).trimmed();
-            if (!upc.isEmpty())
-                procArgs << u"--upc"_s << upc;
-        } else {
-            const QString upc = args.value(u"upc"_s).toString().trimmed();
-            if (!upc.isEmpty())
-                procArgs << u"--upc"_s << upc;
+        QString upc;
+        for (const QString &prefix : {u"openLabelUtility:"_s, u"openBarcodeWizard:"_s}) {
+            if (name.startsWith(prefix)) {
+                upc = name.mid(prefix.size()).trimmed();
+                break;
+            }
         }
+        if (upc.isEmpty())
+            upc = args.value(u"upc"_s).toString().trimmed();
+        if (!upc.isEmpty())
+            procArgs << u"--upc"_s << upc;
         setStatus(tr("Opening Label Utility..."));
-        QProcess::startDetached(u"/usr/local/bin/vt-label-utility"_s, procArgs);
+        QProcess proc;
+        proc.setProgram(u"/usr/local/bin/vt-label-utility"_s);
+        proc.setArguments(procArgs);
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        if (!env.contains(u"DISPLAY"_s))
+            env.insert(u"DISPLAY"_s, u":0"_s);
+        if (!env.contains(u"WAYLAND_DISPLAY"_s))
+            env.insert(u"WAYLAND_DISPLAY"_s, u"wayland-0"_s);
+        if (!env.contains(u"XDG_RUNTIME_DIR"_s))
+            env.insert(u"XDG_RUNTIME_DIR"_s, u"/run/user/1000"_s);
+        proc.setProcessEnvironment(env);
+        proc.setStandardOutputFile(u"/tmp/vt_wiz_runtime.log"_s);
+        proc.setStandardErrorFile(u"/tmp/vt_wiz_runtime.log"_s);
+        proc.startDetached();
         return done(true);
     }
 
@@ -2219,6 +2234,8 @@ QString LayoutController::describeAction(const Action &a) const
     }
     if (type == u"command") {
         static const QHash<QString, const char *> plain{
+            {u"openLabelUtility"_s, QT_TR_NOOP("Opens the ViewTouch Label Utility & Report Designer.")},
+            {u"openBarcodeWizard"_s, QT_TR_NOOP("Opens the ViewTouch Label Utility & Report Designer.")},
             {u"sendOrder"_s, QT_TR_NOOP("Sends the new items to the kitchen and bar.")},
             {u"voidItem"_s, QT_TR_NOOP("Takes the touched item off the check (after it was sent: a void, which may need a manager).")},
             {u"printReceipt"_s, QT_TR_NOOP("Prints the check for the guest.")},

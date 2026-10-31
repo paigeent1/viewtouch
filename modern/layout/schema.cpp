@@ -520,7 +520,7 @@ QJsonArray actionTypes()
                             {"addTip", "Add tip (args.percent)"}, {"gratuity", "Gratuity (args.percent)"},
                             {"setCashTip", "Cash tip for the server (the keypad amount)"},
                             {"payout", "Pay out of drawer"}, {"paidIn", "Pay into drawer"},
-                            {"cashOutTips", "Cash out my tips"}, {"closeApp", "Close ViewTouch (manager; leaves a kiosk)"}, {"toggleBreak", "Start / end a break"}, {"backupNow", "Back up the database now (manager)"},
+                            {"cashOutTips", "Cash out my tips"}, {"openLabelUtility", "Open the Label Utility (print labels)"}, {"closeApp", "Close ViewTouch (manager; leaves a kiosk)"}, {"toggleBreak", "Start / end a break"}, {"backupNow", "Back up the database now (manager)"},
         {"askForTip", "Ask the guest for a tip (customer display)"},
         {"toggleTraining", "Practice mode on / off for this screen (manager)"},
         {"selfOrder", "Make this screen a self-order kiosk for guests (manager)"},
