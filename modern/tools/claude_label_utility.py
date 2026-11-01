@@ -118,6 +118,25 @@ def printer_speaks_zpl(printer_label, tpl=None, extra_text=""):
         return True
     return not any(k in text for k in _RECEIPT_PRINTER_WORDS)
 
+def _printer_display_name(label):
+    m = re.match(r"\s*(?:VT TCP|VT CUPS|VT File|CUPS):\s*(.*?)(?:\s*\(|$)", str(label or ""))
+    return (m.group(1) if m else str(label or "")).strip().lower()
+
+def resolve_template_printer(saved, printers):
+    """Find the template's printer in the current list.
+
+    Exact match first; then the same ViewTouch printer name (so changing a printer's IP in
+    ViewTouch settings carries over to the templates using it); then the first printer.
+    """
+    if saved and saved in printers:
+        return saved
+    want = _printer_display_name(saved)
+    if want:
+        for p in printers:
+            if _printer_display_name(p) == want:
+                return p
+    return printers[0] if printers else "PDF Preview (Desktop)"
+
 def discover_all_printers():
     printers = []
     seen = set()
@@ -1592,10 +1611,8 @@ class ReportDesignerWindow(tk.Toplevel):
         tk.Label(tbar2, text="📏 Stock:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
 
         avail_printers = discover_all_printers()
-        saved_p = self.tpl.get("default_printer", "")
-        if not saved_p or saved_p not in avail_printers:
-            saved_p = avail_printers[0] if avail_printers else "PDF Preview (Desktop)"
-            self.tpl["default_printer"] = saved_p
+        saved_p = resolve_template_printer(self.tpl.get("default_printer", ""), avail_printers)
+        self.tpl["default_printer"] = saved_p
         self.designer_printer_var = tk.StringVar(value=saved_p)
         prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=22, font=("Sans", 9, "bold"))
         prn_cb.pack(side="right", padx=4, ipady=2)
@@ -2643,7 +2660,7 @@ class VTLabelUtility(tk.Tk):
         tpl = self.templates[self.tpl_var.get()]
         if hasattr(self, "route_badge_lbl"):
             avail = discover_all_printers()
-            routed_p = tpl.get("default_printer") or (avail[0] if avail else "Default Printer")
+            routed_p = resolve_template_printer(tpl.get("default_printer", ""), avail)
             w_in, h_in = tpl.get("width_in", 2.0), tpl.get("height_in", 1.0)
             self.route_badge_lbl.config(text=f"🖨️ Target: {routed_p}   |   📏 Stock: {w_in} in x {h_in} in")
         cw = max(600, self.preview_canvas.winfo_width())
@@ -2674,7 +2691,7 @@ class VTLabelUtility(tk.Tk):
         tpl_name = self.tpl_var.get()
         tpl = self.templates[tpl_name]
         printers = discover_all_printers()
-        chosen = tpl.get("default_printer") or (printers[0] if printers else "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]")
+        chosen = resolve_template_printer(tpl.get("default_printer", ""), printers)
 
         sdlg = tk.Toplevel(self)
         sdlg.title(f"Printer Settings & Alignment — [{tpl_name}]")
@@ -2924,10 +2941,10 @@ class VTLabelUtility(tk.Tk):
 
         items = getattr(self, "selected_for_print", None) or [self.filtered_items[0]]
         printers = discover_all_printers()
-        chosen = tpl.get("default_printer", "")
-        if not chosen or chosen not in printers:
-            chosen = printers[0] if printers else "PDF Preview (Desktop)"
+        chosen = resolve_template_printer(tpl.get("default_printer", ""), printers)
+        if chosen != tpl.get("default_printer"):
             tpl["default_printer"] = chosen
+            save_templates(self.templates)
 
         w_in = float(tpl.get("width_in", 2.0))
         h_in = float(tpl.get("height_in", 1.0))

@@ -192,7 +192,7 @@
         "valign": "top"
       }
     ],
-    "default_printer": "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]",
+    "default_printer": "VT TCP: Shelf Labels (192.168.1.24:9100) [network]",
     "v_offset_dots": 0,
     "h_offset_dots": 0,
     "darkness": 18,
@@ -280,7 +280,7 @@
         "valign": "top"
       }
     ],
-    "default_printer": "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]",
+    "default_printer": "VT TCP: Stick Labels (192.168.1.25:9100) [network]",
     "v_offset_dots": 0,
     "h_offset_dots": 0,
     "darkness": 18,
