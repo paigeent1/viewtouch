@@ -694,7 +694,7 @@ def draw_barcode_dots(draw, modules, x, y, w, h, fill=0, mw=None, align="center"
 
 
 
-def render_label_pil_image(tpl, item, dpi=203):
+def render_label_pil_image(tpl, item, dpi=203, mono=True, dot_scale=1.0):
     """Render the whole label to a 1-bit PIL image at the printer's own DPI.
 
     This picture is exactly what gets printed: the Zebra receives it as a ZPL
@@ -707,8 +707,9 @@ def render_label_pil_image(tpl, item, dpi=203):
     h_dots = max(40, int(round(float(tpl.get("height_in", 1.0)) * dpi)))
     img = Image.new("L", (w_dots, h_dots), 255)
 
-    v_off = int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12)
-    h_off = int(tpl.get("h_offset_dots", 0) or 0)
+    # Offsets are stored in printer dots; dot_scale converts them when rendering at another DPI (screen preview)
+    v_off = int(round(int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12) * dot_scale))
+    h_off = int(round(int(tpl.get("h_offset_dots", 0) or 0) * dot_scale))
 
     def get_ttf(fam, bold, italic, px):
         px = max(8, int(px))
@@ -879,9 +880,14 @@ def render_label_pil_image(tpl, item, dpi=203):
         if rot:
             sub = sub.rotate(rot, expand=True, fillcolor=255)
         # Paste only the dark pixels so overlapping boxes don't blank each other out
-        mask = sub.point(lambda p: 255 if p < 160 else 0)
+        if mono:
+            mask = sub.point(lambda p: 255 if p < 160 else 0)
+        else:
+            mask = sub.point(lambda p: 255 - p)       # keep smooth (anti-aliased) edges for the screen
         img.paste(0, (bx, by), mask)
 
+    if not mono:
+        return img
     return img.point(lambda p: 0 if p < 160 else 1, mode="1")
 
 
@@ -909,16 +915,27 @@ def export_pdf_from_bitmaps(items, tpl, out_pdf, copies=1):
     c.save()
 
 
-def label_preview_photo(tpl, item, max_w, max_h):
-    """Tk PhotoImage of the exact print bitmap, scaled to fit (nearest-neighbour, no smoothing)."""
+def label_preview_photo(tpl, item, max_w, max_h, printer_dots=False):
+    """Tk PhotoImage of the label for the screen.
+
+    Default: the same layout re-drawn at the screen's own resolution with smooth text, so it is
+    as sharp as the printout. printer_dots=True shows the exact printer bitmap, dot for dot.
+    """
     import base64, io
     from PIL import Image
-    img = render_label_pil_image(tpl, item, dpi=label_dpi(tpl)).convert("L")
-    scale = min(max_w / float(img.width), max_h / float(img.height))
-    if scale >= 1:
-        scale = max(1, int(scale))               # whole-number zoom keeps every dot identical
-    nw, nh = max(1, int(img.width * scale)), max(1, int(img.height * scale))
-    img = img.resize((nw, nh), Image.NEAREST)
+    w_in = float(tpl.get("width_in", 2.0)); h_in = float(tpl.get("height_in", 1.0))
+    p_dpi = label_dpi(tpl)
+    if printer_dots:
+        img = render_label_pil_image(tpl, item, dpi=p_dpi).convert("L")
+        scale = min(max_w / float(img.width), max_h / float(img.height))
+        if scale >= 1:
+            scale = max(1, int(scale))           # whole-number zoom keeps every dot identical
+        nw, nh = max(1, int(img.width * scale)), max(1, int(img.height * scale))
+        img = img.resize((nw, nh), Image.NEAREST)
+    else:
+        screen_dpi = max(72, int(min(max_w / w_in, max_h / h_in)))
+        img = render_label_pil_image(tpl, item, dpi=screen_dpi, mono=False, dot_scale=screen_dpi / float(p_dpi))
+        nw, nh = img.width, img.height
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode("ascii")), nw, nh
@@ -2615,7 +2632,8 @@ class VTLabelUtility(tk.Tk):
         ch = max(350, self.preview_canvas.winfo_height())
         try:
             # Show the exact picture that will be sent to the printer
-            photo, pw, ph = label_preview_photo(tpl, item, cw - 60, ch - 40)
+            show_dots = bool(getattr(self, "preview_printer_dots", False))
+            photo, pw, ph = label_preview_photo(tpl, item, cw - 60, ch - 40, printer_dots=show_dots)
             self._preview_photo = photo          # keep a reference or Tk drops the image
             c = self.preview_canvas
             c.delete("all")
@@ -2623,7 +2641,10 @@ class VTLabelUtility(tk.Tk):
             c.create_rectangle(ox + 4, oy + 4, ox + pw + 4, oy + ph + 4, fill="#0f172a", outline="")
             c.create_image(ox, oy, image=photo, anchor="nw")
             c.create_rectangle(ox - 1, oy - 1, ox + pw, oy + ph, outline="#111827", width=2)
-            c.create_text(cw // 2, ch - 10, text=f"Exact print image  ·  {label_dpi(tpl)} dpi", fill="#94a3b8", font=("Sans", 9, "bold"))
+            cap = (f"Exact printer dots ({label_dpi(tpl)} dpi)  ·  double-click for sharp preview" if show_dots
+                   else f"Sharp preview  ·  prints at {label_dpi(tpl)} dpi  ·  double-click to see exact printer dots")
+            c.create_text(cw // 2, ch - 10, text=cap, fill="#94a3b8", font=("Sans", 9, "bold"))
+            c.bind("<Double-Button-1>", lambda _e: (setattr(self, "preview_printer_dots", not show_dots), self._render_live_preview()))
         except Exception as e:
             logging.error("Bitmap preview failed, using drawn preview: %s", e)
             scale = min((cw - 60) / tpl["width_in"], (ch - 40) / tpl["height_in"])
