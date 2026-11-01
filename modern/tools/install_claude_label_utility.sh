@@ -26,6 +26,18 @@ if [ -n "$missing" ]; then
     sudo apt-get install -y $missing
 fi
 
+# The ILSA label layouts use Arial, Arial Black and Courier New. Install Microsoft's core
+# fonts so labels print with the same letter shapes and spacing (falls back to Liberation fonts).
+if ! fc-list | grep -qi "Arial Black"; then
+    echo "Installing Microsoft core fonts (Arial, Arial Black, Courier New)..."
+    echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections || true
+    if sudo apt-get install -y ttf-mscorefonts-installer && fc-cache -f >/dev/null 2>&1; then
+        echo "  Fonts installed."
+    else
+        echo "  Could not install the Microsoft fonts; labels will use Liberation fonts instead."
+    fi
+fi
+
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
 [ -n "$DESKTOP_DIR" ] && [ -d "$DESKTOP_DIR" ] || DESKTOP_DIR="$HOME/Desktop"
 mkdir -p "$DESKTOP_DIR" "$HOME/.local/share/applications"

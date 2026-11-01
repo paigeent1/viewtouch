@@ -29,7 +29,9 @@ from reportlab.lib.units import inch
 from reportlab.graphics.barcode import code128
 
 SANDBOX_DIR = os.path.expanduser("~/.local/share/ViewTouch")
-TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "vt_label_templates_v2.json")
+TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "claude_label_templates.json")
+# Starting templates shipped in the repo (copied to TEMPLATE_FILE on first run)
+SEED_TEMPLATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "seed", "templates", "claude_label_templates.json")
 VT_DB_PATH = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
 
 DEFAULT_TEMPLATES = {
@@ -184,72 +186,92 @@ def _unused_old_discover_all_printers():
     printers.append("PDF Preview (Desktop)")
     return printers
 
+_FONT_CACHE = {}
+
+def resolve_font_file(family, bold=False, italic=False):
+    """Find a TrueType file for a named font (e.g. 'Arial Black', 'Courier New') via fontconfig.
+    Falls back to the closest installed font (Liberation Sans/Mono are metric clones of Arial/Courier New)."""
+    key = (family, bool(bold), bool(italic))
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    path = None
+    # Metric-compatible / closest stand-ins when the Microsoft fonts aren't installed
+    fallbacks = {"arial": ("Liberation Sans", bold), "arial black": ("Liberation Sans", True),
+                 "courier new": ("Liberation Mono", bold), "times new roman": ("Liberation Serif", bold)}
+    tries = [(family, bold)]
+    if family.lower() in fallbacks:
+        tries.append(fallbacks[family.lower()])
+    for fam_try, bold_try in tries:
+        pattern = fam_try + (":weight=bold" if bold_try else "") + (":slant=italic" if italic else "")
+        try:
+            out = subprocess.run(["fc-match", "-f", "%{family}|%{file}", pattern], capture_output=True, text=True, timeout=3).stdout.strip()
+            got_fam, _, got_file = out.partition("|")
+            # fc-match always returns *something*; only accept it if it is really the family we asked for
+            if got_file and os.path.exists(got_file) and fam_try.lower() in got_fam.lower():
+                path = got_file
+                break
+        except Exception:
+            pass
+    _FONT_CACHE[key] = path
+    return path
+
+def pdf_font_name_for(family, bold=False, italic=False):
+    """Register a named TrueType font with reportlab and return its PDF font name (or None)."""
+    path = resolve_font_file(family, bold, italic)
+    if not path:
+        return None
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        name = "VT_" + "".join(ch for ch in os.path.basename(path) if ch.isalnum())
+        if name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(name, path))
+        return name
+    except Exception:
+        return None
+
 def load_templates():
-    tpl_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
-    user_file = os.path.expanduser("~/.local/share/ViewTouch/vt_label_templates_v2.json")
-    seed_file = os.path.join(tpl_dir, "vt_label_templates_v2.json")
-    
+    """Claude Label Utility keeps its own template list (separate from vt_label_utility).
+
+    First run: copies the shipped seed file to ~/.local/share/ViewTouch/claude_label_templates.json.
+    After that only that file is used, so deleted templates stay deleted.
+    """
     data = {}
-    for src in (seed_file, user_file):
+    for src in (TEMPLATE_FILE, SEED_TEMPLATE_FILE):
         if os.path.exists(src):
             try:
                 with open(src, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        data.update(loaded)
-            except Exception:
-                pass
-                
-    for k, v in DEFAULT_TEMPLATES.items():
-        if k not in data:
-            data[k] = v
-
-    # If Date_Label_2up_MR was renamed to 'Receiving Label' in file manager,
-    # rename any existing 'DATE LABEL 2UP MR' key in data to 'RECEIVING LABEL'!
-    if "DATE LABEL 2UP MR" in data:
-        data["RECEIVING LABEL"] = data.pop("DATE LABEL 2UP MR")
-
-    # Scan file manager folder (~/viewtouch-main/modern/seed/templates) for template files
-    if os.path.exists(tpl_dir):
-        for entry in sorted(os.listdir(tpl_dir)):
-            full_p = os.path.join(tpl_dir, entry)
-            if not os.path.isfile(full_p) or entry.startswith("."):
-                continue
-            base, ext = os.path.splitext(entry)
-            ext = ext.lower()
-            if ext in (".prn", ".nlbl", ".slnx"):
-                tpl_key = base.strip().upper()
-                if tpl_key not in data:
-                    base_ref = data.get("RECEIVING LABEL") or data.get("2X1VINYL W/BARCODE") or list(data.values())[0]
-                    data[tpl_key] = json.loads(json.dumps(base_ref))
-            elif ext == ".json" and entry not in ("vt_label_templates.json", "vt_label_templates_v2.json"):
-                tpl_key = base.strip().upper()
-                try:
-                    with open(full_p, "r", encoding="utf-8") as jf:
-                        single_data = json.load(jf)
-                        if isinstance(single_data, dict):
-                            data[tpl_key] = single_data
-                except Exception:
-                    pass
-
+                if isinstance(loaded, dict) and loaded:
+                    data = loaded
+                    if src == SEED_TEMPLATE_FILE:
+                        # Keep the RECEIVING LABEL position tweaks already saved by vt_label_utility
+                        try:
+                            with open(os.path.join(SANDBOX_DIR, "vt_label_templates_v2.json"), "r", encoding="utf-8") as vf:
+                                tuned = json.load(vf).get("RECEIVING LABEL")
+                            if isinstance(tuned, dict) and tuned.get("elements"):
+                                data["RECEIVING LABEL"] = tuned
+                        except Exception:
+                            pass
+                        save_templates(data)
+                    break
+            except Exception as e:
+                logging.error("Could not read templates from %s: %s", src, e)
+    if not data:
+        data = json.loads(json.dumps(DEFAULT_TEMPLATES))
     for k in data:
         ensure_box_dims(data[k])
     return data
 
 def save_templates(tpls):
-    user_dir = os.path.expanduser("~/.local/share/ViewTouch")
-    seed_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(seed_dir, exist_ok=True)
-    for p in (
-        os.path.join(user_dir, "vt_label_templates_v2.json"),
-        os.path.join(seed_dir, "vt_label_templates_v2.json")
-    ):
-        try:
-            with open(p, "w", encoding="utf-8") as f:
-                json.dump(tpls, f, indent=2)
-        except Exception:
-            pass
+    try:
+        os.makedirs(os.path.dirname(TEMPLATE_FILE), exist_ok=True)
+        tmp = TEMPLATE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(tpls, f, indent=2)
+        os.replace(tmp, TEMPLATE_FILE)
+    except Exception as e:
+        logging.error("Could not save templates: %s", e)
 
 def calc_gs1_check_digit(digits_11):
     total = 0
@@ -644,13 +666,20 @@ def barcode_modules(field, item):
     return None, raw
 
 
-def draw_barcode_dots(draw, modules, x, y, w, h, fill=0):
-    """Draw bars on a PIL canvas using a whole number of dots per module, centred in the box."""
+def draw_barcode_dots(draw, modules, x, y, w, h, fill=0, mw=None, align="center"):
+    """Draw bars on a PIL canvas using a whole number of dots per module.
+    mw = dots per module (default: the widest that fits the box); align = left/center/right in the box."""
     n = len(modules)
     if not n:
         return 0
-    mw = max(1, int(w // n))
-    x0 = int(x + (w - mw * n) // 2) if mw * n <= w else int(x)
+    mw = max(1, int(mw)) if mw else max(1, int(w // n))
+    total = mw * n
+    if align == "left":
+        x0 = int(x)
+    elif align == "right":
+        x0 = int(x + w - total)
+    else:
+        x0 = int(x + (w - total) // 2)
     i = 0
     while i < n:
         if modules[i] == "1":
@@ -747,11 +776,35 @@ def render_label_pil_image(tpl, item, dpi=203):
             for px in range(start_px, 7, -1):
                 fnt = get_ttf(fam, bold, italic, px)
                 bb = draw.textbbox((0, 0), raw_txt, font=fnt)
-                if (bb[2] - bb[0]) <= (bw - 4) and (bb[3] - bb[1]) <= (bh - 1):
+                if el.get("valign") == "top":
+                    a_, d_ = fnt.getmetrics()
+                    fits = (bb[2] - bb[0]) <= bw and (a_ + d_) <= bh * 1.25
+                else:
+                    fits = (bb[2] - bb[0]) <= (bw - 4) and (bb[3] - bb[1]) <= (bh - 1)
+                if fits:
                     chosen_fnt = fnt
                     break
 
         align = el.get("align", "center")
+        if el.get("valign") == "top":
+            # ReportBuilder style: each line's ascent starts at the top of the box (no vertical centring)
+            try:
+                asc, desc = chosen_fnt.getmetrics()
+            except Exception:
+                asc, desc = (10, 3)
+            cur_y = 0
+            for ln in lines:
+                lb = draw.textbbox((0, 0), ln, font=chosen_fnt, anchor="la")
+                lw_px = lb[2] - lb[0]
+                if align == "left":
+                    tx = -lb[0]
+                elif align == "right":
+                    tx = bw - lw_px - lb[0]
+                else:
+                    tx = (bw - lw_px) / 2.0 - lb[0]
+                draw.text((tx, cur_y), ln, font=chosen_fnt, fill=0, anchor="la")
+                cur_y += asc + desc
+            return
         line_bboxes = [draw.textbbox((0, 0), ln, font=chosen_fnt) for ln in lines]
         line_heights = [bb[3] - bb[1] for bb in line_bboxes]
         total_h = sum(line_heights) + (4 * (len(lines) - 1))
@@ -779,14 +832,45 @@ def render_label_pil_image(tpl, item, dpi=203):
         # A 90/270 rotated element is laid out in a box with width and height swapped
         eff_w, eff_h = (bh, bw) if rot in (90, 270) else (bw, bh)
 
-        sub = Image.new("L", (eff_w, eff_h), 255)
-        sdraw = ImageDraw.Draw(sub)
         if str(field).startswith("barcode"):
-            modules, _val = barcode_modules(field, item)
+            modules, b_val = barcode_modules(field, item)
             if not modules:
                 continue
-            draw_barcode_dots(sdraw, modules, 0, 0, eff_w, eff_h)
+            n_mod = len(modules)
+            # Fixed bar width (ILSA "mmBarWidth") or the widest whole-dot width that fits the box
+            if el.get("module_mm"):
+                mw = max(1, int(round(float(el["module_mm"]) * dpi / 25.4)))
+                if rot:
+                    mw = min(mw, max(1, eff_w // n_mod))
+            else:
+                mw = max(1, eff_w // n_mod)
+            b_align = el.get("align", "center")
+            need_w = mw * n_mod
+            sub_w = max(eff_w, need_w)
+            if need_w > eff_w and not rot:
+                # Bars wider than the box spill out like they did in ReportBuilder
+                if b_align == "center":
+                    bx -= (need_w - eff_w) // 2
+                elif b_align == "right":
+                    bx -= (need_w - eff_w)
+            sub = Image.new("L", (sub_w, eff_h), 255)
+            sdraw = ImageDraw.Draw(sub)
+            bar_h = eff_h
+            hri_font = None
+            if el.get("human_readable"):
+                hri_px = max(8, int(round(float(el.get("hri_size", 8)) * dpi / 72.0)))
+                hri_font = get_ttf(el.get("hri_font", "Sans"), False, False, hri_px)
+                hb = sdraw.textbbox((0, 0), "0123456789", font=hri_font)
+                bar_h = max(6, eff_h - (hb[3] - hb[1]) - 2)
+            x0 = 0 if sub_w > eff_w else ({"left": 0, "right": eff_w - need_w}.get(b_align, (eff_w - need_w) // 2))
+            draw_barcode_dots(sdraw, modules, x0, 0, need_w, bar_h, mw=mw, align="left")
+            if hri_font is not None:
+                txt = str(b_val)
+                tb = sdraw.textbbox((0, 0), txt, font=hri_font)
+                sdraw.text((x0 + (need_w - (tb[2] - tb[0])) / 2.0 - tb[0], bar_h + 1 - tb[1]), txt, font=hri_font, fill=0)
         else:
+            sub = Image.new("L", (eff_w, eff_h), 255)
+            sdraw = ImageDraw.Draw(sub)
             raw_txt = str(format_item_field(item, field, el) or "").strip()
             if not raw_txt:
                 continue
@@ -1003,10 +1087,14 @@ def fit_text_into_box(text, box_w_px, box_h_px, max_font_px=None, bold=True, ita
 UPCA_L_CODES = _EAN_L
 UPCA_R_CODES = _EAN_R
 
-def draw_barcode_on_tk_canvas(canvas_widget, field, item, x, y, w, h, tag=None):
+def draw_barcode_on_tk_canvas(canvas_widget, field, item, x, y, w, h, tag=None, el=None):
     """Screen version of the printed barcode: same symbology and bar pattern as render_label_pil_image."""
     tags = (tag,) if tag else ()
     modules, val = barcode_modules(field, item)
+    if modules and isinstance(el, dict) and el.get("human_readable"):
+        th = max(8, int(h * 0.3))
+        canvas_widget.create_text(x + w // 2, y + h - th // 2, text=str(val), font=(el.get("hri_font", "Sans"), -th), fill="#000000", tags=tags)
+        h = max(4, h - th - 1)
     if not modules:
         canvas_widget.create_text(x + w // 2, y + h // 2, text=str(val or "NO BARCODE"), font=("Monospace", -10), fill="#b91c1c", tags=tags)
         return
@@ -1071,7 +1159,7 @@ def render_label_on_tk_canvas(canvas_widget, tpl, item, ox=28, oy=28, scale=420,
         canvas_widget.create_rectangle(bx, by, bx+bw, by+bh, fill="#ffffff", outline="#2563eb" if is_sel else ("#94a3b8" if show_boxes else ""), width=2 if is_sel else (1 if show_boxes else 0), dash=(4, 2) if (is_sel or show_boxes) else (), tags=(f"el_{idx}",))
         field = el.get("field", "name")
         if str(field).startswith("barcode"):
-            draw_barcode_on_tk_canvas(canvas_widget, field, item, bx, by, bw, bh, tag=f"el_{idx}")
+            draw_barcode_on_tk_canvas(canvas_widget, field, item, bx, by, bw, bh, tag=f"el_{idx}", el=el)
         else:
             raw_txt = format_item_field(item, field, el)
             if not str(raw_txt).strip(): raw_txt = "RECEIVED" if field == "variable_text" else f"[{field}]"
@@ -1405,7 +1493,7 @@ class ReportDesignerWindow(tk.Toplevel):
 
         tk.Label(tbar1, text="Font:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(4, 2))
         self.font_fam_var = tk.StringVar(value="Sans")
-        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=["Sans", "Serif", "Mono"], state="readonly", width=6, font=("Sans", 9))
+        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=["Sans", "Serif", "Mono", "Arial", "Arial Black", "Courier New"], state="readonly", width=11, font=("Sans", 9))
         ff_cb.pack(side="left", padx=2, ipady=2)
         ff_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
 
