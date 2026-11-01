@@ -100,6 +100,24 @@ def ensure_box_dims(tpl):
             el["h"] = 0.22 if el.get("field") == "barcode_img" else max(0.14, float(el.get("size", 10)) / 55.0)
     return tpl
 
+_RECEIPT_PRINTER_WORDS = ("epson", "tm-t", "tmt", "tm-m", "receipt", "escpos", "esc/pos", "star ", "tsp1",
+                          "80mm", "58mm", "kitchen", "ticket", "bar printer", "report")
+
+def printer_speaks_zpl(printer_label, tpl=None, extra_text=""):
+    """Should this printer get ZPL (label printer) or ESC/POS (receipt printer)?
+
+    A template can force it with "printer_language": "zpl" or "escpos". Otherwise this is a label
+    utility, so everything is treated as a ZPL label printer unless its name (or CUPS device URI)
+    clearly says it is a receipt printer.
+    """
+    lang = str((tpl or {}).get("printer_language", "")).lower()
+    if lang in ("zpl", "escpos"):
+        return lang == "zpl"
+    text = (str(printer_label) + " " + str(extra_text)).lower()
+    if any(k in text for k in ("zebra", "zpl", "label")):
+        return True
+    return not any(k in text for k in _RECEIPT_PRINTER_WORDS)
+
 def discover_all_printers():
     printers = []
     seen = set()
@@ -3012,7 +3030,7 @@ class VTLabelUtility(tk.Tk):
                         ip = ip_m.group(1)
                         port = int(ip_m.group(2) or 9100)
                         import socket
-                        is_zpl = any(k in chosen.lower() for k in ("zpl", "zebra", "zd", "lp28", "gx", "gk", "bixolon", "tspl"))
+                        is_zpl = printer_speaks_zpl(chosen, tpl)
                         payload = zpl_out.encode("utf-8") if is_zpl else esc_bytes
                         with socket.create_connection((ip, port), timeout=4.0) as s:
                             s.sendall(payload)
@@ -3026,9 +3044,9 @@ class VTLabelUtility(tk.Tk):
                         q_name = chosen.replace("CUPS: ", "").split(" (")[0].strip()
 
                     v_out = subprocess.run(["lpstat", "-v", q_name], capture_output=True, text=True, timeout=2.0).stdout.lower()
-                    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77"))
+                    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77", "socket://", "zpl"))
                     if is_thermal_q:
-                        is_zpl_q = any(k in q_name.lower() for k in ("zebra", "zpl", "zd", "lp28"))
+                        is_zpl_q = printer_speaks_zpl(q_name, tpl, v_out)
                         raw_file = "/tmp/last_label.zpl" if is_zpl_q else "/tmp/vt_label_job.escpos"
                         if not is_zpl_q:
                             open(raw_file, "wb").write(esc_bytes)
