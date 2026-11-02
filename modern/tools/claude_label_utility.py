@@ -336,6 +336,57 @@ def infer_brand(item_name, category):
             return prefix
     return words[0].upper()
 
+def _clean_code(code):
+    c = str(code or "").strip()
+    if not c or c.lower() in ("0", "none", "null"):
+        return ""
+    d = "".join(ch for ch in c if ch.isdigit())
+    if d and all(ch.isdigit() or ch in " -" for ch in c):
+        return normalize_upc(d) if len(d) == 11 else d     # numeric codes: digits only, 11 digits get a check digit
+    return c                                               # other codes print exactly as ViewTouch stores them
+
+def collect_item_upcs(m):
+    """All codes on a ViewTouch menu item, for picking which one a label prints.
+
+    Returns [(label, code), ...]: ViewTouch's barcodes list in order ("Primary UPC", "Alt UPC 1", ...),
+    then the carton UPC a pack item is linked to (recipe __parent__:<carton UPC>).
+    Nothing is ever written back to ViewTouch.
+    """
+    raw = []
+    bcs = m.get("barcodes", [])
+    if isinstance(bcs, str):
+        bcs = [x for x in re.split(r"[\s,;|]+", bcs) if x]
+    if isinstance(bcs, list):
+        raw.extend(bcs)
+    for k in ("upc", "sku", "altupc"):
+        if m.get(k):
+            raw.append(m.get(k))
+    for k in ("altupcs", "alt_upcs", "altBarcodes"):
+        v = m.get(k)
+        if isinstance(v, list):
+            raw.extend(v)
+    choices, seen = [], set()
+    same = lambda c: c.lstrip("0") if c.isdigit() else c      # 0025900102005 == 025900102005
+    for code in raw:
+        c = _clean_code(code)
+        if c and same(c) not in seen:
+            seen.add(same(c))
+            choices.append(("Primary UPC" if not choices else f"Alt UPC {len(choices)}", c))
+    for rl in m.get("recipe", []) or []:
+        if isinstance(rl, dict):
+            ing = str(rl.get("ingredientId", rl.get("ingredient", "")))
+            if ing.startswith("__parent__:"):
+                c = _clean_code(ing.split(":", 1)[1])
+                if c and same(c) not in seen:
+                    seen.add(same(c))
+                    choices.append(("Carton UPC", c))
+    return choices
+
+def set_item_upc(item, code, label=None):
+    """Choose which of the item's UPCs this label prints (session only)."""
+    item["upc"] = code
+    item["upc_label"] = label or next((l for l, c in item.get("upc_choices", []) if c == code), "UPC")
+
 def parse_vt_menu_dict(m, seen, items):
     if not isinstance(m, dict):
         return
@@ -378,6 +429,10 @@ def parse_vt_menu_dict(m, seen, items):
     mfg = str(m.get("manufacturer") or m.get("brand") or infer_brand(name, cat)).strip().upper()
     dept_grp = "CIGARS" if ("CIGAR" in cat or "CIGAR" in name.upper()) else ("RETAIL" if is_retail else "HOSPITALITY")
 
+    upc_choices = collect_item_upcs(m)
+    if not upc_choices or upc_choices[0][1] != upc:
+        rest = [c for _, c in upc_choices if c.lstrip("0") != upc.lstrip("0")]
+        upc_choices = [("Primary UPC", upc)] + [(f"Alt UPC {i + 1}", c) for i, c in enumerate(rest)]
     key = (name.upper(), upc)
     if key not in seen:
         seen.add(key)
@@ -386,6 +441,9 @@ def parse_vt_menu_dict(m, seen, items):
             "qty": 1,
             "pack_qty": pack_qty,
             "upc": upc,
+            "primary_upc": upc,
+            "upc_choices": upc_choices,
+            "upc_label": "Primary UPC",
             "upce": str(raw_upce).strip(),
             "name": name.upper(),
             "dept_name": cat,
@@ -676,7 +734,9 @@ def barcode_modules(field, item):
     digits = _digits(raw)
     try:
         if field == "barcode_upce":
-            res = _modules_upce(item.get("upce", ""), fallback_upca=raw)
+            # Follow the UPC picked for this label; otherwise the item's own UPC-E
+            picked = item.get("upc_label") not in (None, "Primary UPC")
+            res = _modules_upce(raw if picked else item.get("upce", ""), fallback_upca=raw)
             if res:
                 return res
             field = "barcode_upca"
@@ -2533,9 +2593,14 @@ class VTLabelUtility(tk.Tk):
         top = tk.Frame(self.content, bg="#1e242d")
         top.pack(fill="x", padx=8, pady=6)
 
-        tk.Label(top, text="Barcode:", bg="#1e242d", font=("Sans", 11)).pack(side="left")
-        self.bc_type_var = tk.StringVar(value="UPC-A")
-        ttk.Combobox(top, textvariable=self.bc_type_var, values=["UPC-A", "UPC-E", "Code-39", "Code-128"], width=10, state="readonly").pack(side="left", padx=6)
+        tk.Label(top, text="Print UPC:", bg="#1e242d", font=("Sans", 11)).pack(side="left")
+        self.upc_mode_var = tk.StringVar(value="Primary UPC")
+        upc_mode_cb = ttk.Combobox(top, textvariable=self.upc_mode_var, state="readonly", width=12, font=("Sans", 10, "bold"),
+                                   values=["Primary UPC", "Alt UPC 1", "Alt UPC 2", "Alt UPC 3", "Carton UPC"])
+        upc_mode_cb.pack(side="left", padx=4)
+        upc_mode_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_upc_mode(self.upc_mode_var.get()))
+        make_vt_btn(top, text="🔄 Next UPC", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), padx=10, pady=6,
+                    command=self.cycle_highlighted_upc).pack(side="left", padx=(4, 6))
 
         make_vt_btn(top, text="✓ Select All", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.select_all).pack(side="left", padx=6)
         make_vt_btn(top, text="✖ Deselect All", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.deselect_all).pack(side="left", padx=4)
@@ -2553,8 +2618,8 @@ class VTLabelUtility(tk.Tk):
         cols = ("sel", "qty", "upca", "upce", "desc", "price", "dept_name", "dept_num", "dept_grp", "cat", "mfg")
         self.grid_tree = ttk.Treeview(self.content, columns=cols, show="headings", selectmode="browse")
         headers = [
-            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC / Barcode", 130),
-            ("upce", "Alt UPC", 90), ("desc", "Description", 250), ("price", "Price", 75),
+            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC on Label", 175),
+            ("upce", "Other UPCs", 150), ("desc", "Description", 250), ("price", "Price", 75),
             ("dept_name", "Category", 130), ("dept_num", "Item #", 75),
             ("dept_grp", "Group", 105), ("cat", "Family", 115), ("mfg", "Brand / Mfg", 115)
         ]
@@ -2570,11 +2635,15 @@ class VTLabelUtility(tk.Tk):
         self.grid_tree.delete(*self.grid_tree.get_children())
         q = getattr(self, "filter_var", tk.StringVar()).get().strip().lower()
         for idx, it in enumerate(self.filtered_items):
-            if q and (q not in it["name"].lower() and q not in it["upc"].lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
+            all_codes = " ".join(c for _, c in it.get("upc_choices", [])).lower()
+            if q and (q not in it["name"].lower() and q not in all_codes and q not in it["upc"].lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
                 continue
             chk = "☑" if it.get("selected") else "☐"
+            lbl = it.get("upc_label", "Primary UPC")
+            on_label = it["upc"] if lbl == "Primary UPC" else f"{it['upc']}  [{lbl}]"
+            others = ", ".join(c for _, c in it.get("upc_choices", []) if c != it["upc"])
             self.grid_tree.insert("", "end", iid=str(idx), values=(
-                chk, it["qty"], it["upc"], it["upce"], it["name"], f"${it['price']:.2f}",
+                chk, it["qty"], on_label, others, it["name"], f"${it['price']:.2f}",
                 it["dept_name"], it["dept_num"], it["dept_group"], it["category"], it["manufacturer"]
             ))
 
@@ -2590,6 +2659,30 @@ class VTLabelUtility(tk.Tk):
         except ValueError:
             it["qty"] = 1
         self._populate_grid()
+
+    def apply_upc_mode(self, mode):
+        """Print the chosen UPC (Primary / Alt UPC n / Carton UPC) on the checked items, or all listed items if none are checked.
+        Items that don't have that UPC keep their primary."""
+        targets = [it for it in self.filtered_items if it.get("selected")] or self.filtered_items
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it.get("primary_upc", it["upc"]))]
+            pick = next(((l, c) for l, c in choices if l == mode), choices[0])
+            set_item_upc(it, pick[1], pick[0])
+        self._populate_grid()
+
+    def cycle_highlighted_upc(self):
+        """Step the highlighted row (or the checked rows) to its next UPC."""
+        sel_rows = [r for r in self.grid_tree.selection() if r.isdigit()]
+        targets = [self.filtered_items[int(r)] for r in sel_rows] or [it for it in self.filtered_items if it.get("selected")]
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            cur = next((i for i, (_, c) in enumerate(choices) if c == it["upc"]), 0)
+            l, c = choices[(cur + 1) % len(choices)]
+            set_item_upc(it, c, l)
+        keep = sel_rows
+        self._populate_grid()
+        if keep:
+            self.grid_tree.selection_set(keep)
 
     def update_selected_qty(self):
         try:
@@ -2640,6 +2733,22 @@ class VTLabelUtility(tk.Tk):
         self.page_lbl.pack(side="left", padx=2)
         make_vt_btn(tbar, text="▶", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=3, pady=8, command=self.next_preview_item).pack(side="left", padx=2)
 
+        tk.Label(tbar, text="UPC:", bg="#0c1017", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(8, 2))
+        self.step4_upc_var = tk.StringVar(value="")
+        self.step4_upc_cb = ttk.Combobox(tbar, textvariable=self.step4_upc_var, state="readonly", width=28, font=("Sans", 10, "bold"))
+        self.step4_upc_cb.pack(side="left", padx=2, ipady=4)
+
+        def on_pick_step4_upc(_e=None):
+            if not getattr(self, "selected_for_print", None):
+                return
+            it = self.selected_for_print[self.preview_idx]
+            i = self.step4_upc_cb.current()
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            if 0 <= i < len(choices):
+                set_item_upc(it, choices[i][1], choices[i][0])
+                self._render_live_preview()
+        self.step4_upc_cb.bind("<<ComboboxSelected>>", on_pick_step4_upc)
+
         make_vt_btn(tbar, text="✏️ Edit Report", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_report_designer).pack(side="left", padx=6)
         make_vt_btn(tbar, text="➕ Create Report", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.clone_report).pack(side="left", padx=4)
         make_vt_btn(tbar, text="⚙️ Printer Offset", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.open_printer_settings_dialog).pack(side="left", padx=4)
@@ -2666,6 +2775,13 @@ class VTLabelUtility(tk.Tk):
             return
         item = self.selected_for_print[self.preview_idx]
         self.page_lbl.config(text=f"{self.preview_idx + 1}/{len(self.selected_for_print)}")
+        if hasattr(self, "step4_upc_cb"):
+            choices = item.get("upc_choices") or [("Primary UPC", item.get("upc", ""))]
+            vals = [f"{l}: {c}" for l, c in choices]
+            self.step4_upc_cb["values"] = vals
+            cur = next((i for i, (_, c) in enumerate(choices) if c == item.get("upc")), 0)
+            self.step4_upc_var.set(vals[cur] if vals else "")
+            self.step4_upc_cb.configure(state="readonly" if len(vals) > 1 else "disabled")
         tpl = self.templates[self.tpl_var.get()]
         if hasattr(self, "route_badge_lbl"):
             avail = discover_all_printers()
