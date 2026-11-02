@@ -79,6 +79,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 15:45 ET — Owner — Store logo built into the app
+- **What:** Added modern/assets/images/store-logo.png (Neil's logo.png), built in as qrc:/images/store-logo.png: the screen saver's fallback logo.
+- **Why:** Tablets that can't load the Store Settings logo still show it.
+- **Files:** `modern/assets/images/store-logo.png`
+
 ### 2026-11-02 15:38 ET — Bob (Claude) — UI test: gift card search uses the full keyboard
 - **What:** test_pos_flow.cpp 'UI: the on-screen keyboard finds a customer; a gift card by its number': the Gift Card search box shows the whole keyboard (digits on its top row) and Enter is the return key, not the number pad's Done.
 - **Why:** Store commit f6a26b4 (Oct 29) made the box search names too (Purchased By / For) and removed its number-pad hint, so this test has failed since then. On the Pi, all other [giftcards],[customers] tests pass (299/301 before this fix), including the new transfer and subscription ones.
