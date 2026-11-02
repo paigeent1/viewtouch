@@ -79,6 +79,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 15:38 ET — Bob (Claude) — UI test: gift card search uses the full keyboard
+- **What:** test_pos_flow.cpp 'UI: the on-screen keyboard finds a customer; a gift card by its number': the Gift Card search box shows the whole keyboard (digits on its top row) and Enter is the return key, not the number pad's Done.
+- **Why:** Store commit f6a26b4 (Oct 29) made the box search names too (Purchased By / For) and removed its number-pad hint, so this test has failed since then. On the Pi, all other [giftcards],[customers] tests pass (299/301 before this fix), including the new transfer and subscription ones.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-02 13:58 ET — Bob (Claude) — Screen saver logo: built-in fallback (Neil's idea, done safely)
 - **What:** CMakeLists.txt: if modern/assets/images/store-logo.png exists it's built in as qrc:/images/store-logo.png (its own resource next to burger.png; the QML_FILES list is untouched). Main.qml screen saver: shows the Store Settings logo (tablets: their app-folder copy, as before); if that's missing or fails to load, the built-in one. Keeps asynchronous loading and sourceSize. Replaces the stashed pi-stash-1321 edit, which put RESOURCES in the middle of QML_FILES (every later screen file would have become a plain resource) and dropped the tablet path.
 - **Why:** Neil: tablets sometimes can't load the logo. Owner asked for the clean version.

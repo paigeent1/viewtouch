@@ -493,9 +493,10 @@ TEST_CASE("UI: the on-screen keyboard finds a customer; a gift card by its numbe
     QTest::qWait(50);
     s.tapItem(Screen::findBy(s.window->contentItem(), "placeholderText", u"Type or swipe…"_s));
     REQUIRE(s.keyboardShown());
-    CHECK(Screen::findBy(keyboard, "text", u"Done"_s));   // number fields get the number pad
+    // The search takes a number or a name (Purchased By / For): the whole keyboard, digits on top.
+    CHECK_FALSE(Screen::findBy(keyboard, "text", u"Done"_s));
     s.typeOnScreen(u"60012"_s);
-    s.tapItem(Screen::findBy(keyboard, "text", u"Done"_s));   // Enter looks the card up
+    s.tapItem(Screen::findBy(keyboard, "text", u"⏎"_s));   // Enter looks the card up
     CHECK(s.pos.giftCardInfo()[u"number"_s] == u"60012"_s);
     CHECK_FALSE(s.keyboardShown());
     s.shot("7-gift-card");
