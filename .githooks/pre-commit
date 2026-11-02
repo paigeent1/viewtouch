@@ -1,0 +1,6 @@
+#!/bin/sh
+# Every commit that changes the repository must add an entry at the top of
+# modern/vt-modern-development-notes.md (see AGENTS.md). Enabled by:
+#   git config core.hooksPath .githooks      (modern/tools/setup_dev_hooks.sh does this)
+ROOT="$(git rev-parse --show-toplevel)"
+exec python3 "$ROOT/modern/tools/log_dev_note.py" --check-staged

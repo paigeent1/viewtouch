@@ -10,10 +10,21 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 - Say **what** changed, **why**, the **files**, and the **commit** (short hash) once pushed.
 - Mention anything the next person must know (breaking changes, steps to run on the Pi).
 - Pull before editing and commit this file together with the change it describes.
+- Quickest: stage your change, then run
+  `python3 modern/tools/log_dev_note.py --agent <who> --title "..." --what "..." --why "..." [--next "..."]`.
+- **Enforced:** `.githooks/pre-commit` blocks any commit that changes files without a new, complete entry at
+  the top of this Log. Turn it on once per clone with `bash modern/tools/setup_dev_hooks.sh`.
+  Rules for everyone (people, Claude, Gemini) are in `AGENTS.md` (also `CLAUDE.md`, `GEMINI.md`).
 
 ---
 
 ## Log
+
+### 2026-11-02 09:44 ET — Claude — Enforce the development notes on every commit
+- **What:** Added a pre-commit hook (.githooks/pre-commit) that blocks commits changing files without a new, complete entry (What, Why, Files) at the top of this Log; modern/tools/log_dev_note.py writes entries in the shared format and does the check; modern/tools/setup_dev_hooks.sh turns the hook on per clone. Added AGENTS.md (rules for people and AI agents) with CLAUDE.md, GEMINI.md and .gemini/styleguide.md pointing to it, so Claude and Gemini read the rules at the start of every session.
+- **Why:** The owner asked that all changes be logged this way automatically, by every contributor.
+- **Files:** `.gemini/styleguide.md`, `.githooks/pre-commit`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `modern/tools/log_dev_note.py`, `modern/tools/setup_dev_hooks.sh`
+- **Next person must know:** Run bash modern/tools/setup_dev_hooks.sh once in every clone (the Pi included) or the hook is not active. Emergency bypass: git commit --no-verify. Notes-only and CHANGELOG-only commits are allowed.
 
 ### 2026-11-02 09:41 ET — Claude — Keep the operator's Update icon; manual title for v1.0
 - **What:** removed the wildcard `rm -f /home/pi/Desktop/*label*.desktop …` line that `9f1c09f` added to
