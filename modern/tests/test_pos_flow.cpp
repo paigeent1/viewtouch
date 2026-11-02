@@ -31,6 +31,8 @@
 #include <QDir>
 #include <QQmlProperty>
 #include <QTest>
+#include <QFile>
+#include <QUrl>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -211,6 +213,22 @@ TEST_CASE("Flow: quick order from the floor, open checks list", "[flow]")
 
 namespace {
 
+// Loads a ViewTouch screen the way the app's main.cpp does (vtmLoadModuleQml): this build puts the QML
+// module under qrc:/ViewTouch (no QTP0001 policy), where loadFromModule("ViewTouch", "Main") can't find it.
+void loadViewTouchQml(QQmlApplicationEngine &engine, const char *name)
+{
+    engine.addImportPath(u"qrc:/"_s);
+    engine.addImportPath(u"qrc:/qt/qml"_s);
+    const QString file = QString::fromLatin1(name) + u".qml"_s;
+    for (const QString &dir : {u":/qt/qml/ViewTouch/ui/qml/"_s, u":/ViewTouch/ui/qml/"_s}) {
+        if (QFile::exists(dir + file)) {
+            engine.load(QUrl(u"qrc"_s + dir + file));
+            return;
+        }
+    }
+    engine.loadFromModule("ViewTouch", name);
+}
+
 struct Screen : Session {
     QQmlApplicationEngine engine;
     QQuickWindow *window = nullptr;
@@ -221,7 +239,7 @@ struct Screen : Session {
             c.setFormFactorOverride(formFactor);
         engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&c)},
                                      {u"width"_s, width}, {u"height"_s, height}, {u"touchKeyboard"_s, touchKeyboard}});
-        engine.loadFromModule("ViewTouch", "Main");
+        loadViewTouchQml(engine, "Main");
         REQUIRE_FALSE(engine.rootObjects().isEmpty());
         window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         REQUIRE(window);

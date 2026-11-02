@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:48 ET — Bob (Claude) — UI tests: load Main.qml the way the app does
+- **What:** test_pos_flow.cpp's Screen now loads Main.qml through loadViewTouchQml(): adds qrc:/ and qrc:/qt/qml import paths and loads the file from :/qt/qml/ViewTouch/ui/qml/ or :/ViewTouch/ui/qml/ (as main.cpp's vtmLoadModuleQml), falling back to loadFromModule.
+- **Why:** After b247aa1 the Pi still failed with 'Module ViewTouch contains no type named Main': without the QTP0001 policy the module lives under qrc:/ViewTouch, which loadFromModule doesn't search. The app already works around this; the tests didn't.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+- **Next person must know:** Other UI tests (test_pages_ui.cpp, test_editor_ui.cpp) still call loadFromModule and will fail the same way on the Pi; only the screenshot path is fixed.
+
 ### 2026-11-02 10:40 ET — Bob (Claude) — Tests: register the static ViewTouch QML module like the app does
 - **What:** tests/main.cpp now calls qml_register_types_ViewTouch() and Q_INIT_RESOURCE(qmake_ViewTouch / vtm_ui_raw_qml_0), mirroring main.cpp (store commit 0e4a663). capture_vt_screenshots.sh now always rebuilds vtm_tests (incremental, -j3) before running.
 - **Why:** On the Pi every UI test failed with 'Module ViewTouch contains no type named Main': the linker dropped the static QML module's registration/resources in vtm_tests, the same problem main.cpp was fixed for. Blocked the gift card manual screenshots.
