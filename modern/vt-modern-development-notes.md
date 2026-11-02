@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 12:14 ET — Neil (Gemini) — Rebuild 0.9 User Manual from 0.9 base, fix Label Utility & Gift Card details, keep PDF/shots on Drive
+- **What:** Reset 90 MB image/PDF commit (bb8a5cc9), restored modern/docs/manual/.gitignore, rebuilt modern/docs/manual/manual.html strictly from the 0.9 base with sequential Chapters 19-22, fixed Label Utility (100% read-only, 4 templates, Arial/Arial Black/Courier New, no Make Alt Primary) and Gift Card (Reload button, PatronPal Purchased By/Issued To, 8-column report with 5 views) descriptions, and rendered clean ViewTouch_Modern_User_Manual.pdf (--no-pdf-header-footer) to Google Drive POS project tmp.
+- **Why:** Address all findings from Bob's review: remove 0.10-0.14 upstream feature/screenshot mismatches, fix Label Utility and Gift Card accuracy, remove browser PDF headers, and keep 90 MB of binary images/PDFs out of Git history.
+- **Files:** `modern/docs/manual/manual.html`
+- **Next person must know:** ViewTouch_Modern_User_Manual.pdf lives in Google Drive (POS project tmp/ViewTouch_Modern_User_Manual.pdf) while modern/docs/manual/manual.html and .gitignore are tracked cleanly in Git.
+
 ### 2026-11-02 11:52 ET — Neil (Gemini) — Synchronized Pi server & Android tablet APK build (modern-v0.9.107)
 
 - **What**: Verified and rebuilt the Raspberry Pi `vtmodern` binary (`-j2`) at `/home/pi/viewtouch-main/modern/build/vtmodern`, triggered the synchronized 64-bit (`arm64-v8a`) Android APK build (`modern-v0.9.107`) via GitHub Actions (`modern-android.yml`), staged the compiled APK in `apks/` and `~/.local/share/ViewTouch/ViewTouch/updates/`, and deployed to connected Lenovo tablets (`Bar 1`, `Bar 2`, `Bar 3`).
