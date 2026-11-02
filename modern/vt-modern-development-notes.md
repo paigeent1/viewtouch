@@ -84,6 +84,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:19 ET — Bob (Claude) — Fix build: s_->categories() in the Labels tree
+- **What:** pos_inventory.cpp retailLabels(): categories() is PosShared's, so s_->categories().
+- **Why:** Pi build error: 'categories' was not declared in this scope.
+- **Files:** `modern/app/pos_inventory.cpp`
+
 ### 2026-11-02 17:07 ET — Bob (Claude) — Labels screen: browse the inventory as a tree
 - **What:** Labels screen gets Browse / Find. Browse walks the label utility's own tree: group (Cigars / Retail / Food & drink) > category (ViewTouch's categories) > brand (from the item name, same prefixes as infer_brand) > items, with item counts at each level, a breadcrumb to go back up, and 'Add All' at a brand. PosService::browseRetailLabels(path) (command browseRetailLabels); retailLabels() adds path and children. The tree is only worked out while a Labels screen is browsing (labelBrowsing_), so other screens' updates don't pay for it. Only items with at least one UPC are listed.
 - **Why:** Owner: tablets should be able to search the inventory by tree, like the label utility.

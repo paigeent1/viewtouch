@@ -713,7 +713,7 @@ QVariantMap PosService::retailLabels() const
     // Browsing the tree: the names one level down from the path (with how many items), or, at a
     // brand, its items.
     std::map<QString, QString> categoryNames;
-    for (const MenuCategory &c : categories())
+    for (const MenuCategory &c : s_->categories())
         categoryNames[qs(c.id)] = qs(c.name);
     const auto categoryOf = [&](const MenuItem &m) {
         const auto it = categoryNames.find(qs(m.family));
