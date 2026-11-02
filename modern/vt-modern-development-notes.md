@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:24 ET — Bob (Claude) — Fix build: Labels screen 'Add All' handler
+- **What:** WidgetRetailLabels.qml: the Add All button's for-loop handler is now inside braces (qmlcachegen rejected 'onClicked: for ...').
+- **Why:** Pi build error at WidgetRetailLabels.qml:176.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml`
+- **Next person must know:** test_seed.cpp fails on the store's own pages (retail-entry jump targets, check-list-phone Retail Mode button) from earlier customizations; not from the Labels pages. Worth fixing separately.
+
 ### 2026-11-02 17:19 ET — Bob (Claude) — Fix build: s_->categories() in the Labels tree
 - **What:** pos_inventory.cpp retailLabels(): categories() is PosShared's, so s_->categories().
 - **Why:** Pi build error: 'categories' was not declared in this scope.

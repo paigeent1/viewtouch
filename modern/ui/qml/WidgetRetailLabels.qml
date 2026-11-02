@@ -173,7 +173,7 @@ Item {
                     implicitHeight: 44
                     font.pixelSize: 15
                     text: qsTr("Add All %1").arg((w.info.matches ?? []).length)
-                    onClicked: for (const m of (w.info.matches ?? [])) w.add(m)
+                    onClicked: { for (const m of (w.info.matches ?? [])) w.add(m) }
                 }
                 ListView {
                     visible: w.product && (!w.browsing || w.path.length === 3)
