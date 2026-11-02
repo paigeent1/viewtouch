@@ -38,7 +38,7 @@ Item {
         next.splice(i, 1)
         queue = next
     }
-    function print() {
+    function printLabels() {
         const items = product ? queue.map(q => ({ upc: q.upcs[q.pick].code, qty: q.qty })) : []
         pos.printRetailLabels({ template: chosen, items: items, qty: aloneQty })
         queue = []
@@ -264,7 +264,7 @@ Item {
                     highlighted: true
                     enabled: w.chosen !== "" && w.total > 0 && (w.info.ready ?? true)
                     text: qsTr("Print %n Label(s)", "", w.total)
-                    onClicked: w.print()
+                    onClicked: w.printLabels()
                 }
             }
         }

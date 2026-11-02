@@ -84,6 +84,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:38 ET — Bob (Claude) — Fix tablet app build: Labels screen function name
+- **What:** WidgetRetailLabels.qml: print() renamed printLabels() (Print button updated).
+- **Why:** Android APK build (run 41538211888) failed: 'Illegal method name' at WidgetRetailLabels.qml:41; print is reserved there. The Pi's Qt accepted it.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml`
+
 ### 2026-11-02 17:34 ET — Bob (Claude) — ILSA temp price book: items built like ViewTouch's
 - **What:** load_from_viewtouch_db(): rows from ~/.local/share/ViewTouch/ilsa_temp_pricebook.db now go through parse_vt_menu_dict (priceCents, family, manufacturer, barcodes = UPC + alt UPCs), so they have dept_group, manufacturer, category, upc_choices etc. Tested: tree fields present, alt UPCs selectable, $120.00 stays $120.00.
 - **Why:** Neil's 16:23 hook built items with other keys (mfg, no dept_group/manufacturer/upc_choices): Tree View raised KeyError, alt UPCs couldn't be chosen, and float prices >= 100 would have printed /100.
