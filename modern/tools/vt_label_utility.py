@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+__version__ = "1.0"
 import re
 """
 ViewTouch Label Utility - label printing with full bitmap rendering.
@@ -2297,7 +2298,7 @@ def make_vt_btn(parent, text, command=None, bg="#1d4ed8", fg="#ffffff", font=("S
 class VTLabelUtility(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("ViewTouch Label Utility (Live — Connected to viewtouch.db)")
+        self.title("ViewTouch Label Utility v1.0")
         self.geometry("1920x1080+0+0"); self.attributes("-fullscreen", True)
         self.configure(bg="#14171c")
 
