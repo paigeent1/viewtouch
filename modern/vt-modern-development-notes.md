@@ -75,9 +75,19 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Front-End Ticket Counter, Mode Buttons & Importers**: Live item/quantity counter (`Items: X (Qty: Y)`) in `WidgetOrderList.qml`, Cashier/Manager mode buttons, variable-weight scale barcode parsing, separate `UPC`/`ALTUPC` CSV columns (`app/menu_import.cpp`), and ILSA batch staging (`stage_batch.py`).
 * **Secondary HDMI Customer-Facing Display (CFD)**: Split-screen mode (`--customer-display window`) on Pi 5 Micro-HDMI 1 with 50% live receipt (`CustomerReceiptView.qml`) and 50% dynamic promo/pairing panel (`goesWith`).
 * **4-Node Multi-Store Hub & Web Portal**: `store_config.json` and `corp_sync.py` across `CORP_HUB`, `HCAH_DANBURY`, `BHT_DANBURY`, and `BHT_GAYLORDSVILLE`, plus InMotion PHP/MySQL online ordering with Pi background polling and ESC/POS kitchen auto-printing (`192.168.1.77:9100`).
+* **Corporate ViewTouch & shared gift cards (planned, to be implemented later)**: The owner will build a Corporate ViewTouch
+  instance on a separate Pi before the Buttheads stores launch. Then: one shared card list so balances work at all three
+  stores (Hat City Ale House; Buttheads Tobacco Emporium - Danbury; Buttheads Tobacco Emporium - Gaylordsville), and a
+  per-terminal "This terminal's store" setting that overrides Store Settings > Gift card location (one shared Store Settings
+  can't tell the stores apart). Until then each store's own Gift card location is used.
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-02 16:31 ET — Bob (Claude) — Roadmap: Corporate ViewTouch Pi and shared gift cards (later)
+- **What:** Added to section 5 (Pending Roadmap): a Corporate ViewTouch instance on a separate Pi, built before the Buttheads stores launch; shared gift card balances across Hat City Ale House and both Buttheads Tobacco Emporium stores; a per-terminal store setting overriding Gift card location. Not implemented yet.
+- **Why:** Owner: multi-store gift cards and terminal-level store identification will be addressed when the Corporate Pi is built.
+- **Files:** `modern/vt-modern-development-notes.md`
 
 ### 2026-11-02 16:29 ET — Bob (Claude) — Gift card location: full store names, not codes
 - **What:** Store Settings > Store field renamed 'Gift card location'; no longer forced to capitals; hint shows Hat City Ale House / Buttheads Tobacco Emporium - Danbury.
