@@ -225,6 +225,8 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
              return QVariant(p.sellGiftCard(a.value(0).toString(), a.value(1).toLongLong(), a.value(2).toString(), a.value(3).toString())); }},
         {u"lookupGiftCard"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.lookupGiftCard(a.value(0).toString())); }},
         {u"cashOutGiftCard"_s, [](PosService &p, const QVariantList &) { return QVariant(p.cashOutGiftCard()); }},
+        {u"transferGiftCard"_s, [](PosService &p, const QVariantList &a) {
+             return QVariant(p.transferGiftCard(a.value(0).toString(), a.value(1).toString())); }},
         {u"payWithGiftCard"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.payWithGiftCard(a.value(0).toString(), a.value(1).toLongLong())); }},
         {u"addToWaitlist"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.addToWaitlist(a.value(0).toMap())); }},

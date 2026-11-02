@@ -996,6 +996,8 @@ public:
     // The looked-up card's small balance in cash, when the guest asks (state
     // law: California under $10); paid from the drawer (or the person's bank).
     bool cashOutGiftCard();
+    // Managers: move a card's whole balance to another card (lost card, or combining two); the old one closes.
+    bool transferGiftCard(const QString &fromNumber, const QString &toNumber);
     // A payment on the selected customer's account: "cash" | "card" (keypad amount, else all).
     bool payOnAccount(const QString &method, qint64 amountCents = 0);
     QVariantList customerResults() const override;

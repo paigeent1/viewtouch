@@ -41,6 +41,28 @@ QString lastFour(const std::string &number)
 
 constexpr std::int64_t kMaxGiftCardCents = 200'000;   // $2,000 on one card
 
+// The store's cards are 12 digits ending in a Luhn check digit (the store's numbering since its
+// first cards; new ones start with 6, subscription cards with 9). A new 12-digit number that fails
+// it is a typo.
+bool luhnOk(const QString &digits)
+{
+    int total = 0;
+    for (qsizetype i = 0; i < digits.size(); ++i) {
+        int d = digits.at(digits.size() - 1 - i).digitValue();
+        if (d < 0)
+            return false;
+        if (i % 2 == 1)
+            d = d * 2 > 9 ? d * 2 - 9 : d * 2;
+        total += d;
+    }
+    return total % 10 == 0;
+}
+
+bool looksMistyped(const QString &digits)
+{
+    return digits.size() == 12 && !luhnOk(digits);
+}
+
 } // namespace
 
 CustomerRecord *PosShared::customer(const std::string &id)
@@ -60,6 +82,12 @@ void PosService::saveCustomerRecord(const CustomerRecord &c)
     if (s_->sink)
         s_->sink->saveCustomer(c);
     emit s_->customersChanged();
+}
+
+// Where this ViewTouch is, for the cards it sells: the location code (Store Settings), else the store name.
+static std::string cardLocation(const std::string &code, const std::string &storeName)
+{
+    return code.empty() ? storeName : code;
 }
 
 void PosService::saveGiftCardRecord(const GiftCard &g)
@@ -354,7 +382,8 @@ QVariantMap PosService::giftCardInfo() const
     auto cardMap = [this](const GiftCard &c) -> QVariantMap {
         return {{u"number"_s, qs(c.number)}, {u"pin"_s, qs(c.pin)}, {u"issuedTo"_s, qs(c.issuedTo)},
                 {u"purchasedBy"_s, qs(c.purchasedBy)}, {u"balance"_s, format(c.balance)},
-                {u"balanceCents"_s, qint64(c.balance.cents())}, {u"issued"_s, whenText(c.issuedAt)}};
+                {u"balanceCents"_s, qint64(c.balance.cents())}, {u"issued"_s, whenText(c.issuedAt)},
+                {u"location"_s, qs(c.issuedLocation)}, {u"closed"_s, c.closed}};
     };
     const GiftCard *g = s_->giftCard(ss(giftCardNumber_));
     QVariantList matches;
@@ -378,6 +407,8 @@ QVariantMap PosService::giftCardInfo() const
     if (!g) return m;
     m.insert(u"pin"_s, qs(g->pin)); m.insert(u"issuedTo"_s, qs(g->issuedTo)); m.insert(u"purchasedBy"_s, qs(g->purchasedBy));
     m.insert(u"balance"_s, format(g->balance)); m.insert(u"balanceCents"_s, qint64(g->balance.cents())); m.insert(u"issued"_s, whenText(g->issuedAt));
+    m.insert(u"location"_s, qs(g->issuedLocation)); m.insert(u"closed"_s, g->closed);
+    m.insert(u"replacedBy"_s, g->replacedBy.empty() ? QString() : lastFour(g->replacedBy));
     QVariantList history;
     for (auto it = g->history.rbegin(); it != g->history.rend() && history.size() < 12; ++it)
         history.append(QVariantMap{{u"at"_s, whenText(it->at)}, {u"amount"_s, format(it->amount)}, {u"what"_s, qs(it->what)}});
@@ -428,6 +459,64 @@ bool PosService::cashOutGiftCard()
     return true;
 }
 
+// A manager moves a card's whole balance to another card (a lost card replaced, or two cards combined).
+// The old card is closed for good: it can't be spent or reloaded, and money owed back to it (an undone
+// payment) goes to the new card. Both cards' history shows the move.
+bool PosService::transferGiftCard(const QString &fromNumber, const QString &toNumber)
+{
+    if (!require(perm::Manager, tr("Moving a gift card's balance")))
+        return false;
+    const QString fromN = cleanNumber(fromNumber.isEmpty() ? giftCardNumber_ : fromNumber);
+    const QString toN = cleanNumber(toNumber);
+    GiftCard *from = s_->giftCard(ss(fromN));
+    if (!from)
+        return fail(tr("Look up the old card first."));
+    if (from->closed)
+        return fail(tr("Card %1 was already moved to %2.").arg(lastFour(from->number), lastFour(from->replacedBy)));
+    if (from->balance.cents() <= 0)
+        return fail(tr("Card %1 is empty: nothing to move.").arg(lastFour(from->number)));
+    if (toN.size() < 4)
+        return fail(tr("Swipe or type the new card's number."));
+    if (toN == fromN)
+        return fail(tr("That's the same card."));
+    for (const auto &[id, c] : s_->open) {
+        for (const OrderLine &l : c.lines)
+            if (l.isGiftCard() && !l.voided && (l.giftCardNumber() == ss(fromN) || l.giftCardNumber() == ss(toN)))
+                return fail(tr("Card %1 is on open check #%2: finish or void that first.").arg(lastFour(l.giftCardNumber())).arg(c.id));
+    }
+    GiftCard *to = s_->giftCard(ss(toN));
+    if (to && to->closed)
+        return fail(tr("Card %1 is closed: use another card.").arg(lastFour(to->number)));
+    if (!to && looksMistyped(toN))
+        return fail(tr("%1 isn't a valid card number (check the digits).").arg(toN));
+    const Money amount = from->balance;
+    if ((to ? to->balance : Money()) + amount > Money::fromCents(kMaxGiftCardCents))
+        return fail(tr("A gift card can hold up to %1.").arg(format(Money::fromCents(kMaxGiftCardCents))));
+    const std::string where = cardLocation(s_->settings.giftCardLocation, s_->settings.storeName);
+    const std::string who = user() ? user()->name : std::string();
+    if (!to) {
+        s_->giftCards.push_back({ss(toN), Money(), now(), {}});
+        to = &s_->giftCards.back();
+        from = s_->giftCard(ss(fromN));   // the vector may have moved
+        to->issuedLocation = where;
+        to->pin = from->pin;
+        to->typeCode = from->typeCode;
+    }
+    if (to->purchasedBy.empty()) to->purchasedBy = from->purchasedBy;
+    if (to->issuedTo.empty()) to->issuedTo = from->issuedTo;
+    from->post(now(), Money::fromCents(-amount.cents()),
+               ss(tr("Moved to card %1 at %2 by %3").arg(lastFour(to->number), qs(where), qs(who))), 0, "transfer");
+    from->closed = true;
+    from->replacedBy = to->number;
+    to->post(now(), amount, ss(tr("Moved from card %1 at %2 by %3").arg(lastFour(from->number), qs(where), qs(who))), 0, "transfer");
+    saveGiftCardRecord(*from);
+    saveGiftCardRecord(*to);
+    giftCardNumber_ = qs(to->number);
+    emit notice(tr("%1 moved from card %2 to card %3; card %2 is closed").arg(format(amount), lastFour(from->number), lastFour(to->number)));
+    emit checkChanged();
+    return true;
+}
+
 bool PosService::lookupGiftCard(const QString &number)
 {
     if (!require(perm::Order, tr("Gift cards"))) return false;
@@ -444,15 +533,24 @@ bool PosService::sellGiftCard(const QString &number, qint64 amountCents, const Q
     if (!require(perm::Order, tr("Selling gift cards")))
         return false;
     QString n = cleanNumber(number);
-    if (n.isEmpty()) {   // no card in hand: make up a number (printed on the receipt)
+    if (n.isEmpty()) {   // no card in hand: make up a number (printed on the receipt): 6, 10 random digits, a check digit
         do {
             n = u"6"_s;
-            for (int i = 0; i < 15; ++i)
+            for (int i = 0; i < 10; ++i)
                 n += QChar(u'0' + QRandomGenerator::global()->bounded(10));
+            for (int d = 0; d < 10; ++d)
+                if (luhnOk(n + QChar(u'0' + d))) {
+                    n += QChar(u'0' + d);
+                    break;
+                }
         } while (s_->giftCard(ss(n)));
     }
     if (n.size() < 4)
         return fail(tr("The card number is too short."));
+    if (const GiftCard *old = s_->giftCard(ss(n)); old && old->closed)
+        return fail(tr("Card %1 was replaced by %2: it can't be reloaded.").arg(lastFour(old->number), lastFour(old->replacedBy)));
+    if (!s_->giftCard(ss(n)) && looksMistyped(n))
+        return fail(tr("%1 isn't a valid card number (check the digits).").arg(n));
     const Money amount = Money::fromCents(amountCents > 0 ? amountCents : entry_.toLongLong());
     if (amount.cents() <= 0)
         return fail(tr("Enter the amount to put on the card."));
@@ -513,6 +611,8 @@ bool PosService::payWithGiftCard(const QString &number, qint64 amountCents)
     if (!g)
         return fail(tr("Gift card %1 isn't active. Cards work once the check that sold them is paid.")
                         .arg(lastFour(ss(n))));
+    if (g->closed)
+        return fail(tr("Card %1 was replaced by %2: use the new card.").arg(lastFour(g->number), lastFour(g->replacedBy)));
     if (g->balance.cents() <= 0)
         return fail(tr("Gift card %1 is empty.").arg(lastFour(ss(n))));
     const Money due = c->totals(s_->settings.tax).balance;
@@ -605,7 +705,11 @@ bool PosService::payOnAccount(const QString &method, qint64 amountCents)
 void PosService::returnPayment(const Check &c, const Payment &p)
 {
     if (p.kind == TenderKind::GiftCard) {
-        if (GiftCard *g = s_->giftCard(p.reference)) {
+        GiftCard *g = s_->giftCard(p.reference);
+        if (g && g->closed && !g->replacedBy.empty())   // its balance moved: the money goes to the new card
+            if (GiftCard *to = s_->giftCard(g->replacedBy))
+                g = to;
+        if (g) {
             g->post(now(), p.amount, ss(tr("Back from check #%1").arg(c.id)), c.id, "refund");
             saveGiftCardRecord(*g);
         }
@@ -633,7 +737,10 @@ void PosService::applyCloseEffects(Check &c)
             s_->giftCards.push_back({l.giftCardNumber(), Money(), now(), {}});
             g = &s_->giftCards.back();
         }
-        g->post(now(), l.total(), ss((fresh ? tr("Sold on check #%1") : tr("Reloaded on check #%1")).arg(c.id)), c.id, "sale");
+        const std::string where = cardLocation(s_->settings.giftCardLocation, s_->settings.storeName);
+        if (g->issuedLocation.empty())
+            g->issuedLocation = where;
+        g->post(now(), l.total(), ss((fresh ? tr("Sold on check #%1 at %2") : tr("Reloaded on check #%1 at %2")).arg(c.id).arg(qs(where))), c.id, "sale");
         saveGiftCardRecord(*g);
     }
     earnPoints(c);

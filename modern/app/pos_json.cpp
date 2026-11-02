@@ -946,7 +946,7 @@ QJsonObject toJson(const PosSettings &s)
         mealPeriods.append(QJsonObject{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"start"_s, clockText(m.start)}});
     return {
         {u"schemaVersion"_s, PosSchemaVersion},
-        {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
+        {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"giftCardLocation"_s, qs(s.giftCardLocation)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
         {u"currencySymbol"_s, qs(s.currencySymbol)},
         {u"customColors"_s, [&s] { QJsonArray a; for (const std::string &c : s.customColors) a.append(qs(c)); return a; }()},
         {u"priceChanges"_s, [&s] {
@@ -1183,6 +1183,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
 {
     PosSettings s;
     s.storeName = ss(o.value(u"storeName").toString(qs(s.storeName)));
+    s.giftCardLocation = ss(o.value(u"giftCardLocation").toString());
     s.setupDone = o.value(u"setupDone").toBool(false);
     s.currencySymbol = ss(o.value(u"currencySymbol").toString(qs(s.currencySymbol)));
     for (const QJsonValue &c : o.value(u"customColors").toArray())
@@ -1601,7 +1602,8 @@ QJsonObject toJson(const GiftCard &g)
 {
     return {{u"number"_s, qs(g.number)}, {u"pin"_s, qs(g.pin)}, {u"typeCode"_s, qs(g.typeCode)},
             {u"purchasedBy"_s, qs(g.purchasedBy)}, {u"issuedTo"_s, qs(g.issuedTo)},
-            {u"balance"_s, qint64(g.balance.cents())}, {u"issuedAt"_s, qint64(g.issuedAt)}, {u"history"_s, ledgerJson(g.history)}};
+            {u"balance"_s, qint64(g.balance.cents())}, {u"issuedAt"_s, qint64(g.issuedAt)}, {u"history"_s, ledgerJson(g.history)},
+            {u"issuedLocation"_s, qs(g.issuedLocation)}, {u"closed"_s, g.closed}, {u"replacedBy"_s, qs(g.replacedBy)}};
 }
 
 GiftCard giftCardFromJson(const QJsonObject &o)
@@ -1615,6 +1617,9 @@ GiftCard giftCardFromJson(const QJsonObject &o)
     g.purchasedBy = ss(o.value(u"purchasedBy").toString());
     g.issuedTo = ss(o.value(u"issuedTo").toString());
     g.history = ledgerFromJson(o.value(u"history").toArray());
+    g.issuedLocation = ss(o.value(u"issuedLocation").toString());
+    g.closed = o.value(u"closed").toBool(false);
+    g.replacedBy = ss(o.value(u"replacedBy").toString());
     return g;
 }
 

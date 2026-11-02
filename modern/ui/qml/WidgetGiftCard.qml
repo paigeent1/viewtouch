@@ -12,6 +12,8 @@ Item {
     readonly property var card: pos ? pos.giftCard : ({})
     readonly property bool found: card.found ?? false
     property bool askingCustomer: false
+    readonly property bool closed: card.closed ?? false
+    property bool transferring: false
     property int amountCents: 0
 
     function lookUp() {
@@ -97,7 +99,7 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: 64
                     font.pixelSize: 18
-                    enabled: w.amountCents > 0
+                    enabled: w.amountCents > 0 && !w.closed
                     text: w.amountCents <= 0 ? qsTr("Choose an amount to sell or reload")
                           : (w.found ? qsTr("Reload %1 on the Check") : qsTr("Sell %1 Card on the Check"))
                             .arg("$" + (w.amountCents / 100).toFixed(2))
@@ -115,7 +117,7 @@ Item {
                 }
                 Button {
                     visible: !w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 18; highlighted: true
-                    enabled: w.found && (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
+                    enabled: w.found && !w.closed && (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
                     text: qsTr("Pay the Check from This Card")
                     onClicked: { if ((w.pos.check.customerId ?? "") !== "" || (w.pos.check.customerName ?? "") !== "") w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
                 }
@@ -134,6 +136,60 @@ Item {
                     text: qsTr("Cash Out %1 (under %2)").arg(w.card.balance ?? "").arg(w.card.cashOutBelow ?? "")
                     onClicked: w.pos.cashOutGiftCard()
                 }
+                // Managers: a lost card replaced, or two cards combined. The old card closes for good.
+                Button {
+                    objectName: "giftTransfer"
+                    visible: w.found && !w.closed && (w.card.balanceCents ?? 0) > 0 && !w.transferring
+                    Layout.fillWidth: true
+                    implicitHeight: 56
+                    font.pixelSize: 17
+                    text: qsTr("Transfer / Replace Card…")
+                    onClicked: { newCard.text = ""; w.transferring = true }
+                }
+                ColumnLayout {
+                    visible: w.transferring
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Move all %1 from card %2 to:").arg(w.card.balance ?? "").arg(w.card.display ?? "")
+                    }
+                    TextField {
+                        id: newCard
+                        Layout.fillWidth: true
+                        implicitHeight: 48
+                        font.pixelSize: 20
+                        placeholderText: qsTr("New card: swipe or type its number")
+                        inputMethodHints: Qt.ImhDigitsOnly
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Button {
+                            Layout.fillWidth: true; implicitHeight: 56; font.pixelSize: 17; highlighted: true
+                            enabled: newCard.text.replace(/[^0-9]/g, "").length >= 4
+                            text: qsTr("Move Balance (Manager)")
+                            onClicked: {
+                                const to = newCard.text
+                                w.pos.transferGiftCard(w.card.number, to)
+                                w.transferring = false
+                                number.text = to
+                            }
+                        }
+                        Button {
+                            Layout.fillWidth: true; implicitHeight: 56; font.pixelSize: 17
+                            text: qsTr("Cancel")
+                            onClicked: w.transferring = false
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.6
+                        text: qsTr("The old card is closed for good and both cards' history shows the move.")
+                    }
+                }
             }
 
             ToolSeparator { Layout.fillHeight: true; visible: !w.narrow }
@@ -144,7 +200,9 @@ Item {
                 spacing: 6
                 Label {
                     text: !w.card.number ? qsTr("Look up a card to see its balance.")
-                         : w.found ? qsTr("Card %1").arg(w.card.display) : qsTr("Card %1 isn't active yet").arg(w.card.display)
+                         : !w.found ? qsTr("Card %1 isn't active yet").arg(w.card.display)
+                         : w.closed ? qsTr("Card %1: closed, moved to %2").arg(w.card.display).arg(w.card.replacedBy ?? "")
+                         : qsTr("Card %1").arg(w.card.display)
                     font.pixelSize: 20
                     font.bold: true
                     wrapMode: Text.WordWrap
@@ -158,6 +216,7 @@ Item {
                     color: "#7ee2a8"
                 }
                 Label { visible: w.found; text: qsTr("Since %1  |  PIN: %2  |  For: %3  |  By: %4").arg(w.card.issued ?? "").arg(w.card.pin ?? "----").arg(w.card.issuedTo || "—").arg(w.card.purchasedBy || "—"); opacity: 0.6 }
+                Label { visible: w.found && (w.card.location ?? "") !== ""; text: qsTr("Issued at: %1").arg(w.card.location ?? ""); opacity: 0.6 }
                 Label { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); text: qsTr("Matching Gift Cards (%1) — Tap a card:").arg((w.card.matches ?? []).length); font.bold: true; color: "#90cdf4" }
                 ListView { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6; model: w.card.matches ?? []
                     delegate: WidgetKey { required property var modelData; width: ListView.view.width - 12; height: 58; fontScale: 0.32; baseColor: "#2b3340"; text: modelData.number + "   |   PIN: " + (modelData.pin || "----") + "   |   " + modelData.balance + "\n    For: " + (modelData.issuedTo || "—") + "   |   By: " + (modelData.purchasedBy || "—"); onClicked: { number.text = modelData.number; w.pos.lookupGiftCard(modelData.number) } }

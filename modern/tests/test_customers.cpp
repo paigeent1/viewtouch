@@ -97,19 +97,19 @@ TEST_CASE("Gift cards: sold on a check, live once it's paid, spent, and given ba
     PosService pos(test::seedPosData(), nullptr);
     openDrawer(pos);
 
-    // Sell $50 on card 6000 1111 2222 (no check open: a quick one starts).
-    CHECK_FALSE(pos.sellGiftCard(u"6000 1111 2222"_s, 0));    // no amount
-    REQUIRE(pos.sellGiftCard(u"6000 1111 2222"_s, 5000));
+    // Sell $50 on card 6000 1111 2221 (no check open: a quick one starts).
+    CHECK_FALSE(pos.sellGiftCard(u"6000 1111 2221"_s, 0));    // no amount
+    REQUIRE(pos.sellGiftCard(u"6000 1111 2221"_s, 5000));
     CHECK(pos.lines().size() == 1);
     CHECK(pos.totals()[u"tax"_s].toString() == u"$0.00"_s);              // no tax on gift cards
     CHECK(pos.kitchenTickets().isEmpty());
-    REQUIRE(pos.lookupGiftCard(u"600011112222"_s));
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
     CHECK_FALSE(pos.giftCardInfo()[u"found"_s].toBool());     // not before it's paid
     REQUIRE(pos.tender(u"cash"_s));
     pos.sendOrder();                                           // nothing prints, nothing to make
     REQUIRE(pos.closeCheck());
     CHECK(pos.kitchenTickets().isEmpty());
-    REQUIRE(pos.lookupGiftCard(u"600011112222"_s));
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
     CHECK(pos.giftCardInfo()[u"found"_s].toBool());
     CHECK(pos.giftCardInfo()[u"balance"_s] == u"$50.00"_s);
 
@@ -131,16 +131,16 @@ TEST_CASE("Gift cards: sold on a check, live once it's paid, spent, and given ba
     REQUIRE(pos.startCheck(core::CheckType::Takeout));
     for (int i = 0; i < 5; ++i)
         pos.addItem(u"cobb"_s);                                // $67.66
-    REQUIRE(pos.payWithGiftCard(u"600011112222"_s));
+    REQUIRE(pos.payWithGiftCard(u"600011112221"_s));
     CHECK(pos.totals()[u"balance"_s].toString() == u"$27.66"_s);
     CHECK(pos.giftCardInfo()[u"balance"_s] == u"$0.00"_s);
-    CHECK_FALSE(pos.payWithGiftCard(u"600011112222"_s));       // empty now
+    CHECK_FALSE(pos.payWithGiftCard(u"600011112221"_s));       // empty now
     CHECK_FALSE(pos.payWithGiftCard(u"999999"_s));
     REQUIRE(pos.tender(u"cash"_s));
     REQUIRE(pos.closeCheck());
 
     // Reload it; a card sold on a check that's reopened is taken back.
-    REQUIRE(pos.sellGiftCard(u"600011112222"_s, 2500));
+    REQUIRE(pos.sellGiftCard(u"600011112221"_s, 2500));
     CHECK(pos.lines().first().toMap()[u"name"_s].toString().contains(u"reload"_s));
     const qint64 reload = pos.checkInfo()[u"id"_s].toLongLong();
     REQUIRE(pos.tender(u"cash"_s));
@@ -218,6 +218,45 @@ TEST_CASE("House accounts: managers open them, charges stay under the limit, pay
 
     const core::CustomerRecord &r = pos.shared()->customers.front();
     CHECK(app::customerFromJson(app::toJson(r)) == r);
+}
+
+TEST_CASE("Gift cards: a manager moves a balance to a new card; the old one closes", "[customers][giftcards]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);                                           // Morgan, a manager
+    pos.shared()->settings.giftCardLocation = "HCA";
+
+    REQUIRE(pos.sellGiftCard(u"6000 1111 2221"_s, 5000));
+    REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"location"_s] == u"HCA"_s);     // where it was sold
+
+    // A typo in a new 12-digit number is caught by its check digit.
+    CHECK_FALSE(pos.transferGiftCard(u"600011112221"_s, u"600011113335"_s));
+    CHECK_FALSE(pos.sellGiftCard(u"600011113335"_s, 1000));
+    CHECK_FALSE(pos.transferGiftCard(u"600011112221"_s, u"600011112221"_s));   // the same card
+
+    REQUIRE(pos.transferGiftCard(u"600011112221"_s, u"6000 1111 3336"_s));
+    CHECK(pos.giftCardInfo()[u"number"_s] == u"600011113336"_s);          // now showing the new card
+    CHECK(pos.giftCardInfo()[u"balance"_s] == u"$50.00"_s);
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"closed"_s].toBool());
+    CHECK(pos.giftCardInfo()[u"balance"_s] == u"$0.00"_s);
+    CHECK(pos.giftCardInfo()[u"replacedBy"_s].toString().endsWith(u"3336"_s));
+    CHECK_FALSE(pos.transferGiftCard(u"600011112221"_s, u"900012345675"_s));  // already moved
+    CHECK_FALSE(pos.sellGiftCard(u"600011112221"_s, 1000));                   // can't be reloaded
+
+    // The old card can't pay; the new one can.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    pos.addItem(u"cobb"_s);
+    CHECK_FALSE(pos.payWithGiftCard(u"600011112221"_s));
+    REQUIRE(pos.payWithGiftCard(u"600011113336"_s));
+    REQUIRE(pos.closeCheck());
+
+    // Not counted as a sale or a spend in the report.
+    const QVariantMap report = pos.report(u"accounts"_s);
+    CHECK(rowAmount(report, u"Sold and reloaded"_s) == u"$50.00"_s);
 }
 
 TEST_CASE("Customers and gift cards are saved and come back", "[customers][store]")
