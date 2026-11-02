@@ -15,6 +15,20 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 09:41 ET — Claude — Keep the operator's Update icon; manual title for v1.0
+- **What:** removed the wildcard `rm -f /home/pi/Desktop/*label*.desktop …` line that `9f1c09f` added to
+  `install_label_utility.sh`. The installer still removes the old label-utility icons by exact name
+  (`claude-label-utility.desktop`, `vt-label-utility.desktop`, and their menu entries). Manual updated
+  for the new window title "ViewTouch Label Utility v1.0" and rebuilt.
+- **Why:** the wildcard also deleted the operator's **Update Label Utility** icon
+  (`~/Desktop/update-label-utility.desktop`), which runs this installer — so it deleted itself on first use.
+- **Files:** `modern/tools/install_label_utility.sh`, `modern/docs/label-utility/build_manual.py`,
+  `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/vt-modern-development-notes.md`.
+- **Commit:** this commit (see `git log -- modern/tools/install_label_utility.sh`).
+- **Next person must know:** don't delete desktop files by wildcard. `update-label-utility.desktop` /
+  `update-label-utility.sh` on the Pi desktop are the operator's own update icon (pull, install, sync,
+  screenshots) and must stay. Only the label utility itself has no desktop icon.
+
 ### 2026-11-02 09:40 ET — Gemini — Label Utility v1.0 release & desktop shortcut removal
 
 - **What**: Merged `claude-label-utility` into `main`, stamped `__version__ = "1.0"` and window title `ViewTouch Label Utility v1.0`, tagged `label-utility-v1.0`, and removed Pi desktop `.desktop` shortcuts so the utility launches exclusively from inside ViewTouch (`/usr/local/bin/vt-label-utility`).

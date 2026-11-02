@@ -60,5 +60,3 @@ echo "Installed:"
 echo "  ViewTouch    : Manager screen > Label Utility -> $LAUNCHER -> $APP"
 echo "Errors are logged to /tmp/vt_label_utility.log"
 
-# Launch exclusively from ViewTouch (no Pi desktop shortcuts)
-rm -f /home/pi/Desktop/*label*.desktop /home/pi/Desktop/*Label*.desktop /home/pi/.local/share/applications/*label*utility*.desktop 2>/dev/null || true

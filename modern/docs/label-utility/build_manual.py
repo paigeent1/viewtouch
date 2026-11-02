@@ -167,8 +167,8 @@ story.append(B("<b>For one item:</b> if ViewTouch opens the label utility for a 
                "<font face='Courier'>openLabelUtility</font> command and a UPC), it goes straight to that item's label preview. "
                "Any of the item's codes works — primary, alternate or carton UPC."))
 story.append(B("The program opens full-screen. To close it, press <b>Close</b> (red, bottom-left)."))
-story.append(B("The title bar says <i>ViewTouch Label Utility (Live — Connected to viewtouch.db)</i>, which tells you it is "
-               "reading your live ViewTouch items."))
+story.append(B("The title bar says <i>ViewTouch Label Utility v1.0</i>; the start screen shows how many ViewTouch items it "
+               "loaded."))
 story.append(box("Note:", "Item changes made in ViewTouch (new items, price changes) appear here the next time the program "
                  "opens, or straight away if you press <b>Reload viewtouch.db</b>."))
 story.append(P("The four screens", h2))
