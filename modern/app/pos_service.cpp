@@ -1954,7 +1954,7 @@ QVariantMap PosService::checkInfo() const
         {u"heldCount"_s, c->heldCount()}, {u"roundSize"_s, int(lastRound(*c).size())},
         {u"firesAt"_s, c->fireAt ? timeOfDay(c->fireAt) : QString()}, {u"rush"_s, c->rush}, {u"vip"_s, c->vip},
         {u"allergies"_s, [c] { QStringList a; for (const std::string &x : c->allergies) a << qs(x); return a; }()},
-        {u"coupons"_s, checkCoupons()}, {u"hold"_s, holdInfo(*c)}, {u"tab"_s, c->type == CheckType::Tab},
+        {u"coupons"_s, checkCoupons()}, {u"member"_s, c->memberCard.empty() ? QString() : u"••"_s + qs(c->memberCard.substr(c->memberCard.size() > 4 ? c->memberCard.size() - 4 : 0))}, {u"hold"_s, holdInfo(*c)}, {u"tab"_s, c->type == CheckType::Tab},
         {u"tabHold"_s, s_->settings.tabHold > 0 ? format(Money::fromCents(s_->settings.tabHold)) : QString()},
         {u"opened"_s, timeOfDay(c->openedAt)},
         {u"dueAt"_s, qint64(c->dueAt)}, {u"due"_s, c->dueAt ? dueText(c->dueAt) : QString()},

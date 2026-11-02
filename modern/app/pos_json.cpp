@@ -168,7 +168,7 @@ QJsonObject toJson(const Check &c)
         {u"events"_s, events}, {u"firedCourse"_s, c.firedCourse}, {u"customerId"_s, qs(c.customerId)},
         {u"receiptEmail"_s, qs(c.receiptEmail)}, {u"receiptEmailSent"_s, c.receiptEmailSent},
         {u"cashTipCents"_s, qint64(c.cashTip.cents())},
-        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"hold"_s, [&c] {
+        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"memberCard"_s, qs(c.memberCard)}, {u"hold"_s, [&c] {
             if (c.hold.empty())
                 return QJsonValue();
             return QJsonValue(QJsonObject{{u"reference"_s, qs(c.hold.reference)}, {u"processor"_s, qs(c.hold.processor)},
@@ -289,6 +289,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.vip = o.value(u"vip").toBool();
     c.allergies = strings(o.value(u"allergies").toArray());
     c.coupons = strings(o.value(u"coupons").toArray());
+    c.memberCard = ss(o.value(u"memberCard").toString());
     if (const QJsonObject h = o.value(u"hold").toObject(); !h.isEmpty()) {
         c.hold.reference = ss(h.value(u"reference").toString());
         c.hold.processor = ss(h.value(u"processor").toString());
@@ -1140,7 +1141,7 @@ QJsonObject toJson(const PosSettings &s)
                                       {u"end"_s, p.endMinute}, {u"days"_s, p.days}, {u"code"_s, qs(p.code)},
                                       {u"amount"_s, qint64(p.amount.cents())}, {u"minimum"_s, qint64(p.minimum.cents())},
                                       {u"fromDay"_s, qs(p.fromDay)}, {u"untilDay"_s, qs(p.untilDay)},
-                                      {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}});
+                                      {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}, {u"membersOnly"_s, p.membersOnly}});
              }
              return a;
          }()},
@@ -1427,6 +1428,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         promo.untilDay = ss(p.value(u"untilDay").toString());
         promo.maxUses = std::max(0, p.value(u"maxUses").toInt());
         promo.uses = std::max(0, p.value(u"uses").toInt());
+        promo.membersOnly = p.value(u"membersOnly").toBool(false);
         if (!promo.id.empty())
             s.promotions.push_back(promo);
     }

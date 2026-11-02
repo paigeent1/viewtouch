@@ -259,6 +259,37 @@ TEST_CASE("Gift cards: a manager moves a balance to a new card; the old one clos
     CHECK(rowAmount(report, u"Sold and reloaded"_s) == u"$50.00"_s);
 }
 
+TEST_CASE("Subscription cards: members-only promotions come off once the member's card is shown", "[customers][giftcards]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);
+    core::PosSettings::Promotion members;
+    members.id = "members10";
+    members.name = "Member 10%";
+    members.percentBp = 1000;
+    members.membersOnly = true;                                 // the whole order, members only
+    pos.shared()->settings.promotions.push_back(members);
+
+    REQUIRE(pos.sellGiftCard(u"9000 1234 5675"_s, 2000));       // a subscription card
+    REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
+
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    pos.addItem(u"cobb"_s);
+    const QString before = pos.totals()[u"balance"_s].toString();
+    REQUIRE(pos.lookupGiftCard(u"900012345675"_s));             // the member shows their card
+    CHECK(pos.checkInfo()[u"member"_s].toString().endsWith(u"5675"_s));
+    CHECK(pos.totals()[u"balance"_s].toString() != before);    // 10% off now
+    REQUIRE(pos.payWithGiftCard(u"900012345675"_s));
+    REQUIRE(pos.closeCheck());
+
+    // Another check, no member card: no member discount.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    pos.addItem(u"cobb"_s);
+    CHECK(pos.checkInfo()[u"member"_s].toString().isEmpty());
+    CHECK(pos.totals()[u"balance"_s].toString() == before);
+}
+
 TEST_CASE("Customers and gift cards are saved and come back", "[customers][store]")
 {
     QTemporaryDir dir;

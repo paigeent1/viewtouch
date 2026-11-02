@@ -524,6 +524,18 @@ bool PosService::lookupGiftCard(const QString &number)
     if (q.isEmpty()) { giftCardNumber_.clear(); emit checkChanged(); return false; }
     const QString digits = cleanNumber(q);
     giftCardNumber_ = (digits.size() == q.size() && digits.size() >= 4) ? digits : q;
+    // A subscription (membership) card shown during a sale: the check is a member's, so members-only
+    // promotions come off it.
+    if (Check *c = current(); c && c->status == CheckStatus::Open && digits.startsWith(u'9')) {
+        const GiftCard *g = s_->giftCard(ss(digits));
+        if (g && !g->closed && c->memberCard != g->number) {
+            c->memberCard = g->number;
+            noteEvent(*c, tr("Member card %1").arg(lastFour(g->number)), "member");
+            emit notice(tr("Member %1 on check #%2: member discounts apply").arg(lastFour(g->number)).arg(c->id));
+            changed(*c);
+            return true;
+        }
+    }
     emit checkChanged();
     return true;
 }

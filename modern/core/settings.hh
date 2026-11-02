@@ -389,6 +389,7 @@ struct PosSettings {
         std::string untilDay;                // ...and its last (empty: no end)
         int maxUses = 0;                     // checks it may be used on (0: any number)
         int uses = 0;                        // closed checks it was used on
+        bool membersOnly = false;            // only on checks with a subscription (9...) card on them
         bool operator==(const Promotion &) const = default;
     };
     std::vector<Promotion> promotions;

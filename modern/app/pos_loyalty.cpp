@@ -111,6 +111,9 @@ void PosService::applyPromotions(Check &c)
         // it's used up meanwhile on another check).
         if (!p.code.empty() && std::ranges::find(c.coupons, p.id) == c.coupons.end())
             continue;
+        // Members only: a subscription card was shown on this check.
+        if (p.membersOnly && c.memberCard.empty())
+            continue;
         const Money off = promotionAmount(p, c);
         if (off.cents() > 0)
             wanted.emplace_back(&p, off);

@@ -867,6 +867,7 @@ bool PosService::savePromotionRecord(int index, const QVariantMap &r)
         return fail(tr("The promotion needs a name."));
     p.name = ss(name);
     p.active = r.value(u"active"_s, true).toBool();
+    p.membersOnly = r.value(u"membersOnly"_s, false).toBool();
     for (QString f : r.value(u"families"_s).toString().split(u',', Qt::SkipEmptyParts))
         if (!(f = f.trimmed()).isEmpty()) p.families.push_back(ss(f));
     for (QString i : r.value(u"items"_s).toString().split(u',', Qt::SkipEmptyParts)) {
@@ -883,7 +884,7 @@ bool PosService::savePromotionRecord(int index, const QVariantMap &r)
         if (k != index && !p.code.empty() && list[k].code == p.code)
             return fail(tr("%1 already uses the code %2.").arg(qs(list[k].name), qs(p.code)));
     // No categories or items: the whole order (a coupon; a by-itself one only when it says so).
-    if (p.families.empty() && p.items.empty() && p.code.empty())
+    if (p.families.empty() && p.items.empty() && p.code.empty() && !p.membersOnly)
         return fail(tr("Say which categories or items it covers."));
     p.percentBp = std::clamp<std::int64_t>(std::llround(r.value(u"percent"_s).toDouble() * 100.0), 0, 10000);
     p.amount = Money::fromCents(std::max<std::int64_t>(0, std::llround(r.value(u"amount"_s).toDouble() * 100.0)));

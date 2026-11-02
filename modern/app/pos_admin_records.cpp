@@ -228,7 +228,8 @@ QVariantList PosService::adminRecords(const QString &panel)
     } else if (panel == u"promotions") {
         for (const PosSettings::Promotion &p : s_->settings.promotions)
             add(promotionRecord(p), qs(p.name),
-                (p.code.empty() ? QString() : tr("code %1").arg(qs(p.code)) + u" · "_s)
+                (p.membersOnly ? tr("members") + u" · "_s : QString())
+                    + (p.code.empty() ? QString() : tr("code %1").arg(qs(p.code)) + u" · "_s)
                     + (p.buy > 0 ? tr("buy %1 get %2 at %3% off").arg(p.buy).arg(p.get).arg(double(p.percentBp) / 100.0)
                        : p.amount.cents() > 0 ? tr("%1 off").arg(format(p.amount))
                                               : tr("%1% off").arg(double(p.percentBp) / 100.0))
@@ -409,7 +410,7 @@ QVariantMap PosService::promotionRecord(const PosSettings::Promotion &p) const
             {u"get"_s, p.get}, {u"start"_s, clockText12(p.startMinute)}, {u"end"_s, clockText12(p.endMinute)},
             {u"days"_s, daysText(p.days)}, {u"code"_s, qs(p.code)}, {u"amount"_s, double(p.amount.cents()) / 100.0},
             {u"minimum"_s, double(p.minimum.cents()) / 100.0}, {u"fromDay"_s, qs(p.fromDay)}, {u"untilDay"_s, qs(p.untilDay)},
-            {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}};
+            {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}, {u"membersOnly"_s, p.membersOnly}};
 }
 
 
