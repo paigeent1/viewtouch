@@ -79,6 +79,30 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:19 ET — Bob (Claude) — Restore Bob's work erased again by the 13:15 force-push
+- **What:** Re-applied 505e4f0, 80493ec, c4f7dcc and c0983f3 on top of Neil's 2b49e0b: Label Utility v1.1, the manual corrections, the AGENTS.md no-force-push rule and gift_card_number_report.py, with their notes entries (below). Neil's 13:15 commits look like a replay of his 12:14 apply script (same text, new times): it reset main and claude-label-utility on GitHub and on the Pi again.
+- **Why:** The owner ran the report and the file was gone; the force-push had also put the label utility back to v1.0 on the Pi.
+- **Files:** `AGENTS.md`, `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/build_manual.py`, `modern/docs/manual/manual.html`, `modern/tools/LABEL_UTILITY_NOTES.md`, `modern/tools/gift_card_number_report.py`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** Neil: don't re-run old apply scripts; never push -f or reset the shared branches. Tag label-utility-v1.1 still points to c4f7dcc (same files as this commit).
+
+### 2026-11-02 13:14 ET — Bob (Claude) — Gift card number pattern report (read-only)
+- **What:** New modern/tools/gift_card_number_report.py: reads viewtouch.db read-only and prints only statistics about gift card numbers and PINs (lengths, leading digits, which check-digit rule they pass: Luhn, GS1, mod 11, digit sum; fixed vs varying digit positions; sequential runs; how PINs relate to numbers; type codes). Examples are masked.
+- **Why:** Owner wants to know the numbering scheme of the existing cards (from when there were 3 retail locations) before generating new numbers for the card printer. Prints no full numbers or PINs, so its output can be pasted in chat.
+- **Files:** `modern/tools/gift_card_number_report.py`
+- **Next person must know:** Card numbers + PINs are spendable: never commit or push them to this public repo; keep CSVs for the printer on Drive.
+
+### 2026-11-02 12:45 ET — Bob (Claude) — Label Utility v1.1
+- **What:** __version__ 1.1; window title now built from __version__ (one place to change). Manual cover says Version 1.1 and the title-bar text v1.1; user manual ch 20 and LABEL_UTILITY_NOTES.md say v1.1. LABEL_UTILITY_NOTES.md has a Versions section: 1.1 = Delete Template / Restore Standard Labels, screen fit for 1360x768, no missing-emoji boxes, update script, manual with Pi screenshots; 1.0 = tag at 9f1c09f. Tag label-utility-v1.1 on this commit.
+- **Why:** Owner approved the version bump: those features landed after the 1.0 tag.
+- **Files:** `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/build_manual.py`, `modern/docs/manual/manual.html`, `modern/tools/LABEL_UTILITY_NOTES.md`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** Raise __version__ and add a Versions line for each operator-visible release; tag label-utility-vX.Y.
+
+### 2026-11-02 12:33 ET — Bob (Claude) — Manual: last unverified claims removed; restore entries lost in the 12:14 force-push
+- **What:** Checked Neil's 12:14 manual rebuild (git + the Drive PDF: no browser headers, no 0.10-0.14 features, label utility and gift card fixes in). Removed what still isn't in the code (Pi tree is clean, so it isn't uncommitted there either): 21+ age-verification modal, 5-level Major Category > ... > Sub Group hierarchy (the label utility filters by category and brand), Closed Checks > Assign Customer, touchToWakeSeconds / 60-second dimmer (the real setting is Store Settings > Dim the screen after (minutes)); gift card report columns now match the code. AGENTS.md: never force-push or reset main/claude-label-utility. Restored record of Bob's work erased by the force-push: 12:04 manual rebuild (3584f89, superseded by Neil's 96821b2), 12:10 handoff note BOB_TO_NEIL_user_manual.md on Drive (POS project tmp) (not kept on GitHub: those commits sit on top of the 90 MB commit Neil purged).
+- **Why:** Owner asked Bob to check Neil's updated manual. The 12:14 force-push replaced both shared branches and dropped Bob's three commits and their notes entries without anyone knowing.
+- **Files:** `AGENTS.md`, `modern/docs/manual/manual.html`
+- **Next person must know:** Neil: re-render ViewTouch_Modern_User_Manual.pdf on Drive from this manual.html. If any removed feature does exist, give the file and line.
+
 ### 2026-11-02 13:15 ET — Neil (Gemini) — Rebuild 0.9 User Manual from 0.9 base, fix Label Utility & Gift Card details, keep PDF/shots on Drive
 - **What:** Reset 90 MB image/PDF commit (bb8a5cc9), restored modern/docs/manual/.gitignore, rebuilt modern/docs/manual/manual.html strictly from the 0.9 base with sequential Chapters 19-22, fixed Label Utility (100% read-only, 4 templates, Arial/Arial Black/Courier New, no Make Alt Primary) and Gift Card (Reload button, PatronPal Purchased By/Issued To, 8-column report with 5 views) descriptions, and rendered clean ViewTouch_Modern_User_Manual.pdf (--no-pdf-header-footer) to Google Drive POS project tmp.
 - **Why:** Address all findings from Bob's review: remove 0.10-0.14 upstream feature/screenshot mismatches, fix Label Utility and Gift Card accuracy, remove browser PDF headers, and keep 90 MB of binary images/PDFs out of Git history.

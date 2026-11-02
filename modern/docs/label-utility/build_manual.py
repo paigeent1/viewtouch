@@ -67,7 +67,7 @@ def cover(canv, doc):
     y = 5.6 * inch
     for line in ["Shelf, price, cigar and receiving labels for ViewTouch POS",
                  "Raspberry Pi label station  ·  Zebra label printers",
-                 "", "November 2026"]:
+                 "", "Version 1.1  ·  November 2026"]:
         canv.drawString(0.9 * inch, y, line); y -= 0.3 * inch
     img = os.path.join(HERE, "img", "2X1_VINYL_UPC_PRICE.png")
     if os.path.exists(img):
@@ -227,7 +227,7 @@ story.append(B("<b>For one item:</b> if ViewTouch opens the label utility for a 
                "<font face='Courier'>openLabelUtility</font> command and a UPC), it goes straight to that item's label preview. "
                "Any of the item's codes works — primary, alternate or carton UPC."))
 story.append(B("The program opens full-screen. To close it, press <b>Close</b> (red, bottom-left)."))
-story.append(B("The title bar says <i>ViewTouch Label Utility v1.0</i>; the start screen shows how many ViewTouch items it "
+story.append(B("The title bar says <i>ViewTouch Label Utility v1.1</i>; the start screen shows how many ViewTouch items it "
                "loaded."))
 story.append(box("Note:", "Item changes made in ViewTouch (new items, price changes) appear here the next time the program "
                  "opens, or straight away if you press <b>Reload viewtouch.db</b>."))
