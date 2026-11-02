@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 18:25 ET — Bob (Claude) — Tablets paired with the Pi for wireless debugging
+- **What:** Owner paired Bar 1/2/3 with the Pi (Manager > Close ViewTouch on the tablet, Settings > Developer options > Wireless debugging > Pair device with pairing code, then adb pair <ip:port> <code> on the Pi). With the WRITE_SECURE_SETTINGS grant, a restarted tablet turns wireless debugging back on and vt-adb-ensure reconnects it on 5555, no USB.
+- **Why:** Tablets dropped off ADB after every restart (Bar 3 today).
+- **Files:** `(none: tablet setup)`
+- **Next person must know:** A factory-reset or replaced tablet needs the grant (adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS) and the pairing again.
+
 ### 2026-11-02 17:53 ET — Bob (Claude) — Tablet app d007756 built; how staff reach Labels
 - **What:** APK run 41539109241 (main d007756) succeeded: Labels screen (Browse/Find/scan), End of shift Labels button, gift card features, logo fallback, ADB-after-restart fix. Install order: restart ViewTouch on the Pi first (the Labels screen needs the new server), then download the artifact into apks/, vt-tablets, and grant WRITE_SECURE_SETTINGS on .220/.215/.210. Staff reach Labels with: log in > Log Out (opens End of shift, doesn't log out) > Labels...; managers also Manager > Label Utility.
 - **Why:** Record the build and the owner's how-to.
