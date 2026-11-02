@@ -48,11 +48,9 @@ if [ -f "$REPO_DIR/scripts/bin/vt-label-utility" ] && ! cmp -s "$REPO_DIR/script
 fi
 
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
-[ -n "$DESKTOP_DIR" ] && [ -d "$DESKTOP_DIR" ] || DESKTOP_DIR="$HOME/Desktop"
 mkdir -p "$DESKTOP_DIR" "$HOME/.local/share/applications"
 
 # Remove the old separate "Claude Label Utility" icon (now the ViewTouch Label Utility)
-rm -f "$DESKTOP_DIR/claude-label-utility.desktop" "$HOME/.local/share/applications/claude-label-utility.desktop"
 
 ENTRY="[Desktop Entry]
 Type=Application
@@ -67,8 +65,6 @@ Categories=Office;
 StartupNotify=true
 "
 
-DESKTOP_FILE="$DESKTOP_DIR/vt-label-utility.desktop"
-MENU_FILE="$HOME/.local/share/applications/vt-label-utility.desktop"
 printf '%s' "$ENTRY" > "$DESKTOP_FILE"
 printf '%s' "$ENTRY" > "$MENU_FILE"
 chmod +x "$DESKTOP_FILE" "$MENU_FILE"
