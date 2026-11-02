@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:21 ET — Bob (Claude) — Gift card user manual + ViewTouch screenshot script
+- **What:** New 13-page PDF manual for gift cards in ViewTouch Modern (screen tour, look up, sell/reload, pay, cash out, fixing mistakes, reports, permissions, quick reference), written from WidgetGiftCard.qml, app/pos_customers.cpp and core/report.cpp. New tools/capture_vt_screenshots.sh runs the test suite's 'Manual: a screenshot of every screen' case off screen (demo store in memory; viewtouch.db untouched) and pushes the gift-card-related shots to the pi-vt-shots branch.
+- **Why:** Owner asked for a gift card user manual. Qt can't run in Bob's workspace, so screenshots must be taken on the Pi.
+- **Files:** `modern/docs/gift-cards/ViewTouch_Gift_Cards_User_Manual.pdf`, `modern/docs/gift-cards/build_manual.py`, `modern/docs/gift-cards/screens/.gitkeep`, `modern/tools/capture_vt_screenshots.sh`
+- **Next person must know:** Screenshots show as grey placeholders until the Pi runs capture_vt_screenshots.sh; Bob then copies pi-vt-shots into modern/docs/gift-cards/screens/ and rebuilds. Seed page retail-entry.json button 'Gift Cards' jumps to page 'gift-cards', which doesn't exist (the page is 'gift-card').
+
 ### 2026-11-02 10:13 ET — Bob (Claude) — Neil's manual review: Delete/Restore templates, update script, manual additions
 - **What:** Label utility: new Delete Template and Restore Standard Labels buttons on screen 1 (both ask first; the last template can't be deleted; restore keeps other templates and the RECEIVING LABEL tweaks from the original utility). New modern/tools/update_label_utility.sh: pulls main and claude-label-utility (merging), runs the installer, enables the notes hook, pushes main, beeps. .gitignore: __pycache__/ and *.pyc. Manual: update via the desktop icon / update script (sections 11, 13); deleting and restoring templates (sections 3, 10, 13); Properties window and status bar with fine-tuning tips (8.1); print quantity applies to every ticked item (5).
 - **Why:** Neil (Gemini) reviewed the manual and suggested these six improvements; deleting templates wasn't possible in the program, so it was added rather than documented.
