@@ -1371,7 +1371,7 @@ class ReportDesignerWindow(tk.Toplevel):
     def __init__(self, master, tpl_name, tpl_data, sample_item, on_save_callback):
         super().__init__(master)
         self.title(f"Label Utility — Report Designer - [{tpl_name}]")
-        self.geometry("1920x1080+0+0"); self.transient(master); self.attributes("-fullscreen", True); self.attributes("-topmost", True); self.lift(); self.focus_force()
+        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"); self.transient(master); self.attributes("-fullscreen", True); self.attributes("-topmost", True); self.lift(); self.focus_force()
         self.configure(bg="#808080")
         self.tpl_name = tpl_name
         self.tpl = ensure_box_dims(json.loads(json.dumps(tpl_data)))
@@ -1452,7 +1452,7 @@ class ReportDesignerWindow(tk.Toplevel):
         self._load_selected_props()
 
     def add_field(self):
-        dlg = tk.Toplevel(self); dlg.title("Add Field to Label"); dlg.geometry("420x200+750+400"); dlg.configure(bg="#1e242d"); dlg.transient(self); dlg.attributes("-topmost", True)
+        dlg = tk.Toplevel(self); dlg.title("Add Field to Label"); dlg.geometry("420x200"); dlg.after_idle(lambda d=dlg: fit_dialog(d, 420, 200)); dlg.configure(bg="#1e242d"); dlg.transient(self); dlg.attributes("-topmost", True)
         tk.Label(dlg, text="Choose Component / Field to Add:", bg="#1e242d", fg="#f2f4f7", font=("Sans", 11, "bold")).pack(pady=(14, 6))
         f_var = tk.StringVar(value=GLOBAL_FIELD_LABELS[0])
         ttk.Combobox(dlg, textvariable=f_var, values=GLOBAL_FIELD_LABELS, state="readonly", width=36, font=("Sans", 10)).pack(pady=4)
@@ -1612,7 +1612,7 @@ class ReportDesignerWindow(tk.Toplevel):
                         self.el_cb.current(self.selected_idx); self._load_selected_props(); self._redraw_canvas(); break
         el = self.tpl["elements"][self.selected_idx]
         fk_cur = el.get("field", "name")
-        dlg = tk.Toplevel(self); dlg.title(f"Component Properties — {fk_cur}"); dlg.geometry("480x360+720+340"); dlg.configure(bg="#1e293b"); dlg.transient(self); dlg.attributes("-topmost", True)
+        dlg = tk.Toplevel(self); dlg.title(f"Component Properties — {fk_cur}"); dlg.geometry("480x360"); dlg.after_idle(lambda d=dlg: fit_dialog(d, 480, 360)); dlg.configure(bg="#1e293b"); dlg.transient(self); dlg.attributes("-topmost", True)
         tk.Label(dlg, text=f"Editing Component #{self.selected_idx + 1} Properties", bg="#1e293b", fg="#38bdf8", font=("Sans", 12, "bold")).pack(pady=(12, 8))
         frm = tk.Frame(dlg, bg="#1e293b"); frm.pack(fill="x", padx=20)
         tk.Label(frm, text="Data Field / Type:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=0, column=0, sticky="w", pady=6)
@@ -1658,7 +1658,7 @@ class ReportDesignerWindow(tk.Toplevel):
         # 1. PACK CLOSE ON THE RIGHT FIRST SO IT IS PERMANENTLY ANCHORED AT TOP-RIGHT!
         make_vt_btn(tbar1, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=12, pady=6, radius=12, command=self.on_close_request).pack(side="right", padx=8, pady=2)
 
-        make_vt_btn(tbar1, text="💾 Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
+        make_vt_btn(tbar1, text="Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
         make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.undo).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.redo).pack(side="left", padx=2, pady=2)
 
@@ -1703,19 +1703,20 @@ class ReportDesignerWindow(tk.Toplevel):
         al_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
 
         # Row 2 Toolbar: Component Palette (3x3 Matrix Button Style!)
+        flow_wrap(tbar1)
         tbar_pal = tk.Frame(self, bg="#14171c", bd=0, relief="flat", pady=3)
         tbar_pal.pack(fill="x", side="top")
-        tk.Label(tbar_pal, text="🧰 Palette (Tap Tool -> Tap Label):", bg="#14171c", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=8, pady=3)
+        tk.Label(tbar_pal, text="Palette (Tap Tool -> Tap Label):", bg="#14171c", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="left", padx=8, pady=3)
         palette_items = [
-            ("🔤 Label", "static_label", "#1d4ed8"),
-            ("🏷️ DBText (Desc)", "name", "#047857"),
-            ("💲 DBText (Price)", "price_fmt", "#0f766e"),
-            ("🏭 DBText (Brand)", "manufacturer", "#4338ca"),
-            ("🔢 DBText (UPC)", "upc", "#0284c7"),
-            ("📅 SysVar (Date)", "date_yymmdd", "#b45309"),
-            ("👤 SysVar (Emp)", "emp_initials", "#0e7490"),
-            ("📝 Variable", "variable_text", "#7c3aed"),
-            ("🧮 DBCalc", "db_calc", "#334155"),
+            ("Label", "static_label", "#1d4ed8"),
+            ("DBText (Desc)", "name", "#047857"),
+            ("DBText (Price)", "price_fmt", "#0f766e"),
+            ("DBText (Brand)", "manufacturer", "#4338ca"),
+            ("DBText (UPC)", "upc", "#0284c7"),
+            ("SysVar (Date)", "date_yymmdd", "#b45309"),
+            ("SysVar (Emp)", "emp_initials", "#0e7490"),
+            ("Variable", "variable_text", "#7c3aed"),
+            ("DBCalc", "db_calc", "#334155"),
             ("║▌ Code 128", "barcode_img", "#1e293b"),
             ("║▌ UPC-A", "barcode_upca", "#1e293b"),
         ]
@@ -1727,6 +1728,7 @@ class ReportDesignerWindow(tk.Toplevel):
             ).pack(side="left", padx=2, pady=2)
 
         # Row 3 Toolbar: Box Dimensions, WordWrap, Auto-Fit, Layer Order, Duplicate, Rotate, Delete, Label Size
+        flow_wrap(tbar_pal)
         tbar2 = tk.Frame(self, bg="#0c1017", bd=0, relief="flat", pady=4)
         tbar2.pack(fill="x", side="top")
 
@@ -1744,7 +1746,7 @@ class ReportDesignerWindow(tk.Toplevel):
         media_cb = ttk.Combobox(tbar2, textvariable=self.media_var, values=MEDIA_STOCK_LABELS, state="readonly", width=18, font=("Sans", 9, "bold"))
         media_cb.pack(side="right", padx=4, ipady=2)
         media_cb.bind("<<ComboboxSelected>>", self.on_pick_media_preset)
-        tk.Label(tbar2, text="📏 Stock:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
+        tk.Label(tbar2, text="Stock:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
 
         avail_printers = discover_all_printers()
         saved_p = resolve_template_printer(self.tpl.get("default_printer", ""), avail_printers)
@@ -1753,10 +1755,10 @@ class ReportDesignerWindow(tk.Toplevel):
         prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=22, font=("Sans", 9, "bold"))
         prn_cb.pack(side="right", padx=4, ipady=2)
         prn_cb.bind("<<ComboboxSelected>>", self.on_pick_designer_printer)
-        tk.Label(tbar2, text="🖨️ Target:", bg="#0c1017", fg="#14b8a6", font=("Sans", 9, "bold")).pack(side="right", padx=(6, 2))
+        tk.Label(tbar2, text="Target:", bg="#0c1017", fg="#14b8a6", font=("Sans", 9, "bold")).pack(side="right", padx=(6, 2))
 
         # Left-side box dimension & tool buttons
-        tk.Label(tbar2, text="📐 Box W:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2), pady=3)
+        tk.Label(tbar2, text="Box W:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(6, 2), pady=3)
         self.box_w_var = tk.StringVar(value="1.00")
         bw_spin = tk.Spinbox(tbar2, from_=0.10, to=4.00, increment=0.05, format="%.2f", textvariable=self.box_w_var, width=4, font=("Sans", 9, "bold"), command=self.apply_box_spin_change)
         bw_spin.pack(side="left", padx=2, ipady=2)
@@ -1776,11 +1778,12 @@ class ReportDesignerWindow(tk.Toplevel):
 
         make_vt_btn(tbar2, text="⬆ Front", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.bring_to_front).pack(side="left", padx=2)
         make_vt_btn(tbar2, text="⬇ Back", bg="#334155", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.send_to_back).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="🔄 Rotate", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.rotate_selected).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="📋 Dup", bg="#b45309", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.duplicate_selected).pack(side="left", padx=2)
-        make_vt_btn(tbar2, text="🗑️ Del", bg="#dc2626", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.delete_field).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="Rotate", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.rotate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="Dup", bg="#b45309", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.duplicate_selected).pack(side="left", padx=2)
+        make_vt_btn(tbar2, text="Del", bg="#dc2626", fg="#ffffff", font=("Sans", 9, "bold"), padx=6, pady=5, radius=10, command=self.delete_field).pack(side="left", padx=2)
 
         # Designer Gray Workspace
+        flow_wrap(tbar2)
         work = tk.Frame(self, bg="#808080")
         work.pack(fill="both", expand=True, padx=16, pady=12)
 
@@ -1917,7 +1920,7 @@ class ReportDesignerWindow(tk.Toplevel):
         self._push_undo()
         chosen_p = self.designer_printer_var.get().strip()
         self.tpl["default_printer"] = chosen_p
-        self.status_var.set(f"🖨️ Target Printer for '{self.tpl_name}' set to: {chosen_p} (Save report to lock in)")
+        self.status_var.set(f"Target Printer for '{self.tpl_name}' set to: {chosen_p} (Save report to lock in)")
 
     def on_pick_media_preset(self, _e=None):
         choice = self.media_var.get()
@@ -1931,7 +1934,7 @@ class ReportDesignerWindow(tk.Toplevel):
                 self.tpl["height_in"] = float(mh)
                 self.tpl["media_type"] = mtype
                 self._redraw_canvas()
-                self.status_var.set(f"📏 Media Stock set to: {choice} ({mw} in x {mh} in)")
+                self.status_var.set(f"Media Stock set to: {choice} ({mw} in x {mh} in)")
                 break
 
     def resize_label(self):
@@ -2089,14 +2092,14 @@ class ReportDesignerWindow(tk.Toplevel):
             return
         dlg = tk.Toplevel(self)
         dlg.title("Save Changes?")
-        dlg.geometry("460x190+730+420")
+        dlg.geometry("460x190"); dlg.after_idle(lambda d=dlg: fit_dialog(d, 460, 190))
         dlg.configure(bg="#1e293b")
         dlg.transient(self)
         dlg.attributes("-topmost", True)
         tk.Label(dlg, text=f"Do you want to save changes to '{self.tpl_name}' before closing?", bg="#1e293b", fg="#f8fafc", font=("Sans", 12, "bold"), wraplength=420, justify="center").pack(pady=(22, 18))
         bf = tk.Frame(dlg, bg="#1e293b")
         bf.pack(pady=6)
-        tk.Button(bf, text="💾 Yes, Save", bg="#16a34a", fg="white", font=("Sans", 11, "bold"), width=12, command=lambda: (dlg.destroy(), self.on_save_callback(self.tpl_name, self.tpl), self.destroy())).pack(side="left", padx=6)
+        tk.Button(bf, text="Yes, Save", bg="#16a34a", fg="white", font=("Sans", 11, "bold"), width=12, command=lambda: (dlg.destroy(), self.on_save_callback(self.tpl_name, self.tpl), self.destroy())).pack(side="left", padx=6)
         tk.Button(bf, text="✖ No, Discard", bg="#dc2626", fg="white", font=("Sans", 11, "bold"), width=12, command=lambda: (dlg.destroy(), self.destroy())).pack(side="left", padx=6)
         make_vt_btn(bf, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=9, command=dlg.destroy).pack(side="left", padx=6)
         dlg.update_idletasks()
@@ -2277,6 +2280,81 @@ class VTRoundedButton(tk.Canvas):
         self.create_text(cx, cy, text=self.text, font=self.font, fill=cur_fg, justify="center")
 
 
+def flow_wrap(frame, padx=4, pady=3):
+    """Re-lay a toolbar's packed widgets so they wrap onto extra rows when the screen is too narrow
+    (e.g. the Pi's 1360x768 display) instead of running off the right edge.
+    Left-packed widgets keep their order; right-packed ones follow them in on-screen order."""
+    items = []
+    for w in frame.pack_slaves():
+        items.append((w, w.pack_info().get("side", "left")))
+        w.pack_forget()
+    order = [w for w, side in items if side != "right"] + [w for w, side in reversed(items) if side == "right"]
+    state = {"w": None}
+
+    def relayout(_e=None):
+        width = frame.winfo_width()
+        if width <= 1:
+            width = frame.winfo_toplevel().winfo_width()
+        if width <= 1:
+            width = frame.winfo_screenwidth()
+        if state["w"] == width:
+            return
+        state["w"] = width
+        rows, row, x = [], [], padx
+        for w in order:
+            rw = w.winfo_reqwidth()
+            if row and x + rw > width - padx:
+                rows.append(row); row, x = [], padx
+            row.append((w, x)); x += rw + padx
+        if row:
+            rows.append(row)
+        y = pady
+        for row in rows:
+            rh = max(w.winfo_reqheight() for w, _ in row)
+            for w, x in row:
+                w.place(x=x, y=y + (rh - w.winfo_reqheight()) // 2)
+            y += rh + pady
+        frame.configure(height=y)
+
+    def child_resized(_e=None):
+        # a button/label changed size (e.g. its text was filled in later): lay out again once things settle
+        if not state.get("pending"):
+            state["pending"] = True
+
+            def again():
+                state["pending"] = False
+                state["w"] = None
+                relayout()
+            frame.after_idle(again)
+
+    sizes = {}
+
+    def on_child(e):
+        key = str(e.widget)
+        if sizes.get(key) != (e.widget.winfo_reqwidth(), e.widget.winfo_reqheight()):
+            sizes[key] = (e.widget.winfo_reqwidth(), e.widget.winfo_reqheight())
+            child_resized()
+
+    for w in order:
+        w.bind("<Configure>", on_child, add="+")
+    frame.bind("<Configure>", relayout, add="+")
+    frame.after_idle(relayout)
+    return frame
+
+
+def fit_dialog(dlg, min_w=0, min_h=0):
+    """Size a dialog to its contents (never smaller than min_w x min_h, never larger than the screen)
+    and centre it, so nothing is cut off on smaller screens."""
+    try:
+        dlg.update_idletasks()
+        sw, sh = dlg.winfo_screenwidth(), dlg.winfo_screenheight()
+        w = min(max(dlg.winfo_reqwidth(), min_w), sw - 20)
+        h = min(max(dlg.winfo_reqheight(), min_h), sh - 60)
+        dlg.geometry(f"{w}x{h}+{max(0, (sw - w) // 2)}+{max(0, (sh - h) // 2)}")
+    except Exception:
+        pass
+
+
 def make_vt_btn(parent, text, command=None, bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=None, height=None, padx=10, pady=6, state="normal", radius=12):
     return VTRoundedButton(
         parent,
@@ -2299,7 +2377,7 @@ class VTLabelUtility(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("ViewTouch Label Utility v1.0")
-        self.geometry("1920x1080+0+0"); self.attributes("-fullscreen", True)
+        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"); self.attributes("-fullscreen", True)
         self.configure(bg="#14171c")
 
         self.templates = load_templates()
@@ -2576,7 +2654,7 @@ class VTLabelUtility(tk.Tk):
             w = t_obj.get("width_in", 2.0)
             h = t_obj.get("height_in", 1.0)
             prn = t_obj.get("default_printer", "Auto").split("(")[0].replace("VT TCP:", "").strip()
-            self.tpl_tree.insert("", "end", iid=str(idx), values=(f"🏷️  {name}", f"{w} x {h} in", f"🖨️ {prn}"))
+            self.tpl_tree.insert("", "end", iid=str(idx), values=(f" {name}", f"{w} x {h} in", f"{prn}"))
 
         if active_tpl_names:
             self.tpl_tree.selection_set("0")
@@ -2710,7 +2788,7 @@ class VTLabelUtility(tk.Tk):
                                    values=["Primary UPC", "Alt UPC 1", "Alt UPC 2", "Alt UPC 3", "Carton UPC"])
         upc_mode_cb.pack(side="left", padx=4)
         upc_mode_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_upc_mode(self.upc_mode_var.get()))
-        make_vt_btn(top, text="🔄 Next UPC", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), padx=10, pady=6,
+        make_vt_btn(top, text="↻ Next UPC", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), padx=10, pady=6,
                     command=self.cycle_highlighted_upc).pack(side="left", padx=(4, 6))
 
         make_vt_btn(top, text="✓ Select All", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.select_all).pack(side="left", padx=6)
@@ -2726,6 +2804,7 @@ class VTLabelUtility(tk.Tk):
         sp = tk.Spinbox(top, from_=1, to=200, textvariable=self.batch_qty_var, width=5, font=("Sans", 11), command=self.update_selected_qty)
         sp.pack(side="right", padx=4)
 
+        flow_wrap(top)
         cols = ("sel", "qty", "upca", "upce", "desc", "price", "dept_name", "dept_num", "dept_grp", "cat", "mfg")
         self.grid_tree = ttk.Treeview(self.content, columns=cols, show="headings", selectmode="browse")
         headers = [
@@ -2837,7 +2916,7 @@ class VTLabelUtility(tk.Tk):
         tpl_cb.pack(side="left", padx=6, ipady=4)
         tpl_cb.bind("<<ComboboxSelected>>", lambda _e: self._render_live_preview())
 
-        make_vt_btn(tbar, text="🖨️ Print Labels", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_print_dialog).pack(side="left", padx=6)
+        make_vt_btn(tbar, text="Print Labels", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_print_dialog).pack(side="left", padx=6)
 
         make_vt_btn(tbar, text="◀", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=3, pady=8, command=self.prev_preview_item).pack(side="left", padx=2)
         self.page_lbl = tk.Label(tbar, text=f"1/{len(selected_list)}", bg="#0c1017", fg="#f8fafc", font=("Sans", 10, "bold"), padx=6)
@@ -2866,6 +2945,7 @@ class VTLabelUtility(tk.Tk):
 
         self.route_badge_lbl = tk.Label(tbar, text="", bg="#1e293b", fg="#38bdf8", font=("Sans", 9, "bold"), padx=10, pady=8, bd=0, relief="flat")
         self.route_badge_lbl.pack(side="right", padx=6)
+        flow_wrap(tbar)
 
         self.preview_canvas = tk.Canvas(self.content, bg="#1e242d", bd=2, relief="sunken")
         self.preview_canvas.pack(fill="both", expand=True, padx=16, pady=10)
@@ -2898,7 +2978,8 @@ class VTLabelUtility(tk.Tk):
             avail = discover_all_printers()
             routed_p = resolve_template_printer(tpl.get("default_printer", ""), avail)
             w_in, h_in = tpl.get("width_in", 2.0), tpl.get("height_in", 1.0)
-            self.route_badge_lbl.config(text=f"🖨️ Target: {routed_p}   |   📏 Stock: {w_in} in x {h_in} in")
+            p_short = re.sub(r"\s*\[[^\]]*\]$", "", re.sub(r"^(VT TCP|VT CUPS|VT File|CUPS):\s*", "", str(routed_p)))
+            self.route_badge_lbl.config(text=f"Printer: {p_short}   |   {w_in} x {h_in} in", wraplength=520, justify="left")
         cw = max(600, self.preview_canvas.winfo_width())
         ch = max(350, self.preview_canvas.winfo_height())
         try:
@@ -2931,7 +3012,7 @@ class VTLabelUtility(tk.Tk):
 
         sdlg = tk.Toplevel(self)
         sdlg.title(f"Printer Settings & Alignment — [{tpl_name}]")
-        sdlg.geometry("620x530+650+230")
+        sdlg.geometry("620x530"); sdlg.after_idle(lambda d=sdlg: fit_dialog(d, 620, 530))
         sdlg.configure(bg="#1e293b")
         sdlg.transient(self)
         sdlg.attributes("-topmost", True)
@@ -3065,8 +3146,8 @@ class VTLabelUtility(tk.Tk):
         btn_bar.pack(fill="x", side="bottom", padx=18, pady=12)
 
         make_vt_btn(btn_bar, text="✓ Save & Close", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=14, command=lambda: save_settings(True)).pack(side="right", padx=4)
-        make_vt_btn(btn_bar, text="🖨️ Save & Test Print 1 Label", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=22, command=do_test_print).pack(side="right", padx=6)
-        make_vt_btn(btn_bar, text="📏 Calibrate Gap (~JC)", bg="#7c3aed", fg="#ffffff", font=("Sans", 10, "bold"), width=18, command=do_calibrate_gap).pack(side="left", padx=4)
+        make_vt_btn(btn_bar, text="Save & Test Print 1 Label", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=22, command=do_test_print).pack(side="right", padx=6)
+        make_vt_btn(btn_bar, text="Calibrate Gap (~JC)", bg="#7c3aed", fg="#ffffff", font=("Sans", 10, "bold"), width=18, command=do_calibrate_gap).pack(side="left", padx=4)
         make_vt_btn(btn_bar, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 10, "bold"), width=8, command=sdlg.destroy).pack(side="left", padx=4)
 
         sdlg.update_idletasks()
@@ -3088,7 +3169,7 @@ class VTLabelUtility(tk.Tk):
 
         cdlg = tk.Toplevel(self)
         cdlg.title("Create Label Report (Store / Printer Specific)")
-        cdlg.geometry("520x290+700+360")
+        cdlg.geometry("520x290"); cdlg.after_idle(lambda d=cdlg: fit_dialog(d, 520, 290))
         cdlg.configure(bg="#1e293b")
         cdlg.transient(self)
         cdlg.attributes("-topmost", True)
@@ -3145,7 +3226,7 @@ class VTLabelUtility(tk.Tk):
             return
         vdlg = tk.Toplevel(self)
         vdlg.title("Variable Text")
-        vdlg.geometry("420x170+750+420")
+        vdlg.geometry("420x170"); vdlg.after_idle(lambda d=vdlg: fit_dialog(d, 420, 170))
         vdlg.configure(bg="#1e293b")
         vdlg.transient(self)
         vdlg.attributes("-topmost", True)
@@ -3188,7 +3269,7 @@ class VTLabelUtility(tk.Tk):
         # Single-Step Print Prompt: Only asks "How many labels?" and prints directly to the template's assigned printer!
         qdlg = tk.Toplevel(self)
         qdlg.title("Label Utility — Print Labels")
-        qdlg.geometry("500x295+710+370")
+        qdlg.geometry("500x295"); qdlg.after_idle(lambda d=qdlg: fit_dialog(d, 500, 295))
         qdlg.configure(bg="#1e293b")
         qdlg.transient(self)
         qdlg.attributes("-topmost", True)
@@ -3203,7 +3284,7 @@ class VTLabelUtility(tk.Tk):
 
         tk.Label(qdlg, text="How many labels do you want to print?", bg="#1e293b", fg="#f8fafc", font=("Sans", 13, "bold")).pack(pady=(14, 2))
         tk.Label(qdlg, text=item_summary, bg="#1e293b", fg="#14b8a6", font=("Sans", 10, "bold")).pack(pady=(0, 4))
-        tk.Label(qdlg, text=f"🖨️ Target: {chosen}   |   📏 Media: {w_in} in x {h_in} in", bg="#0f172a", fg="#38bdf8", font=("Sans", 9, "bold"), padx=10, pady=3).pack(pady=(0, 8))
+        tk.Label(qdlg, text=f"Target: {chosen}   |   Media: {w_in} in x {h_in} in", bg="#0f172a", fg="#38bdf8", font=("Sans", 9, "bold"), padx=10, pady=3).pack(pady=(0, 8))
 
         default_qty = max(1, int(items[0].get("qty", 1)))
         qty_var = tk.StringVar(value=str(default_qty))
@@ -3229,7 +3310,7 @@ class VTLabelUtility(tk.Tk):
         def show_print_result(title, msg, is_err=False):
             res_dlg = tk.Toplevel(self)
             res_dlg.title(title)
-            res_dlg.geometry("460x165+730+430")
+            res_dlg.geometry("460x165"); res_dlg.after_idle(lambda d=res_dlg: fit_dialog(d, 460, 165))
             res_dlg.configure(bg="#1e293b")
             res_dlg.transient(self)
             res_dlg.attributes("-topmost", True)
@@ -3324,7 +3405,7 @@ class VTLabelUtility(tk.Tk):
         qty_ent.bind("<Return>", do_print)
         qbtn_frame = tk.Frame(qdlg, bg="#1e293b")
         qbtn_frame.pack(pady=(6, 12))
-        make_vt_btn(qbtn_frame, text="🖨️ Print Now", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), width=15, command=do_print).pack(side="left", padx=8)
+        make_vt_btn(qbtn_frame, text="Print Now", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), width=15, command=do_print).pack(side="left", padx=8)
         make_vt_btn(qbtn_frame, text="⚙️ Adjust Higher / Lower", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), command=lambda: (qdlg.destroy(), self.open_printer_settings_dialog())).pack(side="left", padx=6)
         make_vt_btn(qbtn_frame, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=8, command=qdlg.destroy).pack(side="left", padx=6)
 

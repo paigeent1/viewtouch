@@ -35,9 +35,9 @@ def settle(t=0.8):
 def grab(path):
     """Full-screen screenshot: grim (Wayland), then scrot (X11), then Pillow."""
     if shutil.which("grim") and os.environ.get("WAYLAND_DISPLAY"):
-        if subprocess.run(["grim", path]).returncode == 0:
+        if subprocess.run(["grim", path], stderr=subprocess.DEVNULL).returncode == 0:
             return
-    if shutil.which("scrot") and subprocess.run(["scrot", "-o", path]).returncode == 0:
+    if shutil.which("scrot") and subprocess.run(["scrot", "-o", path], stderr=subprocess.DEVNULL).returncode == 0:
         return
     from PIL import ImageGrab
     ImageGrab.grab().save(path)

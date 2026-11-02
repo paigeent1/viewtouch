@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 09:51 ET — Claude — Label utility fits the Pi's 1360x768 screen; no missing-emoji boxes
+- **What:** Toolbars (label designer x3, items screen, preview screen) now wrap onto extra rows instead of running off the right edge (flow_wrap). All 8 dialogs size themselves to their contents and centre on screen (fit_dialog). Windows use the real screen size instead of a fixed 1920x1080. Removed 31 emoji the Pi has no font for (they showed as empty boxes); kept the symbols it displays. Shortened the preview's printer badge. Screenshot script no longer prints grim's 'failed to create display'.
+- **Why:** Screenshots taken on the Pi (1360x768) showed Code 128/UPC-A, Del and Printer Offset cut off, the printer-settings window missing Print Lower, Shift Right, 600 dpi and Cancel, and empty boxes in place of emoji.
+- **Files:** `modern/tools/capture_manual_screenshots.py`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** Test layout on the Pi's real screen; the cloud workspace's fonts are narrower. Avoid emoji outside the Basic Multilingual Plane in UI text (Tk on the Pi can't draw them).
+
 ### 2026-11-02 09:44 ET — Claude — Enforce the development notes on every commit
 - **What:** Added a pre-commit hook (.githooks/pre-commit) that blocks commits changing files without a new, complete entry (What, Why, Files) at the top of this Log; modern/tools/log_dev_note.py writes entries in the shared format and does the check; modern/tools/setup_dev_hooks.sh turns the hook on per clone. Added AGENTS.md (rules for people and AI agents) with CLAUDE.md, GEMINI.md and .gemini/styleguide.md pointing to it, so Claude and Gemini read the rules at the start of every session.
 - **Why:** The owner asked that all changes be logged this way automatically, by every contributor.
