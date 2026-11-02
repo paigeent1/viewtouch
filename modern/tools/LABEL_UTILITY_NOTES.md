@@ -1,8 +1,17 @@
-# ViewTouch Label Utility v1.0 — Architecture & Maintenance Notes
+# ViewTouch Label Utility v1.1 — Architecture & Maintenance Notes
 
 **`vt_label_utility.py` is the one label program.** It replaced the earlier Gemini version on 2026-11-02
 (that version is in Git history). `claude_label_utility.py` was merged into it, and `beta_label_utility.py`
 was retired — both are in Git history only. Make all label changes in `vt_label_utility.py`.
+
+
+## Versions
+The version is `__version__` at the top of `vt_label_utility.py` (shown in the window title). When a release
+changes what the operator sees or does, raise it, add a line here, and tag the commit `label-utility-vX.Y`.
+- **1.1** (2026-11-02): Delete Template and Restore Standard Labels on screen 1; windows and dialogs fit the
+  Pi's 1360x768 screen; no missing-emoji boxes; `update_label_utility.sh`; manual with Pi screenshots.
+- **1.0** (2026-11-02, tag at `9f1c09f`): bitmap-only printing, ILSA templates, any UPC per label, `--upc`,
+  launched only from ViewTouch.
 
 ## How ViewTouch launches it (keep these names)
 - Manager page button **"Label Utility"** (`seed/pages/manager.json`) runs command **`openLabelUtility`**

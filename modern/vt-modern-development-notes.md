@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 12:45 ET — Bob (Claude) — Label Utility v1.1
+- **What:** __version__ 1.1; window title now built from __version__ (one place to change). Manual cover says Version 1.1 and the title-bar text v1.1; user manual ch 20 and LABEL_UTILITY_NOTES.md say v1.1. LABEL_UTILITY_NOTES.md has a Versions section: 1.1 = Delete Template / Restore Standard Labels, screen fit for 1360x768, no missing-emoji boxes, update script, manual with Pi screenshots; 1.0 = tag at 9f1c09f. Tag label-utility-v1.1 on this commit.
+- **Why:** Owner approved the version bump: those features landed after the 1.0 tag.
+- **Files:** `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/build_manual.py`, `modern/docs/manual/manual.html`, `modern/tools/LABEL_UTILITY_NOTES.md`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** Raise __version__ and add a Versions line for each operator-visible release; tag label-utility-vX.Y.
+
 ### 2026-11-02 12:33 ET — Bob (Claude) — Manual: last unverified claims removed; restore entries lost in the 12:14 force-push
 - **What:** Checked Neil's 12:14 manual rebuild (git + the Drive PDF: no browser headers, no 0.10-0.14 features, label utility and gift card fixes in). Removed what still isn't in the code (Pi tree is clean, so it isn't uncommitted there either): 21+ age-verification modal, 5-level Major Category > ... > Sub Group hierarchy (the label utility filters by category and brand), Closed Checks > Assign Customer, touchToWakeSeconds / 60-second dimmer (the real setting is Store Settings > Dim the screen after (minutes)); gift card report columns now match the code. AGENTS.md: never force-push or reset main/claude-label-utility. Restored record of Bob's work erased by the force-push: 12:04 manual rebuild (3584f89, superseded by Neil's 96821b2), 12:10 handoff note BOB_TO_NEIL_user_manual.md on Drive (POS project tmp) (not kept on GitHub: those commits sit on top of the 90 MB commit Neil purged).
 - **Why:** Owner asked Bob to check Neil's updated manual. The 12:14 force-push replaced both shared branches and dropped Bob's three commits and their notes entries without anyone knowing.
