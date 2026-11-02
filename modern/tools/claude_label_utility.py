@@ -2087,6 +2087,14 @@ class VTRoundedButton(tk.Canvas):
                 self.draw()
         return "break"
 
+    def _lighten(self, color, amount):
+        try:
+            r16, g16, b16 = self.winfo_rgb(color)
+            mix = lambda c: int((c / 257) + (255 - c / 257) * amount)
+            return "#%02x%02x%02x" % (mix(r16), mix(g16), mix(b16))
+        except Exception:
+            return color
+
     def _draw_rounded_rect(self, x1, y1, x2, y2, r, fill, outline=""):
         r = max(2, min(r, int((x2 - x1) / 2), int((y2 - y1) / 2)))
         self.create_arc(x1, y1, x1 + 2*r, y1 + 2*r, start=90, extent=90, fill=fill, outline=outline)
@@ -2125,7 +2133,8 @@ class VTRoundedButton(tk.Canvas):
         self._draw_rounded_rect(bx1, by1, bx2, by2, r, fill=cur_fill)
 
         if not self.pressed and self.btn_state != "disabled" and (bx2 - bx1) > 2 * r + 4:
-            self.create_line(bx1 + r, by1 + 1, bx2 - r, by1 + 1, fill="#ffffff", stipple="gray25")
+            # Subtle solid top highlight: the button's own colour lightened (no stippled dots)
+            self.create_line(bx1 + r, by1 + 1, bx2 - r, by1 + 1, fill=self._lighten(cur_fill, 0.22))
 
         cx = (bx1 + bx2) / 2.0
         cy = (by1 + by2) / 2.0
