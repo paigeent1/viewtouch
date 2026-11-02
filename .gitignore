@@ -55,3 +55,7 @@ coverage/
 modern/build/
 *.bak
 apks/*.apk
+
+# Python bytecode caches
+__pycache__/
+*.pyc

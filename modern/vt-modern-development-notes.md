@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:13 ET — Bob (Claude) — Neil's manual review: Delete/Restore templates, update script, manual additions
+- **What:** Label utility: new Delete Template and Restore Standard Labels buttons on screen 1 (both ask first; the last template can't be deleted; restore keeps other templates and the RECEIVING LABEL tweaks from the original utility). New modern/tools/update_label_utility.sh: pulls main and claude-label-utility (merging), runs the installer, enables the notes hook, pushes main, beeps. .gitignore: __pycache__/ and *.pyc. Manual: update via the desktop icon / update script (sections 11, 13); deleting and restoring templates (sections 3, 10, 13); Properties window and status bar with fine-tuning tips (8.1); print quantity applies to every ticked item (5).
+- **Why:** Neil (Gemini) reviewed the manual and suggested these six improvements; deleting templates wasn't possible in the program, so it was added rather than documented.
+- **Files:** `.gitignore`, `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/build_manual.py`, `modern/tools/update_label_utility.sh`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** The Pi's desktop Update Label Utility icon should run modern/tools/update_label_utility.sh (no screenshots). The screen-1 screenshot predates the two new buttons; re-run capture_manual_screenshots.sh and rebuild the manual to refresh it.
+
 ### 2026-11-02 10:02 ET — Bob (Claude) — Fix blocked-commit message in log_dev_note.py
 - **What:** Escaped the quotes in the example command shown when a commit is blocked.
 - **Why:** The previous commit's name change left unescaped quotes inside a Python string; it compiled but would have crashed (NameError) instead of showing the blocked-commit help.

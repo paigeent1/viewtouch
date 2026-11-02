@@ -275,6 +275,9 @@ story.append(table([
     ["Database status", "Confirms ViewTouch is connected and shows how many items and templates were loaded."],
     ["Lookup Template", "Imports a label template from a file — including ILSA <b>.rtm</b> labels. See section 9."],
     ["Open Template Folder", "Opens the <font face='Courier'>seed/templates</font> folder in the file manager — a handy place to keep files you want to import."],
+    ["Delete Template", "Deletes the template selected in the list on the left (it asks first). The last remaining template can't be deleted."],
+    ["Restore Standard Labels", "Puts the four standard labels (RECEIVING LABEL and the three ILSA labels) back to their original layout and printer, "
+     "replacing any changes made to them. Your other templates are kept. It asks first."],
 ], [1.7, 5.2]))
 
 # ---------------------------------------------------------------- 4
@@ -300,6 +303,9 @@ story.append(B("<b>Select All</b> / <b>Deselect All</b> tick or untick every ite
 story.append(B("<b>Quick Search</b> filters the list as you type. It matches description, brand, category and <i>any</i> of an "
                "item's UPCs — so you can scan or type an alternate UPC to find an item."))
 story.append(B("<b>Print Qty for Selected</b> (right) sets the quantity on every ticked item."))
+story.append(box("Quantities:", "The number you enter in the print window (section 7.2) is printed for <b>every</b> ticked item. "
+                 "The Print Qty column only sets the number the print window starts with — items can't have different quantities "
+                 "in the same print run. To print different amounts, print the items in separate runs."))
 story.append(B("Press <b>Next &gt;&gt;</b> to go to the preview with the ticked items. If nothing is ticked, the first item is used."))
 story.append(KeepTogether([P("Columns", h2), table([
     ["Column", "Meaning"],
@@ -405,6 +411,20 @@ story.append(B("<b>Drag</b> the piece to move it. <b>Drag a handle</b> to change
 story.append(B("<b>Ctrl-click</b> or <b>Shift-click</b> to select several pieces; <b>drag on an empty area</b> to draw a selection box around them."))
 story.append(B("<b>Double-click</b> a piece for its Properties window (field, text, exact position, rotation)."))
 story.append(B("<b>Right-click</b> for a menu: Add Field, Bring to Front, Send to Back, Position / Properties, Duplicate, Rotate 90°, Delete Component."))
+story.append(KeepTogether([P("Properties window (double-click a piece)", h3), table([
+    ["Field", "What it does"],
+    ["Data Field / Type", "What the piece shows — the same list as the Field box in the top toolbar (section 8.5)."],
+    ["Custom / Static Text", "The words for a Label or Variable piece."],
+    ["Left / Top (in)", "The exact position of the piece's top-left corner, in inches from the label's top-left corner."],
+    ["Rotation (deg)", "0, 90, 180 or 270."],
+    ["Save Properties / Cancel", "Apply the changes, or close without changing anything."],
+], [1.9, 5.0])]))
+story.append(KeepTogether([P("Status bar (bottom of the designer)", h3),
+    P("Shows the selected piece's exact size and position, updated as you drag: <font face='Courier'>Object: #2 (name) | "
+      "Left: 0.062 in  Top: 0.583 in  Width: 2.208 in  Height: 0.406 in | Font: 10pt</font>."),
+    box("Fine-tuning small labels:", "For millimetre-critical labels such as the cigar stick label, use the status bar together with "
+        "the arrow keys (0.01 in per press, 0.05 in with Shift), <b>Left / Top</b> in the Properties window, and <b>Box W / H</b> in "
+        "the second toolbar for exact width and height. 0.01 in is about 0.25 mm, or 2 printer dots at 203 dpi.")]))
 story.append(P("8.2 Top toolbar", h2))
 story.append(shot("designer_toolbar1_stacked.png", 5.6, "Top toolbar (shown in two parts)"))
 story.append(table([
@@ -515,6 +535,12 @@ for name, title, desc, w in [
      "RECEIVED, the employee's name and today's date, twice side by side. Needs no item.", 3.0),
 ]:
     story.append(KeepTogether([P(title, h3), P(desc), label_img(name, w), Spacer(1, 8)]))
+story.append(KeepTogether([P("Deleting and restoring templates", h3),
+    B("<b>Delete a template:</b> on screen 1, select it in the template list and press <b>Delete Template</b>."),
+    B("<b>Undo changes to a standard label, or bring back one you deleted:</b> on screen 1 press <b>Restore Standard Labels</b>. "
+      "RECEIVING LABEL and the three ILSA labels return to their original layout and printer; your other templates stay as they are."),
+    B("<b>Bring back a single ILSA label</b> without touching the others: <b>Lookup Template</b> and choose its .rtm file (section 9)."),
+    Spacer(1, 6)]))
 story.append(box("Back up your templates:", "Your adjusted templates live in "
                  "<font face='Courier'>~/.local/share/ViewTouch/claude_label_templates.json</font>. Copy that file somewhere safe after "
                  "making changes you want to keep, or run the upload command in section 12."))
@@ -522,13 +548,19 @@ story.append(box("Back up your templates:", "Your adjusted templates live in "
 # ---------------------------------------------------------------- 11
 story.append(PageBreak())
 story.append(P("11. Updating the program", h1))
-story.append(P("New versions are published to your GitHub repository. To update, open a Terminal on the Pi and run:"))
-story.append(C("cd ~/viewtouch-main\ngit pull myfork claude-label-utility"))
-story.append(P("Then close and reopen the label utility. Your templates and printer settings are kept."))
-story.append(P("If a new version needs new fonts or packages, also run the installer (it can be run any time):"))
-story.append(C("bash ~/viewtouch-main/modern/tools/install_label_utility.sh"))
+story.append(P("New versions are published to your GitHub repository. To update the Pi:"))
+story.append(B("<b>Double-click the Update Label Utility icon</b> on the Pi's desktop (choose <b>Execute</b> if asked). A window opens, "
+               "shows each step, beeps three times when it's finished, and says <b>Up to date</b>."))
+story.append(B("Or, in a Terminal:"))
+story.append(C("bash ~/viewtouch-main/modern/tools/update_label_utility.sh"))
+story.append(P("Either way it: pulls the latest changes from GitHub (Neil's on <font face='Courier'>main</font> and Bob's on "
+               "<font face='Courier'>claude-label-utility</font>), runs the installer, turns on the development-notes check, and "
+               "updates GitHub's <font face='Courier'>main</font> to match the Pi. Then close and reopen the label utility. Your "
+               "templates and printer settings are kept."))
 story.append(P("The installer sets up the launcher ViewTouch's Label Utility button uses, installs any missing Python parts, and installs Microsoft's "
-               "Arial, Arial Black and Courier New fonts used by the ILSA labels. It may ask for the Pi's password."))
+               "Arial, Arial Black and Courier New fonts used by the ILSA labels. It may ask for the Pi's password. It can also be run on its own:"))
+story.append(C("bash ~/viewtouch-main/modern/tools/install_label_utility.sh"))
+story.append(box("If the update stops with an error:", "nothing is lost. Take a photo of the window and send it to Bob.", "warn"))
 
 # ---------------------------------------------------------------- 12
 story.append(P("12. Troubleshooting", h1))
@@ -570,7 +602,9 @@ story.append(table([
     ["Make a new label from an existing one", "Screen 4: Create Report &gt; name, printer, size &gt; Create &amp; Open Designer"],
     ["Bring in an ILSA label", "Screen 1: Lookup Template &gt; choose the .rtm file"],
     ["See exact printer dots", "Screen 4: double-click the preview"],
-    ["Update the program", "<font face='Courier'>cd ~/viewtouch-main &amp;&amp; git pull myfork claude-label-utility</font>"],
+    ["Delete a template", "Screen 1: select it &gt; Delete Template"],
+    ["Undo changes to the standard labels", "Screen 1: Restore Standard Labels"],
+    ["Update the program", "Double-click Update Label Utility on the desktop — or <font face='Courier'>bash ~/viewtouch-main/modern/tools/update_label_utility.sh</font>"],
     ["Send logs for help", "<font face='Courier'>bash ~/viewtouch-main/modern/tools/push_label_log.sh</font>"],
 ], [2.4, 4.5]))
 

@@ -2489,6 +2489,49 @@ class VTLabelUtility(tk.Tk):
             self.tpl_var.set(chosen_tpl)
             self._render_live_preview()
 
+    def delete_selected_template(self):
+        """Remove the template selected in the start screen's list (asks first; the last template can't be deleted)."""
+        from tkinter import messagebox
+        name = getattr(self, "step1_tpl_var", None) and self.step1_tpl_var.get()
+        if not name or name not in self.templates:
+            messagebox.showinfo("Delete Template", "Select a template in the list first.", parent=self); return
+        if len(self.templates) <= 1:
+            messagebox.showinfo("Delete Template", "This is the only template, so it can't be deleted.", parent=self); return
+        if not messagebox.askyesno("Delete Template", f"Delete the template '{name}'?\n\n"
+                                   "The four standard labels can be brought back with Restore Standard Labels.", parent=self):
+            return
+        del self.templates[name]
+        save_templates(self.templates)
+        if getattr(self, "chosen_template_name", None) == name:
+            self.chosen_template_name = next(iter(self.templates))
+        self.show_step(1)
+
+    def restore_standard_templates(self):
+        """Put the standard templates shipped with the program back (replacing ones with the same name;
+        other templates are kept)."""
+        from tkinter import messagebox
+        try:
+            with open(SEED_TEMPLATE_FILE, "r", encoding="utf-8") as f:
+                std = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Restore Standard Labels", f"Could not read the standard labels:\n{e}", parent=self); return
+        try:  # same as first run: keep the RECEIVING LABEL adjustments saved by the original label utility
+            with open(os.path.join(SANDBOX_DIR, "vt_label_templates_v2.json"), "r", encoding="utf-8") as vf:
+                tuned = json.load(vf).get("RECEIVING LABEL")
+            if isinstance(tuned, dict) and tuned.get("elements") and "RECEIVING LABEL" in std:
+                std["RECEIVING LABEL"] = tuned
+        except Exception:
+            pass
+        names = ", ".join(std.keys())
+        if not messagebox.askyesno("Restore Standard Labels", f"Restore these labels to their original layout and printer?\n\n{names}\n\n"
+                                   "Changes you made to them will be replaced. Other templates are kept.", parent=self):
+            return
+        for k, v in std.items():
+            self.templates[k] = ensure_box_dims(json.loads(json.dumps(v)))
+        save_templates(self.templates)
+        self.show_step(1)
+        messagebox.showinfo("Restore Standard Labels", f"Restored {len(std)} standard labels.", parent=self)
+
     def open_template_folder(self):
         folder = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
         subprocess.Popen(["xdg-open", folder if os.path.exists(folder) else os.path.expanduser("~/.local/share/ViewTouch")])
@@ -2703,6 +2746,7 @@ class VTLabelUtility(tk.Tk):
         )
         tools_frame.grid(row=1, column=0, sticky="nsew", pady=(2, 0))
         tools_frame.columnconfigure(0, weight=1)
+        tools_frame.columnconfigure(1, weight=1)
         tools_frame.rowconfigure(0, weight=1)
         tools_frame.rowconfigure(1, weight=1)
 
@@ -2716,6 +2760,11 @@ class VTLabelUtility(tk.Tk):
             command=self.browse_template_file
         )
         btn_lookup.grid(row=0, column=0, sticky="nsew", padx=4, pady=3)
+
+        make_vt_btn(tools_frame, text="Delete Template", font=("Sans", 10, "bold"), bg="#b91c1c", fg="#ffffff", radius=12,
+                    command=self.delete_selected_template).grid(row=0, column=1, sticky="nsew", padx=4, pady=3)
+        make_vt_btn(tools_frame, text="Restore Standard Labels", font=("Sans", 10, "bold"), bg="#0f766e", fg="#ffffff", radius=12,
+                    command=self.restore_standard_templates).grid(row=1, column=1, sticky="nsew", padx=4, pady=3)
 
         btn_folder = make_vt_btn(
             tools_frame,
