@@ -3030,7 +3030,7 @@ class VTLabelUtility(tk.Tk):
         cur_v = int(tpl.get("v_offset_dots", 18) if "v_offset_dots" in tpl else 18)
         v_var = tk.IntVar(value=cur_v)
         dpi_var = tk.StringVar(value=str(label_dpi(tpl)))
-        v_lbl = tk.Label(vf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=26)
+        v_lbl = tk.Label(vf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=34)
 
         def update_v_label(*_a):
             val = int(v_var.get())
@@ -3055,7 +3055,7 @@ class VTLabelUtility(tk.Tk):
 
         cur_h = int(tpl.get("h_offset_dots", 0) or 0)
         h_var = tk.IntVar(value=cur_h)
-        h_lbl = tk.Label(hf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=26)
+        h_lbl = tk.Label(hf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=34)
 
         def update_h_label(*_a):
             val = int(h_var.get())

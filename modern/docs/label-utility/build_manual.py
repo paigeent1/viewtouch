@@ -1,6 +1,7 @@
 # Builds ViewTouch_Label_Utility_User_Manual.pdf (the label utility user manual).
 # Rebuild after changing the label utility:  cd modern/docs/label-utility && python3 build_manual.py ViewTouch_Label_Utility_User_Manual.pdf
-# img/ holds sample labels rendered by vt_label_utility.py.
+# img/ holds sample labels rendered by vt_label_utility.py; screens/ holds screenshots taken on the Pi
+# (bash modern/tools/capture_manual_screenshots.sh, then copy the pi-shots branch files into screens/).
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -26,6 +27,8 @@ head = ParagraphStyle("head", parent=cell, fontName="Helvetica-Bold", textColor=
 h1 = ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=18, leading=22, textColor=NAVY, spaceBefore=4, spaceAfter=10)
 h2 = ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=BLUE, spaceBefore=10, spaceAfter=5)
 h3 = ParagraphStyle("h3", fontName="Helvetica-Bold", fontSize=10.5, leading=13, textColor=NAVY, spaceBefore=6, spaceAfter=3)
+h2.keepWithNext = 1   # never leave a heading alone at the bottom of a page
+h3.keepWithNext = 1
 bullet = ParagraphStyle("bullet", parent=body, leftIndent=14, bulletIndent=4, spaceAfter=3)
 num = ParagraphStyle("num", parent=body, leftIndent=18, bulletIndent=2, spaceAfter=4)
 code = ParagraphStyle("code", fontName="Courier", fontSize=9, leading=12, textColor=colors.HexColor("#0f172a"),
@@ -105,6 +108,63 @@ def table(rows, widths, header=True):
             style.append(("BACKGROUND", (0, r), (-1, r), LIGHT))
     t.setStyle(TableStyle(style))
     return KeepTogether([t, Spacer(1, 10)]) if len(rows) <= 8 else t
+
+
+def stack_toolbar(name):
+    """Cut a wide toolbar screenshot (screens/<name>.png) row by row, splitting long rows in two, and save
+    screens/<name>_stacked.png so its buttons stay readable on a page. Run on every build."""
+    from PIL import Image as PI
+    src = os.path.join(HERE, "screens", name + ".png")
+    if not os.path.exists(src):
+        return
+    im = PI.open(src).convert("RGB"); W, H = im.size; bg = im.getpixel((W - 2, H - 2))
+    uniform_row = lambda y: len({im.getpixel((x, y)) for x in range(0, W, 2)}) <= 2
+    uniform_col = lambda x, y0, y1: len({im.getpixel((x, y)) for y in range(y0, y1)}) <= 2
+    rows, y = [], 0
+    while y < H:
+        while y < H and uniform_row(y): y += 1
+        if y >= H: break
+        y0 = y
+        while y < H and not uniform_row(y): y += 1
+        rows.append((max(0, y0 - 3), min(H, y + 3)))
+    pieces = []
+    for y0, y1 in rows:
+        right = W - 1
+        while right > 0 and all(im.getpixel((right, yy)) == bg for yy in range(y0, y1)): right -= 1
+        right = min(W, right + 7)
+        if right <= W // 2 + 40:
+            pieces.append(im.crop((0, y0, right, y1))); continue
+        mid, split = right // 2, None
+        for d in range(right // 3):
+            for x in (mid - d, mid + d):
+                if 0 < x < right - 1 and uniform_col(x, y0, y1) and uniform_col(x + 1, y0, y1):
+                    split = x; break
+            if split: break
+        split = split or mid
+        pieces += [im.crop((0, y0, split, y1)), im.crop((split, y0, right, y1))]
+    out = PI.new("RGB", (max(p.width for p in pieces) + 8, sum(p.height + 4 for p in pieces) + 8), bg)
+    y = 4
+    for p in pieces:
+        out.paste(p, (4, y)); y += p.height + 4
+    out.save(os.path.join(HERE, "screens", name + "_stacked.png"))
+
+
+for _tb in ("designer_toolbar1", "designer_palette", "designer_toolbar2"):
+    stack_toolbar(_tb)
+
+
+def shot(name, width_in=6.9, caption=None):
+    """A screenshot taken on the Pi (screens/), framed, with an optional caption."""
+    p = os.path.join(HERE, "screens", name)
+    from PIL import Image as PI
+    w, h = PI.open(p).size
+    im = Image(p, width=width_in * inch, height=width_in * inch * h / w)
+    rows = [[im]] + ([[Paragraph(caption, ParagraphStyle("cap", parent=small, textColor=GREY, alignment=TA_CENTER))]] if caption else [])
+    t = Table(rows, colWidths=[width_in * inch + 8])
+    t.setStyle(TableStyle([("BOX", (0, 0), (0, 0), 0.6, GREY), ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                           ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                           ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+    return KeepTogether([t, Spacer(1, 8)])
 
 
 def label_img(name, width_in):
@@ -193,6 +253,7 @@ story.append(table([
 # ---------------------------------------------------------------- 3
 story.append(PageBreak())
 story.append(P("3. Screen 1 — Start", h1))
+story.append(shot("screen1_start.png", 6.9, "Screen 1 — choose items or a saved template"))
 story.append(P("Select ViewTouch data (top row)", h2))
 story.append(P("Each big button chooses which items you will work with and moves you on immediately."))
 story.append(table([
@@ -217,7 +278,9 @@ story.append(table([
 ], [1.7, 5.2]))
 
 # ---------------------------------------------------------------- 4
+story.append(PageBreak())
 story.append(P("4. Screen 2 — Categories (Tree View)", h1))
+story.append(shot("screen2_categories.png", 6.2, "Screen 2 — groups, categories and brands"))
 story.append(B("<b>Left list — ViewTouch Department Groups:</b> tap a category to show only that category in the tree. "
                "<b>ALL VIEWTOUCH CATEGORIES</b> shows everything."))
 story.append(B("<b>Right — Category &amp; Brand Hierarchy:</b> groups (Cigars, Retail…) contain categories, which contain brands "
@@ -229,6 +292,7 @@ story.append(B("Tap a group, category or brand and press <b>Next &gt;&gt;</b> �
 story.append(PageBreak())
 story.append(P("5. Screen 3 — Items", h1))
 story.append(P("This screen lists the items. Tick the ones you want labels for."))
+story.append(shot("screen3_items.png", 6.9, "Screen 3 — two items ticked; the highlighted row will print its primary UPC"))
 story.append(P("Selecting items", h2))
 story.append(B("<b>Tap a row</b> to tick it (the empty box in Selected gets a tick). Tap again to untick. Ticking a row also sets its <b>Print Qty</b> to the "
                "number in <b>Print Qty for Selected</b>."))
@@ -237,14 +301,13 @@ story.append(B("<b>Quick Search</b> filters the list as you type. It matches des
                "item's UPCs — so you can scan or type an alternate UPC to find an item."))
 story.append(B("<b>Print Qty for Selected</b> (right) sets the quantity on every ticked item."))
 story.append(B("Press <b>Next &gt;&gt;</b> to go to the preview with the ticked items. If nothing is ticked, the first item is used."))
-story.append(P("Columns", h2))
-story.append(table([
+story.append(KeepTogether([P("Columns", h2), table([
     ["Column", "Meaning"],
     ["Selected / Print Qty", "Whether the item is ticked and its quantity."],
     ["UPC on Label", "The code that will be printed. If it is not the primary UPC, it is tagged, e.g. <i>04252614 [Alt UPC 1]</i>."],
     ["Other UPCs", "The item's other codes you could print instead."],
     ["Description, Price, Category, Item #, Group, Family, Brand / Mfg", "Item details from ViewTouch."],
-], [2.2, 4.7]))
+], [2.2, 4.7])]))
 story.append(P("Choosing which UPC goes on the label", h2))
 story.append(P("Many items have more than one code in ViewTouch — a primary UPC, alternate UPCs, and for packs the carton UPC. "
                "You can print any of them. <b>This only affects the label; it never changes the item in ViewTouch.</b>"))
@@ -261,6 +324,7 @@ story.append(box("Note:", "The chosen code is used for both the barcode and the 
 story.append(PageBreak())
 story.append(P("6. Screen 4 — Preview &amp; Print", h1))
 story.append(P("The large area shows the label exactly as it will print, for one item at a time."))
+story.append(shot("screen4_preview.png", 6.9, "Screen 4 — toolbar (wraps onto a second row on the Pi's screen) and the label preview"))
 story.append(table([
     ["Control", "What it does"],
     ["Template", "Chooses which label design to use. The preview updates immediately."],
@@ -270,7 +334,7 @@ story.append(table([
     ["Edit Report", "Opens the label designer for the current template (section 8)."],
     ["Create Report", "Makes a new template as a copy of the current one (section 8.6)."],
     ["Printer Offset", "Printer position, darkness, resolution and calibration for this template (section 7.3)."],
-    ["Target badge (right)", "Shows which printer and label size this template uses."],
+    ["Printer badge", "Shows which printer and label size this template uses."],
     ["Double-click the preview", "Switches between the sharp preview and the exact printer-dot view. The caption under the label says which one you are seeing."],
 ], [1.9, 5.0]))
 
@@ -287,6 +351,7 @@ for i, t in enumerate([
 ], 1):
     story.append(N(i, t))
 story.append(P("7.2 The print window", h2))
+story.append(shot("print_window.png", 4.6, "The print window"))
 story.append(table([
     ["Control", "What it does"],
     ["How many labels?", "Number of labels printed <b>for each selected item</b>. Use - and +, type a number, or tap a Quick Qty button (1, 5, 10, 20, 25, 50). "
@@ -312,6 +377,7 @@ story.append(box("Changing a printer's IP:", "Change it in ViewTouch's printer s
 story.append(P("7.3 Printer Offset (printer settings)", h2))
 story.append(P("Open with <b>Printer Offset</b> on screen 4 or <b>Adjust Higher / Lower</b> in the print window. "
                "Settings are saved <b>per template</b>."))
+story.append(shot("printer_settings.png", 5.2, "Printer Offset — printer position, darkness, resolution and calibration"))
 story.append(table([
     ["Setting", "What it does"],
     ["Vertical Position", "<b>Print Higher (-8)</b> / <b>Print Lower (+8)</b> move everything up or down by 8 dots (about 1 mm). -2 / +2 make finer moves. "
@@ -332,6 +398,7 @@ story.append(PageBreak())
 story.append(P("8. Editing labels (the label designer)", h1))
 story.append(P("Press <b>Edit Report</b> on screen 4. The designer opens the current template, filled in with the item being "
                "previewed, so you can see real data while you work."))
+story.append(shot("designer_full.png", 6.9, "The label designer — three toolbars above the label; the description is selected (blue box and handles)"))
 story.append(P("8.1 Moving and sizing pieces with the mouse or touch", h2))
 story.append(B("<b>Click</b> a piece (description, price, barcode…) to select it. A blue dashed box with 8 handles appears."))
 story.append(B("<b>Drag</b> the piece to move it. <b>Drag a handle</b> to change its box size."))
@@ -339,6 +406,7 @@ story.append(B("<b>Ctrl-click</b> or <b>Shift-click</b> to select several pieces
 story.append(B("<b>Double-click</b> a piece for its Properties window (field, text, exact position, rotation)."))
 story.append(B("<b>Right-click</b> for a menu: Add Field, Bring to Front, Send to Back, Position / Properties, Duplicate, Rotate 90°, Delete Component."))
 story.append(P("8.2 Top toolbar", h2))
+story.append(shot("designer_toolbar1_stacked.png", 5.6, "Top toolbar (shown in two parts)"))
 story.append(table([
     ["Control", "What it does"],
     ["Save", "Saves the template and closes the designer."],
@@ -352,6 +420,7 @@ story.append(table([
 ], [1.7, 5.2]))
 story.append(P("8.3 Palette — adding new pieces", h2))
 story.append(P("Tap a palette button, then tap on the label where the new piece should go. Press <b>Esc</b> to cancel."))
+story.append(shot("designer_palette_stacked.png", 5.6, "Palette (shown row by row)"))
 story.append(table([
     ["Palette button", "Adds"],
     ["Label", "Fixed text you type (e.g. SALE)."],
@@ -361,7 +430,7 @@ story.append(table([
     ["DBCalc", "Pack calculation, e.g. PK:10 ($1.20/EA)."],
     ["Code 128 / UPC-A", "A barcode of the item's UPC (the one chosen on screen 3 or 4)."],
 ], [2.6, 4.3]))
-story.append(KeepTogether([P("8.4 Second toolbar", h2), table([
+story.append(KeepTogether([P("8.4 Second toolbar", h2), shot("designer_toolbar2_stacked.png", 5.4, "Second toolbar (shown row by row)"), table([
     ["Control", "What it does"],
     ["Box W / H", "Exact width and height of the selected piece, in inches."],
     ["AutoFont", "On: text shrinks or grows to fill its box. Off: uses the exact font size you set (the ILSA labels use exact sizes)."],
@@ -382,8 +451,7 @@ story.append(table([
     ["Ctrl+A", "Select all pieces", "Delete", "Delete selected"],
     ["Esc", "Cancel palette tool", "", ""],
 ], [1.4, 2.05, 1.4, 2.05]))
-story.append(P("8.5 Field list", h2))
-story.append(table([
+story.append(KeepTogether([P("8.5 Field list", h2), table([
     ["Field", "Prints"],
     ["Label (Static Text)", "The text you type."],
     ["Variable", "Text asked for when printing (default RECEIVED)."],
@@ -393,7 +461,7 @@ story.append(table([
     ["DBCalc", "Pack quantity and per-unit price."],
     ["Code 128 / UPC-A / UPC-E / Code 39", "A barcode. UPC fields automatically use the right type for the code chosen (UPC-A, UPC-E, EAN-13), "
      "and the check digit is always calculated correctly."],
-], [2.9, 4.0]))
+], [2.9, 4.0])]))
 story.append(box("ILSA labels:", "Labels imported from ILSA keep ILSA's bar width, the digits printed under the bars, and their exact "
                  "text placement. These settings are carried over automatically and are not shown in the designer."))
 story.append(P("8.6 Creating a new label (Create Report)", h2))
