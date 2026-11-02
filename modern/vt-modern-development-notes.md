@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:44 ET — Bob (Claude) — Gift card number generator for the card printer
+- **What:** New modern/tools/gift_card_generate.py --type gift|subscription --count N --out file.csv: 12-digit numbers like the existing cards (digit 1: 6 = gift, 9 = subscription; digits 2-11 random; digit 12 Luhn check, the rule all 1,100 existing cards follow), a random 4-digit PIN each, never repeating a number in viewtouch.db (read-only) or any earlier batch (registry ~/.local/share/ViewTouch/gift_card_batches.csv, no PINs). CSV columns: card_number, card_number_printed, pin, barcode, magstripe_track2, card_type, batch; file mode 600.
+- **Why:** Owner wants new card numbers for the gift card printer: 6 for new gift cards, 9 for HCA subscription (metal membership) cards; the report showed existing cards are 12 digits with a Luhn check digit and random-looking serials.
+- **Files:** `modern/tools/gift_card_generate.py`
+- **Next person must know:** Batch CSVs contain spendable numbers + PINs: Drive or the printer only, never Git. Next: store location code on each sale/reload, manager transfer/replace, subscription member discount (ViewTouch C++).
+
 ### 2026-11-02 13:19 ET — Bob (Claude) — Restore Bob's work erased again by the 13:15 force-push
 - **What:** Re-applied 505e4f0, 80493ec, c4f7dcc and c0983f3 on top of Neil's 2b49e0b: Label Utility v1.1, the manual corrections, the AGENTS.md no-force-push rule and gift_card_number_report.py, with their notes entries (below). Neil's 13:15 commits look like a replay of his 12:14 apply script (same text, new times): it reset main and claude-label-utility on GitHub and on the Pi again.
 - **Why:** The owner ran the report and the file was gone; the force-push had also put the label utility back to v1.0 on the Pi.
