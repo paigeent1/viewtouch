@@ -1808,6 +1808,12 @@ Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring
 void LayoutController::runCommand(const QString &name, const QVariantMap &args, Done done)
 {
     if (name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s) || name == u"openLabelUtility"_s || name.startsWith(u"openLabelUtility:"_s)) {
+        // A tablet or another screen without the label utility: the Labels screen, which has the main
+        // computer print them.
+        if (!QFile::exists(u"/usr/local/bin/vt-label-utility"_s)) {
+            navigate(Navigator::Mode::Push, u"labels"_s);
+            return done(true);
+        }
         QStringList procArgs;
         QString upc;
         for (const QString &prefix : {u"openLabelUtility:"_s, u"openLabelUtility:"_s}) {

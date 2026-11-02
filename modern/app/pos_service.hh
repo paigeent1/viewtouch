@@ -485,6 +485,11 @@ public:
     QVariantMap prepLabels() const override;
     // {ingredient | name, hours (use by; 0: none), count, note}.
     bool printPrepLabels(const QVariantMap &labels);
+    QVariantMap retailLabels() const override;
+    // Items for the Labels screen: by name or any of their UPCs.
+    bool findRetailLabels(const QString &query);
+    // Hands the job to the label utility on this (the main) computer, which prints it.
+    bool printRetailLabels(const QVariantMap &job);
     std::string labelPrinterId() const;
     const std::vector<core::Waste> &wasteEntries() const { return s_->waste; }
     const std::vector<core::StockCount> &stockCounts() const { return s_->stockCounts; }
@@ -1189,6 +1194,7 @@ private:
     QString customerQuery_;
     std::string selectedCustomer_;
     QString giftCardNumber_;
+    QString labelQuery_;
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;

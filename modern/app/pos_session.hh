@@ -156,6 +156,9 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap storeCheck READ storeCheck NOTIFY dayChanged)
     // Prep labels: {ingredients, printer}.
     Q_PROPERTY(QVariantMap prepLabels READ prepLabels NOTIFY adminChanged)
+    // Shelf / price / cigar labels from any screen, printed by the label utility on the main computer:
+    // {templates: [{name, size, product}], query, matches: [{id, name, price, upcs: [{label, code}]}]}.
+    Q_PROPERTY(QVariantMap retailLabels READ retailLabels NOTIFY sessionChanged)
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
     Q_PROPERTY(QVariantMap checkSearch READ checkSearch NOTIFY sessionChanged)
@@ -360,6 +363,7 @@ public:
     virtual QVariantMap wasteLog() const = 0;
     virtual QVariantMap storeCheck() const = 0;
     virtual QVariantMap prepLabels() const = 0;
+    virtual QVariantMap retailLabels() const = 0;
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
     virtual QVariantList printerAlerts() const = 0;
@@ -558,6 +562,9 @@ public:
     Q_INVOKABLE void problemsSeen() { invoke(QStringLiteral("problemsSeen")); }
     // {ingredient | name, hours, count, note}.
     Q_INVOKABLE void printPrepLabels(const QVariantMap &labels) { invoke(QStringLiteral("printPrepLabels"), {labels}); }
+    Q_INVOKABLE void findRetailLabels(const QString &query) { invoke(QStringLiteral("findRetailLabels"), {query}); }
+    // {template, items: [{upc, qty}]} (no items: qty of a label without product fields).
+    Q_INVOKABLE void printRetailLabels(const QVariantMap &job) { invoke(QStringLiteral("printRetailLabels"), {job}); }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

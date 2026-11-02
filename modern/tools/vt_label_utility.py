@@ -1151,6 +1151,124 @@ def label_preview_photo(tpl, item, max_w, max_h, printer_dots=False):
     return tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode("ascii")), nw, nh
 
 
+def send_label_job(tpl_name, tpl, items, copies, chosen):
+    """Render items with tpl and send copies of each to the printer `chosen` (as listed by discover_all_printers).
+
+    Returns (ok, message, pdf_to_open): pdf_to_open is set for the "PDF" choice (the caller shows it).
+    Used by the print window and by headless printing for ViewTouch's Labels screen (--print-job).
+    """
+    w_in = float(tpl.get("width_in", 2.0))
+    h_in = float(tpl.get("height_in", 1.0))
+    norm_items = [dict(it, qty=1) for it in items]
+    total_lbls = len(norm_items) * copies
+    txt_out, esc_bytes = build_escpos_and_txt_from_template(tpl_name, tpl, norm_items, copies=copies)
+    zpl_out = build_zpl_from_template(tpl_name, tpl, norm_items, copies=copies)
+
+    open("/tmp/vt_label_job.txt", "w", encoding="utf-8").write(txt_out)
+    open("/tmp/last_label.zpl", "w", encoding="utf-8").write(zpl_out)
+    out_pdf = "/tmp/VT_Labels.pdf"
+    export_pdf_from_bitmaps(norm_items, tpl, out_pdf, copies=copies)
+
+    if "PDF" in chosen:
+        return True, f"PDF of {total_lbls} label(s): {out_pdf}", out_pdf
+
+    if chosen.startswith("VT File:"):
+        m_f = re.search(r"\(([^)]+)\)", chosen)
+        f_target = m_f.group(1) if m_f else "/tmp/vt_label_job.txt"
+        if not os.path.isabs(f_target):
+            f_target = os.path.join(SANDBOX_DIR, "ViewTouch", f_target)
+        open(f_target, "w", encoding="utf-8").write(txt_out)
+        return True, f"✓ Wrote {total_lbls} label(s) to {f_target}!", None
+
+    ip_m = re.search(r"\((\d+\.\d+\.\d+\.\d+)(?::(\d+))?\)", chosen)
+    if ip_m:
+        ip = ip_m.group(1)
+        port = int(ip_m.group(2) or 9100)
+        import socket
+        is_zpl = printer_speaks_zpl(chosen, tpl)
+        payload = zpl_out.encode("utf-8") if is_zpl else esc_bytes
+        with socket.create_connection((ip, port), timeout=4.0) as s:
+            s.sendall(payload)
+        return True, f"✓ Sent {total_lbls} label(s) ({w_in}x{h_in} in) to {ip}:{port}!", None
+
+    if chosen.startswith("VT CUPS:"):
+        m_q = re.search(r"\(([^)]+)\)", chosen)
+        q_name = m_q.group(1).strip() if m_q else chosen.split()[-1]
+    else:
+        q_name = chosen.replace("CUPS: ", "").split(" (")[0].strip()
+
+    v_out = subprocess.run(["lpstat", "-v", q_name], capture_output=True, text=True, timeout=2.0).stdout.lower()
+    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77", "socket://", "zpl"))
+    if is_thermal_q:
+        is_zpl_q = printer_speaks_zpl(q_name, tpl, v_out)
+        raw_file = "/tmp/last_label.zpl" if is_zpl_q else "/tmp/vt_label_job.escpos"
+        if not is_zpl_q:
+            open(raw_file, "wb").write(esc_bytes)
+        proc = subprocess.run(["lp", "-d", q_name, "-o", "raw", raw_file], capture_output=True, text=True, timeout=6.0)
+    else:
+        media_opt = f"Custom.{w_in}x{h_in}in"
+        proc = subprocess.run(["lp", "-d", q_name, "-o", f"media={media_opt}", "-o", "fit-to-page", out_pdf], capture_output=True, text=True, timeout=6.0)
+        if proc.returncode != 0:
+            proc = subprocess.run(["lp", "-d", q_name, "-o", "raw", "/tmp/vt_label_job.txt"], capture_output=True, text=True, timeout=6.0)
+
+    if proc.returncode == 0:
+        job_info = (proc.stdout or "").strip() or f"Queued on {q_name}"
+        return True, f"✓ Sent {total_lbls} label(s) ({w_in}x{h_in} in) to {q_name}!\n({job_info})", None
+    err_txt = (proc.stderr or proc.stdout or f"Exit code {proc.returncode}").strip()
+    return False, f"CUPS could not print to {q_name}:\n{err_txt}", None
+
+
+def find_item_by_code(all_items, code):
+    """The item one of whose UPCs (primary, alt or carton) is code, and that code as printed; else (None, None)."""
+    want = "".join(ch for ch in str(code) if ch.isalnum())
+    key = lambda c: c.lstrip("0") if c.isdigit() else c
+    for it in all_items:
+        for lbl, c in it.get("upc_choices", []) or [("Primary UPC", it.get("upc", ""))]:
+            if key(c) == key(want) or key(c) == key(normalize_upc(want)):
+                return it, (lbl, c)
+    return None, None
+
+
+def run_print_job(path):
+    """Headless printing for ViewTouch's Labels screen (tablets): the job file says which template and,
+    per item, which of its UPCs and how many: {"template": "...", "items": [{"upc": "...", "qty": 3}, ...]}.
+    A template without product fields (e.g. RECEIVING LABEL) may have no items: {"template": ..., "qty": 5}.
+    Prints with the template's own printer, exactly as the print window does. Result in the log."""
+    with open(path, "r", encoding="utf-8") as f:
+        job = json.load(f)
+    templates = load_templates()
+    name = str(job.get("template", ""))
+    if name not in templates:
+        logging.error("Labels screen: template %r not found", name)
+        return 2
+    tpl = templates[name]
+    chosen = resolve_template_printer(tpl.get("default_printer", ""), discover_all_printers())
+    all_items = load_from_viewtouch_db()
+    wanted = job.get("items") or []
+    failures = 0
+    if not wanted:
+        sample = dict(all_items[0]) if all_items else {"name": "", "upc": "", "price": 0.0}
+        wanted = [{"item": sample, "qty": job.get("qty", 1)}]
+    for w in wanted:
+        it = w.get("item")
+        if it is None:
+            found, choice = find_item_by_code(all_items, w.get("upc", ""))
+            if not found:
+                logging.error("Labels screen: UPC %s is not in viewtouch.db", w.get("upc"))
+                failures += 1
+                continue
+            it = dict(found)
+            set_item_upc(it, choice[1], choice[0])
+        copies = max(1, min(500, int(w.get("qty", 1) or 1)))
+        try:
+            ok, msg, _pdf = send_label_job(name, tpl, [it], copies, chosen)
+        except Exception as e:
+            ok, msg = False, f"Print failed: {e}"
+        (logging.info if ok else logging.error)("Labels screen: %s x%d (%s): %s", it.get("name", ""), copies, name, msg)
+        failures += 0 if ok else 1
+    return 1 if failures else 0
+
+
 def pil_1bit_to_zpl_gfa(img_1bit):
     """Converts a 1-bit PIL image (0=black, 1=white) into a ZPL ^GFA command."""
     from PIL import ImageOps
@@ -3421,68 +3539,14 @@ class VTLabelUtility(tk.Tk):
             import threading
             def worker():
                 try:
-                    norm_items = [dict(it, qty=1) for it in items]
-                    total_lbls = len(norm_items) * copies
-                    txt_out, esc_bytes = build_escpos_and_txt_from_template(tpl_name, tpl, norm_items, copies=copies)
-                    zpl_out = build_zpl_from_template(tpl_name, tpl, norm_items, copies=copies)
-
-                    open("/tmp/vt_label_job.txt", "w", encoding="utf-8").write(txt_out)
-                    open("/tmp/last_label.zpl", "w", encoding="utf-8").write(zpl_out)
-                    out_pdf = "/tmp/VT_Labels.pdf"
-                    export_pdf_from_bitmaps(norm_items, tpl, out_pdf, copies=copies)
-
-                    if "PDF" in chosen:
-                        subprocess.Popen(["xdg-open", out_pdf])
+                    ok, msg, pdf = send_label_job(tpl_name, tpl, items, copies, chosen)
+                    if pdf:
+                        subprocess.Popen(["xdg-open", pdf])
                         self.after(0, qdlg.destroy)
-                        return
-
-                    if chosen.startswith("VT File:"):
-                        m_f = re.search(r"\(([^)]+)\)", chosen)
-                        f_target = m_f.group(1) if m_f else "/tmp/vt_label_job.txt"
-                        if not os.path.isabs(f_target):
-                            f_target = os.path.join(SANDBOX_DIR, "ViewTouch", f_target)
-                        open(f_target, "w", encoding="utf-8").write(txt_out)
-                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printed", f"✓ Wrote {total_lbls} label(s) to {f_target}!")))
-                        return
-
-                    ip_m = re.search(r"\((\d+\.\d+\.\d+\.\d+)(?::(\d+))?\)", chosen)
-                    if ip_m:
-                        ip = ip_m.group(1)
-                        port = int(ip_m.group(2) or 9100)
-                        import socket
-                        is_zpl = printer_speaks_zpl(chosen, tpl)
-                        payload = zpl_out.encode("utf-8") if is_zpl else esc_bytes
-                        with socket.create_connection((ip, port), timeout=4.0) as s:
-                            s.sendall(payload)
-                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printed", f"✓ Sent {total_lbls} label(s) ({w_in}x{h_in} in) to {ip}:{port}!")))
-                        return
-
-                    if chosen.startswith("VT CUPS:"):
-                        m_q = re.search(r"\(([^)]+)\)", chosen)
-                        q_name = m_q.group(1).strip() if m_q else chosen.split()[-1]
+                    elif ok:
+                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printed", msg)))
                     else:
-                        q_name = chosen.replace("CUPS: ", "").split(" (")[0].strip()
-
-                    v_out = subprocess.run(["lpstat", "-v", q_name], capture_output=True, text=True, timeout=2.0).stdout.lower()
-                    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77", "socket://", "zpl"))
-                    if is_thermal_q:
-                        is_zpl_q = printer_speaks_zpl(q_name, tpl, v_out)
-                        raw_file = "/tmp/last_label.zpl" if is_zpl_q else "/tmp/vt_label_job.escpos"
-                        if not is_zpl_q:
-                            open(raw_file, "wb").write(esc_bytes)
-                        proc = subprocess.run(["lp", "-d", q_name, "-o", "raw", raw_file], capture_output=True, text=True, timeout=6.0)
-                    else:
-                        media_opt = f"Custom.{w_in}x{h_in}in"
-                        proc = subprocess.run(["lp", "-d", q_name, "-o", f"media={media_opt}", "-o", "fit-to-page", out_pdf], capture_output=True, text=True, timeout=6.0)
-                        if proc.returncode != 0:
-                            proc = subprocess.run(["lp", "-d", q_name, "-o", "raw", "/tmp/vt_label_job.txt"], capture_output=True, text=True, timeout=6.0)
-
-                    if proc.returncode == 0:
-                        job_info = (proc.stdout or "").strip() or f"Queued on {q_name}"
-                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printed", f"✓ Sent {total_lbls} label(s) ({w_in}x{h_in} in) to {q_name}!\n({job_info})")))
-                    else:
-                        err_txt = (proc.stderr or proc.stdout or f"Exit code {proc.returncode}").strip()
-                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printer Error", f"CUPS could not print to {q_name}:\n{err_txt}", True)))
+                        self.after(0, lambda: (qdlg.destroy(), show_print_result("Printer Error", msg, True)))
                 except Exception as e:
                     self.after(0, lambda err=str(e): (qdlg.destroy(), show_print_result("Printer Error", f"Print failed: {err}", True)))
 
@@ -3536,7 +3600,10 @@ if __name__ == "__main__":
     import argparse
     _ap = argparse.ArgumentParser(description="ViewTouch Label Utility")
     _ap.add_argument("--upc", default="", help="open straight to the label preview for this UPC")
+    _ap.add_argument("--print-job", default="", help="print a job file from ViewTouch's Labels screen, with no window")
     _args, _unknown = _ap.parse_known_args()
+    if _args.print_job:
+        sys.exit(run_print_job(_args.print_job))
     START_UPC = _args.upc.strip()
     app = VTLabelUtility()
     app.mainloop()

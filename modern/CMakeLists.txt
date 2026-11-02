@@ -188,6 +188,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetWasteLog.qml
             ui/qml/WidgetStoreCheck.qml
             ui/qml/WidgetPrepLabels.qml
+            ui/qml/WidgetRetailLabels.qml
             ui/qml/WidgetCheckSearch.qml
             ui/qml/WidgetOrderLater.qml
             ui/qml/WidgetMenuGrid.qml

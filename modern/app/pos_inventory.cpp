@@ -13,6 +13,12 @@
 #include <map>
 
 #include <QSet>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QProcess>
 #include <QDateTime>
 
 using namespace Qt::StringLiterals;
@@ -616,6 +622,145 @@ bool PosService::printPrepLabels(const QVariantMap &r)
     std::vector<std::pair<std::string, std::vector<std::string>>> labels(std::size_t(count), {ss(name), lines});
     s_->printer->printLabels(s_->settings, labels, printer);
     emit notice(tr("Printing %n label(s): %1", "", count).arg(name));
+    return true;
+}
+
+// --- retail labels (the label utility, from any screen) ----------------------------------
+
+namespace {
+
+const QString kLabelLauncher = u"/usr/local/bin/vt-label-utility"_s;
+
+// The label utility's templates on this computer (the same file it uses).
+QJsonObject labelTemplates()
+{
+    const QString dir = QDir::homePath() + u"/.local/share/ViewTouch/"_s;
+    for (const QString &name : {u"label_templates.json"_s, u"claude_label_templates.json"_s}) {
+        QFile f(dir + name);
+        if (f.open(QIODevice::ReadOnly)) {
+            const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+            if (!o.isEmpty())
+                return o;
+        }
+    }
+    return {};
+}
+
+QString digitsOnly(const QString &s)
+{
+    QString out;
+    for (QChar ch : s)
+        if (ch.isDigit())
+            out += ch;
+    return out;
+}
+
+QString noLeadingZeros(const QString &s)
+{
+    qsizetype i = 0;
+    while (i < s.size() - 1 && s.at(i) == u'0')
+        ++i;
+    return s.mid(i);
+}
+
+} // namespace
+
+QVariantMap PosService::retailLabels() const
+{
+    static const QStringList productFields{u"name"_s, u"upc"_s, u"barcode_img"_s, u"barcode_upca"_s, u"barcode_upce"_s,
+                                           u"barcode_code39"_s, u"price_fmt"_s, u"manufacturer"_s};
+    QVariantList templates;
+    const QJsonObject all = labelTemplates();
+    for (auto it = all.begin(); it != all.end(); ++it) {
+        const QJsonObject t = it.value().toObject();
+        bool product = false;
+        for (const QJsonValue &e : t.value(u"elements").toArray())
+            product = product || productFields.contains(e.toObject().value(u"field").toString());
+        templates.append(QVariantMap{{u"name"_s, it.key()},
+                                     {u"size"_s, tr("%1 x %2 in").arg(t.value(u"width_in").toDouble(2.0)).arg(t.value(u"height_in").toDouble(1.0))},
+                                     {u"product"_s, product}});
+    }
+    QVariantList matches;
+    const QString q = labelQuery_.trimmed();
+    if (!q.isEmpty()) {
+        const QString code = digitsOnly(q);
+        const bool byCode = code.size() >= 4 && code.size() == q.size();
+        const QStringList words = q.toLower().split(u' ', Qt::SkipEmptyParts);
+        for (const MenuItem &m : s_->menu) {
+            QVariantList upcs;
+            bool hit = false;
+            for (const std::string &b : m.barcodes) {
+                const QString c = digitsOnly(qs(b));
+                if (c.isEmpty())
+                    continue;
+                upcs.append(QVariantMap{{u"label"_s, upcs.isEmpty() ? tr("Primary UPC") : tr("Alt UPC %1").arg(upcs.size())}, {u"code"_s, c}});
+                hit = hit || (byCode && noLeadingZeros(c) == noLeadingZeros(code));
+            }
+            for (const RecipeLine &r : m.recipe) {
+                if (r.ingredientId.starts_with("__parent__:")) {
+                    const QString c = digitsOnly(qs(r.ingredientId.substr(11)));
+                    if (!c.isEmpty()) {
+                        upcs.append(QVariantMap{{u"label"_s, tr("Carton UPC")}, {u"code"_s, c}});
+                        hit = hit || (byCode && noLeadingZeros(c) == noLeadingZeros(code));
+                    }
+                }
+            }
+            if (!byCode) {
+                const QString name = qs(m.name).toLower();
+                hit = !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return name.contains(w); });
+            }
+            if (!hit || upcs.isEmpty())
+                continue;
+            matches.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"price"_s, format(m.price)}, {u"upcs"_s, upcs}});
+            if (matches.size() >= 40)
+                break;
+        }
+    }
+    return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
+            {u"ready"_s, QFile::exists(kLabelLauncher)}};
+}
+
+bool PosService::findRetailLabels(const QString &query)
+{
+    labelQuery_ = query.trimmed();
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::printRetailLabels(const QVariantMap &job)
+{
+    if (user() && !require(perm::Order, tr("Printing labels")))
+        return false;
+    const QString tpl = job.value(u"template"_s).toString();
+    if (tpl.isEmpty() || !labelTemplates().contains(tpl))
+        return fail(tr("Choose a label."));
+    if (!QFile::exists(kLabelLauncher))
+        return fail(tr("The label utility isn't installed on the main computer."));
+    QJsonArray items;
+    int total = 0;
+    for (const QVariant &v : job.value(u"items"_s).toList()) {
+        const QVariantMap i = v.toMap();
+        const QString upc = digitsOnly(i.value(u"upc"_s).toString());
+        const int qty = std::clamp(i.value(u"qty"_s, 1).toInt(), 1, 500);
+        if (upc.isEmpty())
+            continue;
+        items.append(QJsonObject{{u"upc"_s, upc}, {u"qty"_s, qty}});
+        total += qty;
+    }
+    const int alone = std::clamp(job.value(u"qty"_s, 1).toInt(), 1, 500);
+    if (items.isEmpty())
+        total = alone;
+    if (total > 1000)
+        return fail(tr("Print up to 1,000 labels at a time."));
+    const QString path = QDir::tempPath() + u"/vt_label_job_"_s + QString::number(now()) + u".json"_s;
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return fail(tr("Couldn't hand the labels to the label utility."));
+    f.write(QJsonDocument(QJsonObject{{u"template"_s, tpl}, {u"items"_s, items}, {u"qty"_s, alone}}).toJson());
+    f.close();
+    if (!QProcess::startDetached(kLabelLauncher, {u"--print-job"_s, path}))
+        return fail(tr("Couldn't start the label utility."));
+    emit notice(tr("Printing %n label(s): %1", "", total).arg(tpl));
     return true;
 }
 

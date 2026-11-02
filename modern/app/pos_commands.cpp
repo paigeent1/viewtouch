@@ -51,6 +51,8 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"reprintCheck"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.reprintCheck(a.value(0).toLongLong())); }},
         {u"receiveDelivery"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.receiveDelivery(a.value(0).toMap())); }},
         {u"printPrepLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printPrepLabels(a.value(0).toMap())); }},
+        {u"findRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findRetailLabels(a.value(0).toString())); }},
+        {u"printRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printRetailLabels(a.value(0).toMap())); }},
         {u"problemsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.problemsSeen()); }},
         {u"logWaste"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.logWaste(a.value(0).toMap())); }},
         {u"saveStockCount"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveStockCount(a.value(0).toMap())); }},

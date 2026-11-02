@@ -172,6 +172,7 @@ public:
     QVariantMap wasteLog() const override { return v(u"wasteLog").toMap(); }
     QVariantMap storeCheck() const override { return v(u"storeCheck").toMap(); }
     QVariantMap prepLabels() const override { return v(u"prepLabels").toMap(); }
+    QVariantMap retailLabels() const override { return v(u"retailLabels").toMap(); }
     QVariantMap checkSearch() const override { return v(u"checkSearch").toMap(); }
     // Where pictures from the server are kept on this device (tests set it).
     void setImageCache(const QString &dir) { imageCache_ = dir; }
