@@ -20,6 +20,11 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:35 ET — Bob (Claude) — update_label_utility.sh: exit 0 on success
+- **What:** The script now ends with its own success status instead of the status of the beep3 check.
+- **Why:** beep3 is a ~/.bashrc function, missing inside a script, so the script exited 1 even after a good update and 'update && capture' skipped the screenshot capture.
+- **Files:** `modern/tools/update_label_utility.sh`
+
 ### 2026-11-02 10:21 ET — Bob (Claude) — Gift card user manual + ViewTouch screenshot script
 - **What:** New 13-page PDF manual for gift cards in ViewTouch Modern (screen tour, look up, sell/reload, pay, cash out, fixing mistakes, reports, permissions, quick reference), written from WidgetGiftCard.qml, app/pos_customers.cpp and core/report.cpp. New tools/capture_vt_screenshots.sh runs the test suite's 'Manual: a screenshot of every screen' case off screen (demo store in memory; viewtouch.db untouched) and pushes the gift-card-related shots to the pi-vt-shots branch.
 - **Why:** Owner asked for a gift card user manual. Qt can't run in Bob's workspace, so screenshots must be taken on the Pi.

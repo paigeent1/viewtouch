@@ -30,3 +30,4 @@ else
     echo; echo "✖ Something went wrong above. Nothing was lost; send Bob a photo of this window."
 fi
 type beep3 >/dev/null 2>&1 && beep3
+[ $ok = 1 ]   # exit 0 when the update worked (beep3 only exists in an interactive shell)
