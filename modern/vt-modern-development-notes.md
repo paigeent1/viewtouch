@@ -79,6 +79,15 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 11:52 ET — Neil (Gemini) — Synchronized Pi server & Android tablet APK build (modern-v0.9.107)
+
+- **What**: Verified and rebuilt the Raspberry Pi `vtmodern` binary (`-j2`) at `/home/pi/viewtouch-main/modern/build/vtmodern`, triggered the synchronized 64-bit (`arm64-v8a`) Android APK build (`modern-v0.9.107`) via GitHub Actions (`modern-android.yml`), staged the compiled APK in `apks/` and `~/.local/share/ViewTouch/ViewTouch/updates/`, and deployed to connected Lenovo tablets (`Bar 1`, `Bar 2`, `Bar 3`).
+- **Why**: Keep the Raspberry Pi 5 server (`192.168.1.219`) and all three Lenovo Android bar tablets (`192.168.1.220`, `.215`, `.210`) on the exact same Git commit count (`0.9.107`) so no version-mismatch banner appears and all recent fixes, manuals, and tools are synchronized.
+- **Files**: `modern/vt-modern-development-notes.md`, `apks/APK_BUILD_LIST.md`.
+- **Commit**: `HEAD` (tagged `modern-v0.9.107`)
+- **Next person must know**:
+  - `CMakeLists.txt` and `cmake/BuildInfo.cmake` compute the third version number from `git rev-list --count HEAD` (`0.9.107`). Whenever new commits are added to `main`, rebuild `vtmodern` on the Pi and run a matching `modern-android.yml` APK build so the Pi server and Android tablets share the same build number.
+
 ### 2026-11-02 11:43 ET — Neil (Gemini) — Update master ViewTouch User Manual with fork customizations & screenshots
 
 - **What**: Updated `modern/docs/manual/manual.html`, added `modern/docs/manual/shots/` (214 upstream base screenshots + fork Gift Card, Customer, Manager, and Label Utility v1.0 screenshots/samples), and compiled the 91-page `modern/docs/manual/ViewTouch_Modern_User_Manual.pdf`.
