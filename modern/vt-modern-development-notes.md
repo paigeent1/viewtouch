@@ -66,6 +66,15 @@ commits by `tools/changelog.py` — don't hand-edit that one.
   * Top Status Ribbon (`topRibbonEnabled`, time, battery, Wi-Fi, customer count, and live ZIP weather via `storeZip` / `fetchWeather` across `core/settings.hh`, `app/pos_session.hh`, `app/pos_service.hh`, `net/remote_session.hh`, `app/pos_admin_fields.cpp`, and `ui/qml/Main.qml`).
   * 64-bit (`arm64-v8a`) APK pipeline (`.github/workflows/modern-android.yml`, `build_apk.sh`, `cmake/BuildInfo.cmake`), Kiosk home alias (`AndroidManifest.xml`, `Kiosk.kt`), `ensureWirelessAdb`, PIN-protected reboot (`rebootWithPin`), yellow Terminal Name badge, JNI camera scanner (`BarcodeScanner.kt` -> `scanCamera`), and upstream fixes (`2e37ab3a` wake-from-sleep connection, `96b336f8` first-staff-login freeze fix).
 
+## Known-good versions (for rollback)
+
+Newest first. To go back: on the Pi, `cd ~/viewtouch-main && git checkout <commit> -- modern` (or ask Bob/Neil), rebuild
+`vtmodern`, and reinstall the tablet app from the GitHub Actions run listed (gh run download <run> -n ViewTouch-android-arm64-v8a).
+
+| Date | Main commit | Pi ViewTouch | Tablet app | Label utility | What's in it |
+|---|---|---|---|---|---|
+| 2026-11-02 18:28 ET | `31acd71` | built 17:32 from `d2e5300` | run 41539109241 (`d007756`) on Bar 1-3 | v1.1 (`31acd71`) | Gift cards: location, Luhn check, manager transfer/replace, Purchased By/For, subscription (9...) cards + Subscription-only promotions; tablet Labels screen (browse/find/scan, printed by the Pi); End of shift Labels button; screen saver logo fallback; tablets reconnect ADB after restart (paired, permission granted); ILSA temp price book fix; label utility full screen. |
+
 ## 5. Pending Roadmap & Backlog
 
 Not started unless a Log entry says otherwise; files named here (`CustomerReceiptView.qml`, `stage_batch.py`, `corp_sync.py`, `store_config.json`) don't exist yet.
@@ -83,6 +92,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-02 18:28 ET — Bob (Claude) — Known-good version recorded for rollback
+- **What:** New 'Known-good versions (for rollback)' table above the roadmap: 2026-11-02 18:28 = main 31acd71, Pi ViewTouch built 17:32 from d2e5300, tablet app run 41539109241 (d007756), label utility v1.1; with how to roll back.
+- **Why:** Owner wants today's stable version written down for rollback, without version numbering yet.
+- **Files:** `modern/vt-modern-development-notes.md`
 
 ### 2026-11-02 18:26 ET — Bob (Claude) — Label utility: main window and label designer full screen
 - **What:** New go_full_screen(win): fills the screen, then asks the window manager for full screen once the window is showing (again at 600 ms and on every map), with -zoomed (maximised) as fallback. Used by the main window and the Report Designer, which is no longer transient to the main window. Small pop-ups (print quantity, printer settings, field properties) stay pop-ups.
