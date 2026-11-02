@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 16:23 ET — Neil (Gemini) — Install ILSA Temp Pricebook hook in Label Utility & Jan 1 cutover
+- **What:** Connected ViewTouch Label Utility to read from ~/.local/share/ViewTouch/ilsa_temp_pricebook.db when present, added /usr/local/bin/vt-sync-ilsa to pull fresh CSVs from Dropbox on demand, leaving live viewtouch.db 100% clean.
+- **Why:** Enables employee to practice label printing using live up-to-date ILSA inventory/pricing without modifying or polluting the live POS database before the Jan 1 go-live.
+- **Files:** (none)
+- **Next person must know:** When bat file is run on Windows 7, run vt-sync-ilsa on the Pi to refresh the temp pricebook. ON JAN 1: delete ~/.local/share/ViewTouch/ilsa_temp_pricebook.db to switch Label Utility back to reading live viewtouch.db.
+
 ### 2026-11-02 15:55 ET — Neil (Gemini) — Acknowledge Bob status: dispatched APK build for store-logo & verified 15:42+ Pi binary
 - **What:** Triggered GitHub Actions cloud APK workflow from main (62dbe1d) to package Bob's embedded logo (store-logo.png via qt_add_resources). Stood down from local Label Utility edits.
 - **Why:** Tablets require newly built APK to receive the baked-in logo resource. Label Utility start screen preserved on v1.1.

@@ -537,6 +537,38 @@ def parse_vt_menu_dict(m, seen, items):
         })
 
 def load_from_viewtouch_db():
+
+    # --- TEMPORARY ILSA PRICEBOOK HOOK (FOR LABEL UTILITY TRAINING BEFORE JAN 1) ---
+    temp_db = os.path.expanduser("~/.local/share/ViewTouch/ilsa_temp_pricebook.db")
+    if os.path.exists(temp_db):
+        try:
+            t_conn = sqlite3.connect(f"file:{temp_db}?mode=ro", uri=True)
+            t_cur = t_conn.cursor()
+            t_items = []
+            for row in t_cur.execute("SELECT upc, name, dept_num, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc FROM items"):
+                u, nm, dn, cat, pr, cs, mf, pg, sg, pq, alts = row
+                alt_list = [a.strip() for a in alts.split(";") if a.strip()] if alts else []
+                t_items.append({
+                    "id": u,
+                    "name": nm,
+                    "price": pr,
+                    "cost": cs,
+                    "category": cat or "General",
+                    "major_cat": cat or "Retail",
+                    "mfg": mf or "General",
+                    "prod_grp": pg or "General",
+                    "sub_grp": sg or "",
+                    "upc": u,
+                    "barcodes": [u] + alt_list,
+                    "alt_barcodes": alt_list,
+                    "source": "ilsa_temp"
+                })
+            t_conn.close()
+            if t_items:
+                return t_items
+        except Exception as e:
+            print(f"Warning reading temp pricebook, falling back to viewtouch.db: {e}")
+    # --------------------------------------------------------------------------------
     items = []
     seen = set()
     if os.path.exists(VT_DB_PATH):
