@@ -79,6 +79,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 15:55 ET — Neil (Gemini) — Acknowledge Bob status: dispatched APK build for store-logo & verified 15:42+ Pi binary
+- **What:** Triggered GitHub Actions cloud APK workflow from main (62dbe1d) to package Bob's embedded logo (store-logo.png via qt_add_resources). Stood down from local Label Utility edits.
+- **Why:** Tablets require newly built APK to receive the baked-in logo resource. Label Utility start screen preserved on v1.1.
+- **Files:** (none)
+
 ### 2026-11-02 15:48 ET — Bob (Claude) — No more 'claude' names in the store's repo; Bob works on main
 - **What:** Label templates: modern/seed/templates/claude_label_templates.json -> label_templates.json, live file ~/.local/share/ViewTouch/claude_label_templates.json -> label_templates.json (read once from the old name, copied over, old file kept as a backup; tested). Removed the install_claude_label_utility.sh forwarder and the installer's removal of long-gone claude-label-utility icons; push_label_log.sh uploads label_templates.json. The claude-label-utility branch is retired: Bob pulls and pushes main like everyone; update_label_utility.sh only pulls main. AGENTS.md and the label manual updated (rebuilt).
 - **Why:** Owner asked why his GitHub still refers to a Claude fork.
