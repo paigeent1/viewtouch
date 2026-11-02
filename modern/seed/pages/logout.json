@@ -233,6 +233,31 @@
           "fill": "#1f6f73"
         }
       }
+    },
+    {
+      "id": "labels",
+      "kind": "button",
+      "rect": {
+        "x": 150,
+        "y": 580,
+        "w": 390,
+        "h": 140
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Labels\u2026",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "labels"
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#1f6f73"
+        }
+      }
     }
   ]
 }

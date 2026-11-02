@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:29 ET — Bob (Claude) — Labels button on the End of shift screen
+- **What:** seed/pages/logout.json: 'Labels...' button (above Checklists...) opens the Labels screen; logout-phone.json places it on phones. No manager needed (the Labels page is public; printing needs the order permission every staff role has).
+- **Why:** Owner: put the labels button where staff do their duties, without elevated access. ViewTouch has no separate cashier-duties screen; End of shift (Log Out) holds Checklists, Messages, My Bank.
+- **Files:** `modern/seed/pages/logout-phone.json`, `modern/seed/pages/logout.json`
+- **Next person must know:** Starter pages update only pages the store never edited: if Log Out was edited in edit mode, add the button there by hand (Edit Pages: a button with Jump to 'labels').
+
 ### 2026-11-02 17:24 ET — Bob (Claude) — Fix build: Labels screen 'Add All' handler
 - **What:** WidgetRetailLabels.qml: the Add All button's for-loop handler is now inside braces (qmlcachegen rejected 'onClicked: for ...').
 - **Why:** Pi build error at WidgetRetailLabels.qml:176.
