@@ -86,6 +86,52 @@ DEFAULT_TEMPLATES = {
     }
 }
 
+
+RTM_EXACT_TEMPLATES = {
+  "2X1VINYL W/BARCODE": {
+    "width_in": 2.302,
+    "height_in": 1.000,
+    "default_printer": "CUPS: BHDAN_PRICE_LABEL",
+    "media_stock": "2.0 x 1.0 in — Vinyl / Barcode",
+    "v_offset_dots": 0,
+    "h_offset_dots": 0,
+    "elements": [
+      {"id": "mfg", "field": "manufacturer", "x": 0.115, "y": 0.000, "w": 0.958, "h": 0.104, "size": 6, "bold": False, "font_family": "Sans", "align": "left", "auto_font": False, "word_wrap": False},
+      {"id": "upc_txt", "field": "upc", "x": 0.917, "y": 0.000, "w": 0.677, "h": 0.120, "size": 6, "bold": True, "font_family": "Sans", "align": "left", "auto_font": False, "word_wrap": False},
+      {"id": "date", "field": "date_yymmdd", "x": 1.764, "y": 0.000, "w": 0.330, "h": 0.120, "size": 6, "bold": True, "font_family": "Sans", "align": "right", "auto_font": False, "word_wrap": False},
+      {"id": "barcode", "field": "barcode_upca", "x": 0.240, "y": 0.104, "w": 1.020, "h": 0.155, "size": 8, "bold": False, "font_family": "Mono", "align": "left", "human_readable": False, "bar_width_in": 0.013},
+      {"id": "code26", "field": "year_short", "x": 2.010, "y": 0.115, "w": 0.229, "h": 0.198, "size": 10, "bold": True, "font_family": "Sans", "align": "left", "auto_font": False, "word_wrap": False},
+      {"id": "price", "field": "price_fmt", "x": 0.063, "y": 0.146, "w": 2.198, "h": 0.552, "size": 28, "bold": True, "font_family": "Sans", "align": "center", "auto_font": True, "word_wrap": False},
+      {"id": "desc", "field": "name", "x": 0.063, "y": 0.583, "w": 2.208, "h": 0.406, "size": 10, "bold": True, "font_family": "Sans", "align": "center", "auto_font": True, "word_wrap": True}
+    ]
+  },
+  "2X1VINYL W BARCODE": {
+    "width_in": 2.100,
+    "height_in": 1.000,
+    "default_printer": "CUPS: BHDAN_PRICE_LABEL",
+    "media_stock": "2.0 x 1.0 in — Vinyl / Barcode",
+    "v_offset_dots": 0,
+    "h_offset_dots": 0,
+    "elements": [
+      {"id": "desc", "field": "name", "x": 0.104, "y": 0.125, "w": 1.844, "h": 0.188, "size": 8, "bold": False, "font_family": "Sans", "align": "center", "auto_font": False, "word_wrap": True},
+      {"id": "barcode", "field": "barcode_upca", "x": 0.240, "y": 0.385, "w": 1.552, "h": 0.458, "size": 8, "bold": False, "font_family": "Mono", "align": "center", "human_readable": True, "bar_width_in": 0.013}
+    ]
+  },
+  "CIGAR LABEL": {
+    "width_in": 2.000,
+    "height_in": 0.560,
+    "default_printer": "CUPS: BHDAN_STICK_LABEL",
+    "media_stock": "Custom Size (W x H in)",
+    "v_offset_dots": 0,
+    "h_offset_dots": 0,
+    "elements": [
+      {"id": "desc", "field": "name", "x": 0.281, "y": 0.010, "w": 1.760, "h": 0.167, "size": 7, "bold": False, "font_family": "Sans", "align": "left", "auto_font": False, "word_wrap": True},
+      {"id": "barcode", "field": "barcode_upca", "x": 0.271, "y": 0.135, "w": 1.729, "h": 0.333, "size": 9, "bold": False, "font_family": "Sans", "align": "center", "human_readable": True, "bar_width_in": 0.015}
+    ]
+  }
+}
+DEFAULT_TEMPLATES.update(RTM_EXACT_TEMPLATES)
+
 def ensure_box_dims(tpl):
     """Guarantees every element has explicit x, y (top-left) and w, h (box size in inches)."""
     for el in tpl.get("elements", []):
@@ -198,8 +244,8 @@ def load_templates():
                 pass
                 
     for k, v in DEFAULT_TEMPLATES.items():
-        if k not in data:
-            data[k] = v
+        if k not in data or k in ("2X1VINYL W/BARCODE", "2X1VINYL W BARCODE", "CIGAR LABEL"):
+            data[k] = json.loads(json.dumps(v))
 
     # If Date_Label_2up_MR was renamed to 'Receiving Label' in file manager,
     # rename any existing 'DATE LABEL 2UP MR' key in data to 'RECEIVING LABEL'!
@@ -274,33 +320,111 @@ def infer_brand(item_name, category):
             return prefix
     return words[0].upper()
 
+def extract_all_upcs_from_record(m):
+    """Returns (primary_upc, alt_upcs_list, labeled_choices_list) from a DB item dict."""
+    raw_primary = ""
+    alt_candidates = []
+
+    bcs = m.get("barcodes", [])
+    if isinstance(bcs, str) and bcs.strip():
+        try:
+            bcs = json.loads(bcs)
+        except Exception:
+            bcs = [x.strip() for x in bcs.replace(",", " ").replace(";", " ").replace("|", " ").split() if x.strip()]
+    if isinstance(bcs, list):
+        for idx, code in enumerate(bcs):
+            c_str = str(code or "").strip()
+            if not c_str:
+                continue
+            if idx == 0 and not raw_primary:
+                raw_primary = c_str
+            else:
+                alt_candidates.append(("Alt UPC", c_str))
+
+    for pk in ("upc", "PLU_NUM", "plu_num", "sku", "PLU_Num"):
+        v = str(m.get(pk) or "").strip()
+        if v:
+            if not raw_primary:
+                raw_primary = v
+            elif v != raw_primary:
+                alt_candidates.append(("UPC", v))
+
+    for ak, lbl in (
+        ("altupcs", "Alt UPC"),
+        ("alt_upcs", "Alt UPC"),
+        ("altBarcodes", "Alt UPC"),
+        ("alternate_upcs", "Alt UPC"),
+        ("altupc", "Alt UPC"),
+        ("alt_upc", "Alt UPC"),
+        ("Alt_PLUNum", "Alt PLU"),
+        ("alt_plunum", "Alt PLU"),
+        ("UPC_E", "UPC-E"),
+        ("upce", "UPC-E"),
+        ("SUBUNIT_PLU", "Subunit UPC"),
+        ("subunit_plu", "Subunit UPC"),
+        ("PURCH_PLU", "Box/Purch UPC"),
+        ("purch_plu", "Box/Purch UPC"),
+        ("LINK_PLU", "Linked UPC"),
+    ):
+        val = m.get(ak)
+        if not val:
+            continue
+        if isinstance(val, list):
+            for sub_v in val:
+                sv = str(sub_v or "").strip()
+                if sv:
+                    alt_candidates.append((lbl, sv))
+        elif isinstance(val, str):
+            for sv in val.replace(";", ",").replace("|", ",").split(","):
+                sv = sv.strip()
+                if sv and sv not in ("0", "None", "null"):
+                    alt_candidates.append((lbl, sv))
+
+    fallback_id = str(m.get("number") or m.get("id") or "")
+    primary_upc = normalize_upc(raw_primary, fallback_id)
+
+    alt_upcs = []
+    choices = [("Primary UPC", primary_upc)]
+    seen_codes = {primary_upc, raw_primary.strip()}
+
+    for lbl, raw_c in alt_candidates:
+        clean_c = "".join(ch for ch in str(raw_c).strip() if ch.isalnum())
+        if not clean_c:
+            continue
+        norm_c = normalize_upc(clean_c) if (clean_c.isdigit() and len(clean_c) in (11, 12)) else clean_c
+        if norm_c not in seen_codes and clean_c not in seen_codes:
+            seen_codes.add(norm_c)
+            seen_codes.add(clean_c)
+            alt_upcs.append(norm_c)
+            choices.append((f"{lbl} #{len(alt_upcs)}", norm_c))
+
+    return primary_upc, alt_upcs, choices
+
 def parse_vt_menu_dict(m, seen, items):
     if not isinstance(m, dict):
         return
-    name = str(m.get("name") or "").strip()
-    if not name or m.get("active", True) is False:
+    name = str(m.get("name") or m.get("PLU_DESC") or m.get("POS_DESC") or "").strip()
+    if not name or m.get("active", True) is False or str(m.get("ACTIVE", "1")) == "0":
         return
 
-    bcs = m.get("barcodes", [])
-    raw_upc = bcs[0] if isinstance(bcs, list) and len(bcs) > 0 else (m.get("upc") or m.get("sku") or "")
-    raw_upce = bcs[1] if isinstance(bcs, list) and len(bcs) > 1 else (m.get("altupc") or "")
-    fallback_id = str(m.get("number") or m.get("id") or "")
-    upc = normalize_upc(raw_upc, fallback_id)
+    vt_id = str(m.get("id") or m.get("number") or "").strip()
+    primary_upc, alt_upcs, upc_choices = extract_all_upcs_from_record(m)
+    raw_upce = alt_upcs[0] if alt_upcs else ""
 
-    p_raw = m.get("price", m.get("priceCents", 0))
+    p_raw = m.get("price", m.get("LAST_PRICE", m.get("priceCents", 0)))
     try:
         p_num = float(p_raw or 0)
-        price = p_num / 100.0 if isinstance(p_raw, int) or p_num >= 100 else p_num
+        price = p_num / 100.0 if (isinstance(p_raw, int) and "priceCents" in m) or (isinstance(p_raw, int) and p_num >= 100 and "LAST_PRICE" not in m) else p_num
     except Exception:
         price = 0.0
 
-    cat = str(m.get("family") or m.get("category") or "GENERAL").strip().upper()
+    cat = str(m.get("family") or m.get("category") or m.get("CATEGORY") or m.get("DEPT_GRP") or "GENERAL").strip().upper()
     RESTAURANT_CATS = {"BREAKFAST", "BRUNCH", "LUNCH", "DINNER", "APPETIZERS", "ENTREES", "DESSERTS", "SIDES", "SOUPS", "SALADS", "SANDWICHES", "BURGERS", "PIZZA", "PASTA", "KIDS", "DRINKS", "BEVERAGES", "COCKTAILS", "DRAFT BEER", "WINE"}
     if cat in RESTAURANT_CATS or "TOAST" in name.upper() or "PANCAKE" in name.upper() or "OMELET" in name.upper() or "BURGER" in name.upper():
         if "CIGAR" not in cat and "TOBACCO" not in cat and "CIGAR" not in name.upper():
             return
-    has_real_bc = bool(raw_upc and len("".join(ch for ch in str(raw_upc) if ch.isdigit())) >= 8)
-    is_retail = has_real_bc or (str(m.get("taxClass", "")).lower() == "merchandise") or any(k in cat for k in ("CIGAR", "TOBACCO", "RETAIL", "PIPE", "ACCESS", "HUMIDOR", "LIGHTER", "CUTTER", "VAPE", "SMOKE"))
+    has_real_bc = bool(primary_upc and len("".join(ch for ch in str(primary_upc) if ch.isdigit())) >= 8)
+    is_retail = has_real_bc or (str(m.get("taxClass", "")).lower() == "merchandise") or any(k in cat for k in ("CIGAR", "TOBACCO", "RETAIL", "PIPE", "ACCESS", "HUMIDOR", "LIGHTER", "CUTTER", "VAPE", "SMOKE", "GEN MDSE", "MAKE YOUR OWN", "SMOKELESS"))
     pack_qty = 1
 
     for rl in m.get("recipe", []):
@@ -312,28 +436,205 @@ def parse_vt_menu_dict(m, seen, items):
             elif ing.startswith("__parent__:") and qty > 0:
                 pack_qty = int(qty)
                 is_retail = True
+                parent_bc = ing.split(":", 1)[1].strip()
+                if parent_bc and parent_bc not in alt_upcs and parent_bc != primary_upc:
+                    alt_upcs.append(parent_bc)
+                    upc_choices.append((f"Parent/Box UPC #{len(alt_upcs)}", parent_bc))
 
-    mfg = str(m.get("manufacturer") or m.get("brand") or infer_brand(name, cat)).strip().upper()
+    mfg = str(m.get("manufacturer") or m.get("MANUF") or m.get("brand") or infer_brand(name, cat)).strip().upper()
     dept_grp = "CIGARS" if ("CIGAR" in cat or "CIGAR" in name.upper()) else ("RETAIL" if is_retail else "HOSPITALITY")
 
-    key = (name.upper(), upc)
+    key = (vt_id or name.upper(), primary_upc)
     if key not in seen:
         seen.add(key)
         items.append({
+            "vt_id": vt_id,
             "selected": False,
             "qty": 1,
             "pack_qty": pack_qty,
-            "upc": upc,
+            "upc": primary_upc,
+            "primary_upc": primary_upc,
             "upce": str(raw_upce).strip(),
+            "alt_upcs": alt_upcs,
+            "upc_choices": upc_choices,
+            "upc_source_label": "Primary UPC",
             "name": name.upper(),
             "dept_name": cat,
-            "dept_num": str(m.get("number") or "80"),
+            "dept_num": str(m.get("number") or m.get("DEPT_NUM") or "80"),
             "dept_group": dept_grp,
             "category": cat,
             "manufacturer": mfg,
             "price": price,
             "is_retail": is_retail
         })
+
+def promote_alt_upc_in_viewtouch_db(item, new_primary_upc, remove_legacy_primary=True):
+    """
+    Promotes `new_primary_upc` to Primary UPC in viewtouch.db for `item` (anchored by internal `id`/`number` or name),
+    optionally eliminates the legacy primary UPC, and updates any `__parent__:<old_upc>` carton/pack recipe links.
+    Returns (success_bool, message_str).
+    """
+    old_primary = str(item.get("primary_upc") or item.get("upc") or "").strip()
+    new_primary = normalize_upc(new_primary_upc) if (str(new_primary_upc).isdigit() and len(str(new_primary_upc)) in (11, 12)) else str(new_primary_upc).strip()
+    if not new_primary:
+        return False, "No valid UPC selected to promote."
+    if new_primary == old_primary and remove_legacy_primary:
+        return False, f"{new_primary} is already the Primary UPC for {item.get('name')}."
+
+    if not os.path.exists(VT_DB_PATH):
+        return False, f"Database not found at {VT_DB_PATH}"
+
+    target_vt_id = str(item.get("vt_id") or "").strip()
+    target_name = str(item.get("name") or "").strip().upper()
+    updated_items = 0
+    updated_parent_links = 0
+
+    def _mutate_item_dict(d):
+        nonlocal updated_items, updated_parent_links
+        if not isinstance(d, dict):
+            return False
+        changed = False
+        d_id = str(d.get("id") or d.get("number") or "").strip()
+        d_name = str(d.get("name") or d.get("PLU_DESC") or "").strip().upper()
+        p_u, a_u, _ = extract_all_upcs_from_record(d)
+
+        is_target = (target_vt_id and d_id == target_vt_id) or (d_name == target_name and (p_u == old_primary or new_primary in a_u))
+        if is_target:
+            old_list = [p_u] + list(a_u)
+            new_bcs = [new_primary]
+            for c in old_list:
+                if not c or c == new_primary:
+                    continue
+                if remove_legacy_primary and c == old_primary:
+                    continue
+                if c not in new_bcs:
+                    new_bcs.append(c)
+
+            d["barcodes"] = new_bcs
+            d["upc"] = new_primary
+            if "PLU_NUM" in d:
+                d["PLU_NUM"] = new_primary
+            if "sku" in d and str(d["sku"]).strip() == old_primary:
+                d["sku"] = new_primary
+            d["altupc"] = new_bcs[1] if len(new_bcs) > 1 else ""
+            d["altupcs"] = new_bcs[1:]
+            updated_items += 1
+            changed = True
+
+        if old_primary and isinstance(d.get("recipe"), list):
+            for rl in d["recipe"]:
+                if isinstance(rl, dict):
+                    ing = str(rl.get("ingredientId", rl.get("ingredient", "")))
+                    if ing in (f"__parent__:{old_primary}", f"__parent__:{old_primary.lstrip('0')}"):
+                        if "ingredientId" in rl:
+                            rl["ingredientId"] = f"__parent__:{new_primary}"
+                        if "ingredient" in rl:
+                            rl["ingredient"] = f"__parent__:{new_primary}"
+                        updated_parent_links += 1
+                        changed = True
+        return changed
+
+    try:
+        con = sqlite3.connect(VT_DB_PATH, timeout=5.0)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if "menu_items" in tables:
+            cols = [r[1] for r in cur.execute("PRAGMA table_info(menu_items)").fetchall()]
+            rows = cur.execute("SELECT rowid AS _rowid_, * FROM menu_items").fetchall()
+            for row in rows:
+                r_id = row["_rowid_"]
+                row_dict = {k: row[k] for k in row.keys() if k != "_rowid_"}
+                wrote_json_col = False
+                for col_name, val in row_dict.items():
+                    if isinstance(val, (str, bytes)) and ("{" in str(val)):
+                        try:
+                            raw_s = val.decode("utf-8") if isinstance(val, bytes) else val
+                            obj = json.loads(raw_s)
+                            mod = False
+                            if isinstance(obj, dict):
+                                mod = _mutate_item_dict(obj)
+                            elif isinstance(obj, list):
+                                for sub in obj:
+                                    if _mutate_item_dict(sub):
+                                        mod = True
+                            if mod:
+                                new_json = json.dumps(obj)
+                                if "upc" in cols and updated_items > 0 and str(row_dict.get("name", "")).upper() == target_name:
+                                    cur.execute(f'UPDATE menu_items SET "{col_name}" = ?, upc = ? WHERE rowid = ?', (new_json, new_primary, r_id))
+                                else:
+                                    cur.execute(f'UPDATE menu_items SET "{col_name}" = ? WHERE rowid = ?', (new_json, r_id))
+                                wrote_json_col = True
+                        except Exception:
+                            pass
+                if not wrote_json_col and "name" in row_dict and str(row_dict.get("name") or "").strip().upper() == target_name:
+                    if "upc" in cols:
+                        cur.execute("UPDATE menu_items SET upc = ? WHERE rowid = ?", (new_primary, r_id))
+                        updated_items += 1
+        con.commit()
+        con.close()
+    except Exception as e:
+        return False, f"SQLite write error: {e}"
+
+    if updated_items == 0:
+        return False, f"Could not locate '{target_name}' in menu_items to update."
+
+    old_alts = [u for u in item.get("alt_upcs", []) if u != new_primary]
+    if not remove_legacy_primary and old_primary and old_primary != new_primary and old_primary not in old_alts:
+        old_alts.insert(0, old_primary)
+    item["primary_upc"] = new_primary
+    item["upc"] = new_primary
+    item["alt_upcs"] = old_alts
+    item["upce"] = old_alts[0] if old_alts else ""
+    item["upc_choices"] = [("Primary UPC", new_primary)] + [(f"Alt UPC #{i+1}", u) for i, u in enumerate(old_alts)]
+    item["upc_source_label"] = "Primary UPC"
+
+    action_str = f"Eliminated legacy UPC ({old_primary})" if remove_legacy_primary else f"Moved old UPC ({old_primary}) to Alt UPC"
+    link_str = f" & updated {updated_parent_links} pack/carton link(s)" if updated_parent_links else ""
+    return True, f"Promoted {new_primary} to Primary UPC for '{target_name}'! ({action_str}{link_str})"
+
+
+def _enrich_alt_upcs_from_db_and_csv(con, items):
+    """Attaches any additional Alt UPCs from auxiliary SQLite tables or ILSA CSV dumps."""
+    by_upc = {}
+    for it in items:
+        by_upc.setdefault(it["primary_upc"], []).append(it)
+        raw_strip = it["primary_upc"].lstrip("0")
+        if raw_strip:
+            by_upc.setdefault(raw_strip, []).append(it)
+
+    def add_alt(target_item, code, label="Alt UPC"):
+        c = "".join(ch for ch in str(code or "").strip() if ch.isalnum())
+        if not c or c in ("0", "None"):
+            return
+        norm_c = normalize_upc(c) if (c.isdigit() and len(c) in (11, 12)) else c
+        existing = {u for _, u in target_item.get("upc_choices", [])} | {target_item["primary_upc"]}
+        if norm_c not in existing and c not in existing:
+            target_item.setdefault("alt_upcs", []).append(norm_c)
+            target_item.setdefault("upc_choices", [("Primary UPC", target_item["primary_upc"])]).append(
+                (f"{label} #{len(target_item['alt_upcs'])}", norm_c)
+            )
+            if not target_item.get("upce"):
+                target_item["upce"] = norm_c
+
+    if con is not None:
+        try:
+            tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            for tbl in ("alt_upcs", "item_barcodes", "barcodes", "inventory", "plu"):
+                if tbl in tables:
+                    for row in con.execute(f"SELECT * FROM {tbl}").fetchall():
+                        rk = {k.lower(): row[k] for k in row.keys()}
+                        p_code = str(rk.get("plu_num") or rk.get("upc") or rk.get("item_upc") or rk.get("primary_upc") or "").strip()
+                        if not p_code:
+                            continue
+                        norm_p = normalize_upc(p_code)
+                        matched = by_upc.get(norm_p) or by_upc.get(p_code.lstrip("0")) or []
+                        for it in matched:
+                            for col_k, lbl in (("alt_plunum", "Alt PLU"), ("alt_upc", "Alt UPC"), ("upc_e", "UPC-E"), ("subunit_plu", "Subunit UPC"), ("purch_plu", "Box UPC"), ("barcode", "Alt UPC")):
+                                if rk.get(col_k):
+                                    add_alt(it, rk[col_k], lbl)
+        except Exception:
+            pass
 
 def load_from_viewtouch_db():
     items = []
@@ -362,6 +663,7 @@ def load_from_viewtouch_db():
                                 pass
                     if not parsed_json and "name" in row_dict:
                         parse_vt_menu_dict(row_dict, seen, items)
+            _enrich_alt_upcs_from_db_and_csv(con, items)
             con.close()
         except Exception as e:
             print("Note reading viewtouch.db:", e)
@@ -538,13 +840,20 @@ def render_label_pil_image(tpl, item, dpi=203):
         if str(field).startswith("barcode"):
             b_val = str(format_item_field(item, "upc") or "000000000000").strip()
             clean_d = "".join(c for c in b_val if c.isdigit())
+            hr_on = bool(el.get("human_readable", False))
+            bar_bottom = (by + int(bh * 0.76)) if hr_on else (by + bh)
             if field == "barcode_upca" or len(clean_d) in (11, 12):
                 d12 = normalize_upc(b_val)[:12].zfill(12)
                 bits = "101" + "".join(UPCA_L_CODES.get(d, "0001101") for d in d12[:6]) + "01010" + "".join(UPCA_R_CODES.get(d, "1110010") for d in d12[6:]) + "101"
                 mw = float(bw) / 95.0
                 for i, b in enumerate(bits):
                     if b == "1":
-                        draw.rectangle([int(round(bx + i * mw)), by, max(int(round(bx + i * mw)), int(round(bx + (i + 1) * mw)) - 1), by + bh], fill=0)
+                        draw.rectangle([int(round(bx + i * mw)), by, max(int(round(bx + i * mw)), int(round(bx + (i + 1) * mw)) - 1), bar_bottom], fill=0)
+                if hr_on:
+                    hr_fnt = get_ttf(el.get("font_family", "Mono"), True, False, max(10, int(bh * 0.22)))
+                    bb_hr = draw.textbbox((0, 0), d12, font=hr_fnt)
+                    tw_hr = bb_hr[2] - bb_hr[0]
+                    draw.text((bx + (bw - tw_hr) / 2.0, by + int(bh * 0.77) - bb_hr[1]), d12, font=hr_fnt, fill=0)
             else:
                 try:
                     from reportlab.graphics.barcode import code128 as rc128
@@ -555,7 +864,7 @@ def render_label_pil_image(tpl, item, dpi=203):
                     pos = float(bx)
                     for is_b, w_u in bars:
                         if is_b:
-                            draw.rectangle([int(round(pos)), by, max(int(round(pos)), int(round(pos + w_u * unit)) - 1), by + bh], fill=0)
+                            draw.rectangle([int(round(pos)), by, max(int(round(pos)), int(round(pos + w_u * unit)) - 1), bar_bottom], fill=0)
                         pos += w_u * unit
                 except Exception:
                     pass
@@ -863,7 +1172,11 @@ def render_label_on_tk_canvas(canvas_widget, tpl, item, ox=28, oy=28, scale=420,
             elif field == "barcode_upce": b_val = (item.get("upce") or normalize_upc(b_val)[:8]).zfill(8)
             elif field == "barcode_code39": b_val = f"*{str(b_val).upper()}*"
             draw_code128_on_tk_canvas(canvas_widget, b_val, bx, by, bw, bh, tag=f"el_{idx}")
-            pass  # Pure stretchable bars (PrintHumanReadable=False)
+            if el.get("human_readable", False):
+                hr_h = max(11, int(bh * 0.24))
+                canvas_widget.create_rectangle(bx+2, by+bh-hr_h, bx+bw-2, by+bh, fill="#ffffff", outline="", tags=(f"el_{idx}",))
+                hr_font = "Courier New" if el.get("font_family") == "Mono" else "Arial"
+                canvas_widget.create_text(bx+bw//2, by+bh-(hr_h//2), text=b_val, font=(hr_font, -max(8, hr_h-2), "bold"), fill="#000000", tags=(f"el_{idx}",))
         else:
             raw_txt = format_item_field(item, field, el)
             if not str(raw_txt).strip(): raw_txt = "RECEIVED" if field == "variable_text" else f"[{field}]"
@@ -2003,9 +2316,10 @@ class VTLabelUtility(tk.Tk):
         tpl_sel_frame.rowconfigure(1, weight=1)
 
         active_tpl_names = list(self.templates.keys()) if hasattr(self, "templates") else []
-        if "RECEIVING LABEL" in active_tpl_names:
-            active_tpl_names.remove("RECEIVING LABEL")
-            active_tpl_names.insert(0, "RECEIVING LABEL")
+        for priority_tpl in ("CIGAR LABEL", "2X1VINYL W BARCODE", "2X1VINYL W/BARCODE", "RECEIVING LABEL"):
+            if priority_tpl in active_tpl_names:
+                active_tpl_names.remove(priority_tpl)
+                active_tpl_names.insert(0, priority_tpl)
 
         self.step1_tpl_var = tk.StringVar(value=active_tpl_names[0] if active_tpl_names else "")
         self.option_add("*TCombobox*Listbox.font", ("Sans", 14, "bold"))
@@ -2018,7 +2332,6 @@ class VTLabelUtility(tk.Tk):
         cb = ttk.Combobox(top_box, textvariable=self.step1_tpl_var, values=active_tpl_names, state="readonly", font=("Sans", 14, "bold"))
         cb.grid(row=0, column=1, sticky="ew")
 
-        # 3x Height Touch Rows (rowheight=58px)
         t_style = ttk.Style()
         t_style.configure("TplList.Treeview", rowheight=58, font=("Sans", 13, "bold"), background="#1e293b", foreground="#f8fafc", fieldbackground="#1e293b")
         t_style.configure("TplList.Treeview.Heading", font=("Sans", 11, "bold"))
@@ -2048,7 +2361,7 @@ class VTLabelUtility(tk.Tk):
             w = t_obj.get("width_in", 2.0)
             h = t_obj.get("height_in", 1.0)
             prn = t_obj.get("default_printer", "Auto").split("(")[0].replace("VT TCP:", "").strip()
-            self.tpl_tree.insert("", "end", iid=str(idx), values=(f"🏷️  {name}", f"{w} x {h} in", f"🖨️ {prn}"))
+            self.tpl_tree.insert("", "end", iid=str(idx), values=(f"🏷️ {name}", f"{w} x {h} in", f"🖨️ {prn}"))
 
         if active_tpl_names:
             self.tpl_tree.selection_set("0")
@@ -2172,13 +2485,137 @@ class VTLabelUtility(tk.Tk):
                 for mfg in sorted(tree_map[dg][cat]):
                     self.cat_tree.insert(cat_id, "end", text=f"M  {mfg}", values=("MFG", mfg))
 
+    def set_item_upc_mode(self, mode_str):
+        """Switches active printing UPC for selected items (or all filtered items if none selected)."""
+        targets = [it for it in self.filtered_items if it.get("selected")] or self.filtered_items
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            if mode_str == "Primary UPC":
+                it["upc"] = it.get("primary_upc", choices[0][1])
+                it["upc_source_label"] = "Primary UPC"
+            elif mode_str == "First Available Alt UPC":
+                if len(choices) > 1:
+                    it["upc"] = choices[1][1]
+                    it["upc_source_label"] = choices[1][0]
+            elif mode_str.startswith("Alt UPC #"):
+                try:
+                    alt_idx = int(mode_str.split("#", 1)[1].strip())
+                    if alt_idx < len(choices):
+                        it["upc"] = choices[alt_idx][1]
+                        it["upc_source_label"] = choices[alt_idx][0]
+                except Exception:
+                    pass
+        if hasattr(self, "grid_tree"):
+            self._populate_grid()
+
+    def cycle_selected_item_upc(self):
+        """Cycles the highlighted or selected item(s) through their Primary UPC and all Alt UPCs."""
+        sel_rows = self.grid_tree.selection() if hasattr(self, "grid_tree") else ()
+        targets = [self.filtered_items[int(i)] for i in sel_rows if i.isdigit()] if sel_rows else [it for it in self.filtered_items if it.get("selected")]
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            if len(choices) > 1:
+                cur_u = it.get("upc")
+                cur_idx = next((i for i, (_, u) in enumerate(choices) if u == cur_u), 0)
+                nxt_lbl, nxt_u = choices[(cur_idx + 1) % len(choices)]
+                it["upc"] = nxt_u
+                it["upc_source_label"] = nxt_lbl
+        if hasattr(self, "grid_tree"):
+            self._populate_grid()
+
+    def open_promote_alt_upc_dialog(self, target_item=None):
+        """Opens a dialog to permanently replace a legacy Primary UPC with an Alt UPC (or custom UPC) in viewtouch.db."""
+        if target_item is None:
+            if self.current_step == 4 and getattr(self, "selected_for_print", None):
+                target_item = self.selected_for_print[self.preview_idx]
+            else:
+                sel_rows = self.grid_tree.selection() if hasattr(self, "grid_tree") else ()
+                if sel_rows and sel_rows[0].isdigit():
+                    target_item = self.filtered_items[int(sel_rows[0])]
+                else:
+                    sel_checked = [it for it in self.filtered_items if it.get("selected")]
+                    target_item = sel_checked[0] if sel_checked else (self.filtered_items[0] if self.filtered_items else None)
+
+        if not target_item:
+            messagebox.showwarning("No Item Selected", "Please select an item first.")
+            return
+
+        dlg = tk.Toplevel(self)
+        dlg.title("Replace Legacy UPC / Promote Alt UPC in ViewTouch DB")
+        dlg.geometry("580x390+670+310")
+        dlg.configure(bg="#1e293b")
+        dlg.transient(self)
+        dlg.attributes("-topmost", True)
+
+        tk.Label(dlg, text="★ Promote Alt UPC / Eliminate Legacy UPC", bg="#1e293b", fg="#38bdf8", font=("Sans", 13, "bold")).pack(pady=(14, 4))
+        tk.Label(dlg, text=f"Item: {target_item.get('name')}  (VT ID: {target_item.get('vt_id') or target_item.get('dept_num')})", bg="#0f172a", fg="#86efac", font=("Sans", 10, "bold"), padx=12, pady=5).pack(pady=(0, 10))
+
+        frm = tk.Frame(dlg, bg="#1e293b")
+        frm.pack(fill="x", padx=24)
+
+        old_p = target_item.get("primary_upc") or target_item.get("upc") or ""
+        tk.Label(frm, text="Current Primary UPC:", bg="#1e293b", fg="#94a3b8", font=("Sans", 10, "bold")).grid(row=0, column=0, sticky="w", pady=6)
+        tk.Label(frm, text=old_p, bg="#1e293b", fg="#fca5a5", font=("Monospace", 12, "bold")).grid(row=0, column=1, sticky="w", padx=10, pady=6)
+
+        choices = target_item.get("upc_choices") or [("Primary UPC", old_p)]
+        alt_only = [u for _, u in choices if u != old_p]
+        default_new = target_item.get("upc") if target_item.get("upc") != old_p else (alt_only[0] if alt_only else old_p)
+
+        tk.Label(frm, text="Select Alt UPC to Promote:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=1, column=0, sticky="w", pady=6)
+        pick_var = tk.StringVar(value=default_new)
+        cb_vals = [u for _, u in choices]
+        cb = ttk.Combobox(frm, textvariable=pick_var, values=cb_vals, width=26, font=("Monospace", 11, "bold"))
+        cb.grid(row=1, column=1, sticky="w", padx=10, pady=6)
+
+        tk.Label(frm, text="Or Enter / Scan New UPC:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=2, column=0, sticky="w", pady=6)
+        custom_ent = tk.Entry(frm, textvariable=pick_var, width=26, font=("Monospace", 12, "bold"), bg="#ffffff", fg="#000000")
+        custom_ent.grid(row=2, column=1, sticky="w", padx=10, pady=6)
+
+        elim_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(
+            dlg,
+            text=f"Eliminate legacy Primary UPC ({old_p}) completely from item record",
+            variable=elim_var,
+            bg="#1e293b", fg="#f8fafc", selectcolor="#0f172a",
+            activebackground="#1e293b", activeforeground="#ffffff",
+            font=("Sans", 10, "bold")
+        ).pack(pady=(12, 4))
+
+        tk.Label(dlg, text="Note: Item ID, price, department, and carton/pack links are preserved automatically.", bg="#1e293b", fg="#94a3b8", font=("Sans", 9, "italic")).pack(pady=(0, 10))
+
+        def do_commit(*_a):
+            chosen_code = pick_var.get().strip()
+            ok, msg = promote_alt_upc_in_viewtouch_db(target_item, chosen_code, remove_legacy_primary=bool(elim_var.get()))
+            if ok:
+                dlg.destroy()
+                if self.current_step == 3 and hasattr(self, "grid_tree"):
+                    self._populate_grid()
+                elif self.current_step == 4:
+                    self._render_live_preview()
+                messagebox.showinfo("UPC Updated in viewtouch.db", msg)
+            else:
+                messagebox.showerror("Update Note", msg, parent=dlg)
+
+        btn_f = tk.Frame(dlg, bg="#1e293b")
+        btn_f.pack(pady=10)
+        make_vt_btn(btn_f, text="✓ Make Primary in DB", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), width=20, command=do_commit).pack(side="left", padx=8)
+        make_vt_btn(btn_f, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=10, command=dlg.destroy).pack(side="left", padx=8)
+
+        dlg.update_idletasks()
+        dlg.lift()
+        custom_ent.focus_force()
+
     def _build_step3(self):
         top = tk.Frame(self.content, bg="#1e242d")
         top.pack(fill="x", padx=8, pady=6)
 
-        tk.Label(top, text="Barcode:", bg="#1e242d", font=("Sans", 11)).pack(side="left")
-        self.bc_type_var = tk.StringVar(value="UPC-A")
-        ttk.Combobox(top, textvariable=self.bc_type_var, values=["UPC-A", "UPC-E", "Code-39", "Code-128"], width=10, state="readonly").pack(side="left", padx=6)
+        tk.Label(top, text="Code Source:", bg="#1e242d", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left")
+        self.upc_mode_var = tk.StringVar(value="Primary UPC")
+        upc_mode_cb = ttk.Combobox(top, textvariable=self.upc_mode_var, values=["Primary UPC", "First Available Alt UPC", "Alt UPC #1", "Alt UPC #2", "Alt UPC #3"], width=17, state="readonly", font=("Sans", 10, "bold"))
+        upc_mode_cb.pack(side="left", padx=4)
+        upc_mode_cb.bind("<<ComboboxSelected>>", lambda _e: self.set_item_upc_mode(self.upc_mode_var.get()))
+        make_vt_btn(top, text="🔄 Cycle UPC/Alt", bg="#0284c7", fg="#ffffff", font=("Sans", 9, "bold"), padx=7, pady=5, command=self.cycle_selected_item_upc).pack(side="left", padx=3)
+        make_vt_btn(top, text="★ Make Alt Primary", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), padx=7, pady=5, command=self.open_promote_alt_upc_dialog).pack(side="left", padx=3)
 
         make_vt_btn(top, text="✓ Select All", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.select_all).pack(side="left", padx=6)
         make_vt_btn(top, text="✖ Deselect All", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.deselect_all).pack(side="left", padx=4)
@@ -2196,8 +2633,8 @@ class VTLabelUtility(tk.Tk):
         cols = ("sel", "qty", "upca", "upce", "desc", "price", "dept_name", "dept_num", "dept_grp", "cat", "mfg")
         self.grid_tree = ttk.Treeview(self.content, columns=cols, show="headings", selectmode="browse")
         headers = [
-            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC / Barcode", 130),
-            ("upce", "Alt UPC", 90), ("desc", "Description", 250), ("price", "Price", 75),
+            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "Active UPC (Print)", 155),
+            ("upce", "Alt UPCs (Available)", 145), ("desc", "Description", 250), ("price", "Price", 75),
             ("dept_name", "Category", 130), ("dept_num", "Item #", 75),
             ("dept_grp", "Group", 105), ("cat", "Family", 115), ("mfg", "Brand / Mfg", 115)
         ]
@@ -2213,11 +2650,13 @@ class VTLabelUtility(tk.Tk):
         self.grid_tree.delete(*self.grid_tree.get_children())
         q = getattr(self, "filter_var", tk.StringVar()).get().strip().lower()
         for idx, it in enumerate(self.filtered_items):
-            if q and (q not in it["name"].lower() and q not in it["upc"].lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
+            all_alt_str = ", ".join(it.get("alt_upcs", [])) or it.get("upce", "")
+            if q and (q not in it["name"].lower() and q not in it["upc"].lower() and q not in all_alt_str.lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
                 continue
             chk = "☑" if it.get("selected") else "☐"
+            src_tag = "" if it.get("upc_source_label", "Primary UPC") == "Primary UPC" else f" [{it.get('upc_source_label')}]"
             self.grid_tree.insert("", "end", iid=str(idx), values=(
-                chk, it["qty"], it["upc"], it["upce"], it["name"], f"${it['price']:.2f}",
+                chk, it["qty"], f"{it['upc']}{src_tag}", all_alt_str, it["name"], f"${it['price']:.2f}",
                 it["dept_name"], it["dept_num"], it["dept_group"], it["category"], it["manufacturer"]
             ))
 
@@ -2283,6 +2722,22 @@ class VTLabelUtility(tk.Tk):
         self.page_lbl.pack(side="left", padx=2)
         make_vt_btn(tbar, text="▶", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=3, pady=8, command=self.next_preview_item).pack(side="left", padx=2)
 
+        tk.Label(tbar, text="UPC:", bg="#0c1017", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(4, 2))
+        self.step4_upc_var = tk.StringVar(value="")
+        self.step4_upc_cb = ttk.Combobox(tbar, textvariable=self.step4_upc_var, state="readonly", width=19, font=("Sans", 9, "bold"))
+        self.step4_upc_cb.pack(side="left", padx=2, ipady=3)
+        def on_pick_step4_upc(_e=None):
+            if not getattr(self, "selected_for_print", None): return
+            it = self.selected_for_print[self.preview_idx]
+            picked = self.step4_upc_var.get()
+            if ":" in picked:
+                lbl_part, code_part = picked.split(":", 1)
+                it["upc"] = code_part.strip()
+                it["upc_source_label"] = lbl_part.strip()
+                self._render_live_preview()
+        self.step4_upc_cb.bind("<<ComboboxSelected>>", on_pick_step4_upc)
+        make_vt_btn(tbar, text="★ Make Primary", bg="#7c3aed", fg="#ffffff", font=("Sans", 9, "bold"), width=12, pady=8, command=self.open_promote_alt_upc_dialog).pack(side="left", padx=3)
+
         make_vt_btn(tbar, text="✏️ Edit Report", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_report_designer).pack(side="left", padx=6)
         make_vt_btn(tbar, text="➕ Create Report", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.clone_report).pack(side="left", padx=4)
         make_vt_btn(tbar, text="⚙️ Printer Offset", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.open_printer_settings_dialog).pack(side="left", padx=4)
@@ -2309,6 +2764,12 @@ class VTLabelUtility(tk.Tk):
             return
         item = self.selected_for_print[self.preview_idx]
         self.page_lbl.config(text=f"{self.preview_idx + 1}/{len(self.selected_for_print)}")
+        if hasattr(self, "step4_upc_cb"):
+            choices = item.get("upc_choices") or [("Primary UPC", item.get("upc", "000000000000"))]
+            cb_vals = [f"{lbl}: {code}" for lbl, code in choices]
+            self.step4_upc_cb["values"] = cb_vals
+            cur_match = next((v for v in cb_vals if v.endswith(f": {item.get('upc', '')}")), cb_vals[0])
+            self.step4_upc_var.set(cur_match)
         tpl = self.templates[self.tpl_var.get()]
         if hasattr(self, "route_badge_lbl"):
             avail = discover_all_printers()
