@@ -79,6 +79,15 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 11:52 ET — Neil (Gemini) — Synchronized Pi server & Android tablet APK build (modern-v0.9.107)
+
+- **What**: Verified and rebuilt the Raspberry Pi `vtmodern` binary (`-j2`) at `/home/pi/viewtouch-main/modern/build/vtmodern`, triggered the synchronized 64-bit (`arm64-v8a`) Android APK build (`modern-v0.9.107`) via GitHub Actions (`modern-android.yml`), staged the compiled APK in `apks/` and `~/.local/share/ViewTouch/ViewTouch/updates/`, and deployed to connected Lenovo tablets (`Bar 1`, `Bar 2`, `Bar 3`).
+- **Why**: Keep the Raspberry Pi 5 server (`192.168.1.219`) and all three Lenovo Android bar tablets (`192.168.1.220`, `.215`, `.210`) on the exact same Git commit count (`0.9.107`) so no version-mismatch banner appears and all recent fixes, manuals, and tools are synchronized.
+- **Files**: `modern/vt-modern-development-notes.md`, `apks/APK_BUILD_LIST.md`.
+- **Commit**: `HEAD` (tagged `modern-v0.9.107`)
+- **Next person must know**:
+  - `CMakeLists.txt` and `cmake/BuildInfo.cmake` compute the third version number from `git rev-list --count HEAD` (`0.9.107`). Whenever new commits are added to `main`, rebuild `vtmodern` on the Pi and run a matching `modern-android.yml` APK build so the Pi server and Android tablets share the same build number.
+
 ### 2026-11-02 11:28 ET — Bob (Claude) — Review of Neil's handoff sections; retail Gift Cards button fixed
 - **What:** Checked sections 1-5 against the code. Corrected: required bullets are What/Why/Files (Commit, Next optional, as the hook enforces); barcode list (also EAN-13, UPC-E, Code 39); Delete/Restore came after the v1.0 tag; gift card reports are 8 columns, manual is 15 pages, sellGiftCard names aren't passed by the screen; Neil's entry Commit HEAD -> 1ba2d91. Added: viewtouch.db write rule, branch map, QML loading quirk, Stick Labels printer .25, repo is public (no secrets), Pi-only scripts and upstream-only hashes labelled, roadmap files marked not started. Fixed the retail screen's Gift Cards button (gift-cards -> gift-card in retail-entry.json and WidgetRetailEntry.qml) and capture_vt_screenshots.sh builds with -j2 per the Pi OOM rule.
 - **Why:** Owner asked Bob to check Neil's notes update for future developers.
