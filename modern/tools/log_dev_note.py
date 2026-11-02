@@ -3,7 +3,7 @@
 
 Add an entry (newest first, Eastern time, the shared format):
 
-  python3 modern/tools/log_dev_note.py --agent Claude --title "Fix printer offsets" \\
+  python3 modern/tools/log_dev_note.py --agent "Bob (Claude)" --title "Fix printer offsets" \\
       --what "..." --why "..." [--files a.py b.sh] [--next "..."] [--commit abc1234]
 
   --files defaults to the files staged for commit (git add them first).
@@ -103,7 +103,7 @@ def check_staged():
         "\n✖ Commit blocked: every change must be logged in " + NOTES_REL + "\n  - " + "\n  - ".join(problems) +
         "\n\n  Changed: " + ", ".join(changed[:8]) + (" …" if len(changed) > 8 else "") +
         "\n\n  Quick way (stages the entry for you):\n"
-        "    python3 modern/tools/log_dev_note.py --agent <Claude|Gemini|name> --title \"...\" \\\n"
+        "    python3 modern/tools/log_dev_note.py --agent "<Bob (Claude)|Neil (Gemini)|name>" --title \"...\" \\\n"
         "        --what \"...\" --why \"...\" [--next \"...\"]\n"
         "  then commit again.  (Emergency only: git commit --no-verify)\n\n")
     return 1
