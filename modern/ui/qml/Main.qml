@@ -1181,7 +1181,14 @@ ApplicationWindow {
                 readonly property var pos: root.controller.pos
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: status === Image.Ready
-                source: (Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : (root.controller.pos ? root.controller.pos.imageUrl("logo:") : ""))
+                // The logo from Store Settings (on a tablet: the copy in its app folder); if that can't be
+                // loaded, the one built into the app (assets/images/store-logo.png), when there is one.
+                readonly property url builtIn: "qrc:/images/store-logo.png"
+                readonly property url wanted: Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
+                                            : (root.controller.pos ? root.controller.pos.imageUrl("logo:") : "")
+                source: wanted.toString() !== "" ? wanted : builtIn
+                onWantedChanged: source = wanted.toString() !== "" ? wanted : builtIn
+                onStatusChanged: if (status === Image.Error && source !== builtIn) source = builtIn
                 sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
                 width: Math.round(root.height * 0.28)
                 height: Math.round(root.height * 0.28)

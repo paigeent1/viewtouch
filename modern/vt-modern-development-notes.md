@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:58 ET — Bob (Claude) — Screen saver logo: built-in fallback (Neil's idea, done safely)
+- **What:** CMakeLists.txt: if modern/assets/images/store-logo.png exists it's built in as qrc:/images/store-logo.png (its own resource next to burger.png; the QML_FILES list is untouched). Main.qml screen saver: shows the Store Settings logo (tablets: their app-folder copy, as before); if that's missing or fails to load, the built-in one. Keeps asynchronous loading and sourceSize. Replaces the stashed pi-stash-1321 edit, which put RESOURCES in the middle of QML_FILES (every later screen file would have become a plain resource) and dropped the tablet path.
+- **Why:** Neil: tablets sometimes can't load the logo. Owner asked for the clean version.
+- **Files:** `modern/CMakeLists.txt`, `modern/ui/qml/Main.qml`
+- **Next person must know:** The logo file itself isn't in Git yet: copy the Pi's modern/ui/qml/logo.png to modern/assets/images/store-logo.png and commit it (command given to the owner). Without it, the build and screen saver work as before. The stash's label utility edit (deleting _build_step1) should be dropped: no crash in the logs.
+
 ### 2026-11-02 13:54 ET — Bob (Claude) — Say 'subscription', never 'member'
 - **What:** Renamed everything from the last two entries: Promotions switch 'Subscription only' (subscriptionOnly), Check.subscriptionCard, checkInfo 'subscription', messages 'Subscription ..1234 on check #N: subscription discounts apply', 'A subscription card needs its customer...'. No user-facing text says member.
 - **Why:** Owner: 'member' suggests some customers are better than others; every guest should get the fountain. Use 'subscription' in all screens, messages and code.

@@ -313,6 +313,14 @@ if(Qt6_FOUND)
     set_source_files_properties(${VTM_BURGER} PROPERTIES QT_RESOURCE_ALIAS burger.png)
     qt_add_resources(vtm_ui "images" PREFIX "/images" FILES ${VTM_BURGER})
 
+    # The store's logo built in (qrc:/images/store-logo.png): the screen saver shows it when the
+    # logo from Store Settings can't be loaded (e.g. a tablet that can't read it). Optional file.
+    set(VTM_STORE_LOGO ${CMAKE_CURRENT_SOURCE_DIR}/assets/images/store-logo.png)
+    if(EXISTS ${VTM_STORE_LOGO})
+        set_source_files_properties(${VTM_STORE_LOGO} PROPERTIES QT_RESOURCE_ALIAS store-logo.png)
+        qt_add_resources(vtm_ui "store_logo" PREFIX "/images" FILES ${VTM_STORE_LOGO})
+    endif()
+
     if(NOT ANDROID)
         include(packaging/Packaging.cmake)
     endif()
