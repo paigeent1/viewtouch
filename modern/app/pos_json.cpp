@@ -168,7 +168,11 @@ QJsonObject toJson(const Check &c)
         {u"events"_s, events}, {u"firedCourse"_s, c.firedCourse}, {u"customerId"_s, qs(c.customerId)},
         {u"receiptEmail"_s, qs(c.receiptEmail)}, {u"receiptEmailSent"_s, c.receiptEmailSent},
         {u"cashTipCents"_s, qint64(c.cashTip.cents())},
-        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"memberCard"_s, qs(c.memberCard)}, {u"hold"_s, [&c] {
+        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"memberCard"_s, qs(c.memberCard)}, {u"giftCardFor"_s, [&c] {
+            QJsonObject o;
+            for (const auto &[number, who] : c.giftCardFor) o.insert(qs(number), qs(who));
+            return o;
+        }()}, {u"hold"_s, [&c] {
             if (c.hold.empty())
                 return QJsonValue();
             return QJsonValue(QJsonObject{{u"reference"_s, qs(c.hold.reference)}, {u"processor"_s, qs(c.hold.processor)},
@@ -290,6 +294,9 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.allergies = strings(o.value(u"allergies").toArray());
     c.coupons = strings(o.value(u"coupons").toArray());
     c.memberCard = ss(o.value(u"memberCard").toString());
+    const QJsonObject giftCardFor = o.value(u"giftCardFor").toObject();
+    for (auto it = giftCardFor.begin(); it != giftCardFor.end(); ++it)
+        c.giftCardFor[ss(it.key())] = ss(it.value().toString());
     if (const QJsonObject h = o.value(u"hold").toObject(); !h.isEmpty()) {
         c.hold.reference = ss(h.value(u"reference").toString());
         c.hold.processor = ss(h.value(u"processor").toString());
@@ -1605,7 +1612,8 @@ QJsonObject toJson(const GiftCard &g)
     return {{u"number"_s, qs(g.number)}, {u"pin"_s, qs(g.pin)}, {u"typeCode"_s, qs(g.typeCode)},
             {u"purchasedBy"_s, qs(g.purchasedBy)}, {u"issuedTo"_s, qs(g.issuedTo)},
             {u"balance"_s, qint64(g.balance.cents())}, {u"issuedAt"_s, qint64(g.issuedAt)}, {u"history"_s, ledgerJson(g.history)},
-            {u"issuedLocation"_s, qs(g.issuedLocation)}, {u"closed"_s, g.closed}, {u"replacedBy"_s, qs(g.replacedBy)}};
+            {u"issuedLocation"_s, qs(g.issuedLocation)}, {u"closed"_s, g.closed}, {u"replacedBy"_s, qs(g.replacedBy)},
+            {u"customerId"_s, qs(g.customerId)}};
 }
 
 GiftCard giftCardFromJson(const QJsonObject &o)
@@ -1622,6 +1630,7 @@ GiftCard giftCardFromJson(const QJsonObject &o)
     g.issuedLocation = ss(o.value(u"issuedLocation").toString());
     g.closed = o.value(u"closed").toBool(false);
     g.replacedBy = ss(o.value(u"replacedBy").toString());
+    g.customerId = ss(o.value(u"customerId").toString());
     return g;
 }
 

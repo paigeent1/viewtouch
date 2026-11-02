@@ -79,6 +79,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:54 ET — Bob (Claude) — Gift cards: Purchased By from the check's customer, Purchased For when selling, subscriptions tied to a member
+- **What:** Selling: Gift Card screen has a 'Purchased For' box (optional; kept on the check in Check.giftCardFor until the card goes live) and shows who 'Purchased By' will be. When the check is paid, Purchased By = the check's customer (new cards; reloads keep their buyer) and Purchased For = what was typed. With no customer on the check, Sell asks Add Customer... / Sell Without Customer. A NEW subscription (9...) card can't be sold without a customer on the check; it is linked to that customer (GiftCard.customerId), and showing the card on a later check puts that member on the check. checkInfo now has customerId; fixed the 'Pay the Check from This Card' prompt, which read check fields that don't exist (customerId/customerName) and so asked for a customer every time.
+- **Why:** Owner: subscriptions always have a customer; gift cards record Purchased By (a customer) and Purchased For (no customer needed).
+- **Files:** `modern/app/pos_customers.cpp`, `modern/app/pos_json.cpp`, `modern/app/pos_service.cpp`, `modern/core/check.hh`, `modern/core/customer.hh`, `modern/tests/test_customers.cpp`, `modern/ui/qml/WidgetGiftCard.qml`
+
 ### 2026-11-02 13:52 ET — Bob (Claude) — Members-only promotions for subscription (9...) cards
 - **What:** Promotions get a 'Members only' switch (Manager > Promotions; membersOnly in settings JSON). Looking up or scanning a subscription card (number starting with 9, on file, not closed) while a check is open marks the check as the member's (Check.memberCard, saved with the check; checkInfo 'member'; check history 'Member card ..1234') and members-only promotions then come off it, with all the existing promotion rules: first/last day, days, hours, categories/items, percent or amount, minimum, use limit. A members-only promotion may cover the whole order (no categories needed). New test case.
 - **Why:** Owner will set subscription discount rules as he goes and wanted them with valid dates; the Promotions page already has dates, so members-only became a switch on it instead of a second rules page.

@@ -530,6 +530,11 @@ bool PosService::lookupGiftCard(const QString &number)
         const GiftCard *g = s_->giftCard(ss(digits));
         if (g && !g->closed && c->memberCard != g->number) {
             c->memberCard = g->number;
+            if (c->customerId.empty() && !g->customerId.empty())   // the member goes on the check too
+                if (const CustomerRecord *r = s_->customer(g->customerId)) {
+                    c->customerId = r->id;
+                    c->customer = {r->name, r->phone, r->address, r->note};
+                }
             noteEvent(*c, tr("Member card %1").arg(lastFour(g->number)), "member");
             emit notice(tr("Member %1 on check #%2: member discounts apply").arg(lastFour(g->number)).arg(c->id));
             changed(*c);
@@ -569,6 +574,9 @@ bool PosService::sellGiftCard(const QString &number, qint64 amountCents, const Q
     const GiftCard *existing = s_->giftCard(ss(n));
     if ((existing ? existing->balance : Money()) + amount > Money::fromCents(kMaxGiftCardCents))
         return fail(tr("A gift card can hold up to %1.").arg(format(Money::fromCents(kMaxGiftCardCents))));
+    const bool newSubscription = n.startsWith(u'9') && !s_->giftCard(ss(n));
+    if (newSubscription && (!current() || current()->customerId.empty()))
+        return fail(tr("A subscription card belongs to a member: put the customer on the check first (Customers…)."));
     if (!current() && !startCheck(CheckType::Quick))
         return false;
     Check *c = current();
@@ -588,6 +596,8 @@ bool PosService::sellGiftCard(const QString &number, qint64 amountCents, const Q
         if (!issuedTo.trimmed().isEmpty()) g->issuedTo = ss(issuedTo.trimmed());
         saveGiftCardRecord(*g);
     }
+    if (!issuedTo.trimmed().isEmpty())   // Purchased For, kept until the card goes live
+        c->giftCardFor[ss(n)] = ss(issuedTo.trimmed());
     selectedLine_ = l.id;
     giftCardNumber_ = n;
     entry_.clear();
@@ -752,6 +762,17 @@ void PosService::applyCloseEffects(Check &c)
         const std::string where = cardLocation(s_->settings.giftCardLocation, s_->settings.storeName);
         if (g->issuedLocation.empty())
             g->issuedLocation = where;
+        // Purchased By: the customer on the check; Purchased For: as typed when it was sold.
+        if (const auto it = c.giftCardFor.find(l.giftCardNumber()); it != c.giftCardFor.end() && !it->second.empty())
+            g->issuedTo = it->second;
+        if (g->purchasedBy.empty() || fresh) {
+            const CustomerRecord *who = s_->customer(c.customerId);
+            const std::string name = who && !who->name.empty() ? who->name : c.customer.name;
+            if (!name.empty())
+                g->purchasedBy = name;
+        }
+        if (g->number.starts_with('9') && !c.customerId.empty() && g->customerId.empty())
+            g->customerId = c.customerId;   // a subscription card: its member
         g->post(now(), l.total(), ss((fresh ? tr("Sold on check #%1 at %2") : tr("Reloaded on check #%1 at %2")).arg(c.id).arg(qs(where))), c.id, "sale");
         saveGiftCardRecord(*g);
     }

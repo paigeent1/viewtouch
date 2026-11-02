@@ -14,6 +14,19 @@ Item {
     property bool askingCustomer: false
     readonly property bool closed: card.closed ?? false
     property bool transferring: false
+    property bool askingSellCustomer: false
+    // A customer on the open check: Purchased By for a card sold on it.
+    readonly property bool checkHasCustomer: pos !== null && pos.hasCheck
+        && ((pos.check.customerId ?? "") !== "" || ((pos.check.customer ?? {}).name ?? "") !== "")
+    readonly property bool subscriptionNumber: number.text.replace(/[^0-9]/g, "").charAt(0) === "9"
+
+    function sell() {
+        w.pos.sellGiftCard(number.text, w.amountCents, "", forWhom.text)
+        w.amountCents = 0
+        other.text = ""
+        forWhom.text = ""
+        w.askingSellCustomer = false
+    }
     property int amountCents: 0
 
     function lookUp() {
@@ -93,9 +106,28 @@ Item {
                     }
                 }
 
+                RowLayout {
+                    Label { text: qsTr("Purchased For") }
+                    TextField {
+                        id: forWhom
+                        implicitHeight: 48
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Optional: who it's for")
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    text: w.checkHasCustomer ? qsTr("Purchased By: %1").arg((w.pos.check.customer ?? {}).name || qsTr("the customer on the check"))
+                          : w.subscriptionNumber ? qsTr("Subscription card: put the member on the check first (Customers…).")
+                          : qsTr("Purchased By: the customer on the check (none yet).")
+                }
+
                 Item { Layout.fillHeight: true }
 
                 Button {
+                    visible: !w.askingSellCustomer
                     Layout.fillWidth: true
                     implicitHeight: 64
                     font.pixelSize: 18
@@ -104,10 +136,18 @@ Item {
                           : (w.found ? qsTr("Reload %1 on the Check") : qsTr("Sell %1 Card on the Check"))
                             .arg("$" + (w.amountCents / 100).toFixed(2))
                     onClicked: {
-                        w.pos.sellGiftCard(number.text, w.amountCents)
-                        w.amountCents = 0
-                        other.text = ""
+                        if (w.checkHasCustomer || w.found) w.sell()          // a reload keeps its buyer
+                        else w.askingSellCustomer = true
                     }
+                }
+                RowLayout {
+                    visible: w.askingSellCustomer; Layout.fillWidth: true; spacing: 8
+                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…")
+                        onClicked: { w.askingSellCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
+                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; visible: !w.subscriptionNumber
+                        text: qsTr("Sell Without Customer"); onClicked: w.sell() }
+                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; visible: w.subscriptionNumber
+                        text: qsTr("Cancel"); onClicked: w.askingSellCustomer = false }
                 }
                 Label {
                     Layout.fillWidth: true
@@ -119,7 +159,7 @@ Item {
                     visible: !w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 18; highlighted: true
                     enabled: w.found && !w.closed && (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
                     text: qsTr("Pay the Check from This Card")
-                    onClicked: { if ((w.pos.check.customerId ?? "") !== "" || (w.pos.check.customerName ?? "") !== "") w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
+                    onClicked: { if (w.checkHasCustomer) w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
                 }
                 RowLayout {
                     visible: w.askingCustomer; Layout.fillWidth: true; spacing: 8
