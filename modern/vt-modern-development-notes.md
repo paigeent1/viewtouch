@@ -20,6 +20,11 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:02 ET — Bob (Claude) — Fix blocked-commit message in log_dev_note.py
+- **What:** Escaped the quotes in the example command shown when a commit is blocked.
+- **Why:** The previous commit's name change left unescaped quotes inside a Python string; it compiled but would have crashed (NameError) instead of showing the blocked-commit help.
+- **Files:** `modern/tools/log_dev_note.py`
+
 ### 2026-11-02 10:01 ET — Bob (Claude) — Notes refer to Bob (Claude) and Neil (Gemini)
 - **What:** Renamed every contributor reference in this file (entry headings and mentions) from Claude/Gemini to Bob (Claude)/Neil (Gemini); product and file names (Claude Label Utility, claude_label_utility.py, CLAUDE.md, GEMINI.md) unchanged. log_dev_note.py examples now use the new names.
 - **Why:** The owner asked that references in the development notes use Neil (Gemini) and Bob (Claude).
