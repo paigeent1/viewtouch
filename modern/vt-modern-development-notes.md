@@ -1,0 +1,114 @@
+# ViewTouch Modern — development notes
+
+A running, time-stamped record of changes made to this repository by each contributor
+(people, Claude, Gemini). It complements `CHANGELOG.md`, which is generated automatically from
+commits by `tools/changelog.py` — don't hand-edit that one.
+
+**How to add an entry**
+- Add new entries at the **top** of the log (newest first).
+- Heading: `### YYYY-MM-DD HH:MM ET — <who> — <short title>` (Eastern time, the store's clock).
+- Say **what** changed, **why**, the **files**, and the **commit** (short hash) once pushed.
+- Mention anything the next person must know (breaking changes, steps to run on the Pi).
+- Pull before editing and commit this file together with the change it describes.
+
+---
+
+## Log
+
+### 2026-11-02 09:29 ET — Claude — Start the development notes
+- **What:** created this file with time-stamped entries for all of Claude's changes so far (from the
+  commit times). From now on every change gets an entry here. Pointer added to `LABEL_UTILITY_NOTES.md`.
+- **Files:** `modern/vt-modern-development-notes.md`, `modern/tools/LABEL_UTILITY_NOTES.md`.
+
+### 2026-11-02 09:26 ET — Claude — Fix the label utility installer
+- **What:** `install_label_utility.sh` no longer creates desktop or menu icons, and removes old ones
+  (`claude-label-utility.desktop`, `vt-label-utility.desktop`). The label utility is opened from
+  ViewTouch: Manager screen > **Label Utility**.
+- **Why:** Gemini's commit `772ddbc` (09:12) removed the `DESKTOP_FILE`/`MENU_FILE` definitions but kept
+  the lines writing to them, so the installer stopped with `mkdir: cannot create directory ''`.
+- **Files:** `modern/tools/install_label_utility.sh`, `modern/tools/LABEL_UTILITY_NOTES.md`,
+  `modern/docs/label-utility/` (manual rebuilt). **Commit:** `fc6bbe8`
+
+### 2026-11-02 09:18 ET — Claude — Screenshot script for the manual
+- **What:** `capture_manual_screenshots.sh` opens the label utility on the Pi, steps through its
+  screens (start, categories, items, preview, label designer and its three toolbars, printer
+  settings, print window), saves PNGs to `/tmp/vt_label_shots` and uploads them to the `pi-shots`
+  branch. Read-only: never prints or saves templates.
+- **Why:** real screenshots for the manual (the cloud workspace can't render the Pi's fonts).
+- **Files:** `modern/tools/capture_manual_screenshots.py`, `capture_manual_screenshots.sh`. **Commit:** `32d567b`
+
+### 2026-11-02 09:09 ET — Claude — Merge Gemini's beta retirement
+- **What:** merged `71443a6` (Gemini: deleted `beta_label_utility.py`); removed remaining beta
+  mentions from the notes and manual.
+- **Files:** `modern/tools/LABEL_UTILITY_NOTES.md`, `modern/docs/label-utility/`. **Commit:** `35f33b2`
+
+### 2026-11-02 09:05 ET — Claude — Label utility user manual
+- **What:** 15-page PDF manual (how it works, every screen and button, printing, printer settings,
+  label designer, creating and importing labels, templates, updating, troubleshooting, quick reference)
+  plus its source and sample label images.
+- **Files:** `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `build_manual.py`,
+  `img/`. Rebuild: `cd modern/docs/label-utility && python3 build_manual.py ViewTouch_Label_Utility_User_Manual.pdf`.
+  **Commit:** `942c496`
+
+### 2026-11-02 09:01 ET — Claude — Claude Label Utility becomes `vt_label_utility.py`; `--upc` support
+- **What:** `modern/tools/vt_label_utility.py` now contains the Claude Label Utility, titled
+  "ViewTouch Label Utility". ViewTouch's references are unchanged: `openLabelUtility` →
+  `/usr/local/bin/vt-label-utility` → `vt_label_utility.py`, and the idle-logout `pgrep` check.
+  The utility now honours `--upc <code>` (sent by `openLabelUtility:<UPC>`) and opens straight to that
+  item's preview (matches primary, alternate or carton UPC). `claude_label_utility.py` removed (merged).
+  New installer `install_label_utility.sh` (old name forwards to it). Log is `/tmp/vt_label_utility.log`.
+  Added `LABEL_UTILITY_NOTES.md` (design rules for anyone editing the label utility).
+- **Files:** `modern/tools/vt_label_utility.py`, `install_label_utility.sh`,
+  `install_claude_label_utility.sh`, `push_label_log.sh`, `LABEL_UTILITY_NOTES.md`. **Commit:** `0958845`
+
+### 2026-11-02 08:43 ET — Claude — Import ILSA `.rtm` labels
+- **What:** **Lookup Template** imports ILSA ReportBuilder `.rtm` label layouts (size, positions, fonts,
+  alignment, barcode type, bar width, digits under the bars) as templates; asks before replacing.
+- **Files:** `modern/tools/claude_label_utility.py` (now `vt_label_utility.py`). **Commit:** `1d10852`
+
+### 2026-11-02 08:37 ET — Claude — Choose any of an item's UPCs for a label
+- **What:** collects every code on a ViewTouch item (barcodes list + `__parent__:` carton UPC). Items
+  screen: **Print UPC** (Primary / Alt UPC 1–3 / Carton UPC), **Next UPC**, "UPC on Label" and
+  "Other UPCs" columns; search matches any code. Print screen: **UPC** drop-down. Read-only — nothing
+  is written to `viewtouch.db` (the owner does not want alt UPCs promoted to primary).
+- **Commit:** `c8366e4`
+
+### 2026-11-02 08:18 ET — Claude — Remove dotted line on buttons
+- **What:** rounded buttons' top highlight was a white `gray25` stipple (a row of dots); now a solid
+  lighter shade of the button colour. **Commit:** `d77779d`
+
+### 2026-11-01 16:49 ET — Claude — Templates follow their printer by name
+- **What:** if a template's saved printer is no longer listed (e.g. its IP changed in ViewTouch), the
+  same printer name is used instead of silently falling back to the first printer. Cigar template set
+  to "Stick Labels" (192.168.1.25), price label to "Shelf Labels". **Commit:** `5fbdce0`
+
+### 2026-11-01 16:40 ET — Claude — Send ZPL to label printers regardless of name
+- **What:** printers named "Shelf Labels"/"Stick Labels" were sent ESC/POS receipt commands and printed
+  nothing. Label printers now get ZPL unless the name says receipt/Epson/kitchen; a template may force
+  `"printer_language": "zpl"|"escpos"`. **Commit:** `3e86ad3`
+
+### 2026-11-01 16:26 ET — Claude — Sharp print preview
+- **What:** preview re-drawn at screen resolution with smooth text; double-click toggles the exact
+  printer-dot view. Printed output unchanged. **Commit:** `c74d28c`
+
+### 2026-11-01 16:15 ET — Claude — `push_label_log.sh`
+- **What:** uploads the label utility log, the last label sent (`/tmp/last_label.zpl`) and the templates
+  to the `pi-logs` branch for remote diagnosis, without touching working files. **Commit:** `7ef66c2`
+
+### 2026-11-01 16:11 ET — Claude — ILSA label templates and ILSA-style barcodes
+- **What:** the label utility ships only RECEIVING LABEL plus the three ILSA layouts (2X1 VINYL UPC_PRICE,
+  2X1 VINYL UPC_DESC, CIGAR STICK LABEL UPC_DESC) converted exactly from the `.rtm` files. Own template
+  file `~/.local/share/ViewTouch/claude_label_templates.json` (no merging of defaults, deletions stick;
+  keeps the existing RECEIVING LABEL tweaks). Barcodes: fixed ILSA bar width, alignment, digits under the
+  bars; top-anchored text; Arial / Arial Black / Courier New via fontconfig (`resolve_font_file`,
+  `pdf_font_name_for` were referenced but missing). Installer adds Microsoft core fonts.
+- **Files:** `modern/tools/claude_label_utility.py`, `install_claude_label_utility.sh`,
+  `modern/seed/templates/claude_label_templates.json`. **Commit:** `76c84f2`
+
+### 2026-11-01 15:41 ET — Claude — Claude Label Utility (bitmap label rendering)
+- **What:** new label program based on `beta_label_utility.py`: every label (text and barcodes) is one
+  1-bit picture at the printer's DPI, sent as ZPL `^GFA` or an image PDF — no printer fonts or printer
+  barcodes. Barcode bars in whole printer dots (UPC-A, EAN-13, UPC-E, Code 39, Code 128; correct check
+  digits). Same picture for Zebra, CUPS and PDF. Exact print image in the preview. Rotation applied to
+  printed labels. Printer resolution setting (203/300/600 dpi). Desktop launcher installer.
+- **Files:** `modern/tools/claude_label_utility.py`, `install_claude_label_utility.sh`. **Commit:** `18d0996`

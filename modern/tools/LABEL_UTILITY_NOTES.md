@@ -1,9 +1,8 @@
 # ViewTouch Label Utility v1.0 — Architecture & Maintenance Notes
 
 **`vt_label_utility.py` is the one label program.** It replaced the earlier Gemini version on 2026-11-02
-(that version is in Git history). `claude_label_utility.py` was merged into it and removed.
-`beta_label_utility.py` is the older experimental copy — **do not build new features there**; it lacks the
-fixes below.
+(that version is in Git history). `claude_label_utility.py` was merged into it, and `beta_label_utility.py`
+was retired — both are in Git history only. Make all label changes in `vt_label_utility.py`.
 
 ## How ViewTouch launches it (keep these names)
 - Manager page button **"Label Utility"** (`seed/pages/manager.json`) runs command **`openLabelUtility`**
@@ -44,6 +43,14 @@ CIGAR STICK LABEL UPC_DESC ("Stick Labels", 192.168.1.25). ILSA `.rtm` files imp
 (`import_rtm_template`).
 
 ## Files
-- `vt_label_utility.py` — the program · `install_label_utility.sh` — installer (launcher, desktop icon, fonts)
+- `vt_label_utility.py` — the program · `install_label_utility.sh` — installer (ViewTouch launcher, Python libraries, fonts; no desktop icon — open it from ViewTouch)
+- `capture_manual_screenshots.sh` — screenshots the screens for the manual (uploads to `pi-shots`)
 - `push_label_log.sh` — uploads `/tmp/vt_label_utility.log`, `/tmp/last_label.zpl` and the templates to the
   `pi-logs` branch for remote diagnosis
+
+## User manual
+`modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf` (source: `build_manual.py` in the same folder).
+If you change buttons, screens or behaviour, update and rebuild the manual too.
+
+## Development notes
+Record every change, time-stamped, at the top of `modern/vt-modern-development-notes.md` (newest first).
