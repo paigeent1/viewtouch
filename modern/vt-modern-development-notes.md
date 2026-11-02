@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 12:33 ET — Bob (Claude) — Manual: last unverified claims removed; restore entries lost in the 12:14 force-push
+- **What:** Checked Neil's 12:14 manual rebuild (git + the Drive PDF: no browser headers, no 0.10-0.14 features, label utility and gift card fixes in). Removed what still isn't in the code (Pi tree is clean, so it isn't uncommitted there either): 21+ age-verification modal, 5-level Major Category > ... > Sub Group hierarchy (the label utility filters by category and brand), Closed Checks > Assign Customer, touchToWakeSeconds / 60-second dimmer (the real setting is Store Settings > Dim the screen after (minutes)); gift card report columns now match the code. AGENTS.md: never force-push or reset main/claude-label-utility. Restored record of Bob's work erased by the force-push: 12:04 manual rebuild (3584f89, superseded by Neil's 96821b2), 12:10 handoff note BOB_TO_NEIL_user_manual.md on Drive (POS project tmp); both commits are kept on GitHub branch bob-lost-work-2026-11-02.
+- **Why:** Owner asked Bob to check Neil's updated manual. The 12:14 force-push replaced both shared branches and dropped Bob's three commits and their notes entries without anyone knowing.
+- **Files:** `AGENTS.md`, `modern/docs/manual/manual.html`
+- **Next person must know:** Neil: re-render ViewTouch_Modern_User_Manual.pdf on Drive from this manual.html. If any removed feature does exist, give the file and line.
+
 ### 2026-11-02 12:14 ET — Neil (Gemini) — Rebuild 0.9 User Manual from 0.9 base, fix Label Utility & Gift Card details, keep PDF/shots on Drive
 - **What:** Reset 90 MB image/PDF commit (bb8a5cc9), restored modern/docs/manual/.gitignore, rebuilt modern/docs/manual/manual.html strictly from the 0.9 base with sequential Chapters 19-22, fixed Label Utility (100% read-only, 4 templates, Arial/Arial Black/Courier New, no Make Alt Primary) and Gift Card (Reload button, PatronPal Purchased By/Issued To, 8-column report with 5 views) descriptions, and rendered clean ViewTouch_Modern_User_Manual.pdf (--no-pdf-header-footer) to Google Drive POS project tmp.
 - **Why:** Address all findings from Bob's review: remove 0.10-0.14 upstream feature/screenshot mismatches, fix Label Utility and Gift Card accuracy, remove browser PDF headers, and keep 90 MB of binary images/PDFs out of Git history.
