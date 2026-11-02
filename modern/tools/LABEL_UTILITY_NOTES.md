@@ -1,9 +1,8 @@
 # ViewTouch Label Utility — notes for anyone (person or AI) changing it
 
 **`vt_label_utility.py` is the one label program.** It replaced the earlier Gemini version on 2026-11-02
-(that version is in Git history). `claude_label_utility.py` was merged into it and removed.
-`beta_label_utility.py` is the older experimental copy — **do not build new features there**; it lacks the
-fixes below.
+(that version is in Git history). `claude_label_utility.py` was merged into it, and `beta_label_utility.py`
+was retired — both are in Git history only. Make all label changes in `vt_label_utility.py`.
 
 ## How ViewTouch launches it (keep these names)
 - Manager page button **"Label Utility"** (`seed/pages/manager.json`) runs command **`openLabelUtility`**

@@ -156,8 +156,7 @@ story.append(table([
     ["Error log", "<font face='Courier'>/tmp/vt_label_utility.log</font> (cleared when the Pi restarts)"],
     ["Last label sent to a printer", "<font face='Courier'>/tmp/last_label.zpl</font> and <font face='Courier'>/tmp/VT_Labels.pdf</font>"],
 ], [2.4, 4.5]))
-story.append(P("The label utility keeps its own template list, so templates you delete stay deleted. The older experimental "
-               "copy on the Pi (beta_label_utility) has a separate list and is not affected."))
+story.append(P("The label utility keeps its own template list, so templates you delete stay deleted."))
 
 # ---------------------------------------------------------------- 2
 story.append(PageBreak())
