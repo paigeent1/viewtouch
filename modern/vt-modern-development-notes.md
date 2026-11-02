@@ -42,7 +42,7 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 ## 3. Live Environment & Network Topology
 
 * **Main POS Server**: Raspberry Pi 5 (`192.168.1.219`, MAC `d8:3a:dd:e5:47:a5`, POS TCP port `7719`, migrating to `192.168.6.x` on UniFi Dream Machine) running Debian 13 Trixie (Qt 6.8.2). Live DB: `~/.local/share/ViewTouch/ViewTouch/viewtouch.db`.
-* **Lenovo Android Tablet Fleet**: Bar 1 (`192.168.1.220`), Bar 2 (`192.168.1.215`), and Bar 3 (`192.168.1.210`) managed via wireless ADB port `5555` (`vt-adb-ensure`, `vt-status`, `vt-server`, `vt-tablets`).
+* **Lenovo Android Tablet Fleet**: Bar 1 (`192.168.1.220`), Bar 2 (`192.168.1.215`), and Bar 3 (`192.168.1.210`) managed via wireless ADB port `5555` (`vt-adb-ensure`, `vt-status`, `vt-server`, `vt-tablets`). Their addresses are fixed in the UniFi backend.
 * **Printers**: Epson TM-T88 receipt/kitchen thermal printer at `192.168.1.77:9100` (ESC/POS); ZPL label printers "Shelf Labels" at `192.168.1.24:9100` (2x1 vinyl price labels; CUPS queue `BHDAN_PRICE_LABEL`) and "Stick Labels" at `192.168.1.25:9100` (cigar stick labels, different stock).
 * **This repository is public** (`paigeent1/viewtouch`): never put passwords, PINs, API keys or customer data in the repo or these notes.
 
@@ -83,6 +83,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-02 16:40 ET — Bob (Claude) — Tablet addresses are fixed in UniFi
+- **What:** Section 3 notes that the tablets' addresses (.220 Bar 1, .215 Bar 2, .210 Bar 3) are fixed in the UniFi backend.
+- **Why:** Owner confirmed; rules out an address change as the reason a tablet drops off ADB.
+- **Files:** `modern/vt-modern-development-notes.md`
 
 ### 2026-11-02 16:38 ET — Bob (Claude) — Tablets: wireless debugging back on after a restart
 - **What:** Kiosk.ensureWirelessAdb (runs at boot): when the app holds WRITE_SECURE_SETTINGS, it sets adb_enabled, adb_wifi_enabled and adb_allowed_connection_time itself (Settings.Global). The existing DevicePolicyManager.setGlobalSetting calls for those keys always failed silently: Android doesn't let a device owner change them. Manifest declares the permission. One-time per tablet over USB: adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS (kept across app updates).
