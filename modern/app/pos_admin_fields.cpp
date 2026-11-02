@@ -300,8 +300,8 @@ QVariantList PosService::adminFields(const QString &panel)
         return storeSections({
             field(u"storeName"_s, tr("Store name"), u"string"_s),
             field(u"storeZip"_s, tr("Store ZIP code (for weather)"), u"string"_s),
-            field(u"giftCardLocation"_s, tr("Gift card location code"), u"string"_s,
-                  tr("Recorded on every gift card sold or reloaded here, e.g. HCA. Empty: the store name.")),
+            field(u"giftCardLocation"_s, tr("Gift card location"), u"string"_s,
+                  tr("Recorded on every gift card sold or reloaded here, e.g. Hat City Ale House, or Buttheads Tobacco Emporium - Danbury. Empty: the store name.")),
             with(field(u"language"_s, tr("Language"), u"enum"_s,
                        tr("For screens nobody is logged in to, the customer display, receipts and tickets. "
                           "Each person can have their own (Employees).")),

@@ -319,7 +319,7 @@ struct PosSettings {
     // bar and expo screens and the self-order kiosk stay on.
     int screenSaverMinutes = 3;
     std::string storeZip;
-    // Recorded on every gift card sold or reloaded here ("HCA"); empty: the store name.
+    // Recorded on every gift card sold or reloaded here ("Hat City Ale House"); empty: the store name.
     std::string giftCardLocation;
     std::string scanAddPermission = "manager";
     bool topRibbonEnabled = true;

@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 16:29 ET — Bob (Claude) — Gift card location: full store names, not codes
+- **What:** Store Settings > Store field renamed 'Gift card location'; no longer forced to capitals; hint shows Hat City Ale House / Buttheads Tobacco Emporium - Danbury.
+- **Why:** Owner: locations are Hat City Ale House and Buttheads Tobacco Emporium (two stores, told apart by town).
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/app/pos_admin_save.cpp`, `modern/core/settings.hh`
+- **Next person must know:** When the Buttheads stores join one central server, Store Settings is shared by all three stores, so the location will need to come from each terminal (a per-terminal store setting that overrides this one). Not built yet.
+
 ### 2026-11-02 16:23 ET — Neil (Gemini) — Install ILSA Temp Pricebook hook in Label Utility & Jan 1 cutover
 - **What:** Connected ViewTouch Label Utility to read from ~/.local/share/ViewTouch/ilsa_temp_pricebook.db when present, added /usr/local/bin/vt-sync-ilsa to pull fresh CSVs from Dropbox on demand, leaving live viewtouch.db 100% clean.
 - **Why:** Enables employee to practice label printing using live up-to-date ILSA inventory/pricing without modifying or polluting the live POS database before the Jan 1 go-live.
