@@ -1176,19 +1176,23 @@ ApplicationWindow {
             opacity: 0.55
             // The store's logo (Store Settings), when there is one.
             Image {
-                id: screenSaverLogo
-                objectName: "screenSaverLogo"
-                readonly property var pos: root.controller.pos
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: status === Image.Ready
-                source: (Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : (root.controller.pos ? root.controller.pos.imageUrl("logo:") : ""))
-                sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
-                width: Math.round(root.height * 0.28)
-                height: Math.round(root.height * 0.28)
-                fillMode: Image.PreserveAspectFit
-                mipmap: true
-                asynchronous: true
+            id: screenSaverLogo
+            objectName: "screenSaverLogo"
+            anchors.horizontalCenter: parent.horizontalCenter
+            source: (root.controller.pos && root.controller.pos.storeLogo)
+                    ? root.controller.pos.imageUrl("logo:")
+                    : Qt.resolvedUrl("logo.png")
+            width: Math.round(root.height * 0.28)
+            height: Math.round(root.height * 0.28)
+            fillMode: Image.PreserveAspectFit
+            mipmap: true
+            visible: true
+            onStatusChanged: {
+                if (status === Image.Error && source != Qt.resolvedUrl("logo.png")) {
+                    source = Qt.resolvedUrl("logo.png")
+                }
             }
+        }
             Text {
                 id: saverClock
                 anchors.horizontalCenter: parent.horizontalCenter

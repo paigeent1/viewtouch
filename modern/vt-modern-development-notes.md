@@ -79,6 +79,14 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:19 ET — Neil (Gemini) — Fix Android tablet logo fallback and restore Label Utility functionality
+
+- **What**: 1) Safely initialized tpl_var in Label Utility to resolve Tkinter AttributeError crash. 2) Registered logo.png in modern/CMakeLists.txt and implemented hybrid fallback in Main.qml.
+- **Why**: Android Scoped Storage and missing CMake resource caused the logo to fail on Android tablets. Label utility crashed because tpl_var was uninitialized before step 4.
+- **Files**: modern/tools/vt_barcode_wizard.py, modern/CMakeLists.txt, modern/ui/qml/Main.qml, modern/ui/qml/logo.png
+- **Commit**: `PENDING`
+- **Next person must know**: logo.png is now embedded directly in the APK binary resource bundle as a fail-safe fallback if the live tablet network lookup is delayed.
+
 ### 2026-11-02 13:15 ET — Neil (Gemini) — Rebuild 0.9 User Manual from 0.9 base, fix Label Utility & Gift Card details, keep PDF/shots on Drive
 - **What:** Reset 90 MB image/PDF commit (bb8a5cc9), restored modern/docs/manual/.gitignore, rebuilt modern/docs/manual/manual.html strictly from the 0.9 base with sequential Chapters 19-22, fixed Label Utility (100% read-only, 4 templates, Arial/Arial Black/Courier New, no Make Alt Primary) and Gift Card (Reload button, PatronPal Purchased By/Issued To, 8-column report with 5 views) descriptions, and rendered clean ViewTouch_Modern_User_Manual.pdf (--no-pdf-header-footer) to Google Drive POS project tmp.
 - **Why:** Address all findings from Bob's review: remove 0.10-0.14 upstream feature/screenshot mismatches, fix Label Utility and Gift Card accuracy, remove browser PDF headers, and keep 90 MB of binary images/PDFs out of Git history.

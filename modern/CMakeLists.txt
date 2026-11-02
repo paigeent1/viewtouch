@@ -130,6 +130,8 @@ if(Qt6_FOUND)
         OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ViewTouch
         QML_FILES
             ui/qml/Main.qml
+        RESOURCES
+            ui/qml/logo.png
             ui/qml/JoinWindow.qml
             ui/qml/StationWindow.qml
             ui/qml/StationIcon.qml

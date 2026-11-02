@@ -2579,203 +2579,22 @@ class VTLabelUtility(tk.Tk):
             self.show_step(3)
 
     def select_template_and_go(self, tpl_name):
-        if tpl_name in self.templates:
-            self.chosen_template_name = tpl_name
-            self.came_from_step = 1
-            self.show_step(4)
+        self.chosen_template_name = tpl_name
+        self.came_from_step = 1
+        if not hasattr(self, "tpl_var"):
+            self.tpl_var = tk.StringVar(value=tpl_name)
+        else:
             self.tpl_var.set(tpl_name)
-            self._render_live_preview()
-
-    def _build_step1(self):
-        pane = tk.Frame(self.content, bg="#0c1017")
-        pane.pack(fill="both", expand=True, padx=12, pady=6)
-
-        for c in range(12):
-            pane.columnconfigure(c, weight=1, uniform="c")
-        pane.rowconfigure(0, weight=1, minsize=140)
-        pane.rowconfigure(1, weight=3)
-
-        top_frame = tk.LabelFrame(
-            pane, text=" SELECT VIEWTOUCH DATA ", bg="#0c1017", fg="#38bdf8",
-            font=("Sans", 10, "bold"), bd=1, relief="solid", padx=8, pady=6
-        )
-        top_frame.grid(row=0, column=0, columnspan=12, sticky="nsew", padx=4, pady=(0, 6))
-
-        for c in range(4):
-            top_frame.columnconfigure(c, weight=1, uniform="top_btn")
-        top_frame.rowconfigure(0, weight=1)
-
-        cur_mode = getattr(self, "mode_var_val", "tree")
-        self.mode_var = tk.StringVar(value=cur_mode)
-        modes = [
-            ("tree", "Tree View\n\nCategories & Brands", "#15803d"),
-            ("retail", "Retail Items\n\nCigars & Goods Only", "#0284c7"),
-            ("rcv", "Receiving Orders\n\nRecent Deliveries", "#1e3a8a"),
-            ("all", "All Catalog\n\nFull Inventory", "#1e293b"),
-        ]
-        self.mode_btn_widgets = {}
-
-        def select_mode(m_val):
-            self.mode_var.set(m_val)
-            self.mode_var_val = m_val
-            for k, (btn, bg_c, act_c) in self.mode_btn_widgets.items():
-                use_c = act_c if k == m_val else bg_c
-                btn.configure(bg=use_c)
-
-        mode_active_colors = {"tree": "#16a34a", "retail": "#0284c7", "rcv": "#2563eb", "all": "#334155"}
-        mode_dim_colors = {"tree": "#14532d", "retail": "#0369a1", "rcv": "#1e3a8a", "all": "#1e293b"}
-
-        for col_idx, (m_val, m_label, _m_bg) in enumerate(modes):
-            is_active = (cur_mode == m_val)
-            act_c = mode_active_colors.get(m_val, _m_bg)
-            dim_c = mode_dim_colors.get(m_val, _m_bg)
-            init_c = act_c if is_active else dim_c
-            b = make_vt_btn(
-                top_frame,
-                text=m_label,
-                font=("Sans", 10, "bold"),
-                bg=init_c,
-                fg="#ffffff",
-                radius=12,
-                command=lambda v=m_val: self.select_mode_and_go(v)
-            )
-            b.grid(row=0, column=col_idx, sticky="nsew", padx=4, pady=3)
-            self.mode_btn_widgets[m_val] = (b, dim_c, act_c)
-
-        # Large Format Saved Label Template Selection Window (3x Touch Height)
-        tpl_sel_frame = tk.LabelFrame(
-            pane, text=" SELECT SAVED LABEL TEMPLATE ", bg="#0c1017", fg="#38bdf8",
-            font=("Sans", 11, "bold"), bd=1, relief="solid", padx=12, pady=10
-        )
-        tpl_sel_frame.grid(row=1, column=0, columnspan=8, sticky="nsew", padx=(4, 6), pady=2)
-        tpl_sel_frame.columnconfigure(0, weight=1)
-        tpl_sel_frame.rowconfigure(1, weight=1)
-
-        active_tpl_names = list(self.templates.keys()) if hasattr(self, "templates") else []
-        if "RECEIVING LABEL" in active_tpl_names:
-            active_tpl_names.remove("RECEIVING LABEL")
-            active_tpl_names.insert(0, "RECEIVING LABEL")
-
-        self.step1_tpl_var = tk.StringVar(value=active_tpl_names[0] if active_tpl_names else "")
-        self.option_add("*TCombobox*Listbox.font", ("Sans", 14, "bold"))
-
-        top_box = tk.Frame(tpl_sel_frame, bg="#0c1017")
-        top_box.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        top_box.columnconfigure(1, weight=1)
-
-        tk.Label(top_box, text="Template:", bg="#0c1017", fg="#38bdf8", font=("Sans", 12, "bold")).grid(row=0, column=0, padx=(0, 8), sticky="w")
-        cb = ttk.Combobox(top_box, textvariable=self.step1_tpl_var, values=active_tpl_names, state="readonly", font=("Sans", 14, "bold"))
-        cb.grid(row=0, column=1, sticky="ew")
-
-        # 3x Height Touch Rows (rowheight=58px)
-        t_style = ttk.Style()
-        t_style.configure("TplList.Treeview", rowheight=58, font=("Sans", 13, "bold"), background="#1e293b", foreground="#f8fafc", fieldbackground="#1e293b")
-        t_style.configure("TplList.Treeview.Heading", font=("Sans", 11, "bold"))
-        t_style.map("TplList.Treeview", background=[("selected", "#0284c7")], foreground=[("selected", "#ffffff")])
-
-        list_frame = tk.Frame(tpl_sel_frame, bg="#0c1017")
-        list_frame.grid(row=1, column=0, sticky="nsew", pady=4)
-        list_frame.columnconfigure(0, weight=1)
-        list_frame.rowconfigure(0, weight=1)
-
-        cols = ("name", "dim", "prn")
-        self.tpl_tree = ttk.Treeview(list_frame, columns=cols, show="headings", style="TplList.Treeview", selectmode="browse", height=4)
-        self.tpl_tree.heading("name", text="Saved Label Template (File Manager Name)")
-        self.tpl_tree.heading("dim", text="Stock Size")
-        self.tpl_tree.heading("prn", text="Target Destination")
-        self.tpl_tree.column("name", width=340, anchor="w")
-        self.tpl_tree.column("dim", width=120, anchor="center")
-        self.tpl_tree.column("prn", width=180, anchor="w")
-        self.tpl_tree.grid(row=0, column=0, sticky="nsew")
-
-        sb = tk.Scrollbar(list_frame, orient="vertical", command=self.tpl_tree.yview)
-        sb.grid(row=0, column=1, sticky="ns")
-        self.tpl_tree.config(yscrollcommand=sb.set)
-
-        for idx, name in enumerate(active_tpl_names):
-            t_obj = self.templates.get(name, {}) if hasattr(self, "templates") else {}
-            w = t_obj.get("width_in", 2.0)
-            h = t_obj.get("height_in", 1.0)
-            prn = t_obj.get("default_printer", "Auto").split("(")[0].replace("VT TCP:", "").strip()
-            self.tpl_tree.insert("", "end", iid=str(idx), values=(f" {name}", f"{w} x {h} in", f"{prn}"))
-
-        if active_tpl_names:
-            self.tpl_tree.selection_set("0")
-
-        def on_cb_sel(_e=None):
-            c = self.step1_tpl_var.get()
-            if c in active_tpl_names:
-                i = str(active_tpl_names.index(c))
-                self.tpl_tree.selection_set(i); self.tpl_tree.see(i)
-
-        def on_tree_sel(_e=None):
-            s = self.tpl_tree.selection()
-            if s:
-                idx = int(s[0])
-                if 0 <= idx < len(active_tpl_names): self.step1_tpl_var.set(active_tpl_names[idx])
-
-        cb.bind("<<ComboboxSelected>>", on_cb_sel)
-        self.tpl_tree.bind("<<TreeviewSelect>>", on_tree_sel)
-        self.tpl_tree.bind("<Double-Button-1>", lambda _e: self.select_template_and_go(self.step1_tpl_var.get()))
-
-        btn_box = tk.Frame(tpl_sel_frame, bg="#0c1017")
-        btn_box.grid(row=2, column=0, sticky="ew", pady=(8, 2))
-        make_vt_btn(btn_box, text="▶ Open & Preview Selected Label", bg="#16a34a", fg="#ffffff", font=("Sans", 12, "bold"), pady=8, radius=12, command=lambda: self.select_template_and_go(self.step1_tpl_var.get())).pack(fill="x")
-
-        # Right Panel
-        right_panel = tk.Frame(pane, bg="#0c1017")
-        right_panel.grid(row=1, column=8, columnspan=4, sticky="nsew", padx=(4, 4), pady=2)
-        right_panel.columnconfigure(0, weight=1)
-        right_panel.rowconfigure(0, weight=3)
-        right_panel.rowconfigure(1, weight=2)
-
-        db_frame = tk.LabelFrame(
-            right_panel, text=" DATABASE STATUS ", bg="#0c1017", fg="#38bdf8",
-            font=("Sans", 10, "bold"), bd=1, relief="solid", padx=8, pady=4
-        )
-        db_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 4))
-        tk.Label(db_frame, text="ViewTouch POS Connected", bg="#0c1017", fg="#86efac", font=("Sans", 10, "bold"), anchor="w").pack(fill="x", pady=1)
-        tk.Label(db_frame, text=f"• Catalog Items: {len(self.all_items)}", bg="#0c1017", fg="#f8fafc", font=("Sans", 9, "bold"), anchor="w").pack(fill="x", pady=1)
-        tk.Label(db_frame, text=f"• Templates: {len(active_tpl_names)} active", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold"), anchor="w").pack(fill="x", pady=1)
-        db_name = os.path.basename(VT_DB_PATH)
-        tk.Label(db_frame, text=f"• Database: {db_name}", bg="#0c1017", fg="#94a3b8", font=("Monospace", 8), anchor="w").pack(fill="x", pady=1)
-
-        tools_frame = tk.LabelFrame(
-            right_panel, text=" TEMPLATE ACTIONS ", bg="#0c1017", fg="#38bdf8",
-            font=("Sans", 10, "bold"), bd=1, relief="solid", padx=6, pady=4
-        )
-        tools_frame.grid(row=1, column=0, sticky="nsew", pady=(2, 0))
-        tools_frame.columnconfigure(0, weight=1)
-        tools_frame.columnconfigure(1, weight=1)
-        tools_frame.rowconfigure(0, weight=1)
-        tools_frame.rowconfigure(1, weight=1)
-
-        btn_lookup = make_vt_btn(
-            tools_frame,
-            text="Lookup Template",
-            font=("Sans", 10, "bold"),
-            bg="#1d4ed8",
-            fg="#ffffff",
-            radius=12,
-            command=self.browse_template_file
-        )
-        btn_lookup.grid(row=0, column=0, sticky="nsew", padx=4, pady=3)
-
-        make_vt_btn(tools_frame, text="Delete Template", font=("Sans", 10, "bold"), bg="#b91c1c", fg="#ffffff", radius=12,
-                    command=self.delete_selected_template).grid(row=0, column=1, sticky="nsew", padx=4, pady=3)
-        make_vt_btn(tools_frame, text="Restore Standard Labels", font=("Sans", 10, "bold"), bg="#0f766e", fg="#ffffff", radius=12,
-                    command=self.restore_standard_templates).grid(row=1, column=1, sticky="nsew", padx=4, pady=3)
-
-        btn_folder = make_vt_btn(
-            tools_frame,
-            text="Open Template Folder",
-            font=("Sans", 10, "bold"),
-            bg="#334155",
-            fg="#ffffff",
-            radius=12,
-            command=self.open_template_folder
-        )
-        btn_folder.grid(row=1, column=0, sticky="nsew", padx=4, pady=3)
+        if hasattr(self, "show_step"):
+            self.show_step(4)
+        elif hasattr(self, "_build_step4"):
+            self._build_step4()
+        if hasattr(self, "tpl_var"):
+            self.tpl_var.set(tpl_name)
+        if hasattr(self, "on_template_change"):
+            self.on_template_change()
+        elif hasattr(self, "render_preview"):
+            self.render_preview()
 
     def _build_step2(self):
         left = tk.Frame(self.content, bg="#1e242d", width=290)
