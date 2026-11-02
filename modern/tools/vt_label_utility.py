@@ -32,9 +32,11 @@ from reportlab.lib.units import inch
 from reportlab.graphics.barcode import code128
 
 SANDBOX_DIR = os.path.expanduser("~/.local/share/ViewTouch")
-TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "claude_label_templates.json")
+TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "label_templates.json")
+# The same file under its name before 2026-11-02; read once, copied to TEMPLATE_FILE, left as a backup.
+OLD_TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "claude_label_templates.json")
 # Starting templates shipped in the repo (copied to TEMPLATE_FILE on first run)
-SEED_TEMPLATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "seed", "templates", "claude_label_templates.json")
+SEED_TEMPLATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "seed", "templates", "label_templates.json")
 VT_DB_PATH = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
 
 DEFAULT_TEMPLATES = {
@@ -344,19 +346,22 @@ def import_rtm_template(path):
     return tpl
 
 def load_templates():
-    """The label utility keeps its own template list (claude_label_templates.json).
+    """The label utility keeps its own template list (label_templates.json).
 
-    First run: copies the shipped seed file to ~/.local/share/ViewTouch/claude_label_templates.json.
+    First run: copies the store's templates from their old file name, else the shipped seed file, to
+    ~/.local/share/ViewTouch/label_templates.json.
     After that only that file is used, so deleted templates stay deleted.
     """
     data = {}
-    for src in (TEMPLATE_FILE, SEED_TEMPLATE_FILE):
+    for src in (TEMPLATE_FILE, OLD_TEMPLATE_FILE, SEED_TEMPLATE_FILE):
         if os.path.exists(src):
             try:
                 with open(src, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                 if isinstance(loaded, dict) and loaded:
                     data = loaded
+                    if src == OLD_TEMPLATE_FILE:
+                        save_templates(data)   # moved to the new file name; the old file stays as a backup
                     if src == SEED_TEMPLATE_FILE:
                         # Keep the RECEIVING LABEL position tweaks already saved by vt_label_utility
                         try:

@@ -31,8 +31,9 @@ changes what the operator sees or does, raise it, add a line here, and tag the c
 3. **Read-only on viewtouch.db.** ViewTouch keeps the menu in memory and rewrites `menu_items` from memory, so
    direct writes get lost or overwritten. The user does **not** want alt UPCs promoted to primary.
    Choosing an alt/carton UPC is per print, in memory only (`collect_item_upcs`, `set_item_upc`).
-4. **Templates live in `~/.local/share/ViewTouch/claude_label_templates.json`** (seeded once from
-   `modern/seed/templates/claude_label_templates.json`). No merging of built-in defaults or other utilities'
+4. **Templates live in `~/.local/share/ViewTouch/label_templates.json`** (seeded once from
+   `modern/seed/templates/label_templates.json`; until 2026-11-02 the file was `claude_label_templates.json`,
+   which is read once, copied over and kept as a backup). No merging of built-in defaults or other utilities'
    templates; deleted templates must stay deleted. Don't overwrite the user's templates on start-up.
 5. **Printer language:** network/CUPS printers get ZPL unless the name says receipt/Epson/kitchen
    (`printer_speaks_zpl`); a template may set `"printer_language": "zpl"|"escpos"`. Templates find their

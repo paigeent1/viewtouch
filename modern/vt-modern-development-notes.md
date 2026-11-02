@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 15:48 ET — Bob (Claude) — No more 'claude' names in the store's repo; Bob works on main
+- **What:** Label templates: modern/seed/templates/claude_label_templates.json -> label_templates.json, live file ~/.local/share/ViewTouch/claude_label_templates.json -> label_templates.json (read once from the old name, copied over, old file kept as a backup; tested). Removed the install_claude_label_utility.sh forwarder and the installer's removal of long-gone claude-label-utility icons; push_label_log.sh uploads label_templates.json. The claude-label-utility branch is retired: Bob pulls and pushes main like everyone; update_label_utility.sh only pulls main. AGENTS.md and the label manual updated (rebuilt).
+- **Why:** Owner asked why his GitHub still refers to a Claude fork.
+- **Files:** `AGENTS.md`, `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/build_manual.py`, `modern/seed/templates/label_templates.json`, `modern/tools/LABEL_UTILITY_NOTES.md`, `modern/tools/install_claude_label_utility.sh`, `modern/tools/install_label_utility.sh`, `modern/tools/push_label_log.sh`, `modern/tools/update_label_utility.sh`, `modern/tools/vt_label_utility.py`
+- **Next person must know:** CLAUDE.md stays: it's the file Bob reads at the start of every session (like GEMINI.md for Neil). Delete the old branch on GitHub from the Pi: git push myfork --delete claude-label-utility. Old dev-notes entries keep their history as written.
+
 ### 2026-11-02 15:45 ET — Owner — Store logo built into the app
 - **What:** Added modern/assets/images/store-logo.png (Neil's logo.png), built in as qrc:/images/store-logo.png: the screen saver's fallback logo.
 - **Why:** Tablets that can't load the Store Settings logo still show it.

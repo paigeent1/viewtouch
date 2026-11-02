@@ -50,9 +50,7 @@ fi
 # menu icons are created. Remove ones made by earlier versions of this installer.
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
 [ -n "$DESKTOP_DIR" ] && [ -d "$DESKTOP_DIR" ] || DESKTOP_DIR="$HOME/Desktop"
-for f in "$DESKTOP_DIR/claude-label-utility.desktop" "$DESKTOP_DIR/vt-label-utility.desktop" \
-         "$HOME/.local/share/applications/claude-label-utility.desktop" \
-         "$HOME/.local/share/applications/vt-label-utility.desktop"; do
+for f in "$DESKTOP_DIR/vt-label-utility.desktop" "$HOME/.local/share/applications/vt-label-utility.desktop"; do
     [ -e "$f" ] && rm -f "$f" && echo "Removed old icon: $f"
 done
 

@@ -32,7 +32,7 @@ entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (
   copying an older file over a newer one silently undoes other people's work.
 - Commit the notes entry together with the change it describes. Push to the `myfork` remote on the Pi.
 - Don't delete files by wildcard (e.g. `rm ~/Desktop/*label*`); name the exact files.
-- Never force-push or reset `main` or `claude-label-utility` (no `push -f`, no `reset --hard` + push, no `pull -X theirs`):
+- Everyone works on `main` (pull, commit, push). Never force-push or reset it (no `push -f`, no `reset --hard` + push, no `pull -X theirs`):
   it silently deletes other contributors' commits and their notes entries. To undo something, add a new commit
   (`git revert`). If history really must be rewritten (e.g. to purge big files), ask the owner first and re-apply
   everyone else's commits on top.

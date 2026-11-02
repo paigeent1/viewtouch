@@ -11,8 +11,8 @@ REMOTE="${1:-myfork}"
 git remote get-url "$REMOTE" >/dev/null 2>&1 || REMOTE=origin
 
 files=()
-for f in /tmp/vt_label_utility.log /tmp/claude_label_utility.log /tmp/last_label.zpl \
-         "$HOME/.local/share/ViewTouch/claude_label_templates.json"; do
+for f in /tmp/vt_label_utility.log /tmp/last_label.zpl \
+         "$HOME/.local/share/ViewTouch/label_templates.json"; do
     [ -s "$f" ] && files+=("$f")
 done
 if [ ${#files[@]} -eq 0 ]; then

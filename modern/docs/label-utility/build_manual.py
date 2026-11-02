@@ -210,8 +210,8 @@ story.append(P("Where things are kept", h3))
 story.append(table([
     ["What", "Where"],
     ["The program", "<font face='Courier'>~/viewtouch-main/modern/tools/vt_label_utility.py</font>"],
-    ["Your label templates (live copy)", "<font face='Courier'>~/.local/share/ViewTouch/claude_label_templates.json</font>"],
-    ["Starting templates shipped with the program", "<font face='Courier'>~/viewtouch-main/modern/seed/templates/claude_label_templates.json</font>"],
+    ["Your label templates (live copy)", "<font face='Courier'>~/.local/share/ViewTouch/label_templates.json</font>"],
+    ["Starting templates shipped with the program", "<font face='Courier'>~/viewtouch-main/modern/seed/templates/label_templates.json</font>"],
     ["Items, prices, UPCs, printers", "ViewTouch's own database (read only)"],
     ["Error log", "<font face='Courier'>/tmp/vt_label_utility.log</font> (cleared when the Pi restarts)"],
     ["Last label sent to a printer", "<font face='Courier'>/tmp/last_label.zpl</font> and <font face='Courier'>/tmp/VT_Labels.pdf</font>"],
@@ -542,7 +542,7 @@ story.append(KeepTogether([P("Deleting and restoring templates", h3),
     B("<b>Bring back a single ILSA label</b> without touching the others: <b>Lookup Template</b> and choose its .rtm file (section 9)."),
     Spacer(1, 6)]))
 story.append(box("Back up your templates:", "Your adjusted templates live in "
-                 "<font face='Courier'>~/.local/share/ViewTouch/claude_label_templates.json</font>. Copy that file somewhere safe after "
+                 "<font face='Courier'>~/.local/share/ViewTouch/label_templates.json</font>. Copy that file somewhere safe after "
                  "making changes you want to keep, or run the upload command in section 12."))
 
 # ---------------------------------------------------------------- 11
@@ -553,8 +553,7 @@ story.append(B("<b>Double-click the Update Label Utility icon</b> on the Pi's de
                "shows each step, beeps three times when it's finished, and says <b>Up to date</b>."))
 story.append(B("Or, in a Terminal:"))
 story.append(C("bash ~/viewtouch-main/modern/tools/update_label_utility.sh"))
-story.append(P("Either way it: pulls the latest changes from GitHub (Neil's on <font face='Courier'>main</font> and Bob's on "
-               "<font face='Courier'>claude-label-utility</font>), runs the installer, turns on the development-notes check, and "
+story.append(P("Either way it: pulls the latest changes from GitHub (<font face='Courier'>main</font>), runs the installer, turns on the development-notes check, and "
                "updates GitHub's <font face='Courier'>main</font> to match the Pi. Then close and reopen the label utility. Your "
                "templates and printer settings are kept."))
 story.append(P("The installer sets up the launcher ViewTouch's Label Utility button uses, installs any missing Python parts, and installs Microsoft's "
