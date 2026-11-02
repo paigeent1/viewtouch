@@ -3,12 +3,15 @@
 This is the store's ViewTouch fork (`paigeent1/viewtouch`), running on a Raspberry Pi 5 at the store.
 Several contributors work on it — the owner, Claude and Gemini — so these rules keep everyone in step.
 
+**Names:** Claude is called **Bob** and Gemini is called **Neil**. Use these names when talking to the owner and in
+the development notes (e.g. `### 2026-11-02 10:00 ET — Bob (Claude) — ...`, `— Neil (Gemini) — ...`).
+
 ## 1. Log every change (required — commits are blocked without it)
 Every commit that changes anything (other than the notes themselves or `modern/CHANGELOG.md`) must add an
 entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (newest first):
 
 ```
-### YYYY-MM-DD HH:MM ET — <Claude | Gemini | name> — <short title>
+### YYYY-MM-DD HH:MM ET — <Bob (Claude) | Neil (Gemini) | name> — <short title>
 - **What:** what changed
 - **Why:** why it changed
 - **Files:** the files touched

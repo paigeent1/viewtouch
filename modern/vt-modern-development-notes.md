@@ -20,6 +20,11 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 09:59 ET — Bob (Claude) — Contributor names: Bob (Claude) and Neil (Gemini)
+- **What:** Recorded the owner's names for the AI contributors in AGENTS.md, CLAUDE.md, GEMINI.md and .gemini/styleguide.md: Claude is Bob, Gemini is Neil. Notes headings now use '— Bob (Claude) —' / '— Neil (Gemini) —'.
+- **Why:** The owner asked Gemini to refer to itself as Neil and Claude as Bob.
+- **Files:** `.gemini/styleguide.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`
+
 ### 2026-11-02 09:58 ET — Claude — User manual with screenshots from the Pi
 - **What:** Added 10 screenshots taken on the Pi (1360x768) to the label utility manual: every screen, the print window, Printer Offset, the label designer, and each designer toolbar above the table that explains its buttons (cut row by row so the text is readable). Headings kept with their content. build_manual.py now cuts the toolbar screenshots itself. Widened the position readout in Printer Offset, which was clipped.
 - **Why:** The owner asked for screenshots in the manual, especially the designer's top toolbars next to their descriptions.

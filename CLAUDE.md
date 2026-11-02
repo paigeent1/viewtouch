@@ -2,6 +2,8 @@
 
 Read and follow **AGENTS.md** in the repository root. The essentials:
 
+0. **Names:** Claude is **Bob**, Gemini is **Neil** — use them with the owner and in the notes, e.g. `— Bob (Claude) —`.
+
 1. **Log every change** at the top of `modern/vt-modern-development-notes.md` (newest first):
    `### YYYY-MM-DD HH:MM ET — <who> — <short title>` with **What:**, **Why:**, **Files:**, **Commit:**,
    and optionally **Next person must know:**. Helper:
