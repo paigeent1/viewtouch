@@ -113,8 +113,8 @@ QVariantList PosService::adminFields(const QString &panel)
         return {
             field(u"name"_s, tr("Name"), u"string"_s, tr("On the check and receipt, e.g. Happy Hour")), readonlyId,
             field(u"active"_s, tr("On"), u"bool"_s),
-            field(u"membersOnly"_s, tr("Members only"), u"bool"_s,
-                  tr("Only on checks with a subscription (9...) card on them: scan or look up the member's card during the sale.")),
+            field(u"subscriptionOnly"_s, tr("Subscription only"), u"bool"_s,
+                  tr("Only on checks with a subscription (9...) card on them: scan or look up the subscription card during the sale.")),
             field(u"families"_s, tr("Categories"), u"string"_s,
                   tr("Comma separated: %1").arg(families.join(u", "_s))),
             field(u"items"_s, tr("Items"), u"string"_s, tr("Menu item IDs, comma separated (e.g. draft-beer, house-wine)")),

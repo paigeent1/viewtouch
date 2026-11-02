@@ -168,7 +168,7 @@ QJsonObject toJson(const Check &c)
         {u"events"_s, events}, {u"firedCourse"_s, c.firedCourse}, {u"customerId"_s, qs(c.customerId)},
         {u"receiptEmail"_s, qs(c.receiptEmail)}, {u"receiptEmailSent"_s, c.receiptEmailSent},
         {u"cashTipCents"_s, qint64(c.cashTip.cents())},
-        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"memberCard"_s, qs(c.memberCard)}, {u"giftCardFor"_s, [&c] {
+        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"subscriptionCard"_s, qs(c.subscriptionCard)}, {u"giftCardFor"_s, [&c] {
             QJsonObject o;
             for (const auto &[number, who] : c.giftCardFor) o.insert(qs(number), qs(who));
             return o;
@@ -293,7 +293,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.vip = o.value(u"vip").toBool();
     c.allergies = strings(o.value(u"allergies").toArray());
     c.coupons = strings(o.value(u"coupons").toArray());
-    c.memberCard = ss(o.value(u"memberCard").toString());
+    c.subscriptionCard = ss(o.value(u"subscriptionCard").toString());
     const QJsonObject giftCardFor = o.value(u"giftCardFor").toObject();
     for (auto it = giftCardFor.begin(); it != giftCardFor.end(); ++it)
         c.giftCardFor[ss(it.key())] = ss(it.value().toString());
@@ -1148,7 +1148,7 @@ QJsonObject toJson(const PosSettings &s)
                                       {u"end"_s, p.endMinute}, {u"days"_s, p.days}, {u"code"_s, qs(p.code)},
                                       {u"amount"_s, qint64(p.amount.cents())}, {u"minimum"_s, qint64(p.minimum.cents())},
                                       {u"fromDay"_s, qs(p.fromDay)}, {u"untilDay"_s, qs(p.untilDay)},
-                                      {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}, {u"membersOnly"_s, p.membersOnly}});
+                                      {u"maxUses"_s, p.maxUses}, {u"uses"_s, p.uses}, {u"subscriptionOnly"_s, p.subscriptionOnly}});
              }
              return a;
          }()},
@@ -1435,7 +1435,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         promo.untilDay = ss(p.value(u"untilDay").toString());
         promo.maxUses = std::max(0, p.value(u"maxUses").toInt());
         promo.uses = std::max(0, p.value(u"uses").toInt());
-        promo.membersOnly = p.value(u"membersOnly").toBool(false);
+        promo.subscriptionOnly = p.value(u"subscriptionOnly").toBool(false);
         if (!promo.id.empty())
             s.promotions.push_back(promo);
     }

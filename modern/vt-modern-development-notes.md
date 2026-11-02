@@ -79,6 +79,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 13:54 ET — Bob (Claude) — Say 'subscription', never 'member'
+- **What:** Renamed everything from the last two entries: Promotions switch 'Subscription only' (subscriptionOnly), Check.subscriptionCard, checkInfo 'subscription', messages 'Subscription ..1234 on check #N: subscription discounts apply', 'A subscription card needs its customer...'. No user-facing text says member.
+- **Why:** Owner: 'member' suggests some customers are better than others; every guest should get the fountain. Use 'subscription' in all screens, messages and code.
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/app/pos_admin_records.cpp`, `modern/app/pos_admin_save.cpp`, `modern/app/pos_customers.cpp`, `modern/app/pos_json.cpp`, `modern/app/pos_loyalty.cpp`, `modern/app/pos_service.cpp`, `modern/core/check.hh`, `modern/core/customer.hh`, `modern/core/settings.hh`, `modern/tests/test_customers.cpp`, `modern/ui/qml/WidgetGiftCard.qml`
+- **Next person must know:** Wording rule for this store: subscription / subscription card / its customer, never member or membership.
+
 ### 2026-11-02 13:54 ET — Bob (Claude) — Gift cards: Purchased By from the check's customer, Purchased For when selling, subscriptions tied to a member
 - **What:** Selling: Gift Card screen has a 'Purchased For' box (optional; kept on the check in Check.giftCardFor until the card goes live) and shows who 'Purchased By' will be. When the check is paid, Purchased By = the check's customer (new cards; reloads keep their buyer) and Purchased For = what was typed. With no customer on the check, Sell asks Add Customer... / Sell Without Customer. A NEW subscription (9...) card can't be sold without a customer on the check; it is linked to that customer (GiftCard.customerId), and showing the card on a later check puts that member on the check. checkInfo now has customerId; fixed the 'Pay the Check from This Card' prompt, which read check fields that don't exist (customerId/customerName) and so asked for a customer every time.
 - **Why:** Owner: subscriptions always have a customer; gift cards record Purchased By (a customer) and Purchased For (no customer needed).

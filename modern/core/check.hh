@@ -276,7 +276,7 @@ struct Check {
     bool vip = false;                 // the kitchen takes extra care
     std::vector<std::string> allergies;   // the guest's (allergen ids): the kitchen sees them
     std::vector<std::string> coupons;     // promotions whose code was entered on it (their ids)
-    std::string memberCard;               // a subscription (9...) card shown on it: members-only promotions apply
+    std::string subscriptionCard;         // a subscription (9...) card shown on it: subscription-only promotions apply
     std::map<std::string, std::string> giftCardFor;   // card number -> who a card sold on it is for (Purchased For)
     CardHold hold;                        // a tab's card, held
     bool kiosk = false;               // a guest ordered it on the self-order kiosk

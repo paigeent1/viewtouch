@@ -259,42 +259,42 @@ TEST_CASE("Gift cards: a manager moves a balance to a new card; the old one clos
     CHECK(rowAmount(report, u"Sold and reloaded"_s) == u"$50.00"_s);
 }
 
-TEST_CASE("Subscription cards: members-only promotions come off once the member's card is shown", "[customers][giftcards]")
+TEST_CASE("Subscription cards: subscription-only promotions come off once the card is shown", "[customers][giftcards]")
 {
     PosService pos(test::seedPosData(), nullptr);
     openDrawer(pos);
-    core::PosSettings::Promotion members;
-    members.id = "members10";
-    members.name = "Member 10%";
-    members.percentBp = 1000;
-    members.membersOnly = true;                                 // the whole order, members only
-    pos.shared()->settings.promotions.push_back(members);
+    core::PosSettings::Promotion promo;
+    promo.id = "subscription10";
+    promo.name = "Subscription 10%";
+    promo.percentBp = 1000;
+    promo.subscriptionOnly = true;                              // the whole order, subscriptions only
+    pos.shared()->settings.promotions.push_back(promo);
 
-    // A new subscription card needs its member on the check.
+    // A new subscription card needs its customer on the check.
     CHECK_FALSE(pos.sellGiftCard(u"9000 1234 5675"_s, 2000));
     REQUIRE(pos.startCheck(core::CheckType::Quick));
-    REQUIRE(pos.saveCustomer({{u"name"_s, u"Pat Member"_s}, {u"phone"_s, u"555-010-9999"_s}}));
+    REQUIRE(pos.saveCustomer({{u"name"_s, u"Pat Sullivan"_s}, {u"phone"_s, u"555-010-9999"_s}}));
     REQUIRE(pos.sellGiftCard(u"9000 1234 5675"_s, 2000, {}, u"Pat"_s));
     REQUIRE(pos.tender(u"cash"_s));
     REQUIRE(pos.closeCheck());
     REQUIRE(pos.lookupGiftCard(u"900012345675"_s));
-    CHECK(pos.giftCardInfo()[u"purchasedBy"_s] == u"Pat Member"_s);   // the customer on the check
+    CHECK(pos.giftCardInfo()[u"purchasedBy"_s] == u"Pat Sullivan"_s);   // the customer on the check
     CHECK(pos.giftCardInfo()[u"issuedTo"_s] == u"Pat"_s);              // Purchased For, as typed
 
     REQUIRE(pos.startCheck(core::CheckType::Takeout));
     pos.addItem(u"cobb"_s);
     const QString before = pos.totals()[u"balance"_s].toString();
-    REQUIRE(pos.lookupGiftCard(u"900012345675"_s));             // the member shows their card
-    CHECK(pos.checkInfo()[u"member"_s].toString().endsWith(u"5675"_s));
-    CHECK(pos.checkInfo()[u"customer"_s].toMap()[u"name"_s] == u"Pat Member"_s);   // the member came with the card
+    REQUIRE(pos.lookupGiftCard(u"900012345675"_s));             // the customer shows their card
+    CHECK(pos.checkInfo()[u"subscription"_s].toString().endsWith(u"5675"_s));
+    CHECK(pos.checkInfo()[u"customer"_s].toMap()[u"name"_s] == u"Pat Sullivan"_s);   // the customer came with the card
     CHECK(pos.totals()[u"balance"_s].toString() != before);    // 10% off now
     REQUIRE(pos.payWithGiftCard(u"900012345675"_s));
     REQUIRE(pos.closeCheck());
 
-    // Another check, no member card: no member discount.
+    // Another check, no subscription card: no subscription discount.
     REQUIRE(pos.startCheck(core::CheckType::Takeout));
     pos.addItem(u"cobb"_s);
-    CHECK(pos.checkInfo()[u"member"_s].toString().isEmpty());
+    CHECK(pos.checkInfo()[u"subscription"_s].toString().isEmpty());
     CHECK(pos.totals()[u"balance"_s].toString() == before);
 }
 

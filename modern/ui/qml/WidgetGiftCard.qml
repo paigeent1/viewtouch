@@ -120,7 +120,7 @@ Item {
                     wrapMode: Text.WordWrap
                     opacity: 0.6
                     text: w.checkHasCustomer ? qsTr("Purchased By: %1").arg((w.pos.check.customer ?? {}).name || qsTr("the customer on the check"))
-                          : w.subscriptionNumber ? qsTr("Subscription card: put the member on the check first (Customers…).")
+                          : w.subscriptionNumber ? qsTr("Subscription card: put its customer on the check first (Customers…).")
                           : qsTr("Purchased By: the customer on the check (none yet).")
                 }
 

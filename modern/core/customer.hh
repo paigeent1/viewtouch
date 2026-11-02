@@ -95,7 +95,7 @@ struct GiftCard {
     std::string issuedLocation;   // the store (location code) that first sold it
     bool closed = false;          // replaced or its balance moved: can't be spent or reloaded
     std::string replacedBy;       // the card its balance went to
-    std::string customerId;       // a subscription card's member (the customer on the check that sold it)
+    std::string customerId;       // a subscription card's customer (the one on the check that sold it)
 
     void post(std::int64_t at, Money amount, std::string what, std::int64_t checkId, std::string kind)
     {
