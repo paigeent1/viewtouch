@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Sets up the ViewTouch Label Utility (modern/tools/vt_label_utility.py):
 #  - the launcher ViewTouch's "Label Utility" button runs (/usr/local/bin/vt-label-utility)
-#  - a desktop icon and Office-menu entry
 #  - the Python libraries and the fonts the ILSA label layouts use
 #
 # Run on the Pi (safe to run again any time):   bash modern/tools/install_label_utility.sh
@@ -47,33 +46,16 @@ if [ -f "$REPO_DIR/scripts/bin/vt-label-utility" ] && ! cmp -s "$REPO_DIR/script
     sudo install -m 755 "$REPO_DIR/scripts/bin/vt-label-utility" "$LAUNCHER"
 fi
 
+# The label utility is opened from ViewTouch (Manager screen > Label Utility), so no desktop or
+# menu icons are created. Remove ones made by earlier versions of this installer.
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
-mkdir -p "$DESKTOP_DIR" "$HOME/.local/share/applications"
-
-# Remove the old separate "Claude Label Utility" icon (now the ViewTouch Label Utility)
-
-ENTRY="[Desktop Entry]
-Type=Application
-Version=1.0
-Name=ViewTouch Label Utility
-Comment=Print ViewTouch shelf, price, cigar and receiving labels
-Exec=python3 \"$APP\"
-Path=$MODERN_DIR
-Icon=printer
-Terminal=false
-Categories=Office;
-StartupNotify=true
-"
-
-printf '%s' "$ENTRY" > "$DESKTOP_FILE"
-printf '%s' "$ENTRY" > "$MENU_FILE"
-chmod +x "$DESKTOP_FILE" "$MENU_FILE"
-
-# Mark the launcher as trusted where the desktop supports it (quietly ignored otherwise)
-gio set "$DESKTOP_FILE" metadata::trusted true 2>/dev/null || true
+[ -n "$DESKTOP_DIR" ] && [ -d "$DESKTOP_DIR" ] || DESKTOP_DIR="$HOME/Desktop"
+for f in "$DESKTOP_DIR/claude-label-utility.desktop" "$DESKTOP_DIR/vt-label-utility.desktop" \
+         "$HOME/.local/share/applications/claude-label-utility.desktop" \
+         "$HOME/.local/share/applications/vt-label-utility.desktop"; do
+    [ -e "$f" ] && rm -f "$f" && echo "Removed old icon: $f"
+done
 
 echo "Installed:"
-echo "  Desktop icon : $DESKTOP_FILE"
-echo "  Menu entry   : $MENU_FILE (Office menu)"
-echo "  ViewTouch    : Label Utility button -> $LAUNCHER -> $APP"
+echo "  ViewTouch    : Manager screen > Label Utility -> $LAUNCHER -> $APP"
 echo "Errors are logged to /tmp/vt_label_utility.log"

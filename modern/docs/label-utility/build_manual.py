@@ -163,12 +163,9 @@ story.append(PageBreak())
 story.append(P("2. Starting and closing", h1))
 story.append(B("<b>From ViewTouch:</b> on the Manager screen, press the <b>Label Utility</b> button. While the label utility is "
                "open, ViewTouch will not log you out for being idle."))
-story.append(B("<b>From the Pi's desktop:</b> double-click the <b>ViewTouch Label Utility</b> icon (a printer). It is also in the "
-               "applications menu under <b>Office</b>."))
 story.append(B("<b>For one item:</b> if ViewTouch opens the label utility for a particular item (a button set up with the "
                "<font face='Courier'>openLabelUtility</font> command and a UPC), it goes straight to that item's label preview. "
                "Any of the item's codes works — primary, alternate or carton UPC."))
-story.append(B("The first time, the Pi may ask whether to <b>Execute</b> or open the file — choose <b>Execute</b>."))
 story.append(B("The program opens full-screen. To close it, press <b>Close</b> (red, bottom-left)."))
 story.append(B("The title bar says <i>ViewTouch Label Utility (Live — Connected to viewtouch.db)</i>, which tells you it is "
                "reading your live ViewTouch items."))
@@ -462,7 +459,7 @@ story.append(C("cd ~/viewtouch-main\ngit pull myfork claude-label-utility"))
 story.append(P("Then close and reopen the label utility. Your templates and printer settings are kept."))
 story.append(P("If a new version needs new fonts or packages, also run the installer (it can be run any time):"))
 story.append(C("bash ~/viewtouch-main/modern/tools/install_label_utility.sh"))
-story.append(P("The installer sets up the launcher ViewTouch's Label Utility button uses, adds the desktop icon and menu entry, installs any missing Python parts, and installs Microsoft's "
+story.append(P("The installer sets up the launcher ViewTouch's Label Utility button uses, installs any missing Python parts, and installs Microsoft's "
                "Arial, Arial Black and Courier New fonts used by the ILSA labels. It may ask for the Pi's password."))
 
 # ---------------------------------------------------------------- 12
@@ -493,7 +490,7 @@ story.append(PageBreak())
 story.append(P("13. Quick reference", h1))
 story.append(table([
     ["To…", "Do this"],
-    ["Open the label utility", "ViewTouch Manager screen &gt; Label Utility — or the ViewTouch Label Utility desktop icon"],
+    ["Open the label utility", "ViewTouch Manager screen &gt; Label Utility"],
     ["Print shelf labels for some items", "Retail Items &gt; tick items &gt; Next &gt;&gt; &gt; Template &gt; Print Labels &gt; quantity &gt; Print Now"],
     ["Print labels for one brand", "Tree View &gt; double-click the brand &gt; tick items &gt; Next &gt;&gt; &gt; Print Labels"],
     ["Print receiving labels", "Screen 1: double-click RECEIVING LABEL &gt; Print Labels &gt; quantity &gt; Print Now"],
