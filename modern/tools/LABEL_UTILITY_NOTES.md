@@ -51,3 +51,6 @@ CIGAR STICK LABEL UPC_DESC ("Stick Labels", 192.168.1.25). ILSA `.rtm` files imp
 ## User manual
 `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf` (source: `build_manual.py` in the same folder).
 If you change buttons, screens or behaviour, update and rebuild the manual too.
+
+## Development notes
+Record every change, time-stamped, at the top of `modern/vt-modern-development-notes.md` (newest first).
