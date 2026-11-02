@@ -1521,7 +1521,7 @@ class ReportDesignerWindow(tk.Toplevel):
     def __init__(self, master, tpl_name, tpl_data, sample_item, on_save_callback):
         super().__init__(master)
         self.title(f"Label Utility — Report Designer - [{tpl_name}]")
-        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"); self.transient(master); self.attributes("-fullscreen", True); self.attributes("-topmost", True); self.lift(); self.focus_force()
+        go_full_screen(self); self.attributes("-topmost", True); self.lift(); self.focus_force()
         self.configure(bg="#808080")
         self.tpl_name = tpl_name
         self.tpl = ensure_box_dims(json.loads(json.dumps(tpl_data)))
@@ -2430,6 +2430,29 @@ class VTRoundedButton(tk.Canvas):
         self.create_text(cx, cy, text=self.text, font=self.font, fill=cur_fg, justify="center")
 
 
+def go_full_screen(win):
+    """Fill the screen with this window (the main window and the label designer).
+
+    The Pi's window manager ignores a full-screen request made before the window is on screen, and for a
+    window set as transient to another, so it's asked again once the window shows, with a maximised fallback."""
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    win.geometry(f"{sw}x{sh}+0+0")
+
+    def apply(_e=None):
+        try:
+            win.attributes("-fullscreen", True)
+        except tk.TclError:
+            pass
+        try:
+            win.attributes("-zoomed", True)
+        except tk.TclError:
+            pass
+        win.lift()
+    win.after(80, apply)
+    win.after(600, apply)          # once more, after the window manager has placed it
+    win.bind("<Map>", lambda e: apply() if e.widget is win else None, add="+")
+
+
 def flow_wrap(frame, padx=4, pady=3):
     """Re-lay a toolbar's packed widgets so they wrap onto extra rows when the screen is too narrow
     (e.g. the Pi's 1360x768 display) instead of running off the right edge.
@@ -2527,7 +2550,7 @@ class VTLabelUtility(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"ViewTouch Label Utility v{__version__}")
-        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"); self.attributes("-fullscreen", True)
+        go_full_screen(self)
         self.configure(bg="#14171c")
 
         self.templates = load_templates()

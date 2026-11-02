@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 18:26 ET — Bob (Claude) — Label utility: main window and label designer full screen
+- **What:** New go_full_screen(win): fills the screen, then asks the window manager for full screen once the window is showing (again at 600 ms and on every map), with -zoomed (maximised) as fallback. Used by the main window and the Report Designer, which is no longer transient to the main window. Small pop-ups (print quantity, printer settings, field properties) stay pop-ups.
+- **Why:** Owner: run the label utility full screen in all functions; the label designer ('edit report') wasn't. It asked for -fullscreen before it was mapped and as a transient window, which the Pi's window manager ignores.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** Check on the Pi: open a label > Edit / Report Designer; it should cover the whole screen.
+
 ### 2026-11-02 18:25 ET — Bob (Claude) — Tablets paired with the Pi for wireless debugging
 - **What:** Owner paired Bar 1/2/3 with the Pi (Manager > Close ViewTouch on the tablet, Settings > Developer options > Wireless debugging > Pair device with pairing code, then adb pair <ip:port> <code> on the Pi). With the WRITE_SECURE_SETTINGS grant, a restarted tablet turns wireless debugging back on and vt-adb-ensure reconnects it on 5555, no USB.
 - **Why:** Tablets dropped off ADB after every restart (Bar 3 today).
