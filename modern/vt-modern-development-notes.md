@@ -79,6 +79,15 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 11:43 ET — Neil (Gemini) — Update master ViewTouch User Manual with fork customizations & screenshots
+
+- **What**: Updated `modern/docs/manual/manual.html`, added `modern/docs/manual/shots/` (214 upstream base screenshots + fork Gift Card, Customer, Manager, and Label Utility v1.0 screenshots/samples), and compiled the 91-page `modern/docs/manual/ViewTouch_Modern_User_Manual.pdf`.
+- **Why**: Provide a single unified ViewTouch User Manual in the fork covering both the official ViewTouch 0.14 chapters (1–18) and our custom Retail POS Workstation, Primary/Alt UPC & GS1 Modulo-10 engine, Parent/Child cost cascade, 4-argument Gift Cards & 7-column report, ViewTouch Label Utility v1.0, ESC/POS Font B receipts, Top Status/Weather Ribbon, DIRECTV tuning screens, and Lenovo Android tablet kiosk fleet (Chapters 19–22).
+- **Files**: `modern/docs/manual/manual.html`, `modern/docs/manual/ViewTouch_Modern_User_Manual.pdf`, `modern/docs/manual/shots/*`, `modern/docs/manual/.gitignore`, `modern/vt-modern-development-notes.md`.
+- **Commit**: `HEAD`
+- **Next person must know**:
+  - Re-render `modern/docs/manual/ViewTouch_Modern_User_Manual.pdf` anytime `modern/docs/manual/manual.html` is edited using headless Chromium: `chromium --headless --disable-gpu --no-sandbox --print-to-pdf=modern/docs/manual/ViewTouch_Modern_User_Manual.pdf --print-to-pdf-no-header file:///home/pi/viewtouch-main/modern/docs/manual/manual.html`.
+
 ### 2026-11-02 11:28 ET — Bob (Claude) — Review of Neil's handoff sections; retail Gift Cards button fixed
 - **What:** Checked sections 1-5 against the code. Corrected: required bullets are What/Why/Files (Commit, Next optional, as the hook enforces); barcode list (also EAN-13, UPC-E, Code 39); Delete/Restore came after the v1.0 tag; gift card reports are 8 columns, manual is 15 pages, sellGiftCard names aren't passed by the screen; Neil's entry Commit HEAD -> 1ba2d91. Added: viewtouch.db write rule, branch map, QML loading quirk, Stick Labels printer .25, repo is public (no secrets), Pi-only scripts and upstream-only hashes labelled, roadmap files marked not started. Fixed the retail screen's Gift Cards button (gift-cards -> gift-card in retail-entry.json and WidgetRetailEntry.qml) and capture_vt_screenshots.sh builds with -j2 per the Pi OOM rule.
 - **Why:** Owner asked Bob to check Neil's notes update for future developers.
