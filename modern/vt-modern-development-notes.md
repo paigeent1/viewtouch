@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:40 ET — Bob (Claude) — Tests: register the static ViewTouch QML module like the app does
+- **What:** tests/main.cpp now calls qml_register_types_ViewTouch() and Q_INIT_RESOURCE(qmake_ViewTouch / vtm_ui_raw_qml_0), mirroring main.cpp (store commit 0e4a663). capture_vt_screenshots.sh now always rebuilds vtm_tests (incremental, -j3) before running.
+- **Why:** On the Pi every UI test failed with 'Module ViewTouch contains no type named Main': the linker dropped the static QML module's registration/resources in vtm_tests, the same problem main.cpp was fixed for. Blocked the gift card manual screenshots.
+- **Files:** `modern/tests/main.cpp`, `modern/tools/capture_vt_screenshots.sh`
+- **Next person must know:** Untested here (no Qt in Bob's workspace); the first Pi run compiles it. If it fails to compile, the app build is unaffected only when building the ViewTouch target alone.
+
 ### 2026-11-02 10:38 ET — Bob (Claude) — Label manual: new Pi screenshots (screen 1 template actions, printer settings)
 - **What:** Rebuilt the label utility manual with the 10:36 pi-shots capture: screen 1 now shows Delete Template and Restore Standard Labels; printer settings shot trimmed of window bleed at the edges.
 - **Why:** The earlier screen 1 shot predated the new Template Actions buttons.

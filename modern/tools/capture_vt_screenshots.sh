@@ -4,7 +4,7 @@
 #
 # It uses the test suite's "Manual: a screenshot of every screen" case: a made-up demo store in memory,
 # drawn off screen. The store's real data (viewtouch.db) and the running ViewTouch are never touched,
-# and nothing prints. Takes a few minutes (longer the first time, if the tests have to be built).
+# and nothing prints. Takes a few minutes (longer the first time, while the tests are built).
 #
 #   bash modern/tools/capture_vt_screenshots.sh
 set -e
@@ -15,10 +15,8 @@ OUT=/tmp/vt_manual_shots
 if [ ! -d "$BUILD" ]; then
     echo "No ViewTouch build folder at modern/$BUILD (set BUILD_DIR=... to point at it)."; exit 1
 fi
-if [ ! -x "$BUILD/tests/vtm_tests" ]; then
-    echo "Building the ViewTouch tests (once)..."
-    cmake --build "$BUILD" --target vtm_tests -j"$(nproc)"
-fi
+echo "Building the ViewTouch tests (only what changed; the first time takes a while)..."
+cmake --build "$BUILD" --target vtm_tests -j3
 
 rm -rf "$OUT"; mkdir -p "$OUT"
 echo "Taking screenshots (a few minutes; nothing shows on screen)..."
