@@ -47,3 +47,7 @@ CIGAR STICK LABEL UPC_DESC ("Stick Labels", 192.168.1.25). ILSA `.rtm` files imp
 - `vt_label_utility.py` — the program · `install_label_utility.sh` — installer (launcher, desktop icon, fonts)
 - `push_label_log.sh` — uploads `/tmp/vt_label_utility.log`, `/tmp/last_label.zpl` and the templates to the
   `pi-logs` branch for remote diagnosis
+
+## User manual
+`modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf` (source: `build_manual.py` in the same folder).
+If you change buttons, screens or behaviour, update and rebuild the manual too.
