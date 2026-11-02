@@ -267,6 +267,79 @@ def pdf_font_name_for(family, bold=False, italic=False):
     except Exception:
         return None
 
+# ---------------------------------------------------------------------------
+# ILSA / ReportBuilder (.rtm) label import
+# ---------------------------------------------------------------------------
+_RTM_FIELDS = {"PLU_DESC": "name", "POS_DESC": "name", "PLU_NUM": "upc", "PRICE": "price_fmt", "LAST_PRICE": "price_fmt",
+               "MANUF": "manufacturer", "CATEGORY": "category", "DEPT_GRP": "category"}
+_RTM_BARCODES = {"bcUPC_A": "barcode_upca", "bcUPC_E": "barcode_upce", "bcCode39": "barcode_code39",
+                 "bcCode128": "barcode_img", "bcEAN_13": "barcode_img"}
+_RTM_ALIGN = {"taCentered": "center", "taCenter": "center", "taRightJustified": "right", "taLeftJustified": "left"}
+
+def _parse_rtm(text):
+    root = {"props": {}, "children": []}
+    stack = [root]
+    for raw in text.splitlines():
+        line = raw.strip()
+        m = re.match(r"object (\w+): (\w+)", line)
+        if m:
+            node = {"name": m.group(1), "cls": m.group(2), "props": {}, "children": []}
+            stack[-1]["children"].append(node); stack.append(node); continue
+        if line == "end" and len(stack) > 1:
+            stack.pop(); continue
+        m = re.match(r"([\w.]+) = (.*)", line)
+        if m:
+            v = m.group(2).strip()
+            if v.startswith("'") and v.endswith("'"):
+                v = v[1:-1].replace("''", "'")
+            stack[-1]["props"][m.group(1)] = v
+    if not root["children"]:
+        raise ValueError("not a ReportBuilder .rtm text file")
+    return root["children"][0]
+
+def import_rtm_template(path):
+    """Convert an ILSA ReportBuilder label layout (.rtm, ASCII format) into a template dict."""
+    with open(path, "r", encoding="latin-1") as f:
+        rep_ = _parse_rtm(f.read())
+    P = rep_["props"]
+    mm_in = lambda v: round(int(v) / 1000.0 / 25.4, 4)
+    tpl = {"width_in": mm_in(P.get("PrinterSetup.mmPaperWidth", 50800)),
+           "height_in": mm_in(P.get("PrinterSetup.mmPaperHeight", 25400)),
+           "elements": [], "v_offset_dots": 0, "h_offset_dots": 0, "darkness": 18, "tear_off": 0, "printer_dpi": 203,
+           "source": "ILSA ReportBuilder: " + os.path.basename(path)}
+    bands = [c for c in rep_["children"] if c["cls"] == "TppDetailBand"]
+    if not bands:
+        raise ValueError("no detail band (label layout) found in the .rtm file")
+    for o in bands[0]["children"]:
+        p = o["props"]
+        if "mmLeft" not in p:
+            continue
+        fam = p.get("Font.Name", "Arial"); style = p.get("Font.Style", "[]"); size = int(p.get("Font.Size", 8))
+        el = {"id": o["name"], "x": mm_in(p["mmLeft"]), "y": mm_in(p["mmTop"]), "w": mm_in(p["mmWidth"]), "h": mm_in(p["mmHeight"])}
+        el["w"] = round(max(0.05, min(el["w"], tpl["width_in"] - el["x"])), 4)
+        if o["cls"] == "TppDBBarCode":
+            el.update(field=_RTM_BARCODES.get(p.get("BarCodeType"), "barcode_img"), size=size, bold=False,
+                      align=_RTM_ALIGN.get(p.get("Alignment", "taLeftJustified"), "left"),
+                      module_mm=int(p.get("mmBarWidth", 330)) / 1000.0,
+                      human_readable=p.get("PrintHumanReadable", "True") != "False", hri_font=fam, hri_size=size)
+        elif o["cls"] in ("TppDBText", "TppSystemVariable", "TppVariable", "TppLabel"):
+            if o["cls"] == "TppDBText":
+                field = _RTM_FIELDS.get(p.get("DataField", "").upper(), p.get("DataField", "name").lower())
+            elif o["cls"] == "TppLabel":
+                field = "static:" + p.get("Caption", "")
+            else:
+                field = {"yymmdd": "date_yymmdd", "yy": "year_short", "mm/dd/yyyy": "date_slash"}.get(p.get("DisplayFormat", ""), "date_yymmdd")
+            tall_enough = int(p["mmHeight"]) / 1000.0 > size * 0.3528 * 1.15 * 1.8
+            el.update(field=field, size=size, bold="fsBold" in style, italic="fsItalic" in style, font_family=fam,
+                      auto_font=False, valign="top", align=_RTM_ALIGN.get(p.get("TextAlignment", "taLeftJustified"), "left"),
+                      word_wrap=p.get("WordWrap") == "True" and tall_enough)
+        else:
+            continue
+        tpl["elements"].append(el)
+    if not tpl["elements"]:
+        raise ValueError("no printable fields found in the .rtm file")
+    return tpl
+
 def load_templates():
     """Claude Label Utility keeps its own template list (separate from vt_label_utility).
 
@@ -2272,13 +2345,27 @@ class VTLabelUtility(tk.Tk):
         if not os.path.exists(init_dir):
             init_dir = os.path.expanduser("~/.local/share/ViewTouch")
         path = filedialog.askopenfilename(
-            parent=self, title="Select Label Template (.json, .prn, .nlbl, .slnx)",
+            parent=self, title="Import Label Template (ILSA .rtm, .json, .prn, .nlbl, .slnx)",
             initialdir=init_dir,
-            filetypes=[("Label Templates", "*.json *.prn *.nlbl *.slnx"), ("All Files", "*.*")]
+            filetypes=[("Label Templates", "*.rtm *.RTM *.json *.prn *.nlbl *.slnx"), ("ILSA ReportBuilder (.rtm)", "*.rtm *.RTM"), ("All Files", "*.*")]
         )
         if not path: return
         file_stem = os.path.splitext(os.path.basename(path))[0].strip().upper()
-        if path.endswith(".json"):
+        chosen_tpl = None
+        if path.lower().endswith(".rtm"):
+            try:
+                new_tpl = import_rtm_template(path)
+            except Exception as e:
+                messagebox.showerror("Import Failed", f"Could not import {os.path.basename(path)}:\n{e}"); return
+            chosen_tpl = file_stem.replace("_", " ")
+            if chosen_tpl in self.templates and not messagebox.askyesno("Replace Template?", f"A template named '{chosen_tpl}' already exists.\nReplace it with this file?"):
+                return
+            avail = discover_all_printers()
+            new_tpl["default_printer"] = avail[0] if avail else "PDF Preview (Desktop)"
+            self.templates[chosen_tpl] = ensure_box_dims(new_tpl)
+            save_templates(self.templates)
+            messagebox.showinfo("Template Imported", f"Imported '{chosen_tpl}' ({new_tpl['width_in']} x {new_tpl['height_in']} in, {len(new_tpl['elements'])} fields).\n\nCheck the printer under ⚙️ Printer Offset before printing.")
+        elif path.endswith(".json"):
             try:
                 loaded = json.load(open(path, "r", encoding="utf-8"))
                 if isinstance(loaded, dict) and loaded:
