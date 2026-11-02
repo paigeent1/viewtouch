@@ -544,25 +544,20 @@ def load_from_viewtouch_db():
         try:
             t_conn = sqlite3.connect(f"file:{temp_db}?mode=ro", uri=True)
             t_cur = t_conn.cursor()
-            t_items = []
+            t_items, t_seen = [], set()
             for row in t_cur.execute("SELECT upc, name, dept_num, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc FROM items"):
                 u, nm, dn, cat, pr, cs, mf, pg, sg, pq, alts = row
                 alt_list = [a.strip() for a in alts.split(";") if a.strip()] if alts else []
-                t_items.append({
-                    "id": u,
-                    "name": nm,
-                    "price": pr,
-                    "cost": cs,
-                    "category": cat or "General",
-                    "major_cat": cat or "Retail",
-                    "mfg": mf or "General",
-                    "prod_grp": pg or "General",
-                    "sub_grp": sg or "",
-                    "upc": u,
-                    "barcodes": [u] + alt_list,
-                    "alt_barcodes": alt_list,
-                    "source": "ilsa_temp"
-                })
+                # Made like a ViewTouch menu item, so every screen (tree, UPC choice, prices) works the same.
+                try:
+                    cents = int(round(float(pr or 0) * 100))
+                except (TypeError, ValueError):
+                    cents = 0
+                parse_vt_menu_dict({"name": nm, "barcodes": [u] + alt_list, "priceCents": cents,
+                                    "family": cat or "Retail", "manufacturer": mf or "", "taxClass": "merchandise",
+                                    "number": dn}, t_seen, t_items)
+            for it in t_items:
+                it["source"] = "ilsa_temp"
             t_conn.close()
             if t_items:
                 return t_items

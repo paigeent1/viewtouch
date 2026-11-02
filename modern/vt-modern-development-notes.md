@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:34 ET — Bob (Claude) — ILSA temp price book: items built like ViewTouch's
+- **What:** load_from_viewtouch_db(): rows from ~/.local/share/ViewTouch/ilsa_temp_pricebook.db now go through parse_vt_menu_dict (priceCents, family, manufacturer, barcodes = UPC + alt UPCs), so they have dept_group, manufacturer, category, upc_choices etc. Tested: tree fields present, alt UPCs selectable, $120.00 stays $120.00.
+- **Why:** Neil's 16:23 hook built items with other keys (mfg, no dept_group/manufacturer/upc_choices): Tree View raised KeyError, alt UPCs couldn't be chosen, and float prices >= 100 would have printed /100.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** While the temp price book exists, labels (Pi and tablets) print its prices and only its items: the tablet Labels screen lists ViewTouch's items, so an item missing from the price book is skipped (logged in /tmp/vt_label_utility.log). Jan 1: delete the temp DB as Neil noted.
+
 ### 2026-11-02 17:29 ET — Bob (Claude) — Labels button on the End of shift screen
 - **What:** seed/pages/logout.json: 'Labels...' button (above Checklists...) opens the Labels screen; logout-phone.json places it on phones. No manager needed (the Labels page is public; printing needs the order permission every staff role has).
 - **Why:** Owner: put the labels button where staff do their duties, without elevated access. ViewTouch has no separate cashier-duties screen; End of shift (Log Out) holds Checklists, Messages, My Bank.
