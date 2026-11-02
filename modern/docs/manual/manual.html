@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>ViewTouch User Manual</title>
 <style>
+  @page { size: letter; margin: 14mm 14mm 14mm 14mm; }
   body { font-family: "DejaVu Sans", "Liberation Sans", sans-serif; font-size: 10.5pt; line-height: 1.4; color: #1b1b1b; }
   h1 { font-size: 22pt; color: #1f4fa8; page-break-before: always; margin-top: 0; }
   h1.first { page-break-before: auto; }
@@ -25,8 +26,8 @@
 
 <div class="cover">
 <h1 class="first">ViewTouch</h1>
-<p style="font-size:18pt; color:#555">User Manual</p>
-<p style="font-size:11pt; color:#555">For servers, hosts, kitchen staff, cashiers and managers<br>Version 0.9 · October 2026</p>
+<p style="font-size:18pt; color:#555">User Manual — Custom Retail &amp; Hospitality Edition</p>
+<p style="font-size:11pt; color:#555">For cashiers, bartenders, servers, kitchen staff and managers<br>Version 0.9 · Custom Fork Edition (<code>paigeent1/viewtouch</code>) · November 2026</p>
 <p class="shot"><img src="shots/m02-tables.png" width="520" height="292"></p>
 </div>
 
@@ -50,10 +51,24 @@
 <li>The self-order kiosk</li>
 <li>Languages (Español, Français, Português, 中文)</li>
 <li>Keep running if a computer fails</li>
+<li>Retail POS Workstation, UPC Barcodes &amp; Parent/Child Costing</li>
+<li>ViewTouch Label Utility v1.0 &amp; ZPL Barcode Printing</li>
+<li>Custom Hardware, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</li>
 <li>Quick reference</li>
 </ol>
 
 <!-- ======================================================================= -->
+<h1>What's new in the Custom 0.9 Retail &amp; Hospitality Fork</h1>
+<p>Built on top of ViewTouch Modern 0.9, this store edition (<code>paigeent1/viewtouch</code>) adds specialized retail tobacco/cigar inventory controls, barcode validation, ZPL label printing, thermal receipt formatting, and tablet fleet management:</p>
+<ul>
+<li><b>Dedicated Retail POS Entry Mode &amp; Full-Screen Retail Workstation:</b> 11×6 tactile matrix (<code>WidgetRetailEntry.qml</code>), central PLU/numeric keypad, <b>BOX ↔ STICK</b> parent/child unit toggle, 21+ age-verification prompt, 1-tap Retail ↔ Hospitality mode switching, per-terminal default startup mode (<code>vt-set-mode</code>), and a 3-way Menu Builder mode chooser (<b>Hospitality</b>, <b>Retail Inventory</b>, <b>Events &amp; Admissions</b>) with a 5-level merchandise hierarchy (Major Category → Category → Manufacturer → Product Group → Sub Group) and live Profit ($), Gross Margin %, and Markup % calculations (chapter 19).</li>
+<li><b>Primary UPC, Alt UPC &amp; GS1 Modulo-10 Check-Digit Engine:</b> Every item supports a Primary UPC (<code>barcodes[0]</code>) and Alternate/Promo UPCs (<code>barcodes[1..N]</code>). Entering an 11-digit UPC-A automatically calculates and appends the 12th GS1 Modulo-10 check digit on save and scan. Scanning an unknown barcode opens the centered <b>Item Not on File — Yes (Y) / No (N)</b> overlay (<code>ScanAddOverlay.qml</code>) and protects against rapid scanner overwrites (chapter 19).</li>
+<li><b>ViewTouch Label Utility v1.0 (<code>vt-label-utility</code>):</b> Launched from <b>Manager → Label Utility</b>, reading 100% read-only from <code>viewtouch.db</code> (it never writes to the POS database). Renders every label at 203 DPI as a 1-bit bitmap picture (<code>^GFA</code>) with integer-dot UPC-A/Code-128 barcodes, in-memory <b>Print UPC / Next UPC</b> barcode selection, your 4 standard label templates, <b>Delete Template</b> / <b>Restore Standard Labels</b> buttons, and an 8-handle interactive Visual Label Designer using <b>Arial</b>, <b>Arial Black</b>, and <b>Courier New</b> fonts (chapter 20).</li>
+<li><b>Customer First/Last Name Profiles &amp; Enhanced Gift Cards:</b> Split <b>First Name</b> and <b>Last Name</b> customer fields (with 5,538 migrated ILSA customer profiles), 1-tap customer assignment on closed checks, Gift Card <b>Sell</b>, <b>Reload</b>, <b>Balance</b>, and threshold <b>Cash Out</b> (<code>giftCardCashBelowCents</code>), PatronPal imported <b>Purchased By</b> / <b>Issued To</b> fields, and an 8-column landscape <b>Gift Cards Report</b> with 5 views: <b>Summary</b>, <b>Activated</b>, <b>Active Balances</b>, <b>Inactive</b>, and <b>Transactions</b> (chapters 7 and 12).</li>
+<li><b>ESC/POS Font B Receipt Sub-Lines &amp; Compact Choice Text:</b> Free modifier choices always print on guest receipts; 2-space indented modifier sub-lines and <code>Opened &lt;time&gt; - closed &lt;time&gt;</code> timestamps print in compact Epson TM-T88 <b>Font B</b> (9×17 dots, 56 chars/line) while on-screen modifier choices scale cleanly to <code>0.65</code> height (chapters 4 and 11).</li>
+<li><b>Top Status &amp; Live Weather Ribbon, DIRECTV Control &amp; Android Tablet Fleet:</b> Configurable top status ribbon showing live local weather by store ZIP code, Wi-Fi signal, tablet battery, time, and customer count; 5-receiver <b>DIRECTV</b> tuning pages with auto-ranked <b>Frequently Used</b> channels; and 64-bit (<code>arm64-v8a</code>) Lenovo Android tablet kiosk management with top-left yellow Terminal Name badges, JNI camera barcode scanning, 60-second auto-dimmer, <code>touchToWakeSeconds</code>, and Manager-PIN tablet reboot (chapter 21).</li>
+</ul>
+
 <h1>What's new in 0.9</h1>
 <ul>
 <li><b>A computer only for ViewTouch:</b> one line installs it on a fresh Raspberry Pi; the computer locks itself down and starts on the ViewTouch <b>home screen</b> (start ViewTouch, network, time, updates, restart, reset; on the main register the store's setup screens), and the first time you set it up by touch (chapter 1).</li>
@@ -614,6 +629,15 @@
 <li><b>Pay the Check from This Card</b> takes as much as the card holds.</li>
 <li><b>Cash Out</b>: some states make a small balance redeemable in cash when the guest asks (California: under $10). With the store's state chosen (Store Settings → Staff hours), the button shows for such a card; the cash comes out of the drawer (or your bank) as a recorded pay out, and the card is empty. Gift cards never expire.</li>
 </ul>
+
+<h3>Split First &amp; Last Name Customer Profiles &amp; Closed-Check Assignment</h3>
+<p>Customer records in <b>Manager → Customers</b> and <b>Check Options → Customer</b> use split <b>First Name</b> and <b>Last Name</b> fields with cumulative visit and spend tracking. Managers and bartenders can also attach or update a customer profile on an already settled check from <b>Manager → Closed Checks → Assign Customer</b>.</p>
+
+<h3>Gift Cards: Reload, Cash-Out Threshold &amp; 8-Column Report Views</h3>
+<p>On the <b>Gift Card</b> screen (<code>m17-gift-card.png</code>), staff can sell a new card, <b>Reload</b> an existing card, check its balance and transaction history, or <b>Cash Out</b> a low remaining balance when it falls below the store's cash-out threshold (<code>giftCardCashBelowCents</code> in Store Settings). Legacy cards imported from PatronPal also retain their historical <b>Purchased By</b> and <b>Issued To</b> names.</p>
+<p class="shot"><img src="shots/m48-report-gift-cards.png" width="560" height="315"></p>
+<p class="caption">Reports → Gift Cards: 8-column report with Summary, Activated, Active Balances, Inactive, and Transactions views.</p>
+<p>In <b>Manager → Reports → Gift Cards</b>, the report provides five dedicated views—<b>Summary</b>, <b>Activated</b>, <b>Active Balances</b>, <b>Inactive</b>, and <b>Transactions</b>—and displays eight columns including Card #, PIN, Date, Purchased By, Issued To, Status, and Balance/Amount.</p>
 
 <h2>House accounts</h2>
 <p>A manager turns on a house account for a customer (with an optional limit). Put the customer on the check, then touch <b>House Account</b> on the payment screen. Payments on the account (cash or card) are taken on the Customers screen.</p>
@@ -1237,7 +1261,89 @@
 <div class="warn">If the cable between the two computers breaks while both keep running, both may take orders for a few seconds. Orders taken on the old main computer in that time are only in its <code>-before-standby</code> backup.</div>
 
 <!-- ======================================================================= -->
-<h1>19. Quick reference</h1>
+<!-- ======================================================================= -->
+<h1>19. Retail POS Workstation, UPC Barcodes &amp; Parent/Child Costing</h1>
+
+<h2>Dedicated Retail POS Entry Mode</h2>
+<p>Terminals configured for retail counter sales open directly into the <b>Retail POS Entry</b> screen (<code>WidgetRetailEntry.qml</code> / <code>retail-entry.json</code>). Designed for fast cigar, cigarette, and convenience checkout, it combines an <b>11×6 quick-key matrix</b>, a central numeric/PLU keypad, a 1-tap <b>BOX ↔ STICK</b> unit toggle, an interactive 5-level merchandise browser, and an instant <b>21+ Age Verification</b> modal indicating the exact latest legal birth date required for tobacco and alcohol purchases.</p>
+<div class="tip"><b>Per-Terminal Default Mode:</b> Any station can switch between <b>Retail Mode</b> and <b>Hospitality Mode</b> with one tap, or be locked to its default startup mode using <code>vt-set-mode</code> / <code>startPage</code> in Terminal settings.</div>
+
+<h2>3-Way Menu Builder &amp; Full-Screen Retail Item Workstation</h2>
+<p>Opening <b>Manager → Menu Builder</b> presents a 3-way mode chooser—<b>Hospitality (F&amp;B)</b>, <b>Retail Inventory</b>, and <b>Events &amp; Admissions</b>—with per-category visibility toggles so retail merchandise categories stay separate from restaurant and bar screens.</p>
+<p class="shot"><img src="shots/m30-manager.png" width="560" height="315"></p>
+<p class="caption">Manager screen with direct access to Menu Builder, Label Utility, Customers, Gift Cards, and Reports.</p>
+<ul>
+<li><b>5-Level Merchandise Hierarchy:</b> Items are organized across five structured tiers: <b>Major Category → Category → Manufacturer → Product Group → Sub Group</b>.</li>
+<li><b>Alpha (A–Z) vs. UPC Numeric Sort:</b> Toggle the item browser between alphabetical sorting and numeric UPC/PLU sorting, and filter by <b>All</b>, <b>Retail Only</b> (<code>isRetail</code>), or <b>F&amp;B Only</b>.</li>
+<li><b>Parent Carton/Box to Child Single/Pack Cost Cascade:</b> Link a child item (single cigar or pack) to its parent master box/carton UPC (<code>__parent__</code>) and specify the subunit count. Whenever the parent box cost is updated, ViewTouch automatically recalculates the unit cost (<code>__cost__</code>), Profit ($), Gross Margin %, and Markup % for the child item.</li>
+</ul>
+
+<h2>Primary UPC, Alt UPC &amp; GS1 Modulo-10 Check-Digit Validation</h2>
+<p>Each item record stores a <b>Primary UPC</b> (<code>barcodes[0]</code>) alongside comma-separated <b>Alternate / Promo UPCs</b> (<code>barcodes[1..N]</code>). When entering or scanning an 11-digit UPC-A code, ViewTouch automatically computes and appends the 12th <b>GS1 Modulo-10 check digit</b> and validates 8-, 12-, 13-, and 14-digit barcodes against scanning or typing errors.</p>
+<p>If a cashier scans a barcode that does not match any menu item, coupon, gift card, or loyalty card, ViewTouch displays the centered <b>Item Not on File — Yes (Y) / No (N)</b> overlay (<code>ScanAddOverlay.qml</code>) so a manager can add the item on the spot while ignoring duplicate rapid scanner bursts.</p>
+
+<!-- ======================================================================= -->
+<h1>20. ViewTouch Label Utility v1.0 &amp; ZPL Barcode Printing</h1>
+
+<h2>100% Read-Only Database Connection &amp; Bitmap Rendering</h2>
+<p>Touch <b>Manager → Label Utility</b> to open <b>ViewTouch Label Utility v1.0</b> (<code>/usr/local/bin/vt-label-utility</code>). The utility opens <code>viewtouch.db</code> in <b>100% read-only mode</b> (<code>mode=ro</code>)—it never writes to or modifies the POS database. Every label (both text and barcodes) is drawn at 203 DPI as a single 1-bit bitmap picture (<code>^GFA</code>) with integer-dot UPC-A/Code-128 bars so ZPL label printers (such as <code>192.168.1.24:9100</code>) never misinterpret fonts or barcode widths.</p>
+
+<table cellpadding="4"><tr>
+<td><img src="shots/lu-screen1_start.png" width="270" height="158"><br><small>Step 1: Data Filter &amp; 4 Standard Templates</small></td>
+<td><img src="shots/lu-screen2_categories.png" width="270" height="158"><br><small>Step 2: 5-Level Merchandise Tree Filter</small></td>
+</tr><tr>
+<td><img src="shots/lu-screen3_items.png" width="270" height="158"><br><small>Step 3: Select Items, In-Memory Print UPC &amp; Qty</small></td>
+<td><img src="shots/lu-screen4_preview.png" width="270" height="158"><br><small>Step 4: Live WYSIWYG Preview &amp; Print Queue</small></td>
+</tr></table>
+
+<h2>4-Step Label Printing Workflow</h2>
+<ol>
+<li><b>Step 1 — Data Filter &amp; Template List:</b> Choose how to browse items (<b>Tree View</b>, <b>Retail Only</b>, <b>Receiving / Carton</b>, or <b>All Items</b>) and pick from your 4 standard label templates: <b>RECEIVING LABEL</b>, <b>2X1 VINYL UPC_PRICE</b>, <b>2X1 VINYL UPC_DESC</b>, or <b>CIGAR STICK LABEL UPC_DESC</b>. Use <b>Delete Template</b> to remove a custom template (guarded so the last template cannot be deleted) or <b>Restore Standard Labels</b> to restore the 4 standard templates from <code>modern/seed/templates/claude_label_templates.json</code>.</li>
+<li><b>Step 2 — Category Drill-Down:</b> Narrow items by Major Category, Category, Manufacturer, Product Group, or Sub Group.</li>
+<li><b>Step 3 — Item Selection &amp; In-Memory Barcode Picker:</b> Tick items to print, set label quantities, and use the <b>Print UPC</b> dropdown or <b>Next UPC</b> button to cycle an item's printed barcode between its Primary UPC, Alternate UPCs, or Carton UPC in memory for that print job (without altering <code>viewtouch.db</code>).</li>
+<li><b>Step 4 — Preview, Visual Label Designer &amp; Print:</b> Review the live preview, open the <b>Print Window</b> to print to a network ZPL printer, USB printer, CUPS queue, or PDF preview, or open the 8-handle <b>Visual Label Designer</b> to resize boxes, edit properties (Data Field, Custom/Static Text, Left/Top inches, Rotation degrees), and choose between <b>Arial</b>, <b>Arial Black</b>, and <b>Courier New</b> fonts.</li>
+</ol>
+
+<table cellpadding="4"><tr>
+<td><img src="shots/lu-designer_full.png" width="270" height="158"><br><small>Visual Label Designer (Arial, Arial Black, Courier New)</small></td>
+<td><img src="shots/lu-print_window.png" width="270" height="158"><br><small>Print Dialog &amp; Printer Routing</small></td>
+</tr></table>
+
+<h3>Standard Label Samples</h3>
+<table cellpadding="4"><tr>
+<td><img src="shots/lu-sample-2X1_VINYL_UPC_PRICE.png" width="220" height="110"><br><small>2X1 VINYL UPC_PRICE</small></td>
+<td><img src="shots/lu-sample-2X1_VINYL_UPC_DESC.png" width="220" height="110"><br><small>2X1 VINYL UPC_DESC</small></td>
+</tr><tr>
+<td><img src="shots/lu-sample-CIGAR_STICK_LABEL_UPC_DESC.png" width="220" height="90"><br><small>CIGAR STICK LABEL UPC_DESC</small></td>
+<td><img src="shots/lu-sample-RECEIVING_LABEL.png" width="220" height="110"><br><small>RECEIVING LABEL</small></td>
+</tr></table>
+
+<!-- ======================================================================= -->
+<h1>21. Custom Hardware, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</h1>
+
+<h2>Top Status &amp; Live ZIP Weather Ribbon</h2>
+<p>In <b>Manager → Store Settings → Screens</b>, enable the <b>Top Status Ribbon</b> (<code>topRibbonEnabled</code>) to display a status bar across the top of the screen showing the <b>Store Name</b>, <b>Live Local Weather &amp; Temperature</b> (fetched automatically from your 5-digit <code>storeZip</code>), <b>Active Customer/Check Count</b>, <b>Wi-Fi Signal Strength</b>, <b>Tablet Battery %</b>, and <b>12-Hour Clock</b>.</p>
+
+<h2>ESC/POS Font B Thermal Receipt Formatting</h2>
+<p>Guest checks and receipts printed to Epson TM-T88 thermal printers (<code>192.168.1.77:9100</code>) include two automatic readability improvements:</p>
+<ul>
+<li><b>All Free Modifiers Printed:</b> Zero-priced modifier choices (such as cooking temperatures, side choices, or ice/garnish instructions) are never suppressed on the printed guest receipt.</li>
+<li><b>Compact Font B Sub-Lines &amp; Timestamps:</b> Indented modifier sub-lines and the <code>Opened &lt;time&gt; - closed &lt;time&gt;</code> check footer automatically switch the Epson printer to <b>Font B</b> (9×17 dots, 56 characters per line vs. 42 characters in Font A) so item descriptions and right-aligned prices stay visually distinct.</li>
+</ul>
+
+<h2>DIRECTV Multi-Receiver Tuning Screens</h2>
+<p>Touching the blue <b>DIRECTV</b> button on the floor plan opens the receiver selector for all five bar and lounge boxes (<b>BAR 1</b>, <b>BAR 2</b>, <b>BAR FRONT</b>, <b>BOX .72</b>, <b>VIP</b>, or <b>ALL 5 BOXES</b>). Each tuning page displays a self-ranking <b>Frequently Used</b> left column showing the top 8 most-tuned channels with their tune counts, a 20-network sports/news center grid, and direct remote keys on the right.</p>
+
+<h2>Lenovo Android Tablet Kiosk Fleet &amp; System Controls</h2>
+<p>The Raspberry Pi 5 server (<code>192.168.1.219</code>) manages the three 64-bit Lenovo Android bar tablets (<b>Bar 1</b> <code>.220</code>, <b>Bar 2</b> <code>.215</code>, and <b>Bar 3</b> <code>.210</code>):</p>
+<ul>
+<li><b>Top-Left Yellow Terminal Badge &amp; Auto-Start Kiosk:</b> Each tablet displays its assigned terminal name in bold yellow text at the top-left of the Login screen and launches straight into ViewTouch on boot via the Android Home activity alias (<code>Kiosk.kt</code>).</li>
+<li><b>Touch-to-Wake Timer &amp; 60-Second Auto-Dimmer:</b> Tablets automatically dim after 60 seconds of inactivity on the Login screen and wake to full brightness on touch, with configurable per-second sleep timers (<code>touchToWakeSeconds</code>).</li>
+<li><b>Camera Barcode Scanner &amp; Manager-PIN Reboot:</b> Tablets can scan UPC barcodes using their built-in camera (<code>BarcodeScanner.kt</code> → <code>scanCamera</code>), and managers can reboot or exit a tablet from the Login screen's <b>Reboot</b> button using a valid Manager PIN.</li>
+<li><b>System Health &amp; Fleet Commands:</b> Use <code>vt-status</code>, <code>vt-server</code>, <code>vt-tablets</code>, and <code>vt-adb-ensure</code> on the main server (or the buttons in <b>Manager → System Config</b>) to check server uptime, verify wireless ADB connections on port <code>5555</code>, and deploy updated 64-bit APKs.</li>
+</ul>
+
+<h1>22. Quick reference</h1>
 <h2>Where things are</h2>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>To…</th><th>Go to</th></tr>
