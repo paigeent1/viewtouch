@@ -40,7 +40,7 @@ Rectangle {
         { lbl: "ADD EMAIL", col: "#fde047", rad: 22, cmd: "", pg: "check-customer", code: "" },
         { lbl: "NO SALE", col: "#60a5fa", rad: 22, cmd: "openDrawer", pg: "", code: "" },
         { lbl: "SCALE ITEMS", col: "#2563eb", rad: 10, cmd: "", pg: "find-item", code: "" },
-        { lbl: "Gift Cards", col: "#fb923c", rad: 10, cmd: "", pg: "gift-cards", code: "" },
+        { lbl: "Gift Cards", col: "#fb923c", rad: 10, cmd: "", pg: "gift-card", code: "" },
         { lbl: "BOX ↔ STICK", col: "#0284c7", rad: 10, cmd: "", pg: "menu-builder", code: "" },
         { lbl: "Exit POS", col: "#2563eb", rad: 10, cmd: "logout", pg: "", code: "" },
         { lbl: "Cust LookUp", col: "#2dd4bf", rad: 10, cmd: "", pg: "check-customer", code: "" }

@@ -198,7 +198,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "gift-cards"
+          "page": "gift-card"
         }
       ]
     },
