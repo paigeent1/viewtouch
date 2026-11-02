@@ -20,6 +20,12 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:38 ET — Bob (Claude) — Label manual: new Pi screenshots (screen 1 template actions, printer settings)
+- **What:** Rebuilt the label utility manual with the 10:36 pi-shots capture: screen 1 now shows Delete Template and Restore Standard Labels; printer settings shot trimmed of window bleed at the edges.
+- **Why:** The earlier screen 1 shot predated the new Template Actions buttons.
+- **Files:** `modern/docs/label-utility/ViewTouch_Label_Utility_User_Manual.pdf`, `modern/docs/label-utility/screens/printer_settings.png`, `modern/docs/label-utility/screens/screen1_start.png`
+- **Next person must know:** Pi repo is ~/viewtouch-main (not ~/viewtouch); use that path in Pi commands.
+
 ### 2026-11-02 10:35 ET — Bob (Claude) — update_label_utility.sh: exit 0 on success
 - **What:** The script now ends with its own success status instead of the status of the beep3 check.
 - **Why:** beep3 is a ~/.bashrc function, missing inside a script, so the script exited 1 even after a good update and 'update && capture' skipped the screenshot capture.
