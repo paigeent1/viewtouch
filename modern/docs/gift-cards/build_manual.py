@@ -154,7 +154,7 @@ def build():
                   "so a card sold without a plastic card is still usable."],
                  ["Practice checks", "Training (practice) checks can't take money off a real card."]],
                 [1.6, 5.3]),
-          P("What you can do with a card", h2),
+          CondPageBreak(2.2 * inch), P("What you can do with a card", h2),
           B("<b>Sell</b> a new card or <b>reload</b> one that already exists (chapter 4)."),
           B("<b>Check a balance</b> and see the card's history (chapter 3)."),
           B("<b>Pay a check</b> from the card, all or part of it (chapter 5)."),
@@ -173,7 +173,7 @@ def build():
                  ["A scanner", "Scan a card's barcode on almost any screen: the Gift Card screen opens with that card."]],
                 [1.6, 5.3]),
           shot("m17-gift-card", "The Gift Card screen with a card looked up: balance, history and the actions for it."),
-          P("Left side: finding a card and what to do with it", h2),
+          CondPageBreak(3.4 * inch), P("Left side: finding a card and what to do with it", h2),
           table([["Part", "What it does"],
                  ["Search box", "<i>Search Card #, Purchased By, or Purchased For…</i> Type a number (spaces and dashes "
                   "are fine), swipe the card, or type part of a name. Touching it brings up the number pad."],
@@ -186,8 +186,8 @@ def build():
                  ["Cash Out … (under …)", "Shows only when the store's state allows cashing out and the balance is "
                   "under the limit (chapter 6)."]],
                 [1.9, 5.0]),
-          CondPageBreak(2.5 * inch), P("Right side: the card", h2), table([["Part", "What it shows"],
-                 ["Title", "<b>Card 1001</b> (last four digits); <i>Card 1001 isn't active yet</i> for a number with no "
+          CondPageBreak(2.2 * inch), P("Right side: the card", h2), table([["Part", "What it shows"],
+                 ["Title", "<b>Card ••1001</b> (last four digits); <i>Card 1001 isn't active yet</i> for a number with no "
                   "money on file; <i>Look up a card to see its balance</i> when nothing is looked up."],
                  ["Balance", "What's on the card now, in large type."],
                  ["Info line", "<b>Since</b> (when it was first activated) | <b>PIN</b> | <b>For</b> (who it's for) | "
@@ -207,7 +207,7 @@ def build():
                "<b>6000 2026 1001</b> and <b>600020261001</b> find the same card."),
           N(3, "Touch <b>Look Up</b> (or Done on the number pad)."),
           N(4, "Read the balance and history on the right. Tell the guest the balance; nothing has changed on the card."),
-          P("Finding a card without its number", h2),
+          CondPageBreak(2.2 * inch), P("Finding a card without its number", h2),
           P("Type part of a name instead: who bought it or who it's for. Every word you type must match, so "
             "<b>smith</b> finds all Smiths, and <b>john smith</b> narrows it down. You can also type the PIN or the "
             "last digits of the number. When exactly one card matches it opens right away; otherwise tap the one "
@@ -219,10 +219,11 @@ def build():
 
     # 4 ----------------------------------------------------------------------------------------
     s += [P("4. Selling or reloading a card", h1),
-          P("Selling a new card", h2),
+          CondPageBreak(2.2 * inch), P("Selling a new card", h2),
           N(1, "Start a check, or open the guest's check if they're buying other things too. (If no check is open, "
                "ViewTouch starts a quick check for the card.)"),
           N(2, "Open the Gift Card screen: <b>Check…</b> → <b>Sell / Check a Gift Card…</b>"),
+          shot("m10-check-options", "Check options: Sell / Check a Gift Card… opens the Gift Card screen for this check.", 5.2),
           N(3, "Swipe, scan or type the number of the plastic card. <b>No card in hand?</b> Leave the box empty: "
                "ViewTouch makes up a 16-digit number starting with 6 and prints it on the receipt."),
           N(4, "Touch <b>$25</b>, <b>$50</b>, <b>$75</b> or <b>$100</b>, or type the amount in <b>Other $</b>."),
@@ -233,14 +234,14 @@ def build():
           N(7, "Hand the guest the card and the receipt. The receipt shows <b>Card #:</b> with the full number."),
           box("Important:", "The card is worth nothing until the check is paid. If the guest walks away before paying, "
               "nothing is on the card.", "warn"),
-          P("Reloading (adding money to) a card", h2),
+          CondPageBreak(2.2 * inch), P("Reloading (adding money to) a card", h2),
           P("Same steps: look up the existing card, choose the amount, and the button reads "
             "<b>Reload $25 on the Check</b>. The check line says <b>Gift Card reload 1001</b>. The money is added when "
             "the check is paid; the history says <i>Reloaded on check #…</i>."),
-          P("Several cards on one check", h2),
+          CondPageBreak(2.2 * inch), P("Several cards on one check", h2),
           P("Fine: sell each one in turn (look up or leave the number blank, choose the amount, Sell). The same card "
             "can't be on one check twice; change the amount by removing its line and selling it again."),
-          P("When a sale is refused", h2),
+          CondPageBreak(2.2 * inch), P("When a sale is refused", h2),
           table([["Message", "What to do"],
                  ["The card number is too short.", "Numbers need at least 4 digits. Re-swipe or retype."],
                  ["Enter the amount to put on the card.", "Choose an amount button or type one in Other $."],
@@ -266,7 +267,7 @@ def build():
                "Then close the check as usual."),
           box("Tip:", "Tell the guest the remaining balance from the message, or print the receipt: the payment line "
               "shows <b>Gift Card</b>."),
-          P("When a payment is refused", h2),
+          CondPageBreak(2.2 * inch), P("When a payment is refused", h2),
           table([["Message", "What it means"],
                  ["Gift card 1001 isn't active. Cards work once the check that sold them is paid.",
                   "The selling check isn't paid yet, or the number is wrong."],
@@ -343,11 +344,11 @@ def build():
                  ["Reopen a check that sold a card", "A manager (checks closed today)."],
                  ["Change the cash-out limit / the store's state", "A manager (Store Settings → Staff hours)."]],
                 [3.0, 3.9]),
-          P("Settings that matter", h2),
+          CondPageBreak(2.2 * inch), P("Settings that matter", h2),
           B("<b>Store Settings → Staff hours → The store's state</b>: sets the gift card cash-out rule along with overtime "
             "and breaks. Not chosen means no cash-out."),
           B("<b>Cash out gift card balances under ($)</b>: the limit (California $10); 0 = off."),
-          B("<b>Manager → Payment Types</b>: the <b>Gift Card</b> payment type is what shows on receipts and in the reports."),
+          B("<b>Manager → Tenders</b>: the <b>Gift Card</b> tender is what shows on receipts and in the reports."),
           B("Barcode scanners need no setting: a scanned number that belongs to a card opens it."),
           PageBreak()]
 
@@ -363,7 +364,7 @@ def build():
                  ["Find a card without the number", "Type a name, PIN or last digits → tap it in Matching Gift Cards"],
                  ["See what's owed on all cards", "Manager → Reports → Gift Cards → Summary"]],
                 [2.2, 4.7]),
-          P("Good habits", h2),
+          CondPageBreak(2.2 * inch), P("Good habits", h2),
           B("Always finish paying the check before handing over a card: it only works once the check is paid."),
           B("When selling without a plastic card, give the guest the receipt: it is their card number."),
           B("Tell guests their remaining balance after every payment."),

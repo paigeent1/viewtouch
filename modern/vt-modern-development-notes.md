@@ -20,6 +20,11 @@ commits by `tools/changelog.py` — don't hand-edit that one.
 
 ## Log
 
+### 2026-11-02 10:54 ET — Bob (Claude) — Gift card manual: real screenshots from the Pi
+- **What:** Added the 8 demo-store screenshots from pi-vt-shots (10:52 capture) to modern/docs/gift-cards/screens and rebuilt the manual (15 pages): Gift Card screen, check options, payment screen, Reports > Gift Cards. Corrected 'Payment Types' to 'Tenders' and the card title to 'Card ••1001' to match the screens; headings kept with their tables.
+- **Why:** Draft 1 had grey placeholders; the screenshot test now runs on the Pi after 1ccb69f.
+- **Files:** `modern/docs/gift-cards/ViewTouch_Gift_Cards_User_Manual.pdf`, `modern/docs/gift-cards/build_manual.py`, `modern/docs/gift-cards/screens/m10-check-options.png`, `modern/docs/gift-cards/screens/m15-takeout-customer.png`, `modern/docs/gift-cards/screens/m16-customers.png`, `modern/docs/gift-cards/screens/m17-gift-card.png`, `modern/docs/gift-cards/screens/m18-settle.png`, `modern/docs/gift-cards/screens/m30-manager.png`, `modern/docs/gift-cards/screens/m46-report-sales.png`, `modern/docs/gift-cards/screens/m48-report-gift-cards.png`
+
 ### 2026-11-02 10:48 ET — Bob (Claude) — UI tests: load Main.qml the way the app does
 - **What:** test_pos_flow.cpp's Screen now loads Main.qml through loadViewTouchQml(): adds qrc:/ and qrc:/qt/qml import paths and loads the file from :/qt/qml/ViewTouch/ui/qml/ or :/ViewTouch/ui/qml/ (as main.cpp's vtmLoadModuleQml), falling back to loadFromModule.
 - **Why:** After b247aa1 the Pi still failed with 'Module ViewTouch contains no type named Main': without the QTP0001 policy the module lives under qrc:/ViewTouch, which loadFromModule doesn't search. The app already works around this; the tests didn't.
