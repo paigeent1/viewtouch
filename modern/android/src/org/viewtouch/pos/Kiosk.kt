@@ -77,6 +77,15 @@ object Kiosk {
     // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
     @JvmStatic
     fun ensureWirelessAdb(ctx: Context) {
+        // Wireless debugging back on after every restart, so the Pi can reach the tablet again
+        // (vt-adb-ensure then switches it to port 5555). Android lets a device owner change only a
+        // few global settings, and these aren't among them: this needs WRITE_SECURE_SETTINGS, granted
+        // once per tablet over USB: adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS
+        if (ctx.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED) {
+            val cr = ctx.contentResolver
+            for ((k, v) in listOf("adb_enabled" to "1", "adb_wifi_enabled" to "1", "adb_allowed_connection_time" to "0"))
+                try { android.provider.Settings.Global.putString(cr, k, v) } catch (_: Exception) {}
+        }
         val dpm = policy(ctx) ?: return; val who = admin(ctx)
         if (!dpm.isDeviceOwnerApp(ctx.packageName) || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
         for ((k, v) in listOf("adb_enabled" to "1", "adb_wifi_enabled" to "1", "adb_allowed_connection_time" to "0", "stay_on_while_plugged_in" to "7", "wifi_sleep_policy" to "2"))

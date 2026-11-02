@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 16:38 ET — Bob (Claude) — Tablets: wireless debugging back on after a restart
+- **What:** Kiosk.ensureWirelessAdb (runs at boot): when the app holds WRITE_SECURE_SETTINGS, it sets adb_enabled, adb_wifi_enabled and adb_allowed_connection_time itself (Settings.Global). The existing DevicePolicyManager.setGlobalSetting calls for those keys always failed silently: Android doesn't let a device owner change them. Manifest declares the permission. One-time per tablet over USB: adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS (kept across app updates).
+- **Why:** Owner: Bar 3 (192.168.1.210) stopped taking ADB; tcpip 5555 doesn't survive a tablet restart, so tablets drop off after every reboot.
+- **Files:** `modern/android/AndroidManifest.xml`, `modern/android/src/org/viewtouch/pos/Kiosk.kt`
+- **Next person must know:** Needs a new APK. With the grant + a paired Pi, wireless debugging returns after each restart and vt-adb-ensure switches it to 5555. Also reserve .220/.215/.210 for the tablets in the router (DHCP reservations) so their addresses never change.
+
 ### 2026-11-02 16:31 ET — Bob (Claude) — Roadmap: Corporate ViewTouch Pi and shared gift cards (later)
 - **What:** Added to section 5 (Pending Roadmap): a Corporate ViewTouch instance on a separate Pi, built before the Buttheads stores launch; shared gift card balances across Hat City Ale House and both Buttheads Tobacco Emporium stores; a per-terminal store setting overriding Gift card location. Not implemented yet.
 - **Why:** Owner: multi-store gift cards and terminal-level store identification will be addressed when the Corporate Pi is built.
