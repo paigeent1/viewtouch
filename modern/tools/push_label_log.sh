@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uploads the Claude Label Utility log (and the last label sent to the printer)
+# Uploads the ViewTouch Label Utility log (and the last label sent to the printer)
 # to the "pi-logs" branch on GitHub so it can be reviewed remotely.
 # It does not touch your working files or your current branch.
 #
@@ -11,12 +11,12 @@ REMOTE="${1:-myfork}"
 git remote get-url "$REMOTE" >/dev/null 2>&1 || REMOTE=origin
 
 files=()
-for f in /tmp/claude_label_utility.log /tmp/last_label.zpl \
+for f in /tmp/vt_label_utility.log /tmp/claude_label_utility.log /tmp/last_label.zpl \
          "$HOME/.local/share/ViewTouch/claude_label_templates.json"; do
     [ -s "$f" ] && files+=("$f")
 done
 if [ ${#files[@]} -eq 0 ]; then
-    echo "Nothing to upload: /tmp/claude_label_utility.log is empty or missing (no errors logged yet)."
+    echo "Nothing to upload: /tmp/vt_label_utility.log is empty or missing (no errors logged yet)."
     exit 0
 fi
 

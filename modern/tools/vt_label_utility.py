@@ -1,10 +1,29 @@
-import re
 #!/usr/bin/env python3
+import re
 """
-ViewTouch Label Utility & Report Designer (Sandbox Edition)
+ViewTouch Label Utility - label printing with full bitmap rendering.
+Launched by ViewTouch's "Label Utility" button (command openLabelUtility -> /usr/local/bin/vt-label-utility),
+optionally with --upc <code> to open straight to that item's label preview.
+Every label (text and barcodes) is drawn as one picture at the printer's DPI and
+sent as a graphic, so the printer never interprets fonts or barcodes.
+Based on the ViewTouch Label Utility & Report Designer (Sandbox Edition)
 Reads 100% from /home/pi/.local/share/ViewTouch/ViewTouch/viewtouch.db (Read-Only)
 Includes interactive 8-handle resizable field boxes (W x H + Font Size) in the Report Designer.
 """
+import sys, logging
+from logging.handlers import RotatingFileHandler
+import tkinter as tk
+
+_log_handler = RotatingFileHandler('/tmp/vt_label_utility.log', maxBytes=102400, backupCount=1)
+logging.basicConfig(level=logging.ERROR, handlers=[_log_handler], format='%(asctime)s [%(levelname)s] %(message)s')
+
+def _log_err(exc, val, tb):
+    logging.error("Exception caught", exc_info=(exc, val, tb))
+    sys.__excepthook__(exc, val, tb)
+
+sys.excepthook = _log_err
+tk.Tk.report_callback_exception = lambda self, exc, val, tb: _log_err(exc, val, tb)
+
 import datetime, glob, json, os, sqlite3, subprocess, tkinter as tk
 from tkinter import ttk, messagebox
 from reportlab.pdfgen import canvas
@@ -12,7 +31,9 @@ from reportlab.lib.units import inch
 from reportlab.graphics.barcode import code128
 
 SANDBOX_DIR = os.path.expanduser("~/.local/share/ViewTouch")
-TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "vt_label_templates_v2.json")
+TEMPLATE_FILE = os.path.join(SANDBOX_DIR, "claude_label_templates.json")
+# Starting templates shipped in the repo (copied to TEMPLATE_FILE on first run)
+SEED_TEMPLATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "seed", "templates", "claude_label_templates.json")
 VT_DB_PATH = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
 
 DEFAULT_TEMPLATES = {
@@ -80,6 +101,43 @@ def ensure_box_dims(tpl):
         if "h" not in el:
             el["h"] = 0.22 if el.get("field") == "barcode_img" else max(0.14, float(el.get("size", 10)) / 55.0)
     return tpl
+
+_RECEIPT_PRINTER_WORDS = ("epson", "tm-t", "tmt", "tm-m", "receipt", "escpos", "esc/pos", "star ", "tsp1",
+                          "80mm", "58mm", "kitchen", "ticket", "bar printer", "report")
+
+def printer_speaks_zpl(printer_label, tpl=None, extra_text=""):
+    """Should this printer get ZPL (label printer) or ESC/POS (receipt printer)?
+
+    A template can force it with "printer_language": "zpl" or "escpos". Otherwise this is a label
+    utility, so everything is treated as a ZPL label printer unless its name (or CUPS device URI)
+    clearly says it is a receipt printer.
+    """
+    lang = str((tpl or {}).get("printer_language", "")).lower()
+    if lang in ("zpl", "escpos"):
+        return lang == "zpl"
+    text = (str(printer_label) + " " + str(extra_text)).lower()
+    if any(k in text for k in ("zebra", "zpl", "label")):
+        return True
+    return not any(k in text for k in _RECEIPT_PRINTER_WORDS)
+
+def _printer_display_name(label):
+    m = re.match(r"\s*(?:VT TCP|VT CUPS|VT File|CUPS):\s*(.*?)(?:\s*\(|$)", str(label or ""))
+    return (m.group(1) if m else str(label or "")).strip().lower()
+
+def resolve_template_printer(saved, printers):
+    """Find the template's printer in the current list.
+
+    Exact match first; then the same ViewTouch printer name (so changing a printer's IP in
+    ViewTouch settings carries over to the templates using it); then the first printer.
+    """
+    if saved and saved in printers:
+        return saved
+    want = _printer_display_name(saved)
+    if want:
+        for p in printers:
+            if _printer_display_name(p) == want:
+                return p
+    return printers[0] if printers else "PDF Preview (Desktop)"
 
 def discover_all_printers():
     printers = []
@@ -167,72 +225,165 @@ def _unused_old_discover_all_printers():
     printers.append("PDF Preview (Desktop)")
     return printers
 
+_FONT_CACHE = {}
+
+def resolve_font_file(family, bold=False, italic=False):
+    """Find a TrueType file for a named font (e.g. 'Arial Black', 'Courier New') via fontconfig.
+    Falls back to the closest installed font (Liberation Sans/Mono are metric clones of Arial/Courier New)."""
+    key = (family, bool(bold), bool(italic))
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    path = None
+    # Metric-compatible / closest stand-ins when the Microsoft fonts aren't installed
+    fallbacks = {"arial": ("Liberation Sans", bold), "arial black": ("Liberation Sans", True),
+                 "courier new": ("Liberation Mono", bold), "times new roman": ("Liberation Serif", bold)}
+    tries = [(family, bold)]
+    if family.lower() in fallbacks:
+        tries.append(fallbacks[family.lower()])
+    for fam_try, bold_try in tries:
+        pattern = fam_try + (":weight=bold" if bold_try else "") + (":slant=italic" if italic else "")
+        try:
+            out = subprocess.run(["fc-match", "-f", "%{family}|%{file}", pattern], capture_output=True, text=True, timeout=3).stdout.strip()
+            got_fam, _, got_file = out.partition("|")
+            # fc-match always returns *something*; only accept it if it is really the family we asked for
+            if got_file and os.path.exists(got_file) and fam_try.lower() in got_fam.lower():
+                path = got_file
+                break
+        except Exception:
+            pass
+    _FONT_CACHE[key] = path
+    return path
+
+def pdf_font_name_for(family, bold=False, italic=False):
+    """Register a named TrueType font with reportlab and return its PDF font name (or None)."""
+    path = resolve_font_file(family, bold, italic)
+    if not path:
+        return None
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        name = "VT_" + "".join(ch for ch in os.path.basename(path) if ch.isalnum())
+        if name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(name, path))
+        return name
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------------------
+# ILSA / ReportBuilder (.rtm) label import
+# ---------------------------------------------------------------------------
+_RTM_FIELDS = {"PLU_DESC": "name", "POS_DESC": "name", "PLU_NUM": "upc", "PRICE": "price_fmt", "LAST_PRICE": "price_fmt",
+               "MANUF": "manufacturer", "CATEGORY": "category", "DEPT_GRP": "category"}
+_RTM_BARCODES = {"bcUPC_A": "barcode_upca", "bcUPC_E": "barcode_upce", "bcCode39": "barcode_code39",
+                 "bcCode128": "barcode_img", "bcEAN_13": "barcode_img"}
+_RTM_ALIGN = {"taCentered": "center", "taCenter": "center", "taRightJustified": "right", "taLeftJustified": "left"}
+
+def _parse_rtm(text):
+    root = {"props": {}, "children": []}
+    stack = [root]
+    for raw in text.splitlines():
+        line = raw.strip()
+        m = re.match(r"object (\w+): (\w+)", line)
+        if m:
+            node = {"name": m.group(1), "cls": m.group(2), "props": {}, "children": []}
+            stack[-1]["children"].append(node); stack.append(node); continue
+        if line == "end" and len(stack) > 1:
+            stack.pop(); continue
+        m = re.match(r"([\w.]+) = (.*)", line)
+        if m:
+            v = m.group(2).strip()
+            if v.startswith("'") and v.endswith("'"):
+                v = v[1:-1].replace("''", "'")
+            stack[-1]["props"][m.group(1)] = v
+    if not root["children"]:
+        raise ValueError("not a ReportBuilder .rtm text file")
+    return root["children"][0]
+
+def import_rtm_template(path):
+    """Convert an ILSA ReportBuilder label layout (.rtm, ASCII format) into a template dict."""
+    with open(path, "r", encoding="latin-1") as f:
+        rep_ = _parse_rtm(f.read())
+    P = rep_["props"]
+    mm_in = lambda v: round(int(v) / 1000.0 / 25.4, 4)
+    tpl = {"width_in": mm_in(P.get("PrinterSetup.mmPaperWidth", 50800)),
+           "height_in": mm_in(P.get("PrinterSetup.mmPaperHeight", 25400)),
+           "elements": [], "v_offset_dots": 0, "h_offset_dots": 0, "darkness": 18, "tear_off": 0, "printer_dpi": 203,
+           "source": "ILSA ReportBuilder: " + os.path.basename(path)}
+    bands = [c for c in rep_["children"] if c["cls"] == "TppDetailBand"]
+    if not bands:
+        raise ValueError("no detail band (label layout) found in the .rtm file")
+    for o in bands[0]["children"]:
+        p = o["props"]
+        if "mmLeft" not in p:
+            continue
+        fam = p.get("Font.Name", "Arial"); style = p.get("Font.Style", "[]"); size = int(p.get("Font.Size", 8))
+        el = {"id": o["name"], "x": mm_in(p["mmLeft"]), "y": mm_in(p["mmTop"]), "w": mm_in(p["mmWidth"]), "h": mm_in(p["mmHeight"])}
+        el["w"] = round(max(0.05, min(el["w"], tpl["width_in"] - el["x"])), 4)
+        if o["cls"] == "TppDBBarCode":
+            el.update(field=_RTM_BARCODES.get(p.get("BarCodeType"), "barcode_img"), size=size, bold=False,
+                      align=_RTM_ALIGN.get(p.get("Alignment", "taLeftJustified"), "left"),
+                      module_mm=int(p.get("mmBarWidth", 330)) / 1000.0,
+                      human_readable=p.get("PrintHumanReadable", "True") != "False", hri_font=fam, hri_size=size)
+        elif o["cls"] in ("TppDBText", "TppSystemVariable", "TppVariable", "TppLabel"):
+            if o["cls"] == "TppDBText":
+                field = _RTM_FIELDS.get(p.get("DataField", "").upper(), p.get("DataField", "name").lower())
+            elif o["cls"] == "TppLabel":
+                field = "static:" + p.get("Caption", "")
+            else:
+                field = {"yymmdd": "date_yymmdd", "yy": "year_short", "mm/dd/yyyy": "date_slash"}.get(p.get("DisplayFormat", ""), "date_yymmdd")
+            tall_enough = int(p["mmHeight"]) / 1000.0 > size * 0.3528 * 1.15 * 1.8
+            el.update(field=field, size=size, bold="fsBold" in style, italic="fsItalic" in style, font_family=fam,
+                      auto_font=False, valign="top", align=_RTM_ALIGN.get(p.get("TextAlignment", "taLeftJustified"), "left"),
+                      word_wrap=p.get("WordWrap") == "True" and tall_enough)
+        else:
+            continue
+        tpl["elements"].append(el)
+    if not tpl["elements"]:
+        raise ValueError("no printable fields found in the .rtm file")
+    return tpl
+
 def load_templates():
-    tpl_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
-    user_file = os.path.expanduser("~/.local/share/ViewTouch/vt_label_templates_v2.json")
-    seed_file = os.path.join(tpl_dir, "vt_label_templates_v2.json")
-    
+    """The label utility keeps its own template list (claude_label_templates.json).
+
+    First run: copies the shipped seed file to ~/.local/share/ViewTouch/claude_label_templates.json.
+    After that only that file is used, so deleted templates stay deleted.
+    """
     data = {}
-    for src in (seed_file, user_file):
+    for src in (TEMPLATE_FILE, SEED_TEMPLATE_FILE):
         if os.path.exists(src):
             try:
                 with open(src, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        data.update(loaded)
-            except Exception:
-                pass
-                
-    for k, v in DEFAULT_TEMPLATES.items():
-        if k not in data:
-            data[k] = v
-
-    # If Date_Label_2up_MR was renamed to 'Receiving Label' in file manager,
-    # rename any existing 'DATE LABEL 2UP MR' key in data to 'RECEIVING LABEL'!
-    if "DATE LABEL 2UP MR" in data:
-        data["RECEIVING LABEL"] = data.pop("DATE LABEL 2UP MR")
-
-    # Scan file manager folder (~/viewtouch-main/modern/seed/templates) for template files
-    if os.path.exists(tpl_dir):
-        for entry in sorted(os.listdir(tpl_dir)):
-            full_p = os.path.join(tpl_dir, entry)
-            if not os.path.isfile(full_p) or entry.startswith("."):
-                continue
-            base, ext = os.path.splitext(entry)
-            ext = ext.lower()
-            if ext in (".prn", ".nlbl", ".slnx"):
-                tpl_key = base.strip().upper()
-                if tpl_key not in data:
-                    base_ref = data.get("RECEIVING LABEL") or data.get("2X1VINYL W/BARCODE") or list(data.values())[0]
-                    data[tpl_key] = json.loads(json.dumps(base_ref))
-            elif ext == ".json" and entry not in ("vt_label_templates.json", "vt_label_templates_v2.json"):
-                tpl_key = base.strip().upper()
-                try:
-                    with open(full_p, "r", encoding="utf-8") as jf:
-                        single_data = json.load(jf)
-                        if isinstance(single_data, dict):
-                            data[tpl_key] = single_data
-                except Exception:
-                    pass
-
+                if isinstance(loaded, dict) and loaded:
+                    data = loaded
+                    if src == SEED_TEMPLATE_FILE:
+                        # Keep the RECEIVING LABEL position tweaks already saved by vt_label_utility
+                        try:
+                            with open(os.path.join(SANDBOX_DIR, "vt_label_templates_v2.json"), "r", encoding="utf-8") as vf:
+                                tuned = json.load(vf).get("RECEIVING LABEL")
+                            if isinstance(tuned, dict) and tuned.get("elements"):
+                                data["RECEIVING LABEL"] = tuned
+                        except Exception:
+                            pass
+                        save_templates(data)
+                    break
+            except Exception as e:
+                logging.error("Could not read templates from %s: %s", src, e)
+    if not data:
+        data = json.loads(json.dumps(DEFAULT_TEMPLATES))
     for k in data:
         ensure_box_dims(data[k])
     return data
 
 def save_templates(tpls):
-    user_dir = os.path.expanduser("~/.local/share/ViewTouch")
-    seed_dir = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(seed_dir, exist_ok=True)
-    for p in (
-        os.path.join(user_dir, "vt_label_templates_v2.json"),
-        os.path.join(seed_dir, "vt_label_templates_v2.json")
-    ):
-        try:
-            with open(p, "w", encoding="utf-8") as f:
-                json.dump(tpls, f, indent=2)
-        except Exception:
-            pass
+    try:
+        os.makedirs(os.path.dirname(TEMPLATE_FILE), exist_ok=True)
+        tmp = TEMPLATE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(tpls, f, indent=2)
+        os.replace(tmp, TEMPLATE_FILE)
+    except Exception as e:
+        logging.error("Could not save templates: %s", e)
 
 def calc_gs1_check_digit(digits_11):
     total = 0
@@ -259,6 +410,57 @@ def infer_brand(item_name, category):
         if item_name.upper().startswith(prefix):
             return prefix
     return words[0].upper()
+
+def _clean_code(code):
+    c = str(code or "").strip()
+    if not c or c.lower() in ("0", "none", "null"):
+        return ""
+    d = "".join(ch for ch in c if ch.isdigit())
+    if d and all(ch.isdigit() or ch in " -" for ch in c):
+        return normalize_upc(d) if len(d) == 11 else d     # numeric codes: digits only, 11 digits get a check digit
+    return c                                               # other codes print exactly as ViewTouch stores them
+
+def collect_item_upcs(m):
+    """All codes on a ViewTouch menu item, for picking which one a label prints.
+
+    Returns [(label, code), ...]: ViewTouch's barcodes list in order ("Primary UPC", "Alt UPC 1", ...),
+    then the carton UPC a pack item is linked to (recipe __parent__:<carton UPC>).
+    Nothing is ever written back to ViewTouch.
+    """
+    raw = []
+    bcs = m.get("barcodes", [])
+    if isinstance(bcs, str):
+        bcs = [x for x in re.split(r"[\s,;|]+", bcs) if x]
+    if isinstance(bcs, list):
+        raw.extend(bcs)
+    for k in ("upc", "sku", "altupc"):
+        if m.get(k):
+            raw.append(m.get(k))
+    for k in ("altupcs", "alt_upcs", "altBarcodes"):
+        v = m.get(k)
+        if isinstance(v, list):
+            raw.extend(v)
+    choices, seen = [], set()
+    same = lambda c: c.lstrip("0") if c.isdigit() else c      # 0025900102005 == 025900102005
+    for code in raw:
+        c = _clean_code(code)
+        if c and same(c) not in seen:
+            seen.add(same(c))
+            choices.append(("Primary UPC" if not choices else f"Alt UPC {len(choices)}", c))
+    for rl in m.get("recipe", []) or []:
+        if isinstance(rl, dict):
+            ing = str(rl.get("ingredientId", rl.get("ingredient", "")))
+            if ing.startswith("__parent__:"):
+                c = _clean_code(ing.split(":", 1)[1])
+                if c and same(c) not in seen:
+                    seen.add(same(c))
+                    choices.append(("Carton UPC", c))
+    return choices
+
+def set_item_upc(item, code, label=None):
+    """Choose which of the item's UPCs this label prints (session only)."""
+    item["upc"] = code
+    item["upc_label"] = label or next((l for l, c in item.get("upc_choices", []) if c == code), "UPC")
 
 def parse_vt_menu_dict(m, seen, items):
     if not isinstance(m, dict):
@@ -302,6 +504,10 @@ def parse_vt_menu_dict(m, seen, items):
     mfg = str(m.get("manufacturer") or m.get("brand") or infer_brand(name, cat)).strip().upper()
     dept_grp = "CIGARS" if ("CIGAR" in cat or "CIGAR" in name.upper()) else ("RETAIL" if is_retail else "HOSPITALITY")
 
+    upc_choices = collect_item_upcs(m)
+    if not upc_choices or upc_choices[0][1] != upc:
+        rest = [c for _, c in upc_choices if c.lstrip("0") != upc.lstrip("0")]
+        upc_choices = [("Primary UPC", upc)] + [(f"Alt UPC {i + 1}", c) for i, c in enumerate(rest)]
     key = (name.upper(), upc)
     if key not in seen:
         seen.add(key)
@@ -310,6 +516,9 @@ def parse_vt_menu_dict(m, seen, items):
             "qty": 1,
             "pack_qty": pack_qty,
             "upc": upc,
+            "primary_upc": upc,
+            "upc_choices": upc_choices,
+            "upc_label": "Primary UPC",
             "upce": str(raw_upce).strip(),
             "name": name.upper(),
             "dept_name": cat,
@@ -463,16 +672,216 @@ def split_two_lines(text):
             best_i = i
     return " ".join(words[:best_i]) + "\n" + " ".join(words[best_i:])
 
-def render_label_pil_image(tpl, item, dpi=203):
-    """Renders the exact label to a 1-bit PIL Image at 203 DPI using the same TrueType fonts and box-fitting as the screen."""
+# ---------------------------------------------------------------------------
+# Bitmap barcode engine
+# Every label is rendered to a 1-bit picture and the printer only stamps the
+# pixels (like the old ILSA system). Barcodes are drawn here, bar by bar, with
+# every bar a whole number of printer dots wide so they scan reliably.
+# ---------------------------------------------------------------------------
+
+_EAN_L = {'0':'0001101','1':'0011001','2':'0010011','3':'0111101','4':'0100011',
+          '5':'0110001','6':'0101111','7':'0111011','8':'0110111','9':'0001011'}
+_EAN_R = {'0':'1110010','1':'1100110','2':'1101100','3':'1000010','4':'1011100',
+          '5':'1001110','6':'1010000','7':'1000100','8':'1001000','9':'1110100'}
+_EAN_G = {d: p[::-1] for d, p in _EAN_R.items()}
+_EAN13_PARITY = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL']
+# UPC-E parity for number system 0 (E = even/G-code, O = odd/L-code); NS 1 is the inverse
+_UPCE_PARITY_NS0 = ['EEEOOO','EEOEOO','EEOOEO','EEOOOE','EOEEOO','EOOEEO','EOOOEE','EOEOEO','EOEOOE','EOOEOE']
+
+
+def _digits(s):
+    return "".join(ch for ch in str(s or "") if ch.isdigit())
+
+
+def _check_digit_mod10(body):
+    """GS1 check digit for UPC-A (11 digits), EAN-13 (12 digits) or UPC-A expanded from UPC-E."""
+    total = 0
+    for idx, ch in enumerate(reversed(body)):
+        total += int(ch) * (3 if idx % 2 == 0 else 1)
+    return str((10 - total % 10) % 10)
+
+
+def upce_to_upca(upce8_or_7):
+    """Expand UPC-E (NS + 6 digits [+ check]) to the 11-digit UPC-A body."""
+    d = _digits(upce8_or_7)
+    ns, m = d[0], d[1:7]
+    last = m[5]
+    if last in "012":
+        body = m[0:2] + last + "0000" + m[2:5]
+    elif last == "3":
+        body = m[0:3] + "00000" + m[3:5]
+    elif last == "4":
+        body = m[0:4] + "00000" + m[4]
+    else:
+        body = m[0:5] + "0000" + last
+    return ns + body
+
+
+def upca_to_upce(upca):
+    """Return the 8-digit UPC-E for a UPC-A if it can be zero-suppressed, else None."""
+    d = _digits(upca)
+    if len(d) == 11:
+        d += _check_digit_mod10(d)
+    if len(d) != 12 or d[0] not in "01":
+        return None
+    ns, mfr, prod, chk = d[0], d[1:6], d[6:11], d[11]
+    cand = None
+    if mfr[2] in "012" and mfr[3:5] == "00" and prod[0:2] == "00":
+        cand = mfr[0:2] + prod[2:5] + mfr[2]
+    elif mfr[3:5] == "00" and prod[0:3] == "000":
+        cand = mfr[0:3] + prod[3:5] + "3"
+    elif mfr[4] == "0" and prod[0:4] == "0000":
+        cand = mfr[0:4] + prod[4] + "4"
+    elif prod[0:4] == "0000" and prod[4] in "56789":
+        cand = mfr[0:5] + prod[4]
+    if cand and upce_to_upca(ns + cand) == d[:11]:
+        return ns + cand + chk
+    return None
+
+
+def _modules_upca(value):
+    d = _digits(value)
+    if len(d) == 11:
+        d += _check_digit_mod10(d)
+    if len(d) != 12:
+        return None
+    d = d[:11] + _check_digit_mod10(d[:11])          # always print a correct check digit
+    return ("101" + "".join(_EAN_L[c] for c in d[:6]) + "01010" +
+            "".join(_EAN_R[c] for c in d[6:]) + "101"), d
+
+
+def _modules_ean13(value):
+    d = _digits(value)
+    if len(d) == 12:
+        d += _check_digit_mod10(d)
+    if len(d) != 13:
+        return None
+    d = d[:12] + _check_digit_mod10(d[:12])
+    par = _EAN13_PARITY[int(d[0])]
+    left = "".join((_EAN_L if p == "L" else _EAN_G)[c] for p, c in zip(par, d[1:7]))
+    return "101" + left + "01010" + "".join(_EAN_R[c] for c in d[7:]) + "101", d
+
+
+def _modules_upce(value, fallback_upca=""):
+    d = _digits(value)
+    if len(d) == 6:
+        d = "0" + d
+    if len(d) == 7 and d[0] in "01":
+        d += _check_digit_mod10(upce_to_upca(d))
+    if not (len(d) == 8 and d[0] in "01"):
+        d = upca_to_upce(fallback_upca) or ""
+    if len(d) != 8:
+        return None
+    d = d[:7] + _check_digit_mod10(upce_to_upca(d[:7]))
+    par = _UPCE_PARITY_NS0[int(d[7])]
+    if d[0] == "1":
+        par = "".join("O" if p == "E" else "E" for p in par)
+    body = "".join((_EAN_L if p == "O" else _EAN_G)[c] for p, c in zip(par, d[1:7]))
+    return "101" + body + "010101", d
+
+
+def _modules_from_reportlab(kind, value):
+    """Code 128 / Code 39 element widths from reportlab, converted to a 1/0 module string."""
+    if kind == "code39":
+        from reportlab.graphics.barcode import code39 as rl39
+        bc = rl39.Standard39(str(value).upper(), checksum=0, stop=1)
+        bc.validate(); bc.encode()
+        out = []
+        for ch in bc.decompose():           # b/s narrow, B/S wide (3x), i = gap
+            if ch == "i":
+                out.append("0")
+            else:
+                out.append(("1" if ch in "bB" else "0") * (3 if ch.isupper() else 1))
+        return "".join(out), str(value).upper()
+    from reportlab.graphics.barcode import code128 as rl128
+    bc = rl128.Code128(str(value))
+    bc.validate(); bc.encode()
+    out, is_bar = [], True
+    for ch in bc.decompose():               # alternating bar/space, widths a..d = 1..4
+        out.append(("1" if is_bar else "0") * (ord(ch.lower()) - ord("a") + 1))
+        is_bar = not is_bar
+    return "".join(out), str(value)
+
+
+def barcode_modules(field, item):
+    """Pick the symbology for a barcode field and return (module_string, encoded_value) or (None, raw)."""
+    raw = str(item.get("upc", "") or "").strip()
+    digits = _digits(raw)
+    try:
+        if field == "barcode_upce":
+            # Follow the UPC picked for this label; otherwise the item's own UPC-E
+            picked = item.get("upc_label") not in (None, "Primary UPC")
+            res = _modules_upce(raw if picked else item.get("upce", ""), fallback_upca=raw)
+            if res:
+                return res
+            field = "barcode_upca"
+        if field == "barcode_upca" and len(digits) in (11, 12):
+            return _modules_upca(digits)
+        if field == "barcode_code39" and raw:
+            return _modules_from_reportlab("code39", raw)
+        # An 8-digit UPC-E stored in the UPC column (common on cigarettes) with a valid check digit
+        if len(digits) == len(raw) == 8 and digits[0] in "01" and \
+                _check_digit_mod10(upce_to_upca(digits[:7])) == digits[7]:
+            if field == "barcode_upca":
+                return _modules_upca(upce_to_upca(digits[:7]))
+            if field in ("barcode_img", "barcode"):
+                return _modules_upce(digits)
+        if field in ("barcode_img", "barcode_upca", "barcode_ean13", "barcode"):
+            if len(digits) == len(raw) and len(digits) in (11, 12):
+                return _modules_upca(digits)
+            if len(digits) == len(raw) and len(digits) == 13:
+                return _modules_ean13(digits)
+        if raw:
+            return _modules_from_reportlab("code128", raw)
+    except Exception:
+        pass
+    return None, raw
+
+
+def draw_barcode_dots(draw, modules, x, y, w, h, fill=0, mw=None, align="center"):
+    """Draw bars on a PIL canvas using a whole number of dots per module.
+    mw = dots per module (default: the widest that fits the box); align = left/center/right in the box."""
+    n = len(modules)
+    if not n:
+        return 0
+    mw = max(1, int(mw)) if mw else max(1, int(w // n))
+    total = mw * n
+    if align == "left":
+        x0 = int(x)
+    elif align == "right":
+        x0 = int(x + w - total)
+    else:
+        x0 = int(x + (w - total) // 2)
+    i = 0
+    while i < n:
+        if modules[i] == "1":
+            j = i
+            while j < n and modules[j] == "1":
+                j += 1
+            draw.rectangle([x0 + i * mw, int(y), x0 + j * mw - 1, int(y + h - 1)], fill=fill)
+            i = j
+        else:
+            i += 1
+    return mw
+
+
+
+def render_label_pil_image(tpl, item, dpi=203, mono=True, dot_scale=1.0):
+    """Render the whole label to a 1-bit PIL image at the printer's own DPI.
+
+    This picture is exactly what gets printed: the Zebra receives it as a ZPL
+    graphic (^GFA), CUPS printers receive it inside a PDF page, and the
+    print preview shows it. No printer fonts or printer barcodes are used.
+    """
     from PIL import Image, ImageDraw, ImageFont
+    dpi = int(dpi or 203)
     w_dots = max(50, int(round(float(tpl.get("width_in", 2.0)) * dpi)))
     h_dots = max(40, int(round(float(tpl.get("height_in", 1.0)) * dpi)))
     img = Image.new("L", (w_dots, h_dots), 255)
-    draw = ImageDraw.Draw(img)
 
-    v_off = int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12)
-    h_off = int(tpl.get("h_offset_dots", 0) or 0)
+    # Offsets are stored in printer dots; dot_scale converts them when rendering at another DPI (screen preview)
+    v_off = int(round(int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12) * dot_scale))
+    h_off = int(round(int(tpl.get("h_offset_dots", 0) or 0) * dot_scale))
 
     def get_ttf(fam, bold, italic, px):
         px = max(8, int(px))
@@ -486,6 +895,8 @@ def render_label_pil_image(tpl, item, dpi=203):
                     pass
         if fam == "Mono":
             candidates = [
+                "/usr/share/fonts/truetype/msttcorefonts/courbd.ttf" if bold else "/usr/share/fonts/truetype/msttcorefonts/cour.ttf",
+                "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold.ttf" if bold else "/usr/share/fonts/truetype/msttcorefonts/Courier_New.ttf",
                 "/home/pi/viewtouch-main/modern/assets/fonts/LiberationMono-Bold.ttf" if bold else "/home/pi/viewtouch-main/modern/assets/fonts/LiberationMono-Regular.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
             ]
@@ -496,6 +907,8 @@ def render_label_pil_image(tpl, item, dpi=203):
             ]
         else:
             candidates = [
+                "/usr/share/fonts/truetype/msttcorefonts/Ariblk.ttf" if bold else "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf",
+                "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf" if bold else "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",
                 "/home/pi/viewtouch-main/modern/assets/fonts/LiberationSans-Bold.ttf" if bold else "/home/pi/viewtouch-main/modern/assets/fonts/LiberationSans-Regular.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -508,33 +921,17 @@ def render_label_pil_image(tpl, item, dpi=203):
                     pass
         return ImageFont.load_default()
 
-    for el in tpl.get("elements", []):
-        if el.get("visible", True) is False:
-            continue
-        bx = int(round(float(el.get("x", 0.04)) * dpi)) + h_off
-        by = int(round(float(el.get("y", 0.04)) * dpi)) + v_off
-        bw = max(16, int(round(float(el.get("w", 0.8)) * dpi)))
-        bh = max(12, int(round(float(el.get("h", 0.18)) * dpi)))
-        field = el.get("field", "name")
-
-        if str(field).startswith("barcode"):
-            # Let build_zpl_from_template emit crisp native ^BC / ^BU barcode on top, or draw bars here
-            continue
-
-        raw_txt = str(format_item_field(item, field, el) or "").strip()
-        if not raw_txt:
-            continue
-
+    def draw_text_box(draw, raw_txt, el, field, bw, bh):
+        """Fit and draw text inside a (bw x bh) box whose top-left is (0, 0)."""
         fam = el.get("font_family", "Sans")
         bold = bool(el.get("bold", True))
         italic = bool(el.get("italic", False))
         do_wrap = bool(el.get("word_wrap", field == "name"))
         auto_font = bool(el.get("auto_font", True))
 
-        # Match exact fit_text_into_box logic used by render_label_on_tk_canvas!
+        # Same box-fitting rules as render_label_on_tk_canvas
         if do_wrap and len(raw_txt) > 18 and " " in raw_txt:
-            text_to_draw = split_two_lines(raw_txt)
-            lines = text_to_draw.splitlines()
+            lines = split_two_lines(raw_txt).splitlines()
             start_px = max(10, int(bh * 0.44)) if auto_font else max(8, int(float(el.get("size", 12)) * (dpi / 72.0)))
             chosen_fnt = get_ttf(fam, bold, italic, 10)
             for px in range(start_px, 7, -1):
@@ -546,39 +943,174 @@ def render_label_pil_image(tpl, item, dpi=203):
                     chosen_fnt = fnt
                     break
         else:
-            text_to_draw = raw_txt
             lines = [raw_txt]
             start_px = max(10, int(bh * 0.82)) if auto_font else max(8, int(float(el.get("size", 12)) * (dpi / 72.0)))
             chosen_fnt = get_ttf(fam, bold, italic, 10)
             for px in range(start_px, 7, -1):
                 fnt = get_ttf(fam, bold, italic, px)
-                bb = draw.textbbox((0, 0), text_to_draw, font=fnt)
-                tw = bb[2] - bb[0]
-                th = bb[3] - bb[1]
-                if tw <= (bw - 4) and th <= (bh - 1):
+                bb = draw.textbbox((0, 0), raw_txt, font=fnt)
+                if el.get("valign") == "top":
+                    a_, d_ = fnt.getmetrics()
+                    fits = (bb[2] - bb[0]) <= bw and (a_ + d_) <= bh * 1.25
+                else:
+                    fits = (bb[2] - bb[0]) <= (bw - 4) and (bb[3] - bb[1]) <= (bh - 1)
+                if fits:
                     chosen_fnt = fnt
                     break
 
         align = el.get("align", "center")
-        # Calculate exact bounding box of rendered text so we center it inside [bx, by, bx+bw, by+bh]
+        if el.get("valign") == "top":
+            # ReportBuilder style: each line's ascent starts at the top of the box (no vertical centring)
+            try:
+                asc, desc = chosen_fnt.getmetrics()
+            except Exception:
+                asc, desc = (10, 3)
+            cur_y = 0
+            for ln in lines:
+                lb = draw.textbbox((0, 0), ln, font=chosen_fnt, anchor="la")
+                lw_px = lb[2] - lb[0]
+                if align == "left":
+                    tx = -lb[0]
+                elif align == "right":
+                    tx = bw - lw_px - lb[0]
+                else:
+                    tx = (bw - lw_px) / 2.0 - lb[0]
+                draw.text((tx, cur_y), ln, font=chosen_fnt, fill=0, anchor="la")
+                cur_y += asc + desc
+            return
         line_bboxes = [draw.textbbox((0, 0), ln, font=chosen_fnt) for ln in lines]
         line_heights = [bb[3] - bb[1] for bb in line_bboxes]
         total_h = sum(line_heights) + (4 * (len(lines) - 1))
-        cur_y = by + (bh - total_h) / 2.0
-
+        cur_y = (bh - total_h) / 2.0
         for ln, bb, lh in zip(lines, line_bboxes, line_heights):
             lw_px = bb[2] - bb[0]
             if align == "left":
-                tx = bx + 2 - bb[0]
+                tx = 2 - bb[0]
             elif align == "right":
-                tx = bx + bw - lw_px - 2 - bb[0]
+                tx = bw - lw_px - 2 - bb[0]
             else:
-                tx = bx + (bw - lw_px) / 2.0 - bb[0]
-            ty = cur_y - bb[1]
-            draw.text((tx, ty), ln, font=chosen_fnt, fill=0)
+                tx = (bw - lw_px) / 2.0 - bb[0]
+            draw.text((tx, cur_y - bb[1]), ln, font=chosen_fnt, fill=0)
             cur_y += lh + 4
 
+    for el in tpl.get("elements", []):
+        if el.get("visible", True) is False:
+            continue
+        bx = int(round(float(el.get("x", 0.04)) * dpi)) + h_off
+        by = int(round(float(el.get("y", 0.04)) * dpi)) + v_off
+        bw = max(16, int(round(float(el.get("w", 0.8)) * dpi)))
+        bh = max(12, int(round(float(el.get("h", 0.18)) * dpi)))
+        field = el.get("field", "name")
+        rot = int(el.get("rotate", 0) or 0) % 360
+        # A 90/270 rotated element is laid out in a box with width and height swapped
+        eff_w, eff_h = (bh, bw) if rot in (90, 270) else (bw, bh)
+
+        if str(field).startswith("barcode"):
+            modules, b_val = barcode_modules(field, item)
+            if not modules:
+                continue
+            n_mod = len(modules)
+            # Fixed bar width (ILSA "mmBarWidth") or the widest whole-dot width that fits the box
+            if el.get("module_mm"):
+                mw = max(1, int(round(float(el["module_mm"]) * dpi / 25.4)))
+                if rot:
+                    mw = min(mw, max(1, eff_w // n_mod))
+            else:
+                mw = max(1, eff_w // n_mod)
+            b_align = el.get("align", "center")
+            need_w = mw * n_mod
+            sub_w = max(eff_w, need_w)
+            if need_w > eff_w and not rot:
+                # Bars wider than the box spill out like they did in ReportBuilder
+                if b_align == "center":
+                    bx -= (need_w - eff_w) // 2
+                elif b_align == "right":
+                    bx -= (need_w - eff_w)
+            sub = Image.new("L", (sub_w, eff_h), 255)
+            sdraw = ImageDraw.Draw(sub)
+            bar_h = eff_h
+            hri_font = None
+            if el.get("human_readable"):
+                hri_px = max(8, int(round(float(el.get("hri_size", 8)) * dpi / 72.0)))
+                hri_font = get_ttf(el.get("hri_font", "Sans"), False, False, hri_px)
+                hb = sdraw.textbbox((0, 0), "0123456789", font=hri_font)
+                bar_h = max(6, eff_h - (hb[3] - hb[1]) - 2)
+            x0 = 0 if sub_w > eff_w else ({"left": 0, "right": eff_w - need_w}.get(b_align, (eff_w - need_w) // 2))
+            draw_barcode_dots(sdraw, modules, x0, 0, need_w, bar_h, mw=mw, align="left")
+            if hri_font is not None:
+                txt = str(b_val)
+                tb = sdraw.textbbox((0, 0), txt, font=hri_font)
+                sdraw.text((x0 + (need_w - (tb[2] - tb[0])) / 2.0 - tb[0], bar_h + 1 - tb[1]), txt, font=hri_font, fill=0)
+        else:
+            sub = Image.new("L", (eff_w, eff_h), 255)
+            sdraw = ImageDraw.Draw(sub)
+            raw_txt = str(format_item_field(item, field, el) or "").strip()
+            if not raw_txt:
+                continue
+            draw_text_box(sdraw, raw_txt, el, field, eff_w, eff_h)
+
+        if rot:
+            sub = sub.rotate(rot, expand=True, fillcolor=255)
+        # Paste only the dark pixels so overlapping boxes don't blank each other out
+        if mono:
+            mask = sub.point(lambda p: 255 if p < 160 else 0)
+        else:
+            mask = sub.point(lambda p: 255 - p)       # keep smooth (anti-aliased) edges for the screen
+        img.paste(0, (bx, by), mask)
+
+    if not mono:
+        return img
     return img.point(lambda p: 0 if p < 160 else 1, mode="1")
+
+
+def label_dpi(tpl):
+    return int(tpl.get("printer_dpi", 203) or 203)
+
+
+def export_pdf_from_bitmaps(items, tpl, out_pdf, copies=1):
+    """PDF for CUPS/desktop printers: every page is the same 1-bit label picture the Zebra gets."""
+    from reportlab.lib.utils import ImageReader
+    w_pt = float(tpl.get("width_in", 2.0)) * inch
+    h_pt = float(tpl.get("height_in", 1.0)) * inch
+    dpi = label_dpi(tpl)
+    c = canvas.Canvas(out_pdf, pagesize=(w_pt, h_pt))
+    first = True
+    for item in items:
+        img = render_label_pil_image(tpl, item, dpi=dpi).convert("L")
+        reader = ImageReader(img)
+        n = max(1, int(item.get("qty", 1))) * max(1, int(copies))
+        for _ in range(n):
+            if not first:
+                c.showPage()
+            first = False
+            c.drawImage(reader, 0, 0, width=w_pt, height=h_pt)
+    c.save()
+
+
+def label_preview_photo(tpl, item, max_w, max_h, printer_dots=False):
+    """Tk PhotoImage of the label for the screen.
+
+    Default: the same layout re-drawn at the screen's own resolution with smooth text, so it is
+    as sharp as the printout. printer_dots=True shows the exact printer bitmap, dot for dot.
+    """
+    import base64, io
+    from PIL import Image
+    w_in = float(tpl.get("width_in", 2.0)); h_in = float(tpl.get("height_in", 1.0))
+    p_dpi = label_dpi(tpl)
+    if printer_dots:
+        img = render_label_pil_image(tpl, item, dpi=p_dpi).convert("L")
+        scale = min(max_w / float(img.width), max_h / float(img.height))
+        if scale >= 1:
+            scale = max(1, int(scale))           # whole-number zoom keeps every dot identical
+        nw, nh = max(1, int(img.width * scale)), max(1, int(img.height * scale))
+        img = img.resize((nw, nh), Image.NEAREST)
+    else:
+        screen_dpi = max(72, int(min(max_w / w_in, max_h / h_in)))
+        img = render_label_pil_image(tpl, item, dpi=screen_dpi, mono=False, dot_scale=screen_dpi / float(p_dpi))
+        nw, nh = img.width, img.height
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode("ascii")), nw, nh
 
 
 def pil_1bit_to_zpl_gfa(img_1bit):
@@ -594,7 +1126,7 @@ def pil_1bit_to_zpl_gfa(img_1bit):
 
 
 def build_zpl_from_template(tpl_name, tpl, items, copies=1):
-    dpi = int(tpl.get("printer_dpi", 203) or 203)
+    dpi = label_dpi(tpl)
     w_dots = int(round(float(tpl.get("width_in", 2.0)) * dpi))
     h_dots = int(round(float(tpl.get("height_in", 1.0)) * dpi))
 
@@ -616,26 +1148,9 @@ def build_zpl_from_template(tpl_name, tpl, items, copies=1):
             f"^MD{max(-30, min(30, darkness - 15))}",
             "^CI28"
         ]
-        # 1. Render all text elements with 100% WYSIWYG TrueType box-fitting via ^GFA
-        try:
-            img_1b = render_label_pil_image(tpl, item, dpi=dpi)
-            lines.append(pil_1bit_to_zpl_gfa(img_1b))
-        except Exception as e:
-            print("PIL ZPL fallback note:", e)
-
-        # 2. Overlay crisp native hardware ZPL barcodes if the template has any barcode elements
-        for el in tpl.get("elements", []):
-            if el.get("visible", True) is False:
-                continue
-            f_type = el.get("field", "name")
-            if str(f_type).startswith("barcode"):
-                x_d = max(0, int(round(float(el.get("x", 0.04)) * dpi)) + h_offset_dots)
-                y_d = max(0, int(round(float(el.get("y", 0.04)) * dpi)) + v_offset_dots)
-                h_d = max(16, int(round(float(el.get("h", 0.18)) * dpi)))
-                raw_c = str(item.get("upc", "000000000000") or "000000000000").strip()
-                bh_dots = max(20, int(h_d * 0.82))
-                lines.append(f"^FO{x_d},{y_d}^BY2,2,{bh_dots}^BCN,{bh_dots},N,N,N^FD{raw_c}^FS")
-
+        # The whole label (text AND barcodes) is one bitmap; the printer just stamps the dots.
+        img_1b = render_label_pil_image(tpl, item, dpi=dpi)
+        lines.append(pil_1bit_to_zpl_gfa(img_1b))
         lines.append(f"^PQ{qty},0,1,Y")
         lines.append("^XZ")
         blocks.append("\n".join(lines))
@@ -705,7 +1220,7 @@ def export_pdf_labels(items_to_print, tpl, out_pdf):
                         bc.drawOn(c, max(2, bx + (bw - bc.width)/2.0), max(2, by_bottom))
                     elif f_type in ("barcode_upca", "barcode_upce"):
                         u12 = normalize_upc(raw_c)[:12].zfill(12)
-                        w_bc = eanbc.UpcA(u12, barHeight=bh*0.85, barWidth=max(0.55, bw/115.0))
+                        w_bc = eanbc.UPCA(u12, barHeight=bh*0.85, barWidth=max(0.55, bw/115.0))
                         d = Drawing(bw, bh); d.add(w_bc); renderPDF.draw(d, c, max(2, bx + (bw - w_bc.width)/2.0), max(2, by_bottom))
                     else:
                         bc = code128.Code128(raw_c, barHeight=bh, barWidth=max(0.45, bw / 160.0))
@@ -757,7 +1272,37 @@ def fit_text_into_box(text, box_w_px, box_h_px, max_font_px=None, bold=True, ita
         if f.measure(text) <= (box_w_px - 6) and f.metrics("linespace") <= (box_h_px - 2): return px, text
     return 8, text
 
+
+UPCA_L_CODES = _EAN_L
+UPCA_R_CODES = _EAN_R
+
+def draw_barcode_on_tk_canvas(canvas_widget, field, item, x, y, w, h, tag=None, el=None):
+    """Screen version of the printed barcode: same symbology and bar pattern as render_label_pil_image."""
+    tags = (tag,) if tag else ()
+    modules, val = barcode_modules(field, item)
+    if modules and isinstance(el, dict) and el.get("human_readable"):
+        th = max(8, int(h * 0.3))
+        canvas_widget.create_text(x + w // 2, y + h - th // 2, text=str(val), font=(el.get("hri_font", "Sans"), -th), fill="#000000", tags=tags)
+        h = max(4, h - th - 1)
+    if not modules:
+        canvas_widget.create_text(x + w // 2, y + h // 2, text=str(val or "NO BARCODE"), font=("Monospace", -10), fill="#b91c1c", tags=tags)
+        return
+    mw = float(w) / len(modules)
+    i, n = 0, len(modules)
+    while i < n:
+        if modules[i] == "1":
+            j = i
+            while j < n and modules[j] == "1":
+                j += 1
+            canvas_widget.create_rectangle(x + i * mw, y, x + j * mw, y + h, fill="#000000", outline="", tags=tags)
+            i = j
+        else:
+            i += 1
+
 def draw_code128_on_tk_canvas(canvas_widget, value, x, y, w, h, tag=None):
+    draw_barcode_on_tk_canvas(canvas_widget, "barcode_img", {"upc": value}, x, y, w, h, tag=tag)
+
+def orig_draw_code128_on_tk_canvas(canvas_widget, value, x, y, w, h, tag=None):
     """Draw a Code 128 barcode as black bars inside the box (x, y, w, h) on a Tk canvas."""
     tags = (tag,) if tag else ()
     value = str(value or "").strip() or "0"
@@ -803,14 +1348,7 @@ def render_label_on_tk_canvas(canvas_widget, tpl, item, ox=28, oy=28, scale=420,
         canvas_widget.create_rectangle(bx, by, bx+bw, by+bh, fill="#ffffff", outline="#2563eb" if is_sel else ("#94a3b8" if show_boxes else ""), width=2 if is_sel else (1 if show_boxes else 0), dash=(4, 2) if (is_sel or show_boxes) else (), tags=(f"el_{idx}",))
         field = el.get("field", "name")
         if str(field).startswith("barcode"):
-            b_val = format_item_field(item, "upc") or "000000000000"
-            if field == "barcode_upca": b_val = normalize_upc(b_val)[:12].zfill(12)
-            elif field == "barcode_upce": b_val = (item.get("upce") or normalize_upc(b_val)[:8]).zfill(8)
-            elif field == "barcode_code39": b_val = f"*{str(b_val).upper()}*"
-            draw_code128_on_tk_canvas(canvas_widget, b_val, bx, by, bw, bh, tag=f"el_{idx}")
-            if field in ("barcode_upca", "barcode_upce", "barcode_code39"):
-                canvas_widget.create_rectangle(bx+4, by+bh-13, bx+bw-4, by+bh-1, fill="#ffffff", outline="", tags=(f"el_{idx}",))
-                canvas_widget.create_text(bx+bw//2, by+bh-7, text=b_val, font=("Monospace", -9, "bold"), fill="#000000", tags=(f"el_{idx}",))
+            draw_barcode_on_tk_canvas(canvas_widget, field, item, bx, by, bw, bh, tag=f"el_{idx}", el=el)
         else:
             raw_txt = format_item_field(item, field, el)
             if not str(raw_txt).strip(): raw_txt = "RECEIVED" if field == "variable_text" else f"[{field}]"
@@ -1144,7 +1682,7 @@ class ReportDesignerWindow(tk.Toplevel):
 
         tk.Label(tbar1, text="Font:", bg="#0c1017", fg="#cbd5e1", font=("Sans", 9, "bold")).pack(side="left", padx=(4, 2))
         self.font_fam_var = tk.StringVar(value="Sans")
-        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=["Sans", "Serif", "Mono"], state="readonly", width=6, font=("Sans", 9))
+        ff_cb = ttk.Combobox(tbar1, textvariable=self.font_fam_var, values=["Sans", "Serif", "Mono", "Arial", "Arial Black", "Courier New"], state="readonly", width=11, font=("Sans", 9))
         ff_cb.pack(side="left", padx=2, ipady=2)
         ff_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_prop_change())
 
@@ -1208,10 +1746,8 @@ class ReportDesignerWindow(tk.Toplevel):
         tk.Label(tbar2, text="📏 Stock:", bg="#0c1017", fg="#38bdf8", font=("Sans", 9, "bold")).pack(side="right", padx=2)
 
         avail_printers = discover_all_printers()
-        saved_p = self.tpl.get("default_printer", "")
-        if not saved_p or saved_p not in avail_printers:
-            saved_p = avail_printers[0] if avail_printers else "PDF Preview (Desktop)"
-            self.tpl["default_printer"] = saved_p
+        saved_p = resolve_template_printer(self.tpl.get("default_printer", ""), avail_printers)
+        self.tpl["default_printer"] = saved_p
         self.designer_printer_var = tk.StringVar(value=saved_p)
         prn_cb = ttk.Combobox(tbar2, textvariable=self.designer_printer_var, values=avail_printers, state="readonly", width=22, font=("Sans", 9, "bold"))
         prn_cb.pack(side="right", padx=4, ipady=2)
@@ -1686,6 +2222,14 @@ class VTRoundedButton(tk.Canvas):
                 self.draw()
         return "break"
 
+    def _lighten(self, color, amount):
+        try:
+            r16, g16, b16 = self.winfo_rgb(color)
+            mix = lambda c: int((c / 257) + (255 - c / 257) * amount)
+            return "#%02x%02x%02x" % (mix(r16), mix(g16), mix(b16))
+        except Exception:
+            return color
+
     def _draw_rounded_rect(self, x1, y1, x2, y2, r, fill, outline=""):
         r = max(2, min(r, int((x2 - x1) / 2), int((y2 - y1) / 2)))
         self.create_arc(x1, y1, x1 + 2*r, y1 + 2*r, start=90, extent=90, fill=fill, outline=outline)
@@ -1724,7 +2268,8 @@ class VTRoundedButton(tk.Canvas):
         self._draw_rounded_rect(bx1, by1, bx2, by2, r, fill=cur_fill)
 
         if not self.pressed and self.btn_state != "disabled" and (bx2 - bx1) > 2 * r + 4:
-            self.create_line(bx1 + r, by1 + 1, bx2 - r, by1 + 1, fill="#ffffff", stipple="gray25")
+            # Subtle solid top highlight: the button's own colour lightened (no stippled dots)
+            self.create_line(bx1 + r, by1 + 1, bx2 - r, by1 + 1, fill=self._lighten(cur_fill, 0.22))
 
         cx = (bx1 + bx2) / 2.0
         cy = (by1 + by2) / 2.0
@@ -1769,11 +2314,11 @@ class VTLabelUtility(tk.Tk):
         )
         self.header_banner.pack(fill="x", side="top")
 
-        self.content = tk.Frame(self, bg="#1e242d")
-        self.content.pack(fill="both", expand=True, padx=6, pady=4)
-
         bbar = tk.Frame(self, bg="#0c1017", height=54)
         bbar.pack(fill="x", side="bottom", padx=12, pady=6)
+
+        self.content = tk.Frame(self, bg="#1e242d")
+        self.content.pack(fill="both", expand=True, padx=6, pady=4)
 
         self.close_btn = make_vt_btn(bbar, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.destroy)
         self.close_btn.pack(side="left", padx=(4, 6), pady=4)
@@ -1788,6 +2333,27 @@ class VTLabelUtility(tk.Tk):
         self.prev_btn.pack(side="right", padx=6, pady=4)
 
         self.show_step(1)
+        if START_UPC:
+            self.after(150, lambda: self.open_for_upc(START_UPC))
+
+    def open_for_upc(self, code):
+        """Open straight to the label preview for the item with this UPC (any of its codes)."""
+        want = "".join(ch for ch in str(code) if ch.isalnum())
+        key = lambda c: c.lstrip("0") if c.isdigit() else c
+        for it in self.all_items:
+            for lbl, c in it.get("upc_choices", []) or [("Primary UPC", it.get("upc", ""))]:
+                if key(c) == key(want) or key(c) == key(normalize_upc(want)):
+                    for other in self.all_items:
+                        other["selected"] = False
+                    it["selected"] = True
+                    set_item_upc(it, c, lbl)
+                    self.filtered_items = [it]
+                    self.preview_idx = 0
+                    self.came_from_step = 1
+                    self.show_step(4)
+                    return True
+        self.header_banner.config(text=f"ViewTouch Label Utility — UPC {code} was not found in viewtouch.db. Choose your option...")
+        return False
 
     def reload_vt_db(self):
         self.all_items = load_from_viewtouch_db()
@@ -1802,13 +2368,27 @@ class VTLabelUtility(tk.Tk):
         if not os.path.exists(init_dir):
             init_dir = os.path.expanduser("~/.local/share/ViewTouch")
         path = filedialog.askopenfilename(
-            parent=self, title="Select Label Template (.json, .prn, .nlbl, .slnx)",
+            parent=self, title="Import Label Template (ILSA .rtm, .json, .prn, .nlbl, .slnx)",
             initialdir=init_dir,
-            filetypes=[("Label Templates", "*.json *.prn *.nlbl *.slnx"), ("All Files", "*.*")]
+            filetypes=[("Label Templates", "*.rtm *.RTM *.json *.prn *.nlbl *.slnx"), ("ILSA ReportBuilder (.rtm)", "*.rtm *.RTM"), ("All Files", "*.*")]
         )
         if not path: return
         file_stem = os.path.splitext(os.path.basename(path))[0].strip().upper()
-        if path.endswith(".json"):
+        chosen_tpl = None
+        if path.lower().endswith(".rtm"):
+            try:
+                new_tpl = import_rtm_template(path)
+            except Exception as e:
+                messagebox.showerror("Import Failed", f"Could not import {os.path.basename(path)}:\n{e}"); return
+            chosen_tpl = file_stem.replace("_", " ")
+            if chosen_tpl in self.templates and not messagebox.askyesno("Replace Template?", f"A template named '{chosen_tpl}' already exists.\nReplace it with this file?"):
+                return
+            avail = discover_all_printers()
+            new_tpl["default_printer"] = avail[0] if avail else "PDF Preview (Desktop)"
+            self.templates[chosen_tpl] = ensure_box_dims(new_tpl)
+            save_templates(self.templates)
+            messagebox.showinfo("Template Imported", f"Imported '{chosen_tpl}' ({new_tpl['width_in']} x {new_tpl['height_in']} in, {len(new_tpl['elements'])} fields).\n\nCheck the printer under ⚙️ Printer Offset before printing.")
+        elif path.endswith(".json"):
             try:
                 loaded = json.load(open(path, "r", encoding="utf-8"))
                 if isinstance(loaded, dict) and loaded:
@@ -1859,6 +2439,23 @@ class VTLabelUtility(tk.Tk):
             self.next_btn.config(state="disabled", bg="#1e293b", activebackground="#1e293b")
             self._build_step4()
 
+    def select_mode_and_go(self, m_val):
+        self.mode_var.set(m_val)
+        self.mode_var_val = m_val
+        self.from_top_button = True
+        if m_val == 'tree':
+            self.filtered_items = list(self.all_items)
+            self.show_step(2)
+        elif m_val == 'retail':
+            self.filtered_items = [it for it in self.all_items if it.get('is_retail')]
+            self.show_step(3)
+        elif m_val == 'rcv':
+            self.filtered_items = [it for it in self.all_items if it.get('pack_qty', 1) > 1 or it.get('is_retail')]
+            self.show_step(3)
+        else:
+            self.filtered_items = list(self.all_items)
+            self.show_step(3)
+
     def select_template_and_go(self, tpl_name):
         if tpl_name in self.templates:
             self.chosen_template_name = tpl_name
@@ -1873,8 +2470,8 @@ class VTLabelUtility(tk.Tk):
 
         for c in range(12):
             pane.columnconfigure(c, weight=1, uniform="c")
-        pane.rowconfigure(0, weight=3)
-        pane.rowconfigure(1, weight=5)
+        pane.rowconfigure(0, weight=1, minsize=140)
+        pane.rowconfigure(1, weight=3)
 
         top_frame = tk.LabelFrame(
             pane, text=" SELECT VIEWTOUCH DATA ", bg="#0c1017", fg="#38bdf8",
@@ -1918,74 +2515,90 @@ class VTLabelUtility(tk.Tk):
                 bg=init_c,
                 fg="#ffffff",
                 radius=12,
-                command=lambda v=m_val: select_mode(v)
+                command=lambda v=m_val: self.select_mode_and_go(v)
             )
             b.grid(row=0, column=col_idx, sticky="nsew", padx=4, pady=3)
             self.mode_btn_widgets[m_val] = (b, dim_c, act_c)
 
-        # 3x3 Template Matrix
-        tpl_matrix_frame = tk.LabelFrame(
-            pane, text=" LABEL TEMPLATES (3x3 MATRIX) ", bg="#0c1017", fg="#38bdf8",
-            font=("Sans", 10, "bold"), bd=1, relief="solid", padx=8, pady=6
+        # Large Format Saved Label Template Selection Window (3x Touch Height)
+        tpl_sel_frame = tk.LabelFrame(
+            pane, text=" SELECT SAVED LABEL TEMPLATE ", bg="#0c1017", fg="#38bdf8",
+            font=("Sans", 11, "bold"), bd=1, relief="solid", padx=12, pady=10
         )
-        tpl_matrix_frame.grid(row=1, column=0, columnspan=8, sticky="nsew", padx=(4, 6), pady=2)
+        tpl_sel_frame.grid(row=1, column=0, columnspan=8, sticky="nsew", padx=(4, 6), pady=2)
+        tpl_sel_frame.columnconfigure(0, weight=1)
+        tpl_sel_frame.rowconfigure(1, weight=1)
 
-        for c in range(3):
-            tpl_matrix_frame.columnconfigure(c, weight=1, uniform="tpl_c")
-        for r in range(3):
-            tpl_matrix_frame.rowconfigure(r, weight=1, uniform="tpl_r")
-
-        active_tpl_names = list(self.templates.keys())
-        tpl_colors = [
-            "#1d4ed8", "#047857", "#0f766e", "#4338ca",
-            "#0284c7", "#b45309", "#0e7490", "#334155", "#1e293b"
-        ]
-
-        active_tpl_names = list(self.templates.keys())
+        active_tpl_names = list(self.templates.keys()) if hasattr(self, "templates") else []
         if "RECEIVING LABEL" in active_tpl_names:
             active_tpl_names.remove("RECEIVING LABEL")
             active_tpl_names.insert(0, "RECEIVING LABEL")
 
-        for slot in range(9):
-            row_idx = slot // 3
-            col_idx = slot % 3
-            if slot < len(active_tpl_names):
-                t_name = active_tpl_names[slot]
-                t_data = self.templates[t_name]
-                w_in = t_data.get("width_in", 2.0)
-                h_in = t_data.get("height_in", 1.0)
-                p_dest = t_data.get("default_printer", "Auto")
-                # Pull description directly from the template name matching the file in file manager
-                desc_name = t_name.strip()
-                words = desc_name.split()
-                if len(desc_name) > 14 and len(words) > 1:
-                    mid = (len(words) + 1) // 2
-                    desc_name = " ".join(words[:mid]) + "\n" + " ".join(words[mid:])
-                prn_short = p_dest.split("(")[0].replace("VT TCP:", "").strip()
-                lbl_text = f"{desc_name}\n{w_in} in x {h_in} in\n[{prn_short}]"
-                c_bg = tpl_colors[slot % len(tpl_colors)]
+        self.step1_tpl_var = tk.StringVar(value=active_tpl_names[0] if active_tpl_names else "")
+        self.option_add("*TCombobox*Listbox.font", ("Sans", 14, "bold"))
 
-                tbtn = make_vt_btn(
-                    tpl_matrix_frame,
-                    text=lbl_text,
-                    font=("Sans", 9, "bold"),
-                    bg=c_bg,
-                    fg="#ffffff",
-                    radius=14,
-                    command=lambda tn=t_name: self.select_template_and_go(tn)
-                )
-                tbtn.grid(row=row_idx, column=col_idx, sticky="nsew", padx=4, pady=4)
-            else:
-                empty_btn = make_vt_btn(
-                    tpl_matrix_frame,
-                    text=f"+ Slot {slot+1}\n[Create in Editor]",
-                    font=("Sans", 9, "bold"),
-                    bg="#1e293b",
-                    fg="#94a3b8",
-                    radius=14,
-                    command=self.clone_report
-                )
-                empty_btn.grid(row=row_idx, column=col_idx, sticky="nsew", padx=4, pady=4)
+        top_box = tk.Frame(tpl_sel_frame, bg="#0c1017")
+        top_box.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        top_box.columnconfigure(1, weight=1)
+
+        tk.Label(top_box, text="Template:", bg="#0c1017", fg="#38bdf8", font=("Sans", 12, "bold")).grid(row=0, column=0, padx=(0, 8), sticky="w")
+        cb = ttk.Combobox(top_box, textvariable=self.step1_tpl_var, values=active_tpl_names, state="readonly", font=("Sans", 14, "bold"))
+        cb.grid(row=0, column=1, sticky="ew")
+
+        # 3x Height Touch Rows (rowheight=58px)
+        t_style = ttk.Style()
+        t_style.configure("TplList.Treeview", rowheight=58, font=("Sans", 13, "bold"), background="#1e293b", foreground="#f8fafc", fieldbackground="#1e293b")
+        t_style.configure("TplList.Treeview.Heading", font=("Sans", 11, "bold"))
+        t_style.map("TplList.Treeview", background=[("selected", "#0284c7")], foreground=[("selected", "#ffffff")])
+
+        list_frame = tk.Frame(tpl_sel_frame, bg="#0c1017")
+        list_frame.grid(row=1, column=0, sticky="nsew", pady=4)
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.rowconfigure(0, weight=1)
+
+        cols = ("name", "dim", "prn")
+        self.tpl_tree = ttk.Treeview(list_frame, columns=cols, show="headings", style="TplList.Treeview", selectmode="browse", height=4)
+        self.tpl_tree.heading("name", text="Saved Label Template (File Manager Name)")
+        self.tpl_tree.heading("dim", text="Stock Size")
+        self.tpl_tree.heading("prn", text="Target Destination")
+        self.tpl_tree.column("name", width=340, anchor="w")
+        self.tpl_tree.column("dim", width=120, anchor="center")
+        self.tpl_tree.column("prn", width=180, anchor="w")
+        self.tpl_tree.grid(row=0, column=0, sticky="nsew")
+
+        sb = tk.Scrollbar(list_frame, orient="vertical", command=self.tpl_tree.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.tpl_tree.config(yscrollcommand=sb.set)
+
+        for idx, name in enumerate(active_tpl_names):
+            t_obj = self.templates.get(name, {}) if hasattr(self, "templates") else {}
+            w = t_obj.get("width_in", 2.0)
+            h = t_obj.get("height_in", 1.0)
+            prn = t_obj.get("default_printer", "Auto").split("(")[0].replace("VT TCP:", "").strip()
+            self.tpl_tree.insert("", "end", iid=str(idx), values=(f"🏷️  {name}", f"{w} x {h} in", f"🖨️ {prn}"))
+
+        if active_tpl_names:
+            self.tpl_tree.selection_set("0")
+
+        def on_cb_sel(_e=None):
+            c = self.step1_tpl_var.get()
+            if c in active_tpl_names:
+                i = str(active_tpl_names.index(c))
+                self.tpl_tree.selection_set(i); self.tpl_tree.see(i)
+
+        def on_tree_sel(_e=None):
+            s = self.tpl_tree.selection()
+            if s:
+                idx = int(s[0])
+                if 0 <= idx < len(active_tpl_names): self.step1_tpl_var.set(active_tpl_names[idx])
+
+        cb.bind("<<ComboboxSelected>>", on_cb_sel)
+        self.tpl_tree.bind("<<TreeviewSelect>>", on_tree_sel)
+        self.tpl_tree.bind("<Double-Button-1>", lambda _e: self.select_template_and_go(self.step1_tpl_var.get()))
+
+        btn_box = tk.Frame(tpl_sel_frame, bg="#0c1017")
+        btn_box.grid(row=2, column=0, sticky="ew", pady=(8, 2))
+        make_vt_btn(btn_box, text="▶ Open & Preview Selected Label", bg="#16a34a", fg="#ffffff", font=("Sans", 12, "bold"), pady=8, radius=12, command=lambda: self.select_template_and_go(self.step1_tpl_var.get())).pack(fill="x")
 
         # Right Panel
         right_panel = tk.Frame(pane, bg="#0c1017")
@@ -2090,9 +2703,14 @@ class VTLabelUtility(tk.Tk):
         top = tk.Frame(self.content, bg="#1e242d")
         top.pack(fill="x", padx=8, pady=6)
 
-        tk.Label(top, text="Barcode:", bg="#1e242d", font=("Sans", 11)).pack(side="left")
-        self.bc_type_var = tk.StringVar(value="UPC-A")
-        ttk.Combobox(top, textvariable=self.bc_type_var, values=["UPC-A", "UPC-E", "Code-39", "Code-128"], width=10, state="readonly").pack(side="left", padx=6)
+        tk.Label(top, text="Print UPC:", bg="#1e242d", font=("Sans", 11)).pack(side="left")
+        self.upc_mode_var = tk.StringVar(value="Primary UPC")
+        upc_mode_cb = ttk.Combobox(top, textvariable=self.upc_mode_var, state="readonly", width=12, font=("Sans", 10, "bold"),
+                                   values=["Primary UPC", "Alt UPC 1", "Alt UPC 2", "Alt UPC 3", "Carton UPC"])
+        upc_mode_cb.pack(side="left", padx=4)
+        upc_mode_cb.bind("<<ComboboxSelected>>", lambda _e: self.apply_upc_mode(self.upc_mode_var.get()))
+        make_vt_btn(top, text="🔄 Next UPC", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), padx=10, pady=6,
+                    command=self.cycle_highlighted_upc).pack(side="left", padx=(4, 6))
 
         make_vt_btn(top, text="✓ Select All", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.select_all).pack(side="left", padx=6)
         make_vt_btn(top, text="✖ Deselect All", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.deselect_all).pack(side="left", padx=4)
@@ -2110,8 +2728,8 @@ class VTLabelUtility(tk.Tk):
         cols = ("sel", "qty", "upca", "upce", "desc", "price", "dept_name", "dept_num", "dept_grp", "cat", "mfg")
         self.grid_tree = ttk.Treeview(self.content, columns=cols, show="headings", selectmode="browse")
         headers = [
-            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC / Barcode", 130),
-            ("upce", "Alt UPC", 90), ("desc", "Description", 250), ("price", "Price", 75),
+            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC on Label", 175),
+            ("upce", "Other UPCs", 150), ("desc", "Description", 250), ("price", "Price", 75),
             ("dept_name", "Category", 130), ("dept_num", "Item #", 75),
             ("dept_grp", "Group", 105), ("cat", "Family", 115), ("mfg", "Brand / Mfg", 115)
         ]
@@ -2127,11 +2745,15 @@ class VTLabelUtility(tk.Tk):
         self.grid_tree.delete(*self.grid_tree.get_children())
         q = getattr(self, "filter_var", tk.StringVar()).get().strip().lower()
         for idx, it in enumerate(self.filtered_items):
-            if q and (q not in it["name"].lower() and q not in it["upc"].lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
+            all_codes = " ".join(c for _, c in it.get("upc_choices", [])).lower()
+            if q and (q not in it["name"].lower() and q not in all_codes and q not in it["upc"].lower() and q not in it["manufacturer"].lower() and q not in it["category"].lower()):
                 continue
             chk = "☑" if it.get("selected") else "☐"
+            lbl = it.get("upc_label", "Primary UPC")
+            on_label = it["upc"] if lbl == "Primary UPC" else f"{it['upc']}  [{lbl}]"
+            others = ", ".join(c for _, c in it.get("upc_choices", []) if c != it["upc"])
             self.grid_tree.insert("", "end", iid=str(idx), values=(
-                chk, it["qty"], it["upc"], it["upce"], it["name"], f"${it['price']:.2f}",
+                chk, it["qty"], on_label, others, it["name"], f"${it['price']:.2f}",
                 it["dept_name"], it["dept_num"], it["dept_group"], it["category"], it["manufacturer"]
             ))
 
@@ -2147,6 +2769,30 @@ class VTLabelUtility(tk.Tk):
         except ValueError:
             it["qty"] = 1
         self._populate_grid()
+
+    def apply_upc_mode(self, mode):
+        """Print the chosen UPC (Primary / Alt UPC n / Carton UPC) on the checked items, or all listed items if none are checked.
+        Items that don't have that UPC keep their primary."""
+        targets = [it for it in self.filtered_items if it.get("selected")] or self.filtered_items
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it.get("primary_upc", it["upc"]))]
+            pick = next(((l, c) for l, c in choices if l == mode), choices[0])
+            set_item_upc(it, pick[1], pick[0])
+        self._populate_grid()
+
+    def cycle_highlighted_upc(self):
+        """Step the highlighted row (or the checked rows) to its next UPC."""
+        sel_rows = [r for r in self.grid_tree.selection() if r.isdigit()]
+        targets = [self.filtered_items[int(r)] for r in sel_rows] or [it for it in self.filtered_items if it.get("selected")]
+        for it in targets:
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            cur = next((i for i, (_, c) in enumerate(choices) if c == it["upc"]), 0)
+            l, c = choices[(cur + 1) % len(choices)]
+            set_item_upc(it, c, l)
+        keep = sel_rows
+        self._populate_grid()
+        if keep:
+            self.grid_tree.selection_set(keep)
 
     def update_selected_qty(self):
         try:
@@ -2197,6 +2843,22 @@ class VTLabelUtility(tk.Tk):
         self.page_lbl.pack(side="left", padx=2)
         make_vt_btn(tbar, text="▶", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=3, pady=8, command=self.next_preview_item).pack(side="left", padx=2)
 
+        tk.Label(tbar, text="UPC:", bg="#0c1017", fg="#38bdf8", font=("Sans", 10, "bold")).pack(side="left", padx=(8, 2))
+        self.step4_upc_var = tk.StringVar(value="")
+        self.step4_upc_cb = ttk.Combobox(tbar, textvariable=self.step4_upc_var, state="readonly", width=28, font=("Sans", 10, "bold"))
+        self.step4_upc_cb.pack(side="left", padx=2, ipady=4)
+
+        def on_pick_step4_upc(_e=None):
+            if not getattr(self, "selected_for_print", None):
+                return
+            it = self.selected_for_print[self.preview_idx]
+            i = self.step4_upc_cb.current()
+            choices = it.get("upc_choices") or [("Primary UPC", it["upc"])]
+            if 0 <= i < len(choices):
+                set_item_upc(it, choices[i][1], choices[i][0])
+                self._render_live_preview()
+        self.step4_upc_cb.bind("<<ComboboxSelected>>", on_pick_step4_upc)
+
         make_vt_btn(tbar, text="✏️ Edit Report", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_report_designer).pack(side="left", padx=6)
         make_vt_btn(tbar, text="➕ Create Report", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.clone_report).pack(side="left", padx=4)
         make_vt_btn(tbar, text="⚙️ Printer Offset", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.open_printer_settings_dialog).pack(side="left", padx=4)
@@ -2223,28 +2885,52 @@ class VTLabelUtility(tk.Tk):
             return
         item = self.selected_for_print[self.preview_idx]
         self.page_lbl.config(text=f"{self.preview_idx + 1}/{len(self.selected_for_print)}")
+        if hasattr(self, "step4_upc_cb"):
+            choices = item.get("upc_choices") or [("Primary UPC", item.get("upc", ""))]
+            vals = [f"{l}: {c}" for l, c in choices]
+            self.step4_upc_cb["values"] = vals
+            cur = next((i for i, (_, c) in enumerate(choices) if c == item.get("upc")), 0)
+            self.step4_upc_var.set(vals[cur] if vals else "")
+            self.step4_upc_cb.configure(state="readonly" if len(vals) > 1 else "disabled")
         tpl = self.templates[self.tpl_var.get()]
         if hasattr(self, "route_badge_lbl"):
             avail = discover_all_printers()
-            routed_p = tpl.get("default_printer") or (avail[0] if avail else "Default Printer")
+            routed_p = resolve_template_printer(tpl.get("default_printer", ""), avail)
             w_in, h_in = tpl.get("width_in", 2.0), tpl.get("height_in", 1.0)
             self.route_badge_lbl.config(text=f"🖨️ Target: {routed_p}   |   📏 Stock: {w_in} in x {h_in} in")
         cw = max(600, self.preview_canvas.winfo_width())
         ch = max(350, self.preview_canvas.winfo_height())
-        scale = min((cw - 60) / tpl["width_in"], (ch - 40) / tpl["height_in"])
-        ox = (cw - tpl["width_in"] * scale) / 2.0
-        oy = (ch - tpl["height_in"] * scale) / 2.0
-        render_label_on_tk_canvas(self.preview_canvas, tpl, item, ox, oy, scale, selected_idx=None, show_boxes=False)
+        try:
+            # Show the exact picture that will be sent to the printer
+            show_dots = bool(getattr(self, "preview_printer_dots", False))
+            photo, pw, ph = label_preview_photo(tpl, item, cw - 60, ch - 40, printer_dots=show_dots)
+            self._preview_photo = photo          # keep a reference or Tk drops the image
+            c = self.preview_canvas
+            c.delete("all")
+            ox, oy = (cw - pw) // 2, (ch - ph) // 2
+            c.create_rectangle(ox + 4, oy + 4, ox + pw + 4, oy + ph + 4, fill="#0f172a", outline="")
+            c.create_image(ox, oy, image=photo, anchor="nw")
+            c.create_rectangle(ox - 1, oy - 1, ox + pw, oy + ph, outline="#111827", width=2)
+            cap = (f"Exact printer dots ({label_dpi(tpl)} dpi)  ·  double-click for sharp preview" if show_dots
+                   else f"Sharp preview  ·  prints at {label_dpi(tpl)} dpi  ·  double-click to see exact printer dots")
+            c.create_text(cw // 2, ch - 10, text=cap, fill="#94a3b8", font=("Sans", 9, "bold"))
+            c.bind("<Double-Button-1>", lambda _e: (setattr(self, "preview_printer_dots", not show_dots), self._render_live_preview()))
+        except Exception as e:
+            logging.error("Bitmap preview failed, using drawn preview: %s", e)
+            scale = min((cw - 60) / tpl["width_in"], (ch - 40) / tpl["height_in"])
+            ox = (cw - tpl["width_in"] * scale) / 2.0
+            oy = (ch - tpl["height_in"] * scale) / 2.0
+            render_label_on_tk_canvas(self.preview_canvas, tpl, item, ox, oy, scale, selected_idx=None, show_boxes=False)
 
     def open_printer_settings_dialog(self):
         tpl_name = self.tpl_var.get()
         tpl = self.templates[tpl_name]
         printers = discover_all_printers()
-        chosen = tpl.get("default_printer") or (printers[0] if printers else "VT TCP: Zebra Large Labels (192.168.1.24:9100) [network]")
+        chosen = resolve_template_printer(tpl.get("default_printer", ""), printers)
 
         sdlg = tk.Toplevel(self)
         sdlg.title(f"Printer Settings & Alignment — [{tpl_name}]")
-        sdlg.geometry("620x470+650+260")
+        sdlg.geometry("620x530+650+230")
         sdlg.configure(bg="#1e293b")
         sdlg.transient(self)
         sdlg.attributes("-topmost", True)
@@ -2261,11 +2947,12 @@ class VTLabelUtility(tk.Tk):
 
         cur_v = int(tpl.get("v_offset_dots", 18) if "v_offset_dots" in tpl else 18)
         v_var = tk.IntVar(value=cur_v)
+        dpi_var = tk.StringVar(value=str(label_dpi(tpl)))
         v_lbl = tk.Label(vf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=26)
 
         def update_v_label(*_a):
             val = int(v_var.get())
-            inches = val / 203.0
+            inches = val / float(dpi_var.get() or 203)
             dir_txt = "LOWER ↓" if val > 0 else ("HIGHER ↑" if val < 0 else "CENTER (0)")
             v_lbl.config(text=f"{val:+d} dots ({inches:+.2f} in) [{dir_txt}]")
 
@@ -2290,7 +2977,7 @@ class VTLabelUtility(tk.Tk):
 
         def update_h_label(*_a):
             val = int(h_var.get())
-            inches = val / 203.0
+            inches = val / float(dpi_var.get() or 203)
             dir_txt = "RIGHT ➡" if val > 0 else ("LEFT ⬅" if val < 0 else "CENTER (0)")
             h_lbl.config(text=f"{val:+d} dots ({inches:+.2f} in) [{dir_txt}]")
 
@@ -2317,6 +3004,14 @@ class VTLabelUtility(tk.Tk):
         tear_var = tk.StringVar(value=str(tpl.get("tear_off", 0)))
         tk.Spinbox(df, from_=-120, to=120, increment=4, textvariable=tear_var, width=6, font=("Sans", 11, "bold")).pack(side="left", padx=4)
 
+        # 4. Printer resolution: the label picture is drawn dot-for-dot at this DPI
+        rf = tk.LabelFrame(body, text=" Printer Resolution (must match the printer or labels print the wrong size) ", bg="#1e293b", fg="#38bdf8", font=("Sans", 10, "bold"), padx=12, pady=8)
+        rf.pack(fill="x", pady=5)
+        for d_opt, d_txt in (("203", "203 dpi (8 dots/mm)"), ("300", "300 dpi (12 dots/mm)"), ("600", "600 dpi (24 dots/mm)")):
+            tk.Radiobutton(rf, text=d_txt, value=d_opt, variable=dpi_var, bg="#1e293b", fg="#f8fafc", selectcolor="#0f172a",
+                           activebackground="#1e293b", activeforeground="#ffffff", font=("Sans", 10, "bold"),
+                           command=lambda: (update_v_label(), update_h_label())).pack(side="left", padx=8)
+
         status_msg = tk.Label(sdlg, text="Tip: Positive (+) Vertical Offset moves print LOWER so the top line isn't clipped.", bg="#1e293b", fg="#94a3b8", font=("Sans", 9, "italic"))
         status_msg.pack(pady=(4, 4))
 
@@ -2331,6 +3026,10 @@ class VTLabelUtility(tk.Tk):
                 tpl["tear_off"] = int(tear_var.get())
             except ValueError:
                 tpl["tear_off"] = 0
+            try:
+                tpl["printer_dpi"] = int(dpi_var.get())
+            except ValueError:
+                tpl["printer_dpi"] = 203
             save_templates(self.templates)
             self._render_live_preview()
             if close_after:
@@ -2477,10 +3176,10 @@ class VTLabelUtility(tk.Tk):
 
         items = getattr(self, "selected_for_print", None) or [self.filtered_items[0]]
         printers = discover_all_printers()
-        chosen = tpl.get("default_printer", "")
-        if not chosen or chosen not in printers:
-            chosen = printers[0] if printers else "PDF Preview (Desktop)"
+        chosen = resolve_template_printer(tpl.get("default_printer", ""), printers)
+        if chosen != tpl.get("default_printer"):
             tpl["default_printer"] = chosen
+            save_templates(self.templates)
 
         w_in = float(tpl.get("width_in", 2.0))
         h_in = float(tpl.get("height_in", 1.0))
@@ -2562,8 +3261,7 @@ class VTLabelUtility(tk.Tk):
                     open("/tmp/vt_label_job.txt", "w", encoding="utf-8").write(txt_out)
                     open("/tmp/last_label.zpl", "w", encoding="utf-8").write(zpl_out)
                     out_pdf = "/tmp/VT_Labels.pdf"
-                    batch = [dict(it, qty=copies) for it in norm_items]
-                    export_pdf_labels(batch, tpl, out_pdf)
+                    export_pdf_from_bitmaps(norm_items, tpl, out_pdf, copies=copies)
 
                     if "PDF" in chosen:
                         subprocess.Popen(["xdg-open", out_pdf])
@@ -2584,7 +3282,7 @@ class VTLabelUtility(tk.Tk):
                         ip = ip_m.group(1)
                         port = int(ip_m.group(2) or 9100)
                         import socket
-                        is_zpl = any(k in chosen.lower() for k in ("zpl", "zebra", "zd", "lp28", "gx", "gk", "bixolon", "tspl"))
+                        is_zpl = printer_speaks_zpl(chosen, tpl)
                         payload = zpl_out.encode("utf-8") if is_zpl else esc_bytes
                         with socket.create_connection((ip, port), timeout=4.0) as s:
                             s.sendall(payload)
@@ -2598,9 +3296,9 @@ class VTLabelUtility(tk.Tk):
                         q_name = chosen.replace("CUPS: ", "").split(" (")[0].strip()
 
                     v_out = subprocess.run(["lpstat", "-v", q_name], capture_output=True, text=True, timeout=2.0).stdout.lower()
-                    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77"))
+                    is_thermal_q = any(k in q_name.lower() or k in v_out for k in ("tmt", "epson", "receipt", "80mm", "thermal", "zebra", "label", "192.168.1.77", "socket://", "zpl"))
                     if is_thermal_q:
-                        is_zpl_q = any(k in q_name.lower() for k in ("zebra", "zpl", "zd", "lp28"))
+                        is_zpl_q = printer_speaks_zpl(q_name, tpl, v_out)
                         raw_file = "/tmp/last_label.zpl" if is_zpl_q else "/tmp/vt_label_job.escpos"
                         if not is_zpl_q:
                             open(raw_file, "wb").write(esc_bytes)
@@ -2636,15 +3334,10 @@ class VTLabelUtility(tk.Tk):
 
     def go_next(self):
         if self.current_step == 1:
-            mode = self.mode_var.get()
-            if mode == "retail":
-                self.filtered_items = [it for it in self.all_items if it.get("is_retail")]
-                self.show_step(3)
-                return
-            elif mode == "all":
-                self.filtered_items = list(self.all_items)
-                self.show_step(3)
-                return
+            mode = getattr(self, 'mode_var_val', 'tree')
+            if hasattr(self, 'mode_var'): mode = self.mode_var.get() or mode
+            self.select_mode_and_go(mode)
+            return
         elif self.current_step == 2:
             sel = self.cat_tree.selection()
             if sel:
@@ -2662,10 +3355,20 @@ class VTLabelUtility(tk.Tk):
         self.show_step(min(4, self.current_step + 1))
 
     def go_prev(self):
-        if self.current_step == 4 and getattr(self, "came_from_step", None) == 1:
+        if self.current_step == 4 and getattr(self, 'came_from_step', None) == 1:
             self.came_from_step = None; self.show_step(1); return
+        if self.current_step == 3 and getattr(self, 'from_top_button', False):
+            self.from_top_button = False; self.show_step(1); return
+        if self.current_step == 2: self.show_step(1); return
         self.show_step(max(1, self.current_step - 1))
 
+START_UPC = ""
+
 if __name__ == "__main__":
+    import argparse
+    _ap = argparse.ArgumentParser(description="ViewTouch Label Utility")
+    _ap.add_argument("--upc", default="", help="open straight to the label preview for this UPC")
+    _args, _unknown = _ap.parse_known_args()
+    START_UPC = _args.upc.strip()
     app = VTLabelUtility()
     app.mainloop()
