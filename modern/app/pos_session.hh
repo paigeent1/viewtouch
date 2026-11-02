@@ -157,7 +157,8 @@ class PosSession : public QObject {
     // Prep labels: {ingredients, printer}.
     Q_PROPERTY(QVariantMap prepLabels READ prepLabels NOTIFY adminChanged)
     // Shelf / price / cigar labels from any screen, printed by the label utility on the main computer:
-    // {templates: [{name, size, product}], query, matches: [{id, name, price, upcs: [{label, code}]}]}.
+    // {templates: [{name, size, product}], query, matches: [{id, name, price, upcs: [{label, code}]}],
+    //  path: [group, category, brand], children: [{name, count}]} (the tree, browsed one level at a time).
     Q_PROPERTY(QVariantMap retailLabels READ retailLabels NOTIFY sessionChanged)
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
@@ -563,6 +564,7 @@ public:
     // {ingredient | name, hours, count, note}.
     Q_INVOKABLE void printPrepLabels(const QVariantMap &labels) { invoke(QStringLiteral("printPrepLabels"), {labels}); }
     Q_INVOKABLE void findRetailLabels(const QString &query) { invoke(QStringLiteral("findRetailLabels"), {query}); }
+    Q_INVOKABLE void browseRetailLabels(const QStringList &path) { invoke(QStringLiteral("browseRetailLabels"), {path}); }
     // {template, items: [{upc, qty}]} (no items: qty of a label without product fields).
     Q_INVOKABLE void printRetailLabels(const QVariantMap &job) { invoke(QStringLiteral("printRetailLabels"), {job}); }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }

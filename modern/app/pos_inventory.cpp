@@ -655,6 +655,34 @@ QString digitsOnly(const QString &s)
     return out;
 }
 
+// The label utility's tree (tools/vt_label_utility.py: dept_group, category, infer_brand):
+// group (Cigars / Retail / Food & drink) > category > brand (from the name) > items.
+QString labelGroup(const MenuItem &m, const QString &category)
+{
+    const QString name = qs(m.name).toUpper(), cat = category.toUpper();
+    if (cat.contains(u"CIGAR"_s) || name.contains(u"CIGAR"_s))
+        return QObject::tr("Cigars");
+    bool retail = m.taxClass == TaxClass::Merchandise;
+    for (const std::string &b : m.barcodes)
+        retail = retail || std::ranges::count_if(b, [](char c) { return c >= '0' && c <= '9'; }) >= 8;
+    for (const RecipeLine &r : m.recipe)
+        retail = retail || (r.ingredientId == "__retail__" && r.quantity > 0.5) || r.ingredientId.starts_with("__parent__:");
+    for (const char *k : {"TOBACCO", "RETAIL", "PIPE", "ACCESS", "HUMIDOR", "LIGHTER", "CUTTER", "VAPE", "SMOKE"})
+        retail = retail || cat.contains(QLatin1String(k));
+    return retail ? QObject::tr("Retail") : QObject::tr("Food & drink");
+}
+
+QString labelBrand(const MenuItem &m)
+{
+    const QString name = qs(m.name).trimmed().toUpper();
+    for (const char *p : {"ALEC BRADLEY", "AJ FERNANDEZ", "CASA FERNANDEZ", "BAHAMA MAMA", "ARMANDO RAMOS", "BUENA VISTA",
+                          "CROWNED HEADS", "ROMEO Y", "MONTECRISTO", "ARTURO FUENTE", "DREW ESTATE", "LA AROMA",
+                          "MY FATHER", "OLIVA", "PADRON", "PERDOMO", "ROCKY PATEL", "MACANUDO"})
+        if (name.startsWith(QLatin1String(p)))
+            return QLatin1String(p);
+    return name.section(u' ', 0, 0, QString::SectionSkipEmpty);
+}
+
 QString noLeadingZeros(const QString &s)
 {
     qsizetype i = 0;
@@ -682,6 +710,47 @@ QVariantMap PosService::retailLabels() const
     }
     QVariantList matches;
     const QString q = labelQuery_.trimmed();
+    // Browsing the tree: the names one level down from the path (with how many items), or, at a
+    // brand, its items.
+    std::map<QString, QString> categoryNames;
+    for (const MenuCategory &c : categories())
+        categoryNames[qs(c.id)] = qs(c.name);
+    const auto categoryOf = [&](const MenuItem &m) {
+        const auto it = categoryNames.find(qs(m.family));
+        return it != categoryNames.end() && !it->second.isEmpty() ? it->second : (m.family.empty() ? tr("Other") : qs(m.family));
+    };
+    const auto upcsOf = [](const MenuItem &m) {
+        QVariantList upcs;
+        for (const std::string &b : m.barcodes) {
+            const QString c = digitsOnly(qs(b));
+            if (!c.isEmpty())
+                upcs.append(QVariantMap{{u"label"_s, upcs.isEmpty() ? tr("Primary UPC") : tr("Alt UPC %1").arg(upcs.size())}, {u"code"_s, c}});
+        }
+        for (const RecipeLine &r : m.recipe)
+            if (r.ingredientId.starts_with("__parent__:"))
+                if (const QString c = digitsOnly(qs(r.ingredientId.substr(11))); !c.isEmpty())
+                    upcs.append(QVariantMap{{u"label"_s, tr("Carton UPC")}, {u"code"_s, c}});
+        return upcs;
+    };
+    QVariantList children;
+    if (q.isEmpty() && labelBrowsing_) {
+        std::map<QString, int> counts;
+        for (const MenuItem &m : s_->menu) {
+            if (upcsOf(m).isEmpty())
+                continue;
+            const QString category = categoryOf(m);
+            const QStringList at{labelGroup(m, category), category, labelBrand(m)};
+            if (at.mid(0, labelPath_.size()) != labelPath_)
+                continue;
+            if (labelPath_.size() < 3) {
+                ++counts[at.at(labelPath_.size())];
+            } else if (matches.size() < 200) {
+                matches.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"price"_s, format(m.price)}, {u"upcs"_s, upcsOf(m)}});
+            }
+        }
+        for (const auto &[name, n] : counts)
+            children.append(QVariantMap{{u"name"_s, name}, {u"count"_s, n}});
+    }
     if (!q.isEmpty()) {
         const QString code = digitsOnly(q);
         const bool byCode = code.size() >= 4 && code.size() == q.size();
@@ -717,12 +786,22 @@ QVariantMap PosService::retailLabels() const
         }
     }
     return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
-            {u"ready"_s, QFile::exists(kLabelLauncher)}};
+            {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)}};
+}
+
+bool PosService::browseRetailLabels(const QStringList &path)
+{
+    labelPath_ = path.mid(0, 3);
+    labelQuery_.clear();
+    labelBrowsing_ = true;
+    emit sessionChanged();
+    return true;
 }
 
 bool PosService::findRetailLabels(const QString &query)
 {
     labelQuery_ = query.trimmed();
+    labelBrowsing_ = false;
     emit sessionChanged();
     return true;
 }

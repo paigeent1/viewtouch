@@ -488,6 +488,8 @@ public:
     QVariantMap retailLabels() const override;
     // Items for the Labels screen: by name or any of their UPCs.
     bool findRetailLabels(const QString &query);
+    // The tree: [group, category, brand] (fewer: that level's children).
+    bool browseRetailLabels(const QStringList &path);
     // Hands the job to the label utility on this (the main) computer, which prints it.
     bool printRetailLabels(const QVariantMap &job);
     std::string labelPrinterId() const;
@@ -1195,6 +1197,8 @@ private:
     std::string selectedCustomer_;
     QString giftCardNumber_;
     QString labelQuery_;
+    QStringList labelPath_;
+    bool labelBrowsing_ = false;   // the Labels screen is showing the tree (worked out only then)
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;

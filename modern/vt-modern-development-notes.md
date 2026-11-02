@@ -84,6 +84,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 17:07 ET — Bob (Claude) — Labels screen: browse the inventory as a tree
+- **What:** Labels screen gets Browse / Find. Browse walks the label utility's own tree: group (Cigars / Retail / Food & drink) > category (ViewTouch's categories) > brand (from the item name, same prefixes as infer_brand) > items, with item counts at each level, a breadcrumb to go back up, and 'Add All' at a brand. PosService::browseRetailLabels(path) (command browseRetailLabels); retailLabels() adds path and children. The tree is only worked out while a Labels screen is browsing (labelBrowsing_), so other screens' updates don't pay for it. Only items with at least one UPC are listed.
+- **Why:** Owner: tablets should be able to search the inventory by tree, like the label utility.
+- **Files:** `modern/app/pos_commands.cpp`, `modern/app/pos_inventory.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.hh`, `modern/ui/qml/WidgetRetailLabels.qml`
+- **Next person must know:** Not compiled here; same Pi build + APK as the Labels screen.
+
 ### 2026-11-02 17:04 ET — Bob (Claude) — Labels screen on tablets: shelf, price and cigar labels printed by the Pi
 - **What:** New ViewTouch screen 'labels' (widget retailLabels, WidgetRetailLabels.qml) for any screen, tablets included: choose a label template (the label utility's own, read from ~/.local/share/ViewTouch/label_templates.json on the main computer), find items by name or scan a barcode, tap to add, pick which UPC per item (primary / alt / carton, tap to cycle), set quantities, Print. Labels with no product fields (RECEIVING LABEL) just take a count. PosService::retailLabels / findRetailLabels / printRetailLabels (session property retailLabels, Group::Session); printRetailLabels writes a job file and starts /usr/local/bin/vt-label-utility --print-job <file> on the main computer. vt_label_utility.py: the print window's sending code is now send_label_job() (shared), new run_print_job() / --print-job prints with no window to the template's own printer (tested: alt UPC chosen, 2 copies, same bitmap). Manager > Label Utility on a screen without the label utility (tablets) opens the Labels screen; Prep Labels page has a 'Shelf & Price Labels...' button. The page is added to existing stores automatically (starter pages).
 - **Why:** Owner: the kitchen and stock room use tablets for receiving and inventory and need labels; the label utility only runs on the Pi.

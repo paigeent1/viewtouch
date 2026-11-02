@@ -17,6 +17,8 @@ Item {
     // [{name, upcs: [{label, code}], pick (index into upcs), qty}]
     property var queue: []
     property int aloneQty: 1
+    property bool browsing: true   // the tree (group > category > brand > items), or Find
+    readonly property var path: info.path ?? []
     readonly property int total: product ? queue.reduce((n, q) => n + q.qty, 0) : aloneQty
 
     function add(m) {
@@ -42,7 +44,10 @@ Item {
         queue = []
         aloneQty = 1
     }
-    Component.onCompleted: if (templates.length > 0 && chosen === "") chosen = templates[0].name
+    Component.onCompleted: {
+        if (templates.length > 0 && chosen === "") chosen = templates[0].name
+        if (pos) pos.browseRetailLabels([])
+    }
     onTemplatesChanged: if (chosen === "" && templates.length > 0) chosen = templates[0].name
 
     readonly property bool narrow: zone ? zone.narrow : false
@@ -103,6 +108,49 @@ Item {
                     visible: w.product
                     Layout.fillWidth: true
                     spacing: 6
+                    Button { implicitHeight: 44; font.pixelSize: 15; text: qsTr("Browse"); checkable: true; checked: w.browsing
+                        onClicked: { w.browsing = true; find.text = ""; w.pos.browseRetailLabels(w.path) } }
+                    Button { implicitHeight: 44; font.pixelSize: 15; text: qsTr("Find"); checkable: true; checked: !w.browsing
+                        onClicked: { w.browsing = false; w.pos.findRetailLabels(find.text) } }
+                }
+                // Where we are in the tree; touch a step to go back up to it.
+                Flow {
+                    visible: w.product && w.browsing
+                    Layout.fillWidth: true
+                    spacing: 4
+                    Repeater {
+                        model: [qsTr("All")].concat(w.path)
+                        delegate: Button {
+                            required property var modelData
+                            required property int index
+                            implicitHeight: 40
+                            font.pixelSize: 14
+                            flat: index === w.path.length
+                            text: modelData + (index < w.path.length ? "  ›" : "")
+                            onClicked: w.pos.browseRetailLabels(w.path.slice(0, index))
+                        }
+                    }
+                }
+                ListView {
+                    visible: w.product && w.browsing && w.path.length < 3
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 4
+                    model: w.info.children ?? []
+                    delegate: Button {
+                        required property var modelData
+                        width: ListView.view.width
+                        implicitHeight: 50
+                        font.pixelSize: 16
+                        text: modelData.name + "   (" + modelData.count + ")   ›"
+                        onClicked: w.pos.browseRetailLabels(w.path.concat([modelData.name]))
+                    }
+                }
+                RowLayout {
+                    visible: w.product && !w.browsing
+                    Layout.fillWidth: true
+                    spacing: 6
                     TextField {
                         id: find
                         objectName: "retailLabelSearch"
@@ -110,7 +158,7 @@ Item {
                         implicitHeight: 48
                         font.pixelSize: 17
                         placeholderText: qsTr("Find an item: name, or scan its barcode")
-                        onTextEdited: w.pos.findRetailLabels(text)
+                        onTextEdited: { w.browsing = false; w.pos.findRetailLabels(text) }
                         // A scanner types the code and Enter: the one item it matches goes on the list.
                         onAccepted: {
                             w.pos.findRetailLabels(text)
@@ -119,8 +167,16 @@ Item {
                         }
                     }
                 }
+                Button {
+                    visible: w.product && w.browsing && w.path.length === 3 && (w.info.matches ?? []).length > 1
+                    Layout.fillWidth: true
+                    implicitHeight: 44
+                    font.pixelSize: 15
+                    text: qsTr("Add All %1").arg((w.info.matches ?? []).length)
+                    onClicked: for (const m of (w.info.matches ?? [])) w.add(m)
+                }
                 ListView {
-                    visible: w.product
+                    visible: w.product && (!w.browsing || w.path.length === 3)
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
