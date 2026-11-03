@@ -449,6 +449,7 @@ public:
         invoke(QStringLiteral("countDrawerPieces"), {drawerId, QVariant(counts)});
     }
     Q_INVOKABLE void endOfDay() { invoke(QStringLiteral("endOfDay")); }
+    Q_INVOKABLE void saveExceptionTickets() { invoke(QStringLiteral("saveExceptionTickets")); }
     Q_INVOKABLE void printReport(const QString &id, qint64 dayId = 0) { invoke(QStringLiteral("printReport"), {id, dayId}); }
     Q_INVOKABLE void adminSave(const QString &panel, int index, const QVariantMap &record)
     {

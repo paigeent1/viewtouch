@@ -510,6 +510,7 @@ QJsonArray actionTypes()
                             {"closeCheck", "Close check"}, {"removePayment", "Undo payment"},
                             {"noSale", "Open drawer (no sale)"}, {"openDrawerSession", "Start drawer (bank)"},
                             {"countDrawer", "Count drawer"}, {"endOfDay", "End of day"},
+                            {"saveExceptionTickets", "Save exception tickets (pictures + PDF)"},
                             {"login", "Log in"}, {"logout", "Log out"}, {"clockIn", "Clock in"},
                             {"clockOut", "Clock out"}, {"startCheck", "Start table check"},
                             {"startQuick", "Start quick check"}, {"startTakeout", "Start takeout"},

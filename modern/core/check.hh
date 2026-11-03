@@ -199,7 +199,8 @@ struct CheckEvent {
     std::int64_t at = 0;
     std::string who;
     std::string what;
-    std::string kind;   // void | discount | reopen | transfer | move | merge | unpay | undiscount
+    std::string kind;   // void | errorCorrect | discount (an employee's) | promo (coupon, reward: the system's)
+                        // | reopen | transfer | move | merge | unpay | undiscount
     Money amount;       // what it was worth: the item voided, the discount, the payment taken back
     std::string reason; // why (a void's or comp's reason, from the store's list)
 

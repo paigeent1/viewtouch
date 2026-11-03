@@ -104,6 +104,25 @@ public:
                              const std::string &) {}
     // A self-order kiosk's slip for the guest: the order number to show at
     // the counter and what they ordered; `sent`: already being made.
+    // The day's exceptions kept as pictures instead of a second receipt stapled to paperwork:
+    // the Exceptions report and each ticket (the store's copy of a check with voids, error corrects
+    // or an employee's discount; each No Sale slip) as JPEGs, and all of them in one PDF.
+    // Returns the folder written (empty: not saved).
+    struct ExceptionTicket {
+        std::string file;    // file name without extension: "check-123", "nosale-3"
+        std::string title;   // what made it an exception: "Check #123: void, discount"
+        std::optional<core::Check> check;
+        std::optional<core::CashMovement> noSale;
+        int number = 0;      // No Sale #
+        std::string drawer;
+    };
+    virtual QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
+                                         const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
+                                         std::int64_t dayOpenedAt)
+    {
+        (void)settings; (void)exceptions; (void)tickets; (void)dayId; (void)dayOpenedAt;
+        return {};
+    }
     virtual void printOrderSlip(const core::PosSettings &settings, const core::Check &check,
                                 const std::string &printerId, bool sent)
     {
@@ -753,6 +772,9 @@ public:
     // This person counts drawers blind (not seeing what should be there).
     bool blindCount() const;
     bool endOfDay();
+    // The day's exception tickets as pictures and a PDF (also done at end of day). Manager.
+    bool saveExceptionTickets();
+    std::vector<PosPrinter::ExceptionTicket> exceptionTickets() const;
     const core::BusinessDay &currentDay() const { return s_->day; }
     const std::vector<core::Check> &closedToday() const { return s_->closedToday; }
 

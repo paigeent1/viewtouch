@@ -9,6 +9,8 @@
 #include "print/spooler.hh"
 #include "print/ticket_printer.hh"
 #include "print/tickets.hh"
+#include "print/ticket_image.hh"
+#include <QFileInfo>
 #include "qt_catch.hh"
 
 #include <QElapsedTimer>
@@ -191,6 +193,53 @@ TEST_CASE("No Sale prints a slip like a kitchen ticket (no logo) and opens the d
     CHECK(out.contains(u"Make Change"_s));
     CHECK(out.contains(u"Morgan"_s));
     CHECK(out.contains(u"[drawer opened]"_s));
+}
+
+TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy showing voids",
+          "[print][exceptions]")
+{
+    QTemporaryDir dir;
+    auto seed = test::seedPosData();
+    seed.settings.receiptShowVoids = false;   // the customer's receipt hides them; the store's copy doesn't
+    PrintSpooler spooler;
+    TicketPrinter printer(spooler, dir.path());
+    printer.setExceptionsDir(dir.filePath(u"exceptions"_s));
+    core::Check c = burgerCheck(seed.settings, seed.menu);
+    c.lines.front().voided = true;
+    core::CashMovement m;
+    m.kind = core::CashMovement::Kind::NoSale;
+    m.by = "Morgan";
+    m.reason = "Make Change";
+    m.at = 1'700'000'000'000;
+    core::Report r;
+    r.title = "Exceptions";
+    r.section("Drawer opened with no sale");
+    r.line({"Morgan", "1", ""});
+    std::vector<app::PosPrinter::ExceptionTicket> tickets;
+    tickets.push_back({"check-" + std::to_string(c.id), "Check #" + std::to_string(c.id) + ": void", c, std::nullopt, 0, {}});
+    tickets.push_back({"nosale-1", "No Sale #1: Make Change", std::nullopt, m, 1, "Drawer 1"});
+    const QString out = printer.saveExceptionTickets(seed.settings, r, tickets, 7, 1'700'000'000'000);
+    REQUIRE(!out.isEmpty());
+    const QDir d(out);
+    const QStringList pictures = d.entryList({u"*.jpg"_s, u"*.png"_s}, QDir::Files);
+    CHECK(pictures.size() == 3);   // the report, the check, the No Sale
+    CHECK(d.entryList({u"*.pdf"_s}, QDir::Files).size() == 1);
+    const QString ext = pictures.isEmpty() ? u"jpg"_s : QFileInfo(pictures.front()).suffix();
+    const QImage check(d.filePath(u"check-%1.%2"_s.arg(c.id).arg(ext)));
+    REQUIRE(!check.isNull());
+    CHECK(check.height() > check.width());   // a strip of paper
+
+    // The picture is the printer's layout: the voided line is on the store's copy.
+    const Document text = receipt(c, [&] {
+        static core::PosSettings store;
+        store = seed.settings;
+        store.receiptShowVoids = true;
+        return ctx(store);
+    }());
+    CHECK(contains(renderText(text, 42), "VOID"));
+    const QImage drawn = ticketImage(text, 42);
+    CHECK(!drawn.isNull());
+    CHECK(drawn.pixelColor(2, 2) == QColor(Qt::white));
 }
 
 TEST_CASE("TicketPrinter sends labels in the label printer's language, or as slips", "[print][labels]")

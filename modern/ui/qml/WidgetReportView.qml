@@ -321,6 +321,15 @@ Item {
                 fontScale: 0.36
                 onClicked: w.zone.controller.exportReport(w.report, "pdf")
             }
+            WidgetKey {
+                // Today's exception tickets as pictures + one PDF on the main computer (also saved at end of day).
+                visible: w.reportId === "exceptions" && w.period === "day" && w.dayIndex === 0
+                Layout.preferredWidth: w.unit * 6
+                Layout.fillHeight: true
+                text: qsTr("Tickets")
+                fontScale: 0.36
+                onClicked: w.pos.saveExceptionTickets()
+            }
         }
 
         Text {

@@ -79,6 +79,7 @@ if(Qt6_FOUND)
         print/tickets.hh print/tickets.cpp
         print/spooler.hh print/spooler.cpp
         print/ticket_printer.hh print/ticket_printer.cpp
+        print/ticket_image.hh print/ticket_image.cpp
         print/raster.hh print/raster.cpp
         print/printer_monitor.hh print/printer_monitor.cpp
     )

@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:33 ET — Bob (Claude) — Exception tickets saved as JPEGs + one PDF (no stapled second receipt)
+- **What:** At end of day (and from a new Tickets button on the Exceptions report, today) the server saves the day's exception tickets to ~/ViewTouch Exports/Exceptions/<date> day <n>/: exceptions-report.jpg, check-<id>.jpg for every check with a void, error correct, employee discount/comp, payment or discount taken back, or reopen (store copy: voids always shown, headed STORE COPY: EXCEPTION and why), nosale-<n>.jpg for each No Sale slip, and 'Exceptions <date>.pdf' with all of them (report first, tickets three across), copied to ~/Desktop/Reports. Coupons and loyalty rewards are now event kind 'promo' (system discounts): not counted as employee discounts on the Exceptions report and no ticket picture. New print/ticket_image (Document -> QImage, the printer's own layout). Command saveExceptionTickets (manager) for buttons. VT_EXCEPTIONS_DIR overrides the folder.
+- **Why:** Owner: employees print a second receipt for discounts/voids and staple it to paperwork; wants the tickets as pictures in the daily exception report/EOD summary instead.
+- **Files:** `print/ticket_image.hh/.cpp, print/ticket_printer.hh/.cpp, app/pos_service.hh, app/pos_day.cpp, app/pos_commands.cpp, app/pos_session.hh, app/pos_loyalty.cpp, core/check.hh, core/report.cpp, layout/schema.cpp, ui/qml/WidgetReportView.qml, CMakeLists.txt, tests/test_print.cpp, tests/test_pos_m4.cpp`
+- **Next person must know:** Old coupons/rewards recorded before this stay kind 'discount'.
+
 ### 2026-11-03 16:24 ET — Bob (Claude) — No Sale tests use the new reason names
 - **What:** Tests updated to 'Make Change'.
 - **Why:** Previous commit missed the test files.

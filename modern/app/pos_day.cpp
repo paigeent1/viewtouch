@@ -1292,8 +1292,12 @@ bool PosService::endOfDay()
     if (s_->sink)
         s_->sink->saveDay(s_->day, reports);
     s_->pastDays.insert(s_->pastDays.begin(), PastDay{s_->day, reports});
-    if (s_->printer)
+    if (s_->printer) {
         s_->printer->printReport(s_->settings, buildReport(u"sales"_s), receiptPrinter());
+        // The exception tickets as pictures, with the Exceptions report: nothing to staple.
+        s_->printer->saveExceptionTickets(s_->settings, buildReport(u"exceptions"_s), exceptionTickets(), s_->day.id,
+                                          s_->day.openedAt);
+    }
 
     s_->closedToday.clear();
     s_->kitchenDone.clear();
@@ -1314,6 +1318,75 @@ bool PosService::endOfDay()
     emit notice(tr("Day %1 closed. A new day has started.").arg(closedId));
     emit s_->drawerChanged();
     emit s_->dayChanged();
+    return true;
+}
+
+// --- exception tickets ------------------------------------------------------------------
+
+std::vector<PosPrinter::ExceptionTicket> PosService::exceptionTickets() const
+{
+    std::vector<PosPrinter::ExceptionTicket> out;
+    // Checks with something an employee did: voids, error corrects, their discounts and comps,
+    // payments or discounts taken back, reopened. Coupons and rewards are the system's.
+    static const std::vector<std::pair<std::string, std::string>> kinds = {
+        {"void", "void"}, {"errorCorrect", "error correct"}, {"discount", "discount"},
+        {"undiscount", "discount taken back"}, {"unpay", "payment taken back"}, {"reopen", "reopened"}};
+    std::vector<const Check *> checks;
+    for (const Check &c : s_->closedToday)
+        checks.push_back(&c);
+    for (const auto &[id, c] : s_->open)
+        checks.push_back(&c);
+    std::ranges::sort(checks, {}, &Check::id);
+    for (const Check *c : checks) {
+        if (c->training)
+            continue;
+        std::vector<std::string> why;
+        const auto note = [&](const std::string &w) {
+            if (std::ranges::find(why, w) == why.end())
+                why.push_back(w);
+        };
+        for (const CheckEvent &e : c->events)
+            for (const auto &[kind, words] : kinds)
+                if (e.kind == kind)
+                    note(words);
+        for (const OrderLine &l : c->lines)
+            if (l.voided)
+                note(l.corrected ? "error correct" : "void");
+        if (why.empty())
+            continue;
+        std::string title = "Check #" + std::to_string(c->id) + ": ";
+        for (std::size_t i = 0; i < why.size(); ++i)
+            title += (i ? ", " : "") + why[i];
+        out.push_back({"check-" + std::to_string(c->id), title, *c, std::nullopt, 0, {}});
+    }
+    // Each No Sale slip, numbered for the day as printed.
+    std::vector<std::pair<const CashMovement *, const DrawerSession *>> noSales;
+    for (const DrawerSession &d : s_->drawers)
+        for (const CashMovement &m : d.movements)
+            if (m.kind == CashMovement::Kind::NoSale)
+                noSales.push_back({&m, &d});
+    std::ranges::stable_sort(noSales, {}, [](const auto &x) { return x.first->at; });
+    int n = 0;
+    for (const auto &[m, d] : noSales) {
+        ++n;
+        std::string title = "No Sale #" + std::to_string(n) + (m->reason.empty() ? "" : ": " + m->reason);
+        out.push_back({"nosale-" + std::to_string(n), title, std::nullopt, *m, n, d->name});
+    }
+    return out;
+}
+
+bool PosService::saveExceptionTickets()
+{
+    if (!require(perm::Manager, tr("Saving the exception tickets")))
+        return false;
+    if (!s_->printer)
+        return fail(tr("No printer is set up."));
+    const std::vector<PosPrinter::ExceptionTicket> tickets = exceptionTickets();
+    const QString dir = s_->printer->saveExceptionTickets(s_->settings, buildReport(u"exceptions"_s), tickets,
+                                                          s_->day.id, s_->day.openedAt);
+    if (dir.isEmpty())
+        return fail(tr("Couldn't save the exception tickets."));
+    emit notice(tr("%n exception ticket(s) saved to %1", nullptr, int(tickets.size())).arg(dir));
     return true;
 }
 

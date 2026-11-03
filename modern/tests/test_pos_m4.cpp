@@ -565,6 +565,14 @@ TEST_CASE("Exceptions report: voids, comps, payments taken back, reopened, no sa
     CHECK(rowIn(r, "Discounts and comps", morgan) == std::vector<std::string>{morgan, "1", "$12.50"});
     CHECK(rowIn(r, "Payments and discounts taken back", morgan) == std::vector<std::string>{morgan, "1", "$12.50"});
     CHECK(rowIn(r, "Drawer opened with no sale", morgan) == std::vector<std::string>{morgan, "2", ""});
+    // The exception tickets kept as pictures: the check (void, discount) and both No Sales.
+    const auto tickets = p.pos.exceptionTickets();
+    REQUIRE(tickets.size() == 3);
+    CHECK(tickets[0].check.has_value());
+    CHECK(tickets[0].title.find("void") != std::string::npos);
+    CHECK(tickets[0].title.find("discount") != std::string::npos);
+    CHECK(tickets[1].file == "nosale-1");
+    CHECK(tickets[2].number == 2);
     // The drawer report counts the no sales too, without a dollar line.
     CHECK(!rowIn(p.pos.buildReport(u"drawer"_s), p.pos.shared()->drawers.front().name, "Opened with no sale (2)").empty());
     // Events keep their amounts.

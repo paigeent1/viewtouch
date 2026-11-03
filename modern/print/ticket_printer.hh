@@ -35,6 +35,11 @@ public:
     bool printTestPage(const core::PosSettings &settings, const std::string &printerId, bool kickDrawer) override;
     void printOrderSlip(const core::PosSettings &settings, const core::Check &check, const std::string &printerId,
                         bool sent) override;
+    QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
+                                 const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
+                                 std::int64_t dayOpenedAt) override;
+    // Where the day's exception folders go (default: $VT_EXCEPTIONS_DIR, else ~/ViewTouch Exports/Exceptions).
+    void setExceptionsDir(QString dir) { exceptionsDir_ = std::move(dir); }
     void printLabels(const core::PosSettings &settings,
                      const std::vector<std::pair<std::string, std::vector<std::string>>> &labels,
                      const std::string &printerId) override;
@@ -53,6 +58,7 @@ private:
 
     PrintSpooler &spooler_;
     QString outputDir_;
+    QString exceptionsDir_;
     std::function<std::int64_t()> now_;
     std::function<QByteArray(const QString &)> imageSource_;
     // Dithered once per logo and paper width.

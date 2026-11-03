@@ -188,7 +188,7 @@ bool PosService::applyCoupon(const QString &code)
     const Money before = c->totals(s_->settings.tax).discounts;
     applyPromotions(*c);
     const Money off = c->totals(s_->settings.tax).discounts - before;
-    noteEvent(*c, tr("Coupon: %1").arg(qs(p.name)), "discount", off);
+    noteEvent(*c, tr("Coupon: %1").arg(qs(p.name)), "promo", off);   // the system's discount, not an exception
     emit notice(tr("%1: %2 off").arg(qs(p.name), format(off)));
     changed(*c);
     return true;
@@ -332,7 +332,7 @@ bool PosService::redeemReward(int index)
     c->payments.push_back(pay);
     r->points -= reward.points;
     saveCustomerRecord(*r);
-    noteEvent(*c, tr("Reward %1 (%2 points)").arg(format(off)).arg(reward.points), "discount", off);
+    noteEvent(*c, tr("Reward %1 (%2 points)").arg(format(off)).arg(reward.points), "promo", off);
     emit notice(tr("%1 off for %2 points; %3 left").arg(format(off)).arg(reward.points).arg(r->points));
     changed(*c);
     return true;
