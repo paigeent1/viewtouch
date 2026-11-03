@@ -471,4 +471,12 @@ Rectangle {
             }
         }
     }
+
+    // A price check at the counter: the guest sees the item and its price too.
+    PriceCheckOverlay {
+        anchors.fill: parent
+        z: 100
+        pos: d.pos
+        guest: true
+    }
 }

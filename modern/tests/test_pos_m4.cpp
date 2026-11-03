@@ -661,6 +661,34 @@ TEST_CASE("Cancel Sale asks why, numbers the cancel for the day, isn't a sale, a
     CHECK(p.pos.buildReport(u"sales"_s).find("Checks").at(1) == "0");
 }
 
+TEST_CASE("Price check: on and off, a scan shows the item and its box or singles", "[m4][pricecheck]")
+{
+    Pos p;
+    p.login("1234");
+    auto &menu = p.pos.shared()->menu;
+    REQUIRE(menu.size() >= 2);
+    menu[0].barcodes = {"012345678905"};                       // the box
+    menu[1].barcodes = {"098765432109"};                       // a single
+    menu[1].recipe.push_back({"__parent__:012345678905", 20});
+    REQUIRE(p.pos.togglePriceCheck());
+    CHECK(p.pos.priceCheck()[u"on"_s].toBool());
+    REQUIRE(p.pos.priceCheckCode(u"01234567890"_s));        // without its check digit
+    QVariantMap item = p.pos.priceCheck()[u"item"_s].toMap();
+    CHECK(item[u"name"_s].toString() == QString::fromStdString(menu[0].name));
+    QVariantList related = item[u"related"_s].toList();
+    REQUIRE(related.size() == 1);
+    CHECK(related[0].toMap()[u"relation"_s].toString().contains(u"20"_s));
+    REQUIRE(p.pos.priceCheckCode(u"098765432109"_s));
+    related = p.pos.priceCheck()[u"item"_s].toMap()[u"related"_s].toList();
+    REQUIRE(related.size() == 1);
+    CHECK(related[0].toMap()[u"relation"_s].toString().startsWith(u"Box"_s));
+    CHECK(p.pos.shared()->open.empty());                       // nothing rung in
+    p.pos.closePriceCheck();
+    CHECK_FALSE(p.pos.priceCheck().contains(u"item"_s));
+    REQUIRE(p.pos.togglePriceCheck());
+    CHECK(p.pos.priceCheck().isEmpty());
+}
+
 TEST_CASE("X report: sales and drawers so far on paper, nothing closed", "[m4][reports][xreport]")
 {
     Pos p;

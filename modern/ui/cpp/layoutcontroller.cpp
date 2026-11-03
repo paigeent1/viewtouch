@@ -1552,6 +1552,11 @@ void LayoutController::scanned(const QString &code)
     if (editing() || !pos_ || !pos_->loggedIn() || c.isEmpty())
         return;
     typedNumber_.clear();
+    // PRICE CHECK on: the code shows its item (and its box or singles); nothing is rung in.
+    if (pos_->priceCheck().value(u"on"_s).toBool()) {
+        call(u"priceCheckCode"_s, {c}, [](const QVariant &) {});
+        return;
+    }
     const auto *page = currentPage();
     const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier" || page->kind == u"order" || page->id == u"retail-entry");
     QString c12 = c;
@@ -2012,6 +2017,7 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         {u"removePayment"_s, {u"removePayment"_s, {}}}, {u"closeCheck"_s, {u"closeCheck"_s, {}}},
         // Retail CANCEL SALE ("cancelCheck" on the store's pages).
         {u"cancelSale"_s, {u"cancelSale"_s, {}}}, {u"cancelCheck"_s, {u"cancelSale"_s, {}}},
+        {u"priceCheck"_s, {u"togglePriceCheck"_s, {}}},
         {u"printReceipt"_s, {u"printReceipt"_s, {}}}, {u"noSale"_s, {u"noSale"_s, {}}},
         {u"openDrawer"_s, {u"noSale"_s, {}}}, {u"openDrawerSession"_s, {u"openDrawerSession"_s, {}}},
         {u"countDrawer"_s, {u"countDrawer"_s, {}}}, {u"endOfDay"_s, {u"endOfDay"_s, {}}},

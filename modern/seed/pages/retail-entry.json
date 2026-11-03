@@ -572,9 +572,8 @@
       },
       "actions": [
         {
-          "type": "jump",
-          "mode": "push",
-          "page": "find-item"
+          "type": "command",
+          "name": "priceCheck"
         }
       ]
     },

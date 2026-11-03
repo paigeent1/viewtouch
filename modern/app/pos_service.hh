@@ -543,6 +543,13 @@ public:
     QVariantMap clockInJobs() const override;
     QVariantMap cashTipsAsk() const override;
     QVariantMap reasonAsk() const override { return reasonAsk_; }
+    QVariantMap priceCheck() const override { return priceCheck_; }
+    // PRICE CHECK: on (a banner flashes), or off again; while on, a scanned code shows its item.
+    bool togglePriceCheck();
+    // The item for a code (barcode or number), with its box or its singles ("parent"/"child"):
+    // shown in a window and on the customer display. False: no such item.
+    bool priceCheckCode(const QString &code);
+    void closePriceCheck();
     // Answers reasonAsk: the void or comp goes ahead with it ("": it doesn't).
     bool giveReason(const QString &reason);
     // The cash tips kept on the shift just clocked out ("12.50"; "" or "0": none).
@@ -1312,6 +1319,7 @@ private:
     struct GivenReason { QString method; std::string reason; };
     std::optional<GivenReason> reason_;
     QVariantMap reasonAsk_;
+    QVariantMap priceCheck_;   // {on, item}
     QString reasonMethod_;
     QVariantList reasonArgs_;
     // Whether this can go ahead: no reason needed, or given. Else asks (false).

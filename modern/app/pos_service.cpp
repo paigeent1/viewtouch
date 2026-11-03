@@ -1102,6 +1102,68 @@ bool PosService::openCheck(std::int64_t checkId)
     return true;
 }
 
+bool PosService::togglePriceCheck()
+{
+    const bool on = !priceCheck_.value(u"on"_s).toBool();
+    priceCheck_ = on ? QVariantMap{{u"on"_s, true}} : QVariantMap{};
+    emit notice(on ? tr("Price check: scan an item") : tr("Price check off"));
+    emit sessionChanged();
+    return true;
+}
+
+void PosService::closePriceCheck()
+{
+    if (!priceCheck_.contains(u"item"_s))
+        return;
+    priceCheck_.remove(u"item"_s);
+    emit sessionChanged();
+}
+
+bool PosService::priceCheckCode(const QString &code)
+{
+    QString c = code.trimmed();
+    const MenuItem *m = findItem(c);
+    // A UPC-A scanned without its check digit (11 digits).
+    if (!m && c.size() == 11 && std::ranges::all_of(c, [](QChar ch) { return ch.isDigit(); })) {
+        int sum = 0;
+        for (int i = 0; i < 11; ++i)
+            sum += c.at(10 - i).digitValue() * (i % 2 == 0 ? 3 : 1);
+        m = findItem(c + QChar(u'0' + ((10 - (sum % 10)) % 10)));
+    }
+    if (!m || m->isModifier)
+        return fail(tr("No item for %1").arg(c));
+    const auto priced = [this](const MenuItem &x) {
+        return format(x.price) + (x.byWeight ? u" / "_s + qs(x.weightUnit) : QString());
+    };
+    const auto upcOf = [](const MenuItem &x) { return x.barcodes.empty() ? QString() : qs(x.barcodes.front()); };
+    QVariantList related;
+    // Its box (a single's parent), from the Item / UPC Builder's Parent UPC and pack size.
+    for (const RecipeLine &r : m->recipe) {
+        if (!r.ingredientId.starts_with("__parent__:"))
+            continue;
+        const std::string parentUpc = r.ingredientId.substr(11);
+        for (const MenuItem &p : s_->menu)
+            if (std::ranges::find(p.barcodes, parentUpc) != p.barcodes.end())
+                related.append(QVariantMap{{u"name"_s, qs(p.name)}, {u"price"_s, priced(p)}, {u"upc"_s, upcOf(p)},
+                                           {u"relation"_s, tr("Box of %1").arg(int(r.quantity))}});
+    }
+    // Its singles (items whose parent it is).
+    for (const MenuItem &child : s_->menu)
+        for (const RecipeLine &r : child.recipe)
+            if (r.ingredientId.starts_with("__parent__:")
+                && std::ranges::find(m->barcodes, r.ingredientId.substr(11)) != m->barcodes.end())
+                related.append(QVariantMap{{u"name"_s, qs(child.name)}, {u"price"_s, priced(child)},
+                                           {u"upc"_s, upcOf(child)},
+                                           {u"relation"_s, tr("Single (%1 in the box)").arg(int(r.quantity))}});
+    priceCheck_ = {{u"on"_s, true},
+                   {u"item"_s, QVariantMap{{u"name"_s, qs(m->name)}, {u"price"_s, priced(*m)}, {u"upc"_s, upcOf(*m)},
+                                          {u"noDiscount"_s, m->noDiscount},
+                                          {u"soldOut"_s, !m->available || m->soldOutToday},
+                                          {u"related"_s, related}}}};
+    emit sessionChanged();
+    return true;
+}
+
 bool PosService::cancelSale()
 {
     if (!require(perm::Settle, tr("Cancelling a sale")))

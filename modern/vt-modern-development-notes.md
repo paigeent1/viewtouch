@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:22 ET — Bob (Claude) — Price check mode
+- **What:** PRICE CHECK (retail; command priceCheck -> togglePriceCheck) turns price check on: '*PRICE CHECK*' flashes at the top (PriceCheckOverlay in Main.qml); touch again for off. While on, any scan (scanner, camera, serial) goes to priceCheckCode instead of ringing in: a floating window shows the item, price, UPC, No discounts / Sold out, and its box (Parent UPC, 'Box of N') or its singles (items with it as Parent UPC); touch to close. The customer display shows the same item and prices (guest copy). New session property priceCheck (synced to tablets).
+- **Why:** Owner: price check toggle with flashing banner; scanned item shows with its parent or child in a floating window and on the customer display.
+- **Files:** `app/pos_session.hh/.cpp, app/pos_service.hh/.cpp, app/pos_commands.cpp, net/remote_session.hh/.cpp, ui/cpp/layoutcontroller.cpp, ui/qml/PriceCheckOverlay.qml, ui/qml/Main.qml, ui/qml/CustomerDisplay.qml, layout/schema.cpp, CMakeLists.txt, seed/pages/retail-entry.json, tests/test_pos_m4.cpp`
+- **Next person must know:** Tablets need a new APK for the banner/window.
+
 ### 2026-11-03 17:19 ET — Bob (Claude) — Reprint Receipt: pick from the last 7 days
 - **What:** Retail 'Reprint Receipt' now opens new page reprint-receipt: the check search starting at 7 days (Week) and listing them at once (checkSearch props days and showAll); touch a check, then Reprint. Other ranges still a touch away.
 - **Why:** Owner: reprint should open a list of checks from the last 7 days and select the receipt.

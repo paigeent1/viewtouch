@@ -139,6 +139,9 @@ class PosSession : public QObject {
     // Clocking in with more than one job: {who, jobs: [{role, name}]}, else empty.
     Q_PROPERTY(QVariantMap clockInJobs READ clockInJobs NOTIFY sessionChanged)
     Q_PROPERTY(QVariantMap cashTipsAsk READ cashTipsAsk NOTIFY sessionChanged)
+    // Price check mode (PRICE CHECK button): {on, item: {name, price, upc, related: [{name, price,
+    // upc, relation}]}}; scans show the item instead of ringing it in.
+    Q_PROPERTY(QVariantMap priceCheck READ priceCheck NOTIFY sessionChanged)
     // A void or comp waiting for its reason: {kind: "void" | "comp", what, reasons}.
     Q_PROPERTY(QVariantMap reasonAsk READ reasonAsk NOTIFY sessionChanged)
     // The Time Clock screen: who typed their PIN (not logged in), their status,
@@ -357,6 +360,7 @@ public:
     virtual QVariantMap clockInJobs() const = 0;
     // Just clocked out here: the cash tips they kept? ({who, punchId}; {} none)
     virtual QVariantMap cashTipsAsk() const = 0;
+    virtual QVariantMap priceCheck() const = 0;
     virtual QVariantMap reasonAsk() const = 0;
     virtual QVariantMap timeClock() const = 0;
     virtual QVariantMap receiving() const = 0;
@@ -451,6 +455,8 @@ public:
     Q_INVOKABLE void endOfDay() { invoke(QStringLiteral("endOfDay")); }
     Q_INVOKABLE void saveExceptionTickets() { invoke(QStringLiteral("saveExceptionTickets")); }
     Q_INVOKABLE void xReport() { invoke(QStringLiteral("xReport")); }
+    Q_INVOKABLE void togglePriceCheck() { invoke(QStringLiteral("togglePriceCheck")); }
+    Q_INVOKABLE void closePriceCheck() { invoke(QStringLiteral("closePriceCheck")); }
     Q_INVOKABLE void printReport(const QString &id, qint64 dayId = 0) { invoke(QStringLiteral("printReport"), {id, dayId}); }
     Q_INVOKABLE void adminSave(const QString &panel, int index, const QVariantMap &record)
     {

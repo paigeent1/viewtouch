@@ -1418,6 +1418,12 @@ ApplicationWindow {
         pos: root.controller.pos as PosService
     }
 
+    PriceCheckOverlay {
+        anchors.fill: parent
+        z: 58
+        pos: root.controller.pos as PosService
+    }
+
     ReasonSheet {
         id: reasonSheet
         anchors.fill: parent
