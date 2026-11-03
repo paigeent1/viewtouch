@@ -56,7 +56,11 @@ elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
     outs=$(xrandr | awk '/ connected/{print $1}')
     first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
     [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
+    # The POS monitor at its resolution, progressive (an interlaced "1920x1080i" can flicker):
+    # --mode by name takes the first (progressive) mode of that size.
+    res=$(xrandr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /\*/{print $1; exit}' | sed 's/i$//')
     cmd="xrandr --output $second --auto --right-of $first"
+    [ -n "$res" ] && cmd="xrandr --output $first --mode $res; $cmd"
 else
     echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
 fi

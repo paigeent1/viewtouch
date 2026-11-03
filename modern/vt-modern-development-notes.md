@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:50 ET — Bob (Claude) — vt-guest-display: POS monitor progressive
+- **What:** On X11 it now sets the first monitor to its current resolution by name (progressive) before placing the second beside it, now and at boot; the owner's HDMI-1 was on 1920x1080i 50 Hz.
+- **Why:** Owner's xrandr output.
+- **Files:** `scripts/bin/vt-guest-display`
+
 ### 2026-11-03 18:49 ET — Bob (Claude) — Customer Display is an editable page
 - **What:** New seed page customer-display (Edit Pages -> Customer Display, manager): zones guestHeader (logo and check bar), guestMedia (picture/GIF/MP4 between guests; showWhen check none), guestOrder (rewards, items, totals, each tax; showWhen check open), guestMessages (rotating messages). New widget kinds (WidgetGuestHeader/Order/Media/Messages.qml; schema, ZoneItem, editor labels, CMake). LayoutController::guestZones/hasGuestPage/guestCanvas/guestBackground (refreshGuest, built on every refresh from the page as designed, apart from the shown page); GuestPageView.qml draws it (buttons don't run). CustomerDisplay.qml shows the page when the layout has one (else the built-in layout); tips, thank-you, receipt choice, phone keypad and price check stay overlays. Guest email: after joining with a phone, 'touch to add your email' opens an on-screen keyboard (CustomerDisplay emailPad); PosService::customerEmail saves it on the rewards record; customerPrompt.loyalty.hasEmail. Tests: [controller][guest], loyalty email.
 - **Why:** Owner: make the customer display a page for the editor; second Wimaxit as a touch guest screen for phone and email entry.
