@@ -84,6 +84,7 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Global Payments / EMV & Walkout Protection**: 1-tap Credit/Debit sales (`WidgetPaymentPanel.qml`), Bar Tab Pre-Auth & Auto-Incremental Holds (`AUTH` / `TRN_...`), Auto-Create Customer Profile from EMV Chip (`CARDHOLDER/NAME`), and Card-on-File Tokenization (`PMT_...`).
 * **Front-End Ticket Counter, Mode Buttons & Importers**: Live item/quantity counter (`Items: X (Qty: Y)`) in `WidgetOrderList.qml`, Cashier/Manager mode buttons, variable-weight scale barcode parsing, separate `UPC`/`ALTUPC` CSV columns (`app/menu_import.cpp`), and ILSA batch staging (`stage_batch.py`).
 * **Secondary HDMI Customer-Facing Display (CFD)**: Split-screen mode (`--customer-display window`) on Pi 5 Micro-HDMI 1 with 50% live receipt (`CustomerReceiptView.qml`) and 50% dynamic promo/pairing panel (`goesWith`).
+  *Already working (not this item):* the basic customer display (`ui/qml/CustomerDisplay.qml`, `CustomerDisplayWindow.qml`: order, total, tips, thank-you, price checks), turned on in Manager -> Terminals -> Customer display (runs `vt-guest-display on`: HDMI-2 beside HDMI-1, not mirrored). Don't launch vtmodern with `--customer-display` while the monitors are mirrored.
 * **4-Node Multi-Store Hub & Web Portal**: `store_config.json` and `corp_sync.py` across `CORP_HUB`, `HCAH_DANBURY`, `BHT_DANBURY`, and `BHT_GAYLORDSVILLE`, plus InMotion PHP/MySQL online ordering with Pi background polling and ESC/POS kitchen auto-printing (`192.168.1.77:9100`).
 * **Corporate ViewTouch & shared gift cards (planned, to be implemented later)**: The owner will build a Corporate ViewTouch
   instance on a separate Pi before the Buttheads stores launch. Then: one shared card list so balances work at all three
@@ -93,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-03 17:43 ET — Bob (Claude) — Roadmap note: the basic customer display exists
+- **What:** Section 5's CFD item is the 50/50 receipt + promo design (not built); added a line under it that the basic customer display is built and how to turn it on, after a desktop shortcut put the guest screen on both mirrored monitors.
+- **Why:** Avoid the next person reading the roadmap as 'no customer display'.
+- **Files:** `modern/vt-modern-development-notes.md`
 
 ### 2026-11-03 17:35 ET — Bob (Claude) — Fix seed validate: duplicate zone id on retail-discounts
 - **What:** retail-discounts had the order list and the Subtotal button both called 'sale' ([seed]/[editor] validate failures on the Pi). Button renamed rds-subtotal; the new discount and reprint pages' zones also prefixed (rd-/rds-/rpr-).
