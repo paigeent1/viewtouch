@@ -95,6 +95,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:08 ET — Bob (Claude) — Customer display: picture or animated GIF in the left third between guests
+- **What:** New setting displayPanel (Store Settings > Customer display: 'left side between guests', a picture field: PNG/JPG/GIF, animated GIFs play). Saved in settings display.panel, sent as customerPrompt.panel. CustomerDisplay.qml: with no sale the left third shows it (AnimatedImage, cropped to fill) beside the rotating messages; during a sale the order takes it; empty: messages use the whole screen as before.
+- **Why:** Owner: when no sale, push a graphic or video to that panel.
+- **Files:** `core/settings.hh, app/pos_json.cpp, app/pos_admin_fields.cpp, app/pos_admin_shared.hh, app/pos_admin_save.cpp, app/pos_admin_records.cpp, app/pos_day.cpp, ui/qml/CustomerDisplay.qml`
+- **Next person must know:** MP4 video needs Qt Multimedia (not used yet); check the Pi has it before adding.
+
 ### 2026-11-03 18:07 ET — Bob (Claude) — Customer display: order in the left third, messages beside it
 - **What:** CustomerDisplay.qml: during a sale the order is a panel on the left third (rewards box, items with choices and voids, Subtotal, Discounts, each tax on its own from totals.taxLines like the Order summary panel, Gratuity, Tip, Total, Paid, Change); the rotating messages and pictures keep going in the right two thirds. Between guests they use the whole screen as before; thank-you, tip choices, receipt choice and price check unchanged.
 - **Why:** Owner: a modified customer screen with the order summary panel on the left 1/3, keeping the rotating lines.

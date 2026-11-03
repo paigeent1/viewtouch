@@ -477,6 +477,9 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"receiptLogo"_s, tr("Print the logo on receipts"), u"bool"_s,
                   tr("At the top of every receipt, on thermal (ESC/POS) printers.")),
             field(u"displayAccent"_s, tr("Customer display: color"), u"color"_s),
+            field(u"displayPanel"_s, tr("Customer display: left side between guests"), u"image"_s,
+                  tr("A picture or an animated GIF in the left third while there's no sale (the order shows there "
+                     "during one). Empty: the messages use the whole screen.")),
             asRows(field(u"displaySlides"_s, tr("Customer display: between guests"), u"text"_s,
                          tr("Shown in turn; \"image:/path/to/photo.jpg\" for a picture. Running promotions are added "
                             "by themselves.")),

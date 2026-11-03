@@ -21,6 +21,9 @@ Rectangle {
     // Pictures by ref ("store:logo.png", a path...): this screen's copy.
     function img(ref) { return pos ? (pos.imageRevision < 0 ? undefined : pos.imageUrl(ref)) : ref }
     readonly property string logo: !prompt.logo ? "" : img(prompt.logo)
+    // Between guests: the store's picture or animated GIF in the left third (Store Settings).
+    readonly property string panelRef: prompt.panel ?? ""
+    readonly property bool panelShown: !hasCheck && !thanking && panelRef !== ""
 
     color: "#0f1318"
 
@@ -78,7 +81,7 @@ Rectangle {
         Item {
             id: idle
             // Between guests: the whole screen; during a sale: the two thirds beside the order.
-            anchors { left: d.hasCheck ? orderPanel.right : parent.left; right: parent.right; top: parent.top; bottom: parent.bottom }
+            anchors { left: d.hasCheck || d.panelShown ? orderPanel.right : parent.left; right: parent.right; top: parent.top; bottom: parent.bottom }
             visible: !d.thanking || d.hasCheck
             readonly property var slides: d.prompt.slides ?? []
             property int index: 0
@@ -189,16 +192,27 @@ Rectangle {
         Rectangle {
             id: orderPanel
             anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-            width: d.hasCheck ? parent.width / 3 : 0
-            visible: d.hasCheck
+            width: d.hasCheck || d.panelShown ? parent.width / 3 : 0
+            visible: d.hasCheck || d.panelShown
             color: "#151a22"
             border.color: "#2c3442"
             border.width: 1
+
+            // No sale: the store's picture, or an animated GIF playing.
+            AnimatedImage {
+                anchors.fill: parent
+                anchors.margins: 1
+                visible: d.panelShown
+                fillMode: Image.PreserveAspectCrop
+                playing: visible
+                source: d.panelShown ? d.img(d.panelRef) : ""
+            }
 
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: d.unit * 0.8
                 spacing: d.unit * 0.3
+                visible: d.hasCheck
 
                 // Rewards: their points, or join.
                 Rectangle {

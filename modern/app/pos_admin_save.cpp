@@ -386,6 +386,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             s_->settings.receiptLogo = record.value(u"receiptLogo"_s).toBool();
         if (record.contains(u"displayAccent"_s) && !record.value(u"displayAccent"_s).toString().isEmpty())
             s_->settings.displayAccent = ss(record.value(u"displayAccent"_s).toString());
+        if (record.contains(u"displayPanel"_s))
+            s_->settings.displayPanel = ss(record.value(u"displayPanel"_s).toString().trimmed());
         if (record.contains(u"displaySlides"_s)) {
             s_->settings.displaySlides.clear();
             for (const QString &line : record.value(u"displaySlides"_s).toString().split(u'\n', Qt::SkipEmptyParts))

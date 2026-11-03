@@ -181,6 +181,7 @@ QVariantList PosService::adminRecords(const QString &panel)
                   return l.join(u'\n');
               }()},
              {u"displayLogo"_s, qs(s_->settings.displayLogo)}, {u"receiptLogo"_s, s_->settings.receiptLogo}, {u"displayAccent"_s, qs(s_->settings.displayAccent)},
+             {u"displayPanel"_s, qs(s_->settings.displayPanel)},
              {u"displaySlides"_s, [&] {
                   QStringList l;
                   for (const std::string &sl : s_->settings.displaySlides)

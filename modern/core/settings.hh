@@ -373,6 +373,9 @@ struct PosSettings {
     bool receiptLogo = false;    // printed at the top of receipts (ESC/POS printers)
     std::string displayAccent = "#2f6fd6";
     std::vector<std::string> displaySlides;
+    // The customer display's left third between guests (where the order shows during a sale):
+    // a picture or an animated GIF (a picture ref or path); empty: the messages use the whole screen.
+    std::string displayPanel;
     bool loyaltyEnabled = false;
     int pointsPerDollar = 1;
     std::vector<Reward> rewards;
