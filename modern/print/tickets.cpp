@@ -374,4 +374,23 @@ Document drawerKick()
     return d;
 }
 
+Document noSaleTicket(const CashMovement &m, int number, const std::string &drawer, const TicketContext &ctx)
+{
+    Document d;
+    d.center("****" + ctx.tr("No Sale") + "****", true, true);
+    if (number > 0)
+        d.center(ctx.tr("No Sale #%1", {std::to_string(number)}), true);
+    d.rule();
+    if (!drawer.empty())
+        d.columns(ctx.tr("Drawer"), drawer);
+    if (!m.by.empty())
+        d.columns(ctx.tr("By"), m.by);
+    if (!m.reason.empty())
+        d.text(ctx.tr("Why: %1", {m.reason}), Document::Align::Left, true);
+    d.text(ctx.dateTime ? ctx.dateTime(m.at ? m.at : ctx.now) : std::string());
+    d.blank();
+    d.kickDrawer = true;
+    return d;
+}
+
 } // namespace vt::print

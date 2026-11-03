@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/check.hh"
+#include "core/day.hh"
 #include "core/report.hh"
 #include "core/settings.hh"
 #include "print/document.hh"
@@ -46,7 +47,12 @@ Document kitchenTicket(const core::Check &check, const std::vector<core::OrderLi
 // Any report, e.g. the end-of-day summary.
 Document reportTicket(const core::Report &report, const TicketContext &ctx);
 
-// Just open the cash drawer ("No Sale").
+// Just open the cash drawer.
 Document drawerKick();
+
+// No Sale: a slip like a kitchen ticket (no logo) that opens the drawer too:
+// "****No Sale****", No Sale #number, the drawer, who, why and when.
+Document noSaleTicket(const core::CashMovement &noSale, int number, const std::string &drawer,
+                      const TicketContext &ctx);
 
 } // namespace vt::print

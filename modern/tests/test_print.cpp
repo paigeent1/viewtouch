@@ -169,6 +169,30 @@ TEST_CASE("TicketPrinter routes kitchen lines by printer and writes files", "[pr
     CHECK(receiptText.contains(u"[drawer opened]"_s));   // receipt printer has the drawer
 }
 
+TEST_CASE("No Sale prints a slip like a kitchen ticket (no logo) and opens the drawer", "[print][nosale]")
+{
+    QTemporaryDir dir;
+    auto seed = test::seedPosData();
+    PrintSpooler spooler;
+    TicketPrinter printer(spooler, dir.path());
+    core::CashMovement m;
+    m.kind = core::CashMovement::Kind::NoSale;
+    m.by = "Morgan";
+    m.reason = "Make change";
+    m.at = 1'700'000'000'000;
+    const Document d = noSaleTicket(m, 3, "Drawer 1", ctx(seed.settings));
+    CHECK(d.kickDrawer);
+    CHECK(std::ranges::none_of(d.lines, [](const Document::Line &l) { return l.kind == Document::Kind::Image; }));
+    printer.printNoSale(seed.settings, m, 3, "Drawer 1", "receipt");
+    REQUIRE(spooler.waitIdle(5000));
+    const QString out = readFile(dir.filePath(u"receipt.txt"_s));
+    CHECK(out.contains(u"****No Sale****"_s));
+    CHECK(out.contains(u"No Sale #3"_s));
+    CHECK(out.contains(u"Make change"_s));
+    CHECK(out.contains(u"Morgan"_s));
+    CHECK(out.contains(u"[drawer opened]"_s));
+}
+
 TEST_CASE("TicketPrinter sends labels in the label printer's language, or as slips", "[print][labels]")
 {
     QTemporaryDir dir;

@@ -4,6 +4,7 @@
 #include "app/i18n.hh"
 #include "app/pos_service.hh"
 
+#include <algorithm>
 #include <QDateTime>
 #include <QThreadPool>
 #include <QPointer>
@@ -133,21 +134,28 @@ bool PosService::noSale()
     if (!haveReason("noSale", tr("Open the drawer with no sale")))
         return false;
     const std::string why = takeReason();
-    s_->printer->openDrawer(s_->settings, receiptPrinter());
-    // Kept with the drawer: who opened it with nothing sold (exceptions report).
-    if (DrawerSession *d = myDrawer()) {
-        CashMovement m;
+    CashMovement m;
+    m.kind = CashMovement::Kind::NoSale;
+    m.reason = why;
+    m.by = user() ? user()->name : std::string();
+    m.at = now();
+    // Numbered for the day across all drawers: No Sale #1, #2...
+    int number = 1;
+    for (const DrawerSession &ds : s_->drawers)
+        number += static_cast<int>(std::ranges::count_if(
+            ds.movements, [](const CashMovement &x) { return x.kind == CashMovement::Kind::NoSale; }));
+    DrawerSession *d = myDrawer();
+    // The slip ("****No Sale****", no logo) and the drawer kick.
+    s_->printer->printNoSale(s_->settings, m, number, d ? d->name : std::string(), receiptPrinter());
+    // Kept with the drawer: who opened it with nothing sold, and why (exceptions report).
+    if (d) {
         m.id = d->nextMovementId++;
-        m.kind = CashMovement::Kind::NoSale;
-        m.reason = why;
-        m.by = user() ? user()->name : std::string();
-        m.at = now();
         d->movements.push_back(m);
         if (s_->sink)
             s_->sink->saveDrawer(*d);
         emit s_->drawerChanged();
     }
-    emit notice(tr("Drawer opened (no sale)"));
+    emit notice(tr("Drawer opened (No Sale #%1)").arg(number));
     return true;
 }
 

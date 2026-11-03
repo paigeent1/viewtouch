@@ -39,7 +39,7 @@ Rectangle {
         { lbl: "📷 SCAN", col: "#22c55e", rad: 22, cmd: "scanCamera", pg: "", code: "" },
         { lbl: "DISCOUNTS", col: "#ef4444", rad: 10, cmd: "", pg: "discounts", code: "" },
         { lbl: "ADD EMAIL", col: "#fde047", rad: 22, cmd: "", pg: "check-customer", code: "" },
-        { lbl: "NO SALE", col: "#60a5fa", rad: 22, cmd: "openDrawer", pg: "", code: "" },
+        { lbl: "NO SALE", col: "#60a5fa", rad: 22, cmd: "noSale", pg: "", code: "" },
         { lbl: "SCALE ITEMS", col: "#2563eb", rad: 10, cmd: "", pg: "find-item", code: "" },
         { lbl: "Gift Cards", col: "#fb923c", rad: 10, cmd: "", pg: "gift-card", code: "" },
         { lbl: "BOX ↔ STICK", col: "#0284c7", rad: 10, cmd: "", pg: "menu-builder", code: "" },

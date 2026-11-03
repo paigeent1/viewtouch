@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:23 ET — Bob (Claude) — No Sale slip: ****No Sale**** ticket, numbered, from the retail NO SALE button
+- **What:** No Sale now prints a slip on the drawer's printer like a kitchen ticket (no logo): ****No Sale****, No Sale #n for the day, drawer, who, why, date and time, and the drawer kicks in the same job (print log: 'No Sale #n'). The reason question from the previous entry comes first. Retail screen NO SALE button now names the noSale command (the screen already mapped its old openDrawer to noSale, so customized retail pages work without editing).
+- **Why:** Owner: retail NO SALE asks why, opens the drawer and prints a No Sale slip logged as a ticket.
+- **Files:** `app/pos_service.hh, app/pos_day.cpp, print/tickets.hh, print/tickets.cpp, print/ticket_printer.hh, print/ticket_printer.cpp, seed/pages/retail-entry.json, ui/qml/WidgetRetailEntry.qml, tests/test_print.cpp`
+
 ### 2026-11-03 16:21 ET — Bob (Claude) — No Sale asks why with reason buttons
 - **What:** No Sale now shows reason buttons (the same sheet as voids/comps, titled 'Why open the drawer?') before the drawer opens; Cancel keeps it shut. The reason is kept on the drawer's NoSale movement and the Exceptions report adds a 'No sale: why' section. Reasons are edited in Store Settings > Voids, comps and No Sale (Reasons for No Sale); an empty list turns the question off. Defaults: Make change, Fix a payment, Count or check the drawer, Cash drop or pickup, Manager request.
 - **Why:** Owner asked for buttons for employee input of a No Sale reason.

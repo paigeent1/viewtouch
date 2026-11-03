@@ -87,6 +87,14 @@ public:
     virtual void printReport(const core::PosSettings &settings, const core::Report &report,
                              const std::string &printerId) = 0;
     virtual void openDrawer(const core::PosSettings &settings, const std::string &printerId) = 0;
+    // No Sale: the drawer opened, with a slip saying so (no logo, like a kitchen ticket):
+    // "****No Sale****", its number for the day, who, why, when. Kept as a ticket in the print log.
+    virtual void printNoSale(const core::PosSettings &settings, const core::CashMovement &noSale, int number,
+                             const std::string &drawer, const std::string &printerId)
+    {
+        (void)noSale; (void)number; (void)drawer;
+        openDrawer(settings, printerId);
+    }
     // A test page on printer `printerId` (its logo, text sizes, a cut), and
     // the drawer wired to it opened when `kickDrawer`. False: no such printer.
     virtual bool printTestPage(const core::PosSettings &, const std::string &, bool) { return false; }

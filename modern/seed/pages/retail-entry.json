@@ -170,7 +170,7 @@
       "actions": [
         {
           "type": "command",
-          "name": "openDrawer"
+          "name": "noSale"
         }
       ]
     },

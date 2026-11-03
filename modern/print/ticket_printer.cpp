@@ -191,6 +191,24 @@ void TicketPrinter::openDrawer(const PosSettings &settings, const std::string &p
     }
 }
 
+void TicketPrinter::printNoSale(const PosSettings &settings, const CashMovement &m, int number,
+                                const std::string &drawer, const std::string &printerId)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    // On the printer the drawer is wired to (as openDrawer picks it): the slip and the kick together.
+    const PrinterConfig *p = receiptPrinter(settings, printerId);
+    if (!p || !p->drawerKick) {
+        const auto it = std::ranges::find_if(settings.printers, [](const PrinterConfig &c) { return c.drawerKick; });
+        if (it != settings.printers.end())
+            p = &*it;
+    }
+    if (!p)
+        return;
+    Document d = noSaleTicket(m, number, drawer, context(settings));
+    d.kickDrawer = p->drawerKick;
+    send(settings, *p, d, QString::fromStdString("No Sale #" + std::to_string(number)));
+}
+
 bool TicketPrinter::printTestPage(const PosSettings &settings, const std::string &printerId, bool kickDrawer)
 {
     const auto it = std::ranges::find_if(settings.printers, [&](const PrinterConfig &p) { return p.id == printerId; });

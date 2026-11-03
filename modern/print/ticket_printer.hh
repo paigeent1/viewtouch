@@ -30,6 +30,8 @@ public:
     void printReport(const core::PosSettings &settings, const core::Report &report,
                      const std::string &printerId) override;
     void openDrawer(const core::PosSettings &settings, const std::string &printerId) override;
+    void printNoSale(const core::PosSettings &settings, const core::CashMovement &noSale, int number,
+                     const std::string &drawer, const std::string &printerId) override;
     bool printTestPage(const core::PosSettings &settings, const std::string &printerId, bool kickDrawer) override;
     void printOrderSlip(const core::PosSettings &settings, const core::Check &check, const std::string &printerId,
                         bool sent) override;
