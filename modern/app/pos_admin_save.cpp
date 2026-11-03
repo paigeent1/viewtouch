@@ -248,6 +248,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         s_->settings.receiptFooter = ss(record.value(u"receiptFooter"_s).toString());
         if (record.contains(u"receiptFreeChoices"_s))
             s_->settings.receiptFreeChoices = record.value(u"receiptFreeChoices"_s).toBool();
+        if (record.contains(u"receiptShowVoids"_s))
+            s_->settings.receiptShowVoids = record.value(u"receiptShowVoids"_s).toBool();
         if (record.contains(u"soldOutBackNextDay"_s))
             s_->settings.soldOutBackNextDay = record.value(u"soldOutBackNextDay"_s).toBool();
         const double gratuity = number(record, u"gratuityPercent");

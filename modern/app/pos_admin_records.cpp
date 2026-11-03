@@ -104,6 +104,7 @@ QVariantList PosService::adminRecords(const QString &panel)
         add({{u"storeName"_s, qs(s_->settings.storeName)}, {u"storeZip"_s, qs(s_->settings.storeZip)}, {u"giftCardLocation"_s, qs(s_->settings.giftCardLocation)}, {u"topRibbonShowWeather"_s, s_->settings.topRibbonShowWeather}, {u"language"_s, qs(s_->settings.language)}, {u"currencySymbol"_s, qs(s_->settings.currencySymbol)},
              {u"receiptHeader"_s, qs(s_->settings.receiptHeader)}, {u"receiptFooter"_s, qs(s_->settings.receiptFooter)},
              {u"receiptFreeChoices"_s, s_->settings.receiptFreeChoices},
+             {u"receiptShowVoids"_s, s_->settings.receiptShowVoids},
              {u"soldOutBackNextDay"_s, s_->settings.soldOutBackNextDay},
              {u"gratuityPercent"_s, double(s_->settings.gratuityBp) / 100.0},
              {u"gratuityMinGuests"_s, s_->settings.gratuityMinGuests},

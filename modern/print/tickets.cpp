@@ -126,8 +126,15 @@ Document receipt(const Check &check, const TicketContext &ctx)
     d.rule();
 
     for (const OrderLine &l : check.lines) {
-        if (l.voided)
+        if (l.voided) {
+            // Store Settings > Receipts: shown marked, price in brackets, not counted; else left off.
+            if (ctx.settings.receiptShowVoids && !l.isComment()) {
+                const std::string qty = l.quantity > 1 ? std::to_string(l.quantity) + " x " : "";
+                d.columns(std::string(l.corrected ? "ERR CORR " : "VOID ") + qty + l.displayName(),
+                          "(" + ctx.money(qualifiedPrice(l.unitPrice, l.qualifier) * l.quantity) + ")");
+            }
             continue;
+        }
         if (l.isComment())
             continue;   // kitchen notes are not for the guest
         if (l.isShare()) {   // its part of the whole, the choices under it unpriced

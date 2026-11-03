@@ -627,6 +627,15 @@ TEST_CASE("Retail: the UPC prints above the item; an error correct stays on the 
     CHECK(r.find("4006381333931") < r.find("Cobb"));
     CHECK(r.find("012345678905") == std::string::npos);     // the error-corrected one isn't there
 
+    // Store Settings > Receipts: shown, marked, not counted.
+    pos.shared()->settings.receiptShowVoids = true;
+    const std::string shown = print::renderText(
+        print::receipt(c, {pos.shared()->settings, [](std::int64_t) { return std::string("Nov 3"); },
+                           [](std::int64_t) { return std::string("9:15 AM"); }, 0}), 42);
+    CHECK(shown.find("ERR CORR") != std::string::npos);
+    CHECK(shown.find("($12.50)") != std::string::npos);
+    pos.shared()->settings.receiptShowVoids = false;
+
     // Rung on the Retail screen (counter, or a bartender in retail mode): the customer has it in hand.
     CHECK(c.lines[0].forKitchen());                          // scanned elsewhere: goes to its printer
     REQUIRE(pos.noteScan(u"012345678905"_s, u"cobb"_s, true));

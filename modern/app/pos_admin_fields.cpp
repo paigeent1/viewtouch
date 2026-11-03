@@ -319,6 +319,8 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"receiptFooter"_s, tr("Receipt footer"), u"text"_s),
             field(u"receiptFreeChoices"_s, tr("Free choices on receipts"), u"bool"_s,
                   tr("Off: the guest's receipt shows only choices that change the price (Extra bacon), not No onion or Medium rare. Kitchen tickets show them all.")),
+            field(u"receiptShowVoids"_s, tr("Voids and error corrects on receipts"), u"bool"_s,
+                  tr("On: voided and error-corrected items print on the guest's receipt, marked VOID or ERR CORR with the price in brackets (not counted). Off: clean receipts without them. The cashier's screen and the Exceptions report always show them.")),
             field(u"soldOutBackNextDay"_s, tr("86'd items come back the next day"), u"bool"_s,
                   tr("On: items marked sold out during service are back after End of Day. Off: until someone turns them back on. Marked sold out in the Menu Builder: always until changed there.")),
             with(field(u"cashMode"_s, tr("Cash handling"), u"enum"_s,

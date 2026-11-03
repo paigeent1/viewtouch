@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:11 ET — Bob (Claude) — Setting: voids and error corrects on receipts
+- **What:** PosSettings::receiptShowVoids (default off, saved in settings JSON; Store Settings > Receipts 'Voids and error corrects on receipts'). On: the guest receipt prints voided lines as 'VOID <item>' and error corrects as 'ERR CORR <item>' with the price in brackets, not counted; off: left off (today's behavior). Cashier screen and Exceptions report unchanged. Test [receipts] extended. Not compiled here.
+- **Why:** Owner: make omitting voids/error corrects from the customer receipt a setting.
+- **Files:** `modern/core/settings.hh, modern/app/pos_admin_fields.cpp, modern/app/pos_admin_shared.hh, modern/app/pos_admin_save.cpp, modern/app/pos_admin_records.cpp, modern/app/pos_json.cpp, modern/print/tickets.cpp, modern/tests/test_cards.cpp`
+
 ### 2026-11-03 15:54 ET — Bob (Claude) — Page checks pass: phone versions and retail page jumps
 - **What:** Layout::validate failures in the [editor] tests: settle-phone now hides the new 'items' zone; tables-phone and check-list-phone hide 'retail-mode-btn' (Oct 27); retail-entry.json: DISCOUNTS -> settle (Pay screen), TIME CLOCK -> time-clock, ITEM RETURN -> no action (returns not built; page 'reasons' never existed), Lighter Refill / EMPTY BOX / MISC TXBL -> addItem by name (were jumps to a page 'order' that doesn't exist). New zone rtl-scan '📷 SCAN' (scanCamera) at x968 y16 288x72. Found: the store's retail screen is the zone page retail-entry.json; WidgetRetailEntry.qml is not used by any page (its SCAN button/ringInput fix never showed).
 - **Why:** Pi [editor] tests failed (5 cases), one from today's Pay-page zone, the rest pre-existing since Oct 27.

@@ -981,6 +981,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"printers"_s, printers},
         {u"receiptHeader"_s, qs(s.receiptHeader)}, {u"receiptLogo"_s, s.receiptLogo},
         {u"receiptFreeChoices"_s, s.receiptFreeChoices},
+        {u"receiptShowVoids"_s, s.receiptShowVoids},
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
         {u"gratuity"_s, QJsonObject{{u"percent"_s, double(s.gratuityBp) / 100.0}, {u"minGuests"_s, s.gratuityMinGuests}}},
@@ -1348,6 +1349,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.displayLogo = ss(display.value(u"logo").toString());
     s.receiptLogo = o.value(u"receiptLogo").toBool();
     s.receiptFreeChoices = o.value(u"receiptFreeChoices").toBool(false);
+    s.receiptShowVoids = o.value(u"receiptShowVoids").toBool(false);
     s.soldOutBackNextDay = o.value(u"soldOutBackNextDay").toBool(true);
     s.displayAccent = ss(display.value(u"accent").toString(u"#2f6fd6"_s));
     for (const QJsonValue &v : display.value(u"slides").toArray())
