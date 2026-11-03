@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 08:08 ET — Bob (Claude) — Neil's apply_changes_tree_branches re-patched the label utility and the launcher
+- **What:** Ran on the Pi ~06:38: (good) ILSA export with 5 tree levels, rebuilt ilsa_temp_pricebook.db, vt-sync-ilsa; (bad) regex-patched modern/tools/vt_label_utility.py in the working tree (older price-book loader, losing the parse_vt_menu_dict fixes) and copied it over /usr/local/bin/vt-label-utility again. Owner discards the edit (saved as ~/label_utility_pi_edit_*.diff), pulls, reinstalls the launcher from scripts/bin. AGENTS.md: two new rules (no Pi-side patches of repo files; the launcher stays a launcher). Note to Neil in Drive (BOB_TO_NEIL_stop_patching_label_utility.md).
+- **Why:** Owner's git pull failed on a local change to vt_label_utility.py.
+- **Files:** `AGENTS.md`
+- **Next person must know:** Price book check: 866 of 33,552 UPCs fail their GS1 check digit (many look like 11-digit UPCs padded with zeros, e.g. 0002119603207 ~ 021196032071); labels now print them exactly as stored (Code 128).
+
 ### 2026-11-03 07:58 ET — Bob (Claude) — Labels print every UPC/EAN exactly as stored
 - **What:** vt_label_utility.py: normalize_upc and _clean_code no longer add a check digit to 11-digit codes; new gs1_symbol_kind(); barcode_modules() prints UPC-A / EAN-13 / UPC-E only when the stored code already is that valid symbol (length + check digit), else Code 128 of the exact code; never adds, drops or corrects a digit (before: 11 digits got a check digit, a wrong check digit was 'corrected', an 8-digit UPC-E on a UPC-A field was expanded to 12). Designer field names say so. Tablet Labels list (pos_inventory.cpp) lists price book codes as stored (withCheckDigit removed); test updated. Checked by decoding the drawn bars: 12-digit UPC-A and its 13-digit leading-0 form give identical bars; EAN-13, UPC-E, 11 digits, bad check digits, letters, 14 digits all encode the stored value. LABEL_UTILITY_NOTES.md section added.
 - **Why:** Owner: labels must print the UPC/EAN as entered in the price book, because items are entered by scanning labels. No per-item barcode type exists in ViewTouch or the price book.
