@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:07 ET — Bob (Claude) — Full screen follows a monitor change
+- **What:** main.cpp present(): when full screen, ViewTouch watches its screen's geometryChanged, screenChanged, primaryScreenChanged, screenAdded/Removed, and 0.8 s later moves to the primary screen if needed and turns full screen off and on, so it fills a swapped monitor or a new resolution without a restart. Not compiled here.
+- **Why:** Owner changed monitors; ViewTouch didn't rescale (full screen was only set at start).
+- **Files:** `modern/main.cpp`
+- **Next person must know:** If a compositor still doesn't send the new size, vt-server restarts it at the right size.
+
 ### 2026-11-03 11:00 ET — Bob (Claude) — Label utility Tree View: A-Z letter pad
 - **What:** A 7x4 letter pad (# for digits/other, A-Z) above the left drill list: touching a letter scrolls the list so the first entry starting with it is at the top (yview_moveto(1.0) then see(row): exact) and highlights it; letters nothing starts with at the current level are greyed and can't be touched (updated on every level). Tested on 39 manufacturers: A->ACID, C->CAMACHO, H->H UPMANN, M->MACANUDO, #->1502.
 - **Why:** Owner: jump by letter instead of scrolling by touch.

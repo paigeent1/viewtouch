@@ -42,6 +42,8 @@
 #include <QNetworkRequest>
 #include <QSaveFile>
 #include <QScreen>
+#include <QSet>
+#include <memory>
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QtQml/qqmlextensionplugin.h>
@@ -339,8 +341,34 @@ void present(QQuickWindow *window, const Args &cli, const Options &o)
 {
     const bool inWindow = !cli.isSet(o.kiosk)
                           && (cli.isSet(o.windowed) || cli.isSet(o.size) || cli.isSet(o.screenshot));
-    if (!inWindow)
+    if (!inWindow) {
         window->showFullScreen();
+        // A monitor swapped or its resolution changed: fill the (new) screen again. Full screen is only
+        // worked out when it's turned on, so it's turned off and on again on the main screen.
+        const auto refit = [window] {
+            QTimer::singleShot(800, window, [window] {
+                if (window->visibility() == QWindow::Hidden)
+                    return;
+                if (QScreen *main = QGuiApplication::primaryScreen(); main && window->screen() != main)
+                    window->setScreen(main);
+                window->showNormal();
+                window->showFullScreen();
+            });
+        };
+        auto watched = std::make_shared<QSet<QScreen *>>();
+        const auto watch = [window, refit, watched](QScreen *screen) {
+            if (screen && !watched->contains(screen)) {
+                watched->insert(screen);
+                QObject::connect(screen, &QScreen::geometryChanged, window, refit);
+                QObject::connect(screen, &QObject::destroyed, window, [watched, screen] { watched->remove(screen); });
+            }
+        };
+        watch(window->screen());
+        QObject::connect(window, &QWindow::screenChanged, window, [watch, refit](QScreen *s) { watch(s); refit(); });
+        QObject::connect(qGuiApp, &QGuiApplication::primaryScreenChanged, window, [watch, refit](QScreen *s) { watch(s); refit(); });
+        QObject::connect(qGuiApp, &QGuiApplication::screenAdded, window, [refit](QScreen *) { refit(); });
+        QObject::connect(qGuiApp, &QGuiApplication::screenRemoved, window, [refit](QScreen *) { refit(); });
+    }
     if (cli.isSet(o.kiosk) && !QGuiApplication::overrideCursor())
         QGuiApplication::setOverrideCursor(Qt::BlankCursor);
 }
