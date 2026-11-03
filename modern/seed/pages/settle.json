@@ -12,12 +12,27 @@
   "permission": "check.settle",
   "zones": [
     {
-      "id": "payment",
-      "kind": "paymentPanel",
+      "id": "items",
+      "kind": "orderList",
       "rect": {
         "x": 16,
         "y": 16,
-        "w": 900,
+        "w": 440,
+        "h": 1048
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "props": {
+        "controls": false
+      }
+    },
+    {
+      "id": "payment",
+      "kind": "paymentPanel",
+      "rect": {
+        "x": 472,
+        "y": 16,
+        "w": 444,
         "h": 1048
       },
       "shape": "rect",
