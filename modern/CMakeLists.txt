@@ -30,7 +30,7 @@ target_include_directories(vtm_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # core library and its tests can still be built.
 #   Fedora: sudo dnf install qt6-qtbase-devel qt6-qtdeclarative-devel
 # ---------------------------------------------------------------------------
-find_package(Qt6 6.8 COMPONENTS Core Gui Quick QuickControls2 Sql Network)
+find_package(Qt6 6.8 COMPONENTS Core Gui Quick QuickControls2 Sql Network OPTIONAL_COMPONENTS Multimedia)
 
 if(Qt6_FOUND)
     qt_standard_project_setup()
@@ -251,6 +251,16 @@ if(Qt6_FOUND)
     )
     target_include_directories(vtm_ui PUBLIC ui/cpp)
     target_link_libraries(vtm_ui PUBLIC vtm_layout vtm_editor vtm_storage vtm_pos vtm_print vtm_net Qt6::Gui Qt6::Quick Qt6::QuickControls2)
+    # Video on the customer display (MP4 between guests) where Qt Multimedia is installed:
+    #   Raspberry Pi OS / Debian: sudo apt install qt6-multimedia-dev qml6-module-qtmultimedia
+    if(TARGET Qt6::Multimedia)
+        message(STATUS "Qt Multimedia found: the customer display can play video")
+        qt_target_qml_sources(vtm_ui QML_FILES ui/qml/VideoPanel.qml)
+        target_link_libraries(vtm_ui PUBLIC Qt6::Multimedia)
+        target_compile_definitions(vtm_ui PUBLIC VT_HAVE_VIDEO=1)
+    else()
+        message(STATUS "Qt Multimedia not found: no video on the customer display (pictures and GIFs still work)")
+    endif()
 
     qt_add_executable(vtmodern main.cpp)
     target_link_libraries(vtmodern PRIVATE vtm_ui $<LINK_LIBRARY:WHOLE_ARCHIVE,vtm_ui,vtm_uiplugin>)

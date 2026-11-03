@@ -23,7 +23,11 @@ Rectangle {
     readonly property string logo: !prompt.logo ? "" : img(prompt.logo)
     // Between guests: the store's picture or animated GIF in the left third (Store Settings).
     readonly property string panelRef: prompt.panel ?? ""
-    readonly property bool panelShown: !hasCheck && !thanking && panelRef !== ""
+    // Or a video there (an MP4 on the Pi), where this screen can play one (VideoPanel.qml is built in).
+    readonly property string videoPath: prompt.video ?? ""
+    property bool videoFailed: false
+    onVideoPathChanged: videoFailed = false
+    readonly property bool panelShown: !hasCheck && !thanking && (panelRef !== "" || videoPath !== "")
 
     color: "#0f1318"
 
@@ -198,14 +202,26 @@ Rectangle {
             border.color: "#2c3442"
             border.width: 1
 
-            // No sale: the store's picture, or an animated GIF playing.
+            // No sale: the store's video, picture, or an animated GIF playing.
+            Loader {
+                id: video
+                anchors.fill: parent
+                anchors.margins: 1
+                active: d.panelShown && d.videoPath !== "" && !d.videoFailed
+                source: active ? "VideoPanel.qml" : ""
+                onStatusChanged: if (status === Loader.Error) d.videoFailed = true   // no video here: the picture
+                onLoaded: {
+                    item.source = d.videoPath.startsWith("/") ? "file://" + d.videoPath : d.videoPath
+                    item.failed.connect(() => d.videoFailed = true)
+                }
+            }
             AnimatedImage {
                 anchors.fill: parent
                 anchors.margins: 1
-                visible: d.panelShown
+                visible: d.panelShown && video.status !== Loader.Ready && d.panelRef !== ""
                 fillMode: Image.PreserveAspectCrop
                 playing: visible
-                source: d.panelShown ? d.img(d.panelRef) : ""
+                source: visible ? d.img(d.panelRef) : ""
             }
 
             ColumnLayout {

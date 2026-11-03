@@ -1076,7 +1076,7 @@ QJsonObject toJson(const PosSettings &s)
              QJsonArray slides;
              for (const std::string &sl : s.displaySlides) slides.append(qs(sl));
              return QJsonObject{{u"logo"_s, qs(s.displayLogo)}, {u"accent"_s, qs(s.displayAccent)}, {u"slides"_s, slides},
-                                {u"panel"_s, qs(s.displayPanel)}};
+                                {u"panel"_s, qs(s.displayPanel)}, {u"video"_s, qs(s.displayVideo)}};
          }()},
         {u"loyalty"_s, [&] {
              QJsonArray rewards;
@@ -1358,6 +1358,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     const QJsonObject display = o.value(u"display").toObject();
     s.displayLogo = ss(display.value(u"logo").toString());
     s.displayPanel = ss(display.value(u"panel").toString());
+    s.displayVideo = ss(display.value(u"video").toString());
     s.receiptLogo = o.value(u"receiptLogo").toBool();
     s.receiptFreeChoices = o.value(u"receiptFreeChoices").toBool(false);
     s.receiptShowVoids = o.value(u"receiptShowVoids").toBool(false);

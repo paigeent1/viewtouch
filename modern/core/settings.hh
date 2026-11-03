@@ -376,6 +376,9 @@ struct PosSettings {
     // The customer display's left third between guests (where the order shows during a sale):
     // a picture or an animated GIF (a picture ref or path); empty: the messages use the whole screen.
     std::string displayPanel;
+    // A video for that spot instead (an MP4 file on the main computer, played muted on a loop),
+    // on screens that can play video (the Pi with Qt Multimedia); others show displayPanel.
+    std::string displayVideo;
     bool loyaltyEnabled = false;
     int pointsPerDollar = 1;
     std::vector<Reward> rewards;

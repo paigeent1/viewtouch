@@ -480,6 +480,9 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"displayPanel"_s, tr("Customer display: left side between guests"), u"image"_s,
                   tr("A picture or an animated GIF in the left third while there's no sale (the order shows there "
                      "during one). Empty: the messages use the whole screen.")),
+            field(u"displayVideo"_s, tr("Customer display: video there instead"), u"text"_s,
+                  tr("An MP4 file on the Pi (/home/pi/Videos/promo.mp4), played muted on a loop in the left third "
+                     "between guests. Screens that can't play video show the picture above.")),
             asRows(field(u"displaySlides"_s, tr("Customer display: between guests"), u"text"_s,
                          tr("Shown in turn; \"image:/path/to/photo.jpg\" for a picture. Running promotions are added "
                             "by themselves.")),

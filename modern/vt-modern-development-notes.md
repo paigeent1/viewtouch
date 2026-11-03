@@ -95,6 +95,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:10 ET — Bob (Claude) — Customer display: MP4 video in the left third (Qt Multimedia, optional)
+- **What:** CMake finds Qt6 Multimedia as an optional component; when present it builds ui/qml/VideoPanel.qml (MediaPlayer + VideoOutput, muted, looping, cropped to fill) into the module and links Qt6::Multimedia. New setting displayVideo (Store Settings > Customer display: 'video there instead', an MP4 path on the Pi). CustomerDisplay.qml loads VideoPanel.qml between guests when a video is set; where it isn't built (tablets: the Android Qt has no Multimedia) or the file won't play, it falls back to the picture/GIF.
+- **Why:** Owner: add MP4 support to the customer display panel.
+- **Files:** `CMakeLists.txt, ui/qml/VideoPanel.qml, ui/qml/CustomerDisplay.qml, core/settings.hh, app/pos_json.cpp, app/pos_admin_fields.cpp, app/pos_admin_shared.hh, app/pos_admin_save.cpp, app/pos_admin_records.cpp, app/pos_day.cpp`
+- **Next person must know:** Pi needs: sudo apt install qt6-multimedia-dev qml6-module-qtmultimedia (+ the ffmpeg or gstreamer multimedia plugin), then a rebuild (CMake re-runs by itself).
+
 ### 2026-11-03 18:08 ET — Bob (Claude) — Customer display: picture or animated GIF in the left third between guests
 - **What:** New setting displayPanel (Store Settings > Customer display: 'left side between guests', a picture field: PNG/JPG/GIF, animated GIFs play). Saved in settings display.panel, sent as customerPrompt.panel. CustomerDisplay.qml: with no sale the left third shows it (AnimatedImage, cropped to fill) beside the rotating messages; during a sale the order takes it; empty: messages use the whole screen as before.
 - **Why:** Owner: when no sale, push a graphic or video to that panel.
