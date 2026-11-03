@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:11 ET — Bob (Claude) — vt-mirror: the second HDMI shows the first
+- **What:** New scripts/bin/vt-mirror (on|off): Wayland (wlr-randr, labwc/wayfire): second output placed at 0,0 with the first output's current mode; kept after reboots via ~/.config/labwc/autostart (marked line) and ~/.config/autostart/vt-mirror.desktop. X11: xrandr --same-as (autostart .desktop). Prints what it did. Untested on the Pi.
+- **Why:** Owner: mirror the first display on the second HDMI for now.
+- **Files:** `scripts/bin/vt-mirror`
+- **Next person must know:** ViewTouch's own customer display (--customer-display window) is the alternative for a guest-facing second monitor.
+
 ### 2026-11-03 11:07 ET — Bob (Claude) — Full screen follows a monitor change
 - **What:** main.cpp present(): when full screen, ViewTouch watches its screen's geometryChanged, screenChanged, primaryScreenChanged, screenAdded/Removed, and 0.8 s later moves to the primary screen if needed and turns full screen off and on, so it fills a swapped monitor or a new resolution without a restart. Not compiled here.
 - **Why:** Owner changed monitors; ViewTouch didn't rescale (full screen was only set at start).

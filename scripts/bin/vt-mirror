@@ -1,0 +1,61 @@
+#!/bin/bash
+# Mirror the first HDMI screen onto the second (the same picture on both), now and after every reboot.
+#   vt-mirror        mirror
+#   vt-mirror off    undo (the second screen extends the desktop again, after a reboot)
+# Works on the Pi's Wayland desktop (labwc / wayfire: wlr-randr) and the older X11 desktop (xrandr).
+# Best with both monitors at the same resolution; otherwise the second shows part of the screen or bars.
+MODE="${1:-on}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+AUTOSTART_DIR="$HOME/.config/autostart"
+LABWC_AUTOSTART="$HOME/.config/labwc/autostart"
+MARK="# vt-mirror"
+
+for wd in "$WAYLAND_DISPLAY" wayland-0 wayland-1; do
+    [ -n "$wd" ] && WAYLAND_DISPLAY="$wd" wlr-randr >/dev/null 2>&1 && { export WAYLAND_DISPLAY="$wd"; break; }
+done
+
+if command -v wlr-randr >/dev/null && wlr-randr >/dev/null 2>&1; then
+    outs=$(wlr-randr | awk '/^[A-Za-z]/{print $1}')
+    first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    if [ "$MODE" = "off" ]; then
+        sed -i "/$MARK/d" "$LABWC_AUTOSTART" 2>/dev/null
+        rm -f "$AUTOSTART_DIR/vt-mirror.desktop"
+        echo "Mirroring off from the next reboot."
+        exit 0
+    fi
+    [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
+    mode=$(wlr-randr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /current/{print $1; exit}')
+    cmd="wlr-randr --output $second --pos 0,0"
+    [ -n "$mode" ] && wlr-randr --output "$second" --mode "$mode" >/dev/null 2>&1 && cmd="wlr-randr --output $second --mode $mode --pos 0,0"
+    eval "$cmd" || { echo "Couldn't place $second on $first"; exit 1; }
+    # Again after every reboot (labwc's autostart, and the desktop autostart for wayfire).
+    mkdir -p "$(dirname "$LABWC_AUTOSTART")" "$AUTOSTART_DIR"
+    sed -i "/$MARK/d" "$LABWC_AUTOSTART" 2>/dev/null
+    echo "(sleep 3; $cmd) & $MARK" >> "$LABWC_AUTOSTART"
+    printf '[Desktop Entry]\nType=Application\nName=vt-mirror\nExec=sh -c "sleep 3; %s"\n' "$cmd" > "$AUTOSTART_DIR/vt-mirror.desktop"
+    echo "Mirroring $first ($mode) onto $second. Kept after reboots."
+    exit 0
+fi
+
+if command -v xrandr >/dev/null && DISPLAY="${DISPLAY:-:0}" xrandr >/dev/null 2>&1; then
+    export DISPLAY="${DISPLAY:-:0}"
+    outs=$(xrandr | awk '/ connected/{print $1}')
+    first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    if [ "$MODE" = "off" ]; then
+        rm -f "$AUTOSTART_DIR/vt-mirror.desktop"
+        echo "Mirroring off from the next reboot."
+        exit 0
+    fi
+    [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
+    mode=$(xrandr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /\*/{print $1; exit}')
+    cmd="xrandr --output $second --same-as $first"
+    [ -n "$mode" ] && cmd="xrandr --output $second --mode $mode --same-as $first"
+    eval "$cmd" || { echo "Couldn't mirror $first onto $second"; exit 1; }
+    mkdir -p "$AUTOSTART_DIR"
+    printf '[Desktop Entry]\nType=Application\nName=vt-mirror\nExec=sh -c "sleep 3; %s"\n' "$cmd" > "$AUTOSTART_DIR/vt-mirror.desktop"
+    echo "Mirroring $first ($mode) onto $second. Kept after reboots."
+    exit 0
+fi
+
+echo "Couldn't reach the Pi's screen (neither wlr-randr nor xrandr answered). Run this on the Pi's desktop session."
+exit 1
