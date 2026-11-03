@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:58 ET — Bob (Claude) — Merge main into bob/customer-display-page
+- **What:** Brought tonight's main (vt-guest-display touch learning fix) into the Customer Display page branch; vt-guest-display keeps both the progressive-mode and the stdbuf/source-id changes.
+- **Why:** Test the branch with current main before merging it.
+- **Files:** `scripts/bin/vt-guest-display`
+
 ### 2026-11-03 18:58 ET — Bob (Claude) — Customer Display page: review fixes
 - **What:** Independent review fixes: keypad and email keyboard stop touches from reaching the page under them (MouseArea), and the guest order widget ignores taps while one is open (overlayOpen); the email keyboard closes when the check changes or the cashier asks for a tip; tip choices hide while it's open; the guest page shows only guest widgets, labels, pictures, buttons (which don't run), clocks and decorations, so no order-screen widget can work the cashier's check from there; customerEmail refuses practice checks; showWhen comment back above ruleShows; controller test now moves the cashier's page and checks the guest page stays.
 - **Why:** Reviewer's findings on the Customer Display page change.
@@ -112,6 +117,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** Owner: make the customer display a page for the editor; second Wimaxit as a touch guest screen for phone and email entry.
 - **Files:** `seed/pages/customer-display.json, ui/qml/WidgetGuest*.qml, ui/qml/GuestPageView.qml, ui/qml/CustomerDisplay.qml, ui/qml/CustomerDisplayWindow.qml, ui/qml/Main.qml, ui/qml/ZoneItem.qml, ui/cpp/layoutcontroller.hh/.cpp, ui/cpp/editorcontroller.cpp, layout/schema.cpp, main.cpp, app/pos_service.hh, app/pos_session.hh, app/pos_commands.cpp, app/pos_loyalty.cpp, app/pos_day.cpp, CMakeLists.txt, tests/test_controller.cpp, tests/test_loyalty.cpp`
 - **Next person must know:** Built and tested on branch bob/customer-display-page first (GitHub Modern checks), merged to main after.
+
+### 2026-11-03 18:51 ET — Bob (Claude) — vt-guest-display touch: sees the touch
+- **What:** The learn step ran xinput test-xi2 through a pipe (output held back until it exited) and read the master device number; now stdbuf -oL, and it takes the touchscreen's number from the brackets ('device: 2 (7)'); 20 seconds, Touch/ButtonPress/Motion events.
+- **Why:** Owner: 'No touch seen' after touching the guest screen.
+- **Files:** `scripts/bin/vt-guest-display`
 
 ### 2026-11-03 18:43 ET — Bob (Claude) — Two touchscreens: vt-touch-map and vt-guest-display touch
 - **What:** New scripts/bin/vt-touch-map ties each touchscreen to its monitor: the guest's (remembered by USB port, udev ID_PATH, in ~/.vt-guest-touch) to the second monitor, every other one to the first. vt-guest-display touch: 'touch the guest screen' (xinput test-xi2) learns which touchscreen is the guest's (both Wimaxits report wch.cn USB2IIC_CTP_CONTROL). vt-guest-display on and the boot script run vt-touch-map. Roadmap: guest-screen raffles and phone/email entry.
