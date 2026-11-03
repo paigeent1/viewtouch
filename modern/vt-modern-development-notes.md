@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:38 ET — Bob (Claude) — Label utility: Previous steps back through Tree View
+- **What:** select_mode_and_go set from_top_button for every mode, so in Tree View Previous on the item list jumped to the start instead of the category screen. Now only Retail / Receiving / All (which skip the category screen) set it. Tested: Tree 2->3->4, Previous 4->3->2->1; Retail 3, Previous ->1. Bug was Bob's (0958845, Nov 2), not Neil's.
+- **Why:** Owner: Previous at bottom right went back to the utility's home screen.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 10:37 ET — Bob (Claude) — Label utility: a category chosen on the left opens in the tree
 - **What:** _populate_category_tree(filter_cat): the chosen category's node is open (brands showing) and selected (Next uses it), and scrolled into view; before, with over 2,000 items categories started closed, so touching e.g. PREMIUM CIGARS on the left showed it folded. Tested with 45,000 items: category opens with its brands, Next -> its items.
 - **Why:** Owner: touching Premium Cigars didn't expand the hierarchy.

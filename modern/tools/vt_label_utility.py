@@ -2806,7 +2806,9 @@ class VTLabelUtility(tk.Tk):
     def select_mode_and_go(self, m_val):
         self.mode_var.set(m_val)
         self.mode_var_val = m_val
-        self.from_top_button = True
+        # Retail / Receiving / All go straight to the items, so Previous from there goes back to the start;
+        # Tree View goes through the category screen, so Previous goes back to it.
+        self.from_top_button = m_val != 'tree'
         if m_val == 'tree':
             self.filtered_items = list(self.all_items)
             self.show_step(2)
