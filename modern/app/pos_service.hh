@@ -547,7 +547,8 @@ public:
     // A line already sent is voided as usual (voidItem).
     bool errorCorrect();
     // The barcode about to ring in itemId (the scanner): the line keeps that code (receipts print it).
-    bool noteScan(const QString &code, const QString &itemId);
+    // retail: rung on the Retail screen, so the customer has it (OrderLine::handed: no ticket, no screen).
+    bool noteScan(const QString &code, const QString &itemId, bool retail = false);
     // How many of an unsent line (1-99); 0: the selected line. A sent line
     // can't change: more of it is a new line (repeatLine).
     bool setLineQuantity(qint64 lineId, int quantity);
@@ -1208,7 +1209,8 @@ private:
     QString customerQuery_;
     std::string selectedCustomer_;
     QString giftCardNumber_;
-    std::pair<QString, QString> pendingScan_;   // {item id, scanned code} for the next addItem
+    struct PendingScan { QString itemId, code; bool retail = false; };
+    PendingScan pendingScan_;   // for the next addItem
     QString labelQuery_;
     QStringList labelPath_;
     bool labelBrowsing_ = false;   // the Labels screen is showing the tree (worked out only then)

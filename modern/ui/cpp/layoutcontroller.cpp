@@ -1568,7 +1568,9 @@ void LayoutController::scanned(const QString &code)
             continue;
         if (ordering) {
             const QString itemId = m.value(u"id"_s).toString();
-            pos_->invoke(u"noteScan"_s, {c, itemId});   // the line keeps the code scanned (receipts print it)
+            // The line keeps the code scanned (receipts print it); on the Retail screen the customer
+            // has the item in hand, so it goes to no printer or station screen.
+            pos_->invoke(u"noteScan"_s, {c, itemId, page->id == u"retail-entry"});
             if (!pos_->hasCheck()) {
                 call(u"quickOrder"_s, {}, [this, itemId](const QVariant &) { orderItem(itemId); });
             } else {

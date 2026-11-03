@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 09:43 ET — Bob (Claude) — Items rung on the Retail screen never go to a printer or station
+- **What:** OrderLine::handed (saved in JSON): set when the item is rung on the Retail screen (LayoutController::scanned passes retail = page is retail-entry to noteScan; typed codes and quick keys go through scanned too). forKitchen() is false for handed lines, so closing a counter sale (which sends what's unsent) prints no ticket and shows nothing on a station screen, and a merged counter sale doesn't send a runner. Bar/table items keep routing by their Printer (empty/unknown printer still = kitchen). Retail screen gets a '📷 SCAN' button (scanCamera: the tablet camera; on the Pi it says to use the handheld scanner). Test [receipts] extended.
+- **Why:** Owner: only kitchen and bar items should print/show at kitchen and bar; a humidor printer/screen for a runner to bring retail items to tables; a bartender sells cigars to walk-ins by switching to Retail mode and scanning with the tablet camera.
+- **Files:** `modern/core/check.hh, modern/app/pos_json.cpp, modern/app/pos_service.hh, modern/app/pos_service.cpp, modern/app/pos_commands.cpp, modern/ui/cpp/layoutcontroller.cpp, modern/ui/qml/WidgetRetailEntry.qml, modern/tests/test_cards.cpp`
+- **Next person must know:** Store setup (owner, not code): set each category's Printer (kitchen / bar / humidor), add a 'humidor' printer and/or a Humidor station screen. Items with no printer still default to the kitchen.
+
 ### 2026-11-03 09:31 ET — Bob (Claude) — Print tests match the store's receipt rules
 - **What:** Two [print] tests failed on the Pi since the store's Oct 23/27 changes (not from today's work): ESC/POS rows in Font B (sub-lines) are up to 4/3 of the width in characters (same paper width), and the guest receipt prints every choice, free ones too. test_print.cpp now allows width*4/3 bytes per ESC/POS row and expects free choices on the receipt (test renamed). Pi run 09:31: [receipts],[admin],[labels],[print] otherwise passed (49/51 cases), including the new retail receipt test.
 - **Why:** Pi test failures 09:31.

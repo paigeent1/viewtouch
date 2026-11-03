@@ -1217,8 +1217,11 @@ bool PosService::addItem(const QString &idOrName)
             priced.name += " (" + ss(i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(item->eventAt),
                                                          u"ddd MMM d, h:mm AP"_s)) + ")";
         OrderLine &line = c.addItem(priced, q);
-        if (scan.first == qs(item->id) && !scan.second.isEmpty())
-            line.upc = ss(scan.second);
+        if (scan.itemId == qs(item->id)) {
+            if (!scan.code.isEmpty())
+                line.upc = ss(scan.code);
+            line.handed = scan.retail;
+        }
         if (const auto hits = allergyHits(c, line); !hits.empty())
             emit notice(tr("⚠ %1 contains %2: the guest is allergic. The kitchen is told.")
                             .arg(qs(item->name), allergenNames(hits).join(u", "_s)));
@@ -1359,9 +1362,9 @@ bool PosService::errorCorrect()
     return true;
 }
 
-bool PosService::noteScan(const QString &code, const QString &itemId)
+bool PosService::noteScan(const QString &code, const QString &itemId, bool retail)
 {
-    pendingScan_ = {itemId, code.trimmed()};
+    pendingScan_ = {itemId, code.trimmed(), retail};
     return true;
 }
 

@@ -36,6 +36,7 @@ Rectangle {
         { lbl: "SUSPEND", col: "#c084fc", rad: 30, w: 165, cmd: "releaseCheck", pg: "", code: "" }
     ]
     property var bottomLeftModel: [
+        { lbl: "📷 SCAN", col: "#22c55e", rad: 22, cmd: "scanCamera", pg: "", code: "" },
         { lbl: "DISCOUNTS", col: "#ef4444", rad: 10, cmd: "", pg: "discounts", code: "" },
         { lbl: "ADD EMAIL", col: "#fde047", rad: 22, cmd: "", pg: "check-customer", code: "" },
         { lbl: "NO SALE", col: "#60a5fa", rad: 22, cmd: "openDrawer", pg: "", code: "" },

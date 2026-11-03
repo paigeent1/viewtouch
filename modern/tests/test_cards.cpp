@@ -627,8 +627,18 @@ TEST_CASE("Retail: the UPC prints above the item; an error correct stays on the 
     CHECK(r.find("4006381333931") < r.find("Cobb"));
     CHECK(r.find("012345678905") == std::string::npos);     // the error-corrected one isn't there
 
+    // Rung on the Retail screen (counter, or a bartender in retail mode): the customer has it in hand.
+    CHECK(c.lines[0].forKitchen());                          // scanned elsewhere: goes to its printer
+    REQUIRE(pos.noteScan(u"012345678905"_s, u"cobb"_s, true));
+    REQUIRE(pos.addItem(u"cobb"_s));
+    REQUIRE(c.lines.size() == 3);
+    CHECK(c.lines[2].handed);
+    CHECK_FALSE(c.lines[2].forKitchen());                    // no printer, no station screen, no runner
+    CHECK_FALSE(c.lines[0].handed);
+
     const auto back = app::checkFromJson(app::toJson(c));
     REQUIRE(back);
     CHECK(back->lines[1].corrected);
     CHECK(back->lines[0].upc == "4006381333931");
+    CHECK(back->lines[2].handed);
 }

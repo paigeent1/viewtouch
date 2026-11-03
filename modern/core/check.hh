@@ -56,6 +56,9 @@ struct OrderLine {
     // Error correct on the retail screen (VOID PREV ITEM): taken off before paying, kept on the check
     // as voided so the cashier sees it; never on the guest's receipt. Counts as sent (never to the kitchen).
     bool corrected = false;
+    // Rung on the Retail screen (counter or bar): the customer already has it, so it never goes to a
+    // printer or a station screen (a runner isn't sent for it), even after a merge into a table check.
+    bool handed = false;
     std::string upc;             // the code it was rung in with (the scanned one, else the item's primary); receipts print it
     std::int64_t sentAt = 0;
     bool made = false;           // bumped on the kitchen display (legacy ORDER_MADE)
@@ -90,7 +93,7 @@ struct OrderLine {
     }
     // Something the kitchen sees (not a gift card or a hidden item).
     // (The first piece of a shared item stands for it.)
-    bool forKitchen() const { return !kitchenHide && !itemId.starts_with("giftcard:") && share <= 1; }
+    bool forKitchen() const { return !kitchenHide && !handed && !itemId.starts_with("giftcard:") && share <= 1; }
     bool isShare() const { return shareOf > 1; }
     void unshare() { share = shareOf = 0; shareGroup = 0; }
     // How many to count in item counts and stock: the first piece of a
