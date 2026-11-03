@@ -471,6 +471,7 @@ public:
     Q_INVOKABLE void repeatLine(qint64 lineId = 0) { invoke(QStringLiteral("repeatLine"), {lineId}); }
     // The touched item off the check (sent: a void, which may need a manager).
     Q_INVOKABLE void voidItem() { invoke(QStringLiteral("voidItem"), {}); }
+    Q_INVOKABLE void errorCorrect() { invoke(QStringLiteral("errorCorrect"), {}); }
     Q_INVOKABLE void splitBySeat() { invoke(QStringLiteral("splitBySeat"), {}); }
     Q_INVOKABLE void printTableChecks() { invoke(QStringLiteral("printTableChecks"), {}); }
     Q_INVOKABLE void testPrinter(const QString &printerId, bool kickDrawer = false) { invoke(QStringLiteral("testPrinter"), {printerId, kickDrawer}); }

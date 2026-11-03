@@ -3,6 +3,7 @@
 #include "stationcontroller.hh"
 #include "language.hh"
 #include "layoutcontroller.hh"
+#include "serialscanner.hh"
 #include "app/i18n.hh"
 #include "net/stripe_api.hh"
 #include "net/discovery.hh"
@@ -664,6 +665,11 @@ int runTerminal(const Args &cli, const Options &o)
 
         LayoutController controller(*pages);
         controller.setPos(&remote);
+#ifndef Q_OS_ANDROID
+        SerialScanner serialScanner;   // a serial barcode scanner on this terminal (see serialscanner.hh)
+        QObject::connect(&serialScanner, &SerialScanner::scanned, &controller, &LayoutController::scanned);
+        serialScanner.start();
+#endif
         // Page edits are saved on the server, which passes them on to everyone.
         controller.setSaver([&remote](const vt::layout::Layout &layout, QString *) {
             remote.saveLayout(layout);
@@ -1413,6 +1419,12 @@ int runStore(const Args &cli, const Options &o)
 
     LayoutController controller(*layout);
     controller.setPos(&pos);
+#ifndef Q_OS_ANDROID
+    // A serial barcode scanner (USB-serial adapter) rings items in like a keyboard scanner.
+    SerialScanner serialScanner;
+    QObject::connect(&serialScanner, &SerialScanner::scanned, &controller, &LayoutController::scanned);
+    serialScanner.start();
+#endif
     controller.setSaver([&hub, &controller](const vt::layout::Layout &l, QString *error) {
         return hub.save(l, error, &controller);
     });

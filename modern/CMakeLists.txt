@@ -242,6 +242,7 @@ if(Qt6_FOUND)
             ui/cpp/reportexport.hh ui/cpp/reportexport.cpp
             ui/cpp/menuprint.hh ui/cpp/menuprint.cpp
             ui/cpp/cardreader.hh ui/cpp/cardreader.cpp
+            ui/cpp/serialscanner.hh ui/cpp/serialscanner.cpp
             ui/cpp/posforeign.hh
     )
     target_include_directories(vtm_ui PUBLIC ui/cpp)

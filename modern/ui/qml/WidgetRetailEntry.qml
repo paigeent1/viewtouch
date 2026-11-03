@@ -47,8 +47,8 @@ Rectangle {
     ]
     function ringInput(codeStr) {
         var clean = codeStr.trim(); if (clean === "") return
-        if (controller && (!pos || !pos.checkNumber || pos.checkNumber <= 0)) controller.command("startQuick");
-        if (pos) { for (var i = 0; i < pendingQty; ++i) { if (typeof pos.scanBarcode === "function") pos.scanBarcode(clean); else if (controller) controller.command("scanBarcode", { "barcode": clean, "code": clean }) } }
+        // The same as a scan: the item rings in (a check starts by itself) and keeps the code typed.
+        if (controller) { for (var i = 0; i < pendingQty; ++i) controller.scanned(clean) }
         statusMsg = (itemReturnMode ? "RETURN: " : "SCANNED: ") + clean + (pendingQty > 1 ? (" (x" + pendingQty + ")") : "")
         pendingQty = 1; itemReturnMode = false; numBuffer = ""
     }

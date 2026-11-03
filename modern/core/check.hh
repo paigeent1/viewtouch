@@ -53,6 +53,10 @@ struct OrderLine {
     std::string station;         // the station that makes it (empty: its printer's screen)
     bool sent = false;           // sent to the kitchen; can no longer just be deleted
     bool voided = false;         // voided after sending (kept for the record)
+    // Error correct on the retail screen (VOID PREV ITEM): taken off before paying, kept on the check
+    // as voided so the cashier sees it; never on the guest's receipt. Counts as sent (never to the kitchen).
+    bool corrected = false;
+    std::string upc;             // the code it was rung in with (the scanned one, else the item's primary); receipts print it
     std::int64_t sentAt = 0;
     bool made = false;           // bumped on the kitchen display (legacy ORDER_MADE)
     std::int64_t madeAt = 0;

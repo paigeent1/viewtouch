@@ -367,7 +367,7 @@ Report auditReport(const std::vector<const Check *> &checks, const ReportContext
     }
     r.section("Summary");
     const std::pair<const char *, const char *> kinds[] = {
-        {"void", "Voids"}, {"discount", "Discounts"}, {"reopen", "Reopened checks"},
+        {"void", "Voids"}, {"errorCorrect", "Error corrects"}, {"discount", "Discounts"}, {"reopen", "Reopened checks"},
         {"transfer", "Transfers"}, {"move", "Table moves"}, {"merge", "Merges"}};
     for (const auto &[kind, label] : kinds) {
         if (const auto it = counts.find(kind); it != counts.end())
@@ -714,6 +714,7 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
     struct Kind { const char *title; std::vector<std::string> kinds; bool money; };
     const Kind kinds[] = {
         {"Voids (items already sent)", {"void"}, true},
+        {"Error corrects (retail, before paying)", {"errorCorrect"}, true},
         {"Discounts and comps", {"discount"}, true},
         {"Payments and discounts taken back", {"unpay", "undiscount"}, true},
         {"Reopened checks", {"reopen"}, true},

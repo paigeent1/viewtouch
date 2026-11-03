@@ -1568,6 +1568,7 @@ void LayoutController::scanned(const QString &code)
             continue;
         if (ordering) {
             const QString itemId = m.value(u"id"_s).toString();
+            pos_->invoke(u"noteScan"_s, {c, itemId});   // the line keeps the code scanned (receipts print it)
             if (!pos_->hasCheck()) {
                 call(u"quickOrder"_s, {}, [this, itemId](const QVariant &) { orderItem(itemId); });
             } else {
@@ -1992,6 +1993,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         {u"splitBySeat"_s, {u"splitBySeat"_s, {}}}, {u"printTableChecks"_s, {u"printTableChecks"_s, {}}},
         {u"combineTableChecks"_s, {u"combineTableChecks"_s, {}}}, {u"sendOrder"_s, {u"sendOrder"_s, {}}},
         {u"voidItem"_s, {u"voidItem"_s, {}}}, {u"lineMore"_s, {u"lineMore"_s, {0}}},
+        // Retail screen VOID PREV ITEM ("removeLine" on the store's pages): an error correct.
+        {u"errorCorrect"_s, {u"errorCorrect"_s, {}}}, {u"removeLine"_s, {u"errorCorrect"_s, {}}},
         {u"lineLess"_s, {u"lineLess"_s, {0}}}, {u"repeatLine"_s, {u"repeatLine"_s, {0}}},
         {u"undoLast"_s, {u"undoLast"_s, {}}}, {u"anotherRound"_s, {u"anotherRound"_s, {}}}, {u"timeClockDone"_s, {u"timeClockDone"_s, {}}},
         {u"amountOff"_s, {u"customDiscount"_s, {false}}}, {u"percentOff"_s, {u"customDiscount"_s, {true}}}, {u"addComment"_s, {u"addComment"_s, {}}},

@@ -7,6 +7,7 @@
 #include "qt_catch.hh"
 
 #include <QSignalSpy>
+#include <algorithm>
 #include <QTest>
 #include <QJsonArray>
 #include <QUrlQuery>
@@ -590,4 +591,44 @@ TEST_CASE("Stripe test mode, live: a tab's card held, raised, charged; another l
     REQUIRE(pos.releaseHold());
     QTest::qWait(3000);
     CHECK_FALSE(notices.last().contains(u"couldn't"_s));
+}
+
+TEST_CASE("Retail: the UPC prints above the item; an error correct stays on the screen, not the receipt", "[receipts]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    for (core::MenuItem &m : pos.shared()->menu)
+        if (m.id == "cobb")
+            m.barcodes = {"012345678905", "4006381333931"};
+    REQUIRE(pos.noteScan(u"4006381333931"_s, u"cobb"_s));   // the scanner read the alternate code
+    REQUIRE(pos.addItem(u"cobb"_s));
+    REQUIRE(pos.addItem(u"cobb"_s));                         // rung by key: the primary UPC
+    REQUIRE(pos.shared()->open.size() == 1);
+    core::Check &c = pos.shared()->open.begin()->second;
+    REQUIRE(c.lines.size() == 2);
+    CHECK(c.lines[0].upc == "4006381333931");
+    CHECK(c.lines[1].upc == "012345678905");
+    const auto before = c.totals(pos.shared()->settings.tax).items;
+
+    REQUIRE(pos.errorCorrect());                             // VOID PREV ITEM: the newest line
+    CHECK(c.lines.size() == 2);                              // still on the check, for the cashier
+    CHECK(c.lines[1].voided);
+    CHECK(c.lines[1].corrected);
+    CHECK(c.unsentCount() == 1);                             // never sent to the kitchen
+    CHECK(c.totals(pos.shared()->settings.tax).items.cents() * 2 == before.cents());
+    CHECK(std::ranges::any_of(c.events, [](const core::CheckEvent &e) { return e.kind == "errorCorrect"; }));
+    QVariantList lines = pos.lines();
+    CHECK(lines[1].toMap()[u"corrected"_s].toBool());
+
+    const std::string r = print::renderText(
+        print::receipt(c, {pos.shared()->settings, [](std::int64_t) { return std::string("Nov 3"); },
+                           [](std::int64_t) { return std::string("9:15 AM"); }, 0}), 42);
+    CHECK(r.find("4006381333931") != std::string::npos);    // above the item that was sold
+    CHECK(r.find("4006381333931") < r.find("Cobb"));
+    CHECK(r.find("012345678905") == std::string::npos);     // the error-corrected one isn't there
+
+    const auto back = app::checkFromJson(app::toJson(c));
+    REQUIRE(back);
+    CHECK(back->lines[1].corrected);
+    CHECK(back->lines[0].upc == "4006381333931");
 }

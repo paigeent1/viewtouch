@@ -294,6 +294,8 @@ OrderLine &Check::addItem(const MenuItem &item, Qualifier q)
     l.kitchenColor = item.kitchenColor;
     l.allergens = item.allergens;
     l.kitchenHide = item.kitchenHide;
+    if (!item.barcodes.empty())
+        l.upc = item.barcodes.front();
     l.noDiscount = item.noDiscount;
     l.noStaffDiscount = item.noStaffDiscount;
     if (item.byWeight)

@@ -119,6 +119,10 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"allergens"_s, strings(l.allergens));
         if (l.kitchenHide)
             lo.insert(u"kitchenHide"_s, true);
+        if (l.corrected)
+            lo.insert(u"corrected"_s, true);
+        if (!l.upc.empty())
+            lo.insert(u"upc"_s, qs(l.upc));
         if (l.noDiscount)
             lo.insert(u"noDiscount"_s, true);
         if (l.noStaffDiscount)
@@ -229,6 +233,8 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.kitchenColor = ss(lo.value(u"kitchenColor").toString());
         l.allergens = strings(lo.value(u"allergens").toArray());
         l.kitchenHide = lo.value(u"kitchenHide").toBool();
+        l.corrected = lo.value(u"corrected").toBool();
+        l.upc = ss(lo.value(u"upc").toString());
         l.noDiscount = lo.value(u"noDiscount").toBool();
         l.noStaffDiscount = lo.value(u"noStaffDiscount").toBool();
         l.served = lo.value(u"served").toBool();

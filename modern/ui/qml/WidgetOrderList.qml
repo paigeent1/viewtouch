@@ -504,7 +504,7 @@ Item {
                             onClicked: w.zone.controller.chooseLine(row.modelData.id)
                         }
                         Text {
-                            text: row.modelData.voided ? qsTr("VOID") : row.modelData.price
+                            text: row.modelData.voided ? (row.modelData.corrected ? qsTr("ERR CORR") : qsTr("VOID")) : row.modelData.price
                             color: row.modelData.voided ? "#ff6369" : w.ink
                             font.family: w.face
                             font.pixelSize: w.unit

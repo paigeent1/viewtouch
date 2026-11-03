@@ -140,6 +140,8 @@ Document receipt(const Check &check, const TicketContext &ctx)
             continue;
         }
         const std::string qty = l.quantity > 1 ? std::to_string(l.quantity) + " x " : "";
+        if (!l.upc.empty())
+            d.text("  " + l.upc);   // small print above the description: the code it was rung in with
         d.columns(qty + l.displayName(), ctx.money(l.total()));
         // A fee says what it is (fee laws: it mustn't look like a tip).
         if (l.itemId == "fee:delivery")

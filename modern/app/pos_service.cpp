@@ -1170,6 +1170,8 @@ bool PosService::addItem(const QString &idOrName)
             return fail(tr("%1 is sold out (%2 tickets).").arg(qs(item->name)).arg(item->ticketCapacity));
     }
 
+    // A scanned code rings in this item: its line keeps that code (an alternate UPC included).
+    const auto scan = std::exchange(pendingScan_, {});
     if (!current() && !startCheck(CheckType::Quick))
         return false;
     Check &c = *current();
@@ -1215,6 +1217,8 @@ bool PosService::addItem(const QString &idOrName)
             priced.name += " (" + ss(i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(item->eventAt),
                                                          u"ddd MMM d, h:mm AP"_s)) + ")";
         OrderLine &line = c.addItem(priced, q);
+        if (scan.first == qs(item->id) && !scan.second.isEmpty())
+            line.upc = ss(scan.second);
         if (const auto hits = allergyHits(c, line); !hits.empty())
             emit notice(tr("⚠ %1 contains %2: the guest is allergic. The kitchen is told.")
                             .arg(qs(item->name), allergenNames(hits).join(u", "_s)));
@@ -1319,6 +1323,45 @@ bool PosService::voidItem()
     }
     selectedLine_ = 0;
     changed(*c);
+    return true;
+}
+
+bool PosService::errorCorrect()
+{
+    Check *c = current();
+    if (!c)
+        return fail(tr("No check is open."));
+    OrderLine *l = c->line(selectedLine_);
+    if (!l || l->voided || l->isComment()) {
+        l = nullptr;
+        for (auto it = c->lines.rbegin(); it != c->lines.rend() && !l; ++it)
+            if (!it->voided && !it->isComment())
+                l = &*it;
+    }
+    if (!l)
+        return fail(tr("Nothing to take off."));
+    if (l->sent) {               // already sent: an ordinary void (reason, permission, kitchen told)
+        selectedLine_ = l->id;
+        return voidItem();
+    }
+    if (!require(perm::Order, tr("Ordering")))
+        return false;
+    const QString name = qs(l->displayName());
+    const Money was = l->total();
+    l->voided = true;
+    l->corrected = true;
+    l->sent = true;              // never goes to the kitchen; nothing waits on it
+    l->kitchenHide = true;
+    noteEvent(*c, tr("Error correct %1 (%2)").arg(name, format(was)), "errorCorrect", was);
+    emit notice(tr("Error correct: %1").arg(name));
+    selectedLine_ = 0;
+    changed(*c);
+    return true;
+}
+
+bool PosService::noteScan(const QString &code, const QString &itemId)
+{
+    pendingScan_ = {itemId, code.trimmed()};
     return true;
 }
 
@@ -1986,7 +2029,7 @@ QVariantList PosService::lines() const
         out.append(QVariantMap{
             {u"id"_s, qint64(l.id)}, {u"name"_s, qs(l.displayName())}, {u"quantity"_s, l.quantity},
             {u"price"_s, l.isComment() ? QString() : format(l.total())}, {u"comment"_s, l.isComment()},
-            {u"sent"_s, l.sent}, {u"voided"_s, l.voided}, {u"modifiers"_s, mods},
+            {u"sent"_s, l.sent}, {u"voided"_s, l.voided}, {u"corrected"_s, l.corrected}, {u"modifiers"_s, mods},
             // − / + / Again apply (not a comment, gift card or weighed item).
             {u"countable"_s, !l.isComment() && !l.isGiftCard() && !l.isFee() && !l.voided && l.weight == 0 && !l.isShare()},
             {u"fee"_s, l.isFee()},
