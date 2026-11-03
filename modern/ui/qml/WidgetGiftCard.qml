@@ -231,6 +231,31 @@ Item {
                 }
                 Label { visible: w.found; text: qsTr("Since %1  |  PIN: %2  |  For: %3  |  By: %4").arg(w.card.issued ?? "").arg(w.card.pin ?? "----").arg(w.card.issuedTo || "—").arg(w.card.purchasedBy || "—"); opacity: 0.6 }
                 Label { visible: w.found && (w.card.location ?? "") !== ""; text: qsTr("Issued at: %1").arg(w.card.location ?? ""); opacity: 0.6 }
+                // The card's other actions, next to its balance.
+                RowLayout {
+                    visible: w.found && !w.closed
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    spacing: 8
+                    // Managers: a lost card replaced, or two cards combined. The old card closes for good.
+                    Button {
+                        objectName: "giftTransfer"
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        enabled: (w.card.balanceCents ?? 0) > 0 && !w.transferring
+                        text: qsTr("Transfer / Replace Card…")
+                        onClicked: { newCard.text = ""; w.transferring = true }
+                    }
+                    // State law (California: under $10): a small balance in cash, when the guest asks.
+                    Button {
+                        objectName: "giftCashOut"
+                        visible: w.card.cashOut ?? false
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        text: qsTr("Cash Out %1 (under %2)").arg(w.card.balance ?? "").arg(w.card.cashOutBelow ?? "")
+                        onClicked: w.pos.cashOutGiftCard()
+                    }
+                }
                 Label { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); text: qsTr("Matching Gift Cards (%1) — Tap a card:").arg((w.card.matches ?? []).length); font.bold: true; color: "#90cdf4" }
                 ListView { visible: (w.card.matches ?? []).length > 1 || (!w.found && (w.card.matches ?? []).length > 0); Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6; model: w.card.matches ?? []
                     delegate: WidgetKey { required property var modelData; width: ListView.view.width - 12; height: 58; fontScale: 0.32; baseColor: "#2b3340"; text: modelData.number + "   |   PIN: " + (modelData.pin || "----") + "   |   " + modelData.balance + "\n    For: " + (modelData.issuedTo || "—") + "   |   By: " + (modelData.purchasedBy || "—"); onClicked: { number.text = modelData.number; w.pos.lookupGiftCard(modelData.number) } }
@@ -253,26 +278,17 @@ Item {
             }
         }
 
-        // The card's actions along the bottom: Pay in the middle, clear of the page's own buttons below.
+        // Pay along the bottom, centered and half as wide, so the page's own buttons in the corners
+        // (‹ Back / ‹ Manager on the left, Pay › on the right) never cover it.
         RowLayout {
-            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: parent.width * 0.5
+            Layout.maximumWidth: parent.width * 0.5
             spacing: 12
             visible: w.found && !w.closed
-            // Managers: a lost card replaced, or two cards combined. The old card closes for good.
-            Button {
-                objectName: "giftTransfer"
-                Layout.preferredWidth: 1
-                Layout.fillWidth: true
-                implicitHeight: 64
-                font.pixelSize: 17
-                enabled: (w.card.balanceCents ?? 0) > 0 && !w.transferring
-                text: qsTr("Transfer / Replace Card…")
-                onClicked: { newCard.text = ""; w.transferring = true }
-            }
             Button {
                 objectName: "giftPay"
                 visible: !w.askingCustomer
-                Layout.preferredWidth: 2
                 Layout.fillWidth: true
                 implicitHeight: 64
                 font.pixelSize: 19
@@ -281,27 +297,8 @@ Item {
                 text: qsTr("Pay the Check from This Card")
                 onClicked: { if (w.checkHasCustomer) w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
             }
-            RowLayout {
-                visible: w.askingCustomer
-                Layout.preferredWidth: 2
-                Layout.fillWidth: true
-                spacing: 8
-                Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…"); onClicked: { w.askingCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
-                Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; text: qsTr("Bypass & Pay Now"); onClicked: { w.askingCustomer = false; w.pos.payWithGiftCard(w.card.number, 0) } }
-            }
-            // State law (California: under $10): a small balance in cash, when the guest asks.
-            Button {
-                objectName: "giftCashOut"
-                Layout.preferredWidth: 1
-                Layout.fillWidth: true
-                implicitHeight: 64
-                font.pixelSize: 17
-                // Only where state law makes a small balance cashable; otherwise an empty space, so Pay stays centered.
-                enabled: w.card.cashOut ?? false
-                opacity: enabled ? 1 : 0
-                text: qsTr("Cash Out %1 (under %2)").arg(w.card.balance ?? "").arg(w.card.cashOutBelow ?? "")
-                onClicked: w.pos.cashOutGiftCard()
-            }
+            Button { visible: w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…"); onClicked: { w.askingCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
+            Button { visible: w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; text: qsTr("Bypass & Pay Now"); onClicked: { w.askingCustomer = false; w.pos.payWithGiftCard(w.card.number, 0) } }
         }
         }
     }

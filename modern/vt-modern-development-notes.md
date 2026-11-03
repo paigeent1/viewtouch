@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 20:26 ET — Bob (Claude) — Gift Card screen: nothing in the bottom corners
+- **What:** Transfer / Replace Card… and Cash Out moved from the bottom bar to a row under the card's balance (right column). The bottom bar holds only Pay the Check from This Card (or Add Customer… / Bypass & Pay Now), centered at half the widget's width, so the page's own corner buttons (‹ Back / ‹ Manager, Pay ›) can't cover anything. Not compiled here.
+- **Why:** Owner: a button at bottom left (Transfer) was covered by the back button.
+- **Files:** `modern/ui/qml/WidgetGiftCard.qml`
+- **Next person must know:** Needs the Pi build (vt-server) and a new APK for the tablets.
+
 ### 2026-11-02 20:20 ET — Bob (Claude) — Labels: preview on tablets; print order by description or UPC
 - **What:** Tablet Labels screen: Preview button on each queued item and by the Print button opens the label as it will print, drawn on the Pi by vt_label_utility.py --preview-job (render_label_pil_image at the template's DPI, PNG) and sent as a data: URL in retailLabels().preview (previewBusy/previewError/previewName); a newer preview wins; Print from the preview. Print order buttons: As added / Description / UPC (the list shows and prints in that order). PosService::previewRetailLabel/closeRetailLabelPreview (QProcess, async) + commands + Q_INVOKABLEs. Pi label utility: touching the Description or UPC on Label heading sorts the select screen (again: reverse); printing follows the list order. Tested here: --preview-job (alt UPC drawn, missing UPC exit 3), grid sort + Next. C++/QML not compiled here.
 - **Why:** Owner: label preview before printing on tablets; sort by UPC or description for printing.
