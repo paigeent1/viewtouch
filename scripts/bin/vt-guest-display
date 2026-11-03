@@ -43,7 +43,7 @@ fi
 if [ -z "$WAYLAND_DISPLAY" ] || ! wlr-randr >/dev/null 2>&1; then
     # By device number: a touchscreen often shows up twice under one name (wch.cn USB2IIC_CTP_CONTROL).
     touch_cmd="for id in \$(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2); do xinput map-to-output \$id $first; done"
-    cmd="$cmd; sleep 1; $touch_cmd"
+    cmd="$cmd; sleep 1; { $touch_cmd; } 2>/dev/null || true"
 else
     # labwc (Wayland): <touch mapToOutput> in rc.xml.
     RC="$HOME/.config/labwc/rc.xml"

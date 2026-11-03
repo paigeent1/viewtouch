@@ -96,6 +96,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:27 ET — Bob (Claude) — vt-guest-display: touchscreen step can't fail the rest
+- **What:** The touch mapping is wrapped ({ ...; } 2>/dev/null || true) so an xinput error no longer reports 'Couldn't put HDMI-2 beside HDMI-1' and stops before the restart.
+- **Why:** Owner's run: an xinput BadMatch stopped vt-guest-display after the monitors were already side by side.
+- **Files:** `scripts/bin/vt-guest-display`
+
 ### 2026-11-03 18:27 ET — Bob (Claude) — vt-guest-display: touchscreen by device id
 - **What:** Map touch pointers by xinput id (the store's touchscreen 'wch.cn USB2IIC_CTP_CONTROL' is listed twice, so map-to-output by name is refused); match ctp/touch/ilitek/goodix/egalax/eeti pointer devices.
 - **Why:** Owner's xinput list.
