@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 06:46 ET — Bob (Claude) — Tablet Labels screen: one step per screen (label, tree levels, items, list)
+- **What:** WidgetRetailLabels.qml rewritten as steps: 1) label styles across the top (big buttons; a label without item fields goes straight to How many); 2) the tree, one level per screen as big buttons with item counts, plus Show Items (N) on every level; 3) items (touch adds, ✓ count, Add All, first 300 shown); 4) To Print list (UPC cycle, qty, Preview, print order, Clear List, Print). The widget's own ‹ Back steps back one screen (items > level > level above > labels; Find/list go back where they came from); a level with nothing below opens its items and Back from it goes up a level. Find/scan field and To Print (n) on every later step; a scan adds its one match when the main computer's answer arrives (scanCode). Server: tree depth is variable: the ILSA price book adds product group and sub group under brand (when set); retailLabels() returns itemCount, showingItems, showItemsAsked; new showRetailLabelItems(path) command (Q_INVOKABLE + pos_commands). Test [labels] extended. Not compiled here (no Qt/qmllint).
+- **Why:** Owner: label styles across the top; then a screen per tree level of buttons; Show Items while selecting the tree; Back steps back through the steps, not out of the screen.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml, modern/app/pos_inventory.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_commands.cpp, modern/tests/test_customers.cpp`
+- **Next person must know:** The page's own ‹ Back (outside the widget) still leaves the Labels screen; the in-screen ‹ Back is the step-back. Needs vt-server on the Pi and a new APK.
+
 ### 2026-11-02 20:26 ET — Bob (Claude) — Gift Card screen: nothing in the bottom corners
 - **What:** Transfer / Replace Card… and Cash Out moved from the bottom bar to a row under the card's balance (right column). The bottom bar holds only Pay the Check from This Card (or Add Customer… / Bypass & Pay Now), centered at half the widget's width, so the page's own corner buttons (‹ Back / ‹ Manager, Pay ›) can't cover anything. Not compiled here.
 - **Why:** Owner: a button at bottom left (Transfer) was covered by the back button.

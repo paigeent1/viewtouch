@@ -490,6 +490,8 @@ public:
     bool findRetailLabels(const QString &query);
     // The tree: [group, category, brand] (fewer: that level's children).
     bool browseRetailLabels(const QStringList &path);
+    // Every item under the path (Show Items), up to 300; the levels below are still listed.
+    bool showRetailLabelItems(const QStringList &path);
     // Hands the job to the label utility on this (the main) computer, which prints it.
     bool printRetailLabels(const QVariantMap &job);
     // A picture of one label, drawn by the label utility exactly as it prints ({template, upc}); it
@@ -1203,6 +1205,7 @@ private:
     QString labelQuery_;
     QStringList labelPath_;
     bool labelBrowsing_ = false;   // the Labels screen is showing the tree (worked out only then)
+    bool labelShowItems_ = false;  // ... and the items under its path
     QString labelPreview_;         // data:image/png;base64,... of the last preview
     QString labelPreviewName_;     // what it shows
     QString labelPreviewError_;

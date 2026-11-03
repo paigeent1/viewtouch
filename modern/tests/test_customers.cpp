@@ -434,7 +434,7 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
         QSqlQuery q(db);
         REQUIRE(q.exec(u"CREATE TABLE items(upc, name, dept_num, dept_grp, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc)"_s));
         REQUIRE(q.exec(u"INSERT INTO items VALUES('076452361243','RYJ 1875 Clem Tubo','20','CIGARS','PREMIUM CIGARS',120.0,8,"
-                       "'ROMEO Y JULIETA','','',1,'076452361250')"_s));
+                       "'ROMEO Y JULIETA','Churchill','Tubo',1,'076452361250')"_s));
         REQUIRE(q.exec(u"INSERT INTO items VALUES('01234567890','ZIPPO CLASSIC','30','','LIGHTERS',22.5,10,'GENERAL','','',1,NULL)"_s));
         db.close();
     }
@@ -445,7 +445,16 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"CIGARS"_s, u"RETAIL"_s});
     REQUIRE(pos.browseRetailLabels({u"RETAIL"_s, u"LIGHTERS"_s}));
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"ZIPPO"_s});   // GENERAL: brand from the name
+    REQUIRE(pos.showRetailLabelItems({}));                                               // Show Items at the top: everything
+    CHECK(pos.retailLabels()[u"showingItems"_s].toBool());
+    CHECK(pos.retailLabels()[u"matches"_s].toList().size() == 2);
     REQUIRE(pos.browseRetailLabels({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s}));
+    CHECK_FALSE(pos.retailLabels()[u"showingItems"_s].toBool());                         // ILSA's product group below the brand
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"CHURCHILL"_s});
+    REQUIRE(pos.browseRetailLabels({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s, u"CHURCHILL"_s, u"TUBO"_s}));
+    CHECK(pos.retailLabels()[u"showingItems"_s].toBool());                               // the bottom: its items
+    REQUIRE(pos.showRetailLabelItems({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s}));
+    CHECK(pos.retailLabels()[u"itemCount"_s].toInt() == 1);
     const QVariantList at = pos.retailLabels()[u"matches"_s].toList();
     REQUIRE(at.size() == 1);
     CHECK(at.first().toMap()[u"price"_s].toString() == u"$120.00"_s);

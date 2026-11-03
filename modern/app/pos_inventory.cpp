@@ -708,7 +708,7 @@ QString brandFromName(const QString &upperName)
 // One item on the Labels screen, from ViewTouch's menu or from the ILSA price book.
 struct LabelItem {
     QString id, name, price;
-    QStringList at;        // group, category, brand
+    QStringList at;        // group, category, brand (the price book: then product group, sub group)
     QVariantList upcs;     // [{label, code}]
     QStringList codes;     // the same codes, for scanning
 };
@@ -756,9 +756,11 @@ const std::vector<LabelItem> &pricebookItems()
             while (info.next())
                 cols << info.value(1).toString();
             const QString dg = cols.contains(u"dept_grp"_s) ? u"dept_grp"_s : u"''"_s;
+            const QString pg = cols.contains(u"prod_grp"_s) ? u"prod_grp"_s : u"''"_s;
+            const QString sg = cols.contains(u"sub_grp"_s) ? u"sub_grp"_s : u"''"_s;
             QSqlQuery q(db);
             q.setForwardOnly(true);
-            if (q.exec(u"SELECT upc, name, %1, category, price, mfg, altupc FROM items"_s.arg(dg))) {
+            if (q.exec(u"SELECT upc, name, %1, category, price, mfg, altupc, %2, %3 FROM items"_s.arg(dg, pg, sg))) {
                 QSet<QString> seen;
                 while (q.next()) {
                     LabelItem it;
@@ -791,6 +793,12 @@ const std::vector<LabelItem> &pricebookItems()
                     if (brand.isEmpty() || brand == u"GENERAL"_s || numeric)
                         brand = brandFromName(it.name);
                     it.at = {group, cat, brand.isEmpty() ? u"GENERAL"_s : brand};
+                    // ILSA's product group and sub group, when the item has them (a sub group only under a product group).
+                    if (const QString p = q.value(7).toString().trimmed().toUpper(); !p.isEmpty()) {
+                        it.at << p;
+                        if (const QString s = q.value(8).toString().trimmed().toUpper(); !s.isEmpty())
+                            it.at << s;
+                    }
                     it.id = u"ilsa:"_s + it.codes.first();
                     bool ok = false;
                     const double price = q.value(4).toDouble(&ok);
@@ -862,21 +870,27 @@ QVariantMap PosService::retailLabels() const
     const auto entry = [](const LabelItem &it) {
         return QVariantMap{{u"id"_s, it.id}, {u"name"_s, it.name}, {u"price"_s, it.price}, {u"upcs"_s, it.upcs}};
     };
-    // Browsing the tree: the names one level down from the path (with how many items), or, at a
-    // brand, its items.
+    // Browsing the tree: the names one level down from the path (with how many items under each),
+    // and, when asked (Show Items) or at the bottom of the tree, every item under the path.
     QVariantList children;
+    int itemCount = 0;
+    bool showingItems = false;
     if (q.isEmpty() && labelBrowsing_) {
         std::map<QString, int> counts;
         for (const LabelItem &it : items) {
             if (it.at.mid(0, labelPath_.size()) != labelPath_)
                 continue;
-            if (labelPath_.size() < 3)
+            ++itemCount;
+            if (it.at.size() > labelPath_.size())
                 ++counts[it.at.at(labelPath_.size())];
-            else if (matches.size() < 200)
-                matches.append(entry(it));
         }
         for (const auto &[name, n] : counts)
             children.append(QVariantMap{{u"name"_s, name}, {u"count"_s, n}});
+        showingItems = labelShowItems_ || (children.isEmpty() && !labelPath_.isEmpty());
+        if (showingItems)
+            for (const LabelItem &it : items)
+                if (it.at.mid(0, labelPath_.size()) == labelPath_ && matches.size() < 300)
+                    matches.append(entry(it));
     }
     if (!q.isEmpty()) {
         const QString code = digitsOnly(q);
@@ -899,15 +913,25 @@ QVariantMap PosService::retailLabels() const
     }
     return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
             {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)},
+            {u"itemCount"_s, itemCount}, {u"showingItems"_s, showingItems}, {u"showItemsAsked"_s, labelShowItems_},
             {u"preview"_s, labelPreview_}, {u"previewName"_s, labelPreviewName_}, {u"previewBusy"_s, labelPreviewBusy_},
             {u"previewError"_s, labelPreviewError_}};
 }
 
 bool PosService::browseRetailLabels(const QStringList &path)
 {
-    labelPath_ = path.mid(0, 3);
+    labelPath_ = path.mid(0, 5);
     labelQuery_.clear();
     labelBrowsing_ = true;
+    labelShowItems_ = false;
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::showRetailLabelItems(const QStringList &path)
+{
+    browseRetailLabels(path);
+    labelShowItems_ = true;
     emit sessionChanged();
     return true;
 }
