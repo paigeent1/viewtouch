@@ -3241,6 +3241,13 @@ class VTLabelUtility(tk.Tk):
         make_vt_btn(top, text="✓ Select All", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.select_all).pack(side="left", padx=6)
         make_vt_btn(top, text="✖ Deselect All", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), padx=12, pady=6, command=self.deselect_all).pack(side="left", padx=4)
 
+        # Sort the list (labels print in this order): A to Z by description, or by the UPC on the label.
+        tk.Label(top, text="Sort:", bg="#1e242d", font=("Sans", 11)).pack(side="left", padx=(16, 4))
+        make_vt_btn(top, text="A–Z", bg="#7c3aed", fg="#ffffff", font=("Sans", 10, "bold"), padx=14, pady=6,
+                    command=lambda: self.sort_grid("desc", False)).pack(side="left", padx=3)
+        make_vt_btn(top, text="UPC", bg="#7c3aed", fg="#ffffff", font=("Sans", 10, "bold"), padx=14, pady=6,
+                    command=lambda: self.sort_grid("upca", False)).pack(side="left", padx=3)
+
         tk.Label(top, text="Quick Search:", bg="#1e242d", font=("Sans", 11)).pack(side="left", padx=(16, 4))
         self.filter_var = tk.StringVar()
         self.filter_var.trace_add("write", lambda *_: self._populate_grid())
@@ -3252,6 +3259,17 @@ class VTLabelUtility(tk.Tk):
         sp.pack(side="right", padx=4)
 
         flow_wrap(top)
+        # A letter row: touch a letter to jump to the first item starting with it (sorts A to Z first).
+        letters = tk.Frame(self.content, bg="#1e242d")
+        letters.pack(fill="x", padx=8, pady=(0, 4))
+        self.grid_letter_buttons = {}
+        for i, ch in enumerate("#ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+            b = tk.Button(letters, text=ch, font=("Sans", 13, "bold"), relief="flat", bd=0, highlightthickness=0,
+                          bg="#334155", fg="#f8fafc", activebackground="#0284c7", activeforeground="#ffffff",
+                          disabledforeground="#64748b", command=lambda c=ch: self._jump_grid_letter(c))
+            b.grid(row=0, column=i, sticky="nsew", padx=1, ipady=8)
+            letters.grid_columnconfigure(i, weight=1, uniform="gl")
+            self.grid_letter_buttons[ch] = b
         # Six columns and tall rows, for a finger on the touch screen (the tree already chose the category/brand).
         g_style = ttk.Style(self)
         g_style.configure("ItemGrid.Treeview", rowheight=58, font=("Sans", 14))
@@ -3295,11 +3313,16 @@ class VTLabelUtility(tk.Tk):
         if top:
             self.grid_tree.update_idletasks()
             self.grid_tree.yview_moveto(top)
+        shown = {self._letter_of(self.filtered_items[int(r)]["name"]) for r in self.grid_tree.get_children()}
+        for ch, btn in getattr(self, "grid_letter_buttons", {}).items():
+            btn.config(state="normal" if ch in shown else "disabled", bg="#334155" if ch in shown else "#1e293b")
 
-    def sort_grid(self, col):
-        """Sort the items by description or by the UPC on the label (touch again: reverse). Printing follows this order."""
+    def sort_grid(self, col, reverse=None):
+        """Sort the items by description or by the UPC on the label (a heading touched again: reverse; the
+        A-Z / UPC buttons always go up). Printing follows this order."""
         last = getattr(self, "grid_sort", None)
-        reverse = bool(last and last[0] == col and not last[1])
+        if reverse is None:
+            reverse = bool(last and last[0] == col and not last[1])
         key = (lambda it: it["name"]) if col == "desc" else (lambda it: (len(str(it["upc"])), str(it["upc"])))
         self.filtered_items.sort(key=key, reverse=reverse)
         self.grid_sort = (col, reverse)
@@ -3308,6 +3331,17 @@ class VTLabelUtility(tk.Tk):
             self.grid_tree.heading(c_id, text=h_txt + arrow)
         self.grid_tree.yview_moveto(0)
         self._populate_grid()
+
+    def _jump_grid_letter(self, ch):
+        """Scroll the item list to the first description starting with ch (A to Z order first)."""
+        if getattr(self, "grid_sort", None) != ("desc", False):
+            self.sort_grid("desc", False)
+        for row in self.grid_tree.get_children():
+            if self._letter_of(self.filtered_items[int(row)]["name"]) == ch:
+                self.grid_tree.yview_moveto(1.0)
+                self.grid_tree.update_idletasks()
+                self.grid_tree.see(row)
+                return
 
     def on_toggle_row(self, _event=None):
         sel = self.grid_tree.selection()

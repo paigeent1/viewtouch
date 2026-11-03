@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:20 ET — Bob (Claude) — Label utility item list: A-Z / UPC sort buttons and a letter row
+- **What:** Screen 3 toolbar: 'Sort: A–Z' and 'UPC' buttons (sort_grid(col, False): always ascending; the column headings still toggle); a full-width row of letter buttons (#, A-Z) above the list jumps to the first description starting with that letter (sorts A to Z first), letters with no item greyed (updated with the list). Quick Search (top center) unchanged: filters by description, any UPC, manufacturer or category as you type (needs a keyboard on the Pi). Tested: UPC sort, M/#/D jumps, Next.
+- **Why:** Owner: sort by UPC/alpha and letter selection on the label utility item list; asked what the top center text box does.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 11:15 ET — Bob (Claude) — Pi display: two Wimaxit M1410CT mirrored at 1920x1080 (X11)
 - **What:** The Pi runs the X11 desktop (xrandr, outputs HDMI-1 / HDMI-2). New monitors: Wimaxit M1410CT 14-inch touch, native 1920x1080; the Pi had kept 1024x768 (black bars). Set with xrandr --mode 1920x1080 on both, HDMI-2 --same-as HDMI-1, saved by vt-mirror (~/.config/autostart/vt-mirror.desktop).
 - **Why:** Owner swapped monitors and wanted the second HDMI to mirror the first.
