@@ -2,11 +2,32 @@
 # The customer display (the guest's order, total, tip choices, price checks) on the Pi's second HDMI.
 #   vt-guest-display on    second monitor = customer display (stops mirroring; kept after reboots)
 #   vt-guest-display off   back to mirroring the first monitor on the second
+#   vt-guest-display touch the guest monitor is a touchscreen too: touch it once so the Pi learns which
+#                          touchscreen is which (both report the same name); remembered by USB port
 # Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
 MODE="${1:-on}"
 STATE="$HOME/.vt-customer-display"
 export DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 AUTOSTART="$HOME/.config/autostart/vt-guest-display.desktop"
+
+if [ "$MODE" = touch ]; then
+    command -v xinput >/dev/null || { echo "xinput is missing: sudo apt install xinput"; exit 1; }
+    ids=$(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
+    [ -z "$ids" ] && { echo "No touchscreen found. Is the guest monitor's USB touch cable plugged in?"; exit 1; }
+    echo "Touch the GUEST screen (the second monitor) now, within 15 seconds..."
+    hit=$(timeout 15 xinput test-xi2 --root 2>/dev/null | awk -v want=" $ids " '
+        /EVENT type/ { ev = $0 }
+        /device: [0-9]+/ { if (ev ~ /Touch|ButtonPress/) { split($2, a, " "); d = a[1]; if (index(want, " " d " ")) { print d; exit } } }')
+    [ -z "$hit" ] && { echo "No touch seen. Run it again and touch the guest screen."; exit 1; }
+    node=$(xinput list-props "$hit" | awk -F'"' '/Device Node/{print $2; exit}')
+    port=$(udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p')
+    [ -z "$port" ] && { echo "Couldn't tell which USB port that touchscreen is on."; exit 1; }
+    echo "$port" > "$HOME/.vt-guest-touch"
+    vt-touch-map
+    echo "Guest touchscreen learned (USB port $port): it now touches the second monitor; the other one the POS."
+    echo "Keep it plugged into the same USB port (or run vt-guest-display touch again)."
+    exit 0
+fi
 
 if [ "$MODE" = off ]; then
     rm -f "$STATE" "$AUTOSTART" "$HOME/.config/vt-guest-display.sh"
@@ -41,9 +62,8 @@ else
 fi
 # The touchscreen stays on the POS monitor: spread over both, every touch would land in the wrong place.
 if [ -z "$WAYLAND_DISPLAY" ] || ! wlr-randr >/dev/null 2>&1; then
-    # By device number: a touchscreen often shows up twice under one name (wch.cn USB2IIC_CTP_CONTROL).
-    touch_cmd="for id in \$(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2); do xinput map-to-output \$id $first; done"
-    cmd="$cmd; sleep 1; { $touch_cmd; } 2>/dev/null || true"
+    # Each touchscreen on its own monitor (vt-touch-map: the guest's, learned with `touch`, on the second).
+    cmd="$cmd; sleep 1; vt-touch-map || true"
 else
     # labwc (Wayland): <touch mapToOutput> in rc.xml.
     RC="$HOME/.config/labwc/rc.xml"

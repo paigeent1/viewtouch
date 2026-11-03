@@ -1,0 +1,22 @@
+#!/bin/bash
+# Ties each touchscreen to its own monitor (X11): the guest's touchscreen (learned once with
+# `vt-guest-display touch`, remembered by the USB port it's plugged into) to the second monitor,
+# every other touchscreen to the first (the POS). Run by vt-guest-display and after every reboot.
+export DISPLAY="${DISPLAY:-:0}"
+outs=$(xrandr 2>/dev/null | awk '/ connected/{print $1}')
+first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+[ -z "$first" ] && exit 0
+guest_port=$(cat "$HOME/.vt-guest-touch" 2>/dev/null)
+port_of() {   # the USB port (udev ID_PATH) behind an xinput device id
+    local node
+    node=$(xinput list-props "$1" 2>/dev/null | awk -F'"' '/Device Node/{print $2; exit}')
+    [ -n "$node" ] && udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p'
+}
+for id in $(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2); do
+    target=$first
+    if [ -n "$second" ] && [ -n "$guest_port" ] && [ "$(port_of "$id")" = "$guest_port" ]; then
+        target=$second
+    fi
+    xinput map-to-output "$id" "$target" 2>/dev/null || true
+done
+exit 0
