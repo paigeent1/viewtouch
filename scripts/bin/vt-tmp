@@ -8,6 +8,14 @@ if [ ! -f /tmp/apply_changes.py ]; then
     rclone copy /tmp/output.txt "gdrive:POS project tmp/"
     exit 1
 fi
+# Repo files change only through Git commits (AGENTS.md). A change file that writes ViewTouch's code or the
+# label utility launcher is refused: it blocks the owner's git pull and undoes fixes (2026-11-02 and -03).
+if grep -nE "/usr/local/bin/vt-label-utility|viewtouch-main/modern/(tools|app|ui|core|net|seed|layout|storage)/|vt_label_utility\.py\b.*write_text|VT_LU\.write_text" /tmp/apply_changes.py; then
+    echo "REFUSED: apply_changes.py changes ViewTouch's code or the label utility launcher (lines above)." | tee /tmp/output.txt
+    echo "Make code changes as Git commits on main (AGENTS.md); apply_changes.py is for things outside the repo." | tee -a /tmp/output.txt
+    rclone copy /tmp/output.txt "gdrive:POS project tmp/"
+    exit 1
+fi
 echo "2. Running apply_changes.py..."
 python3 /tmp/apply_changes.py 2>&1 | tee /tmp/output.txt
 {

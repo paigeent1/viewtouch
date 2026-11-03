@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 08:35 ET — Bob (Claude) — vt-tmp refuses change files that patch ViewTouch's code or the launcher
+- **What:** Neil's new apply_changes.py (08:35) still had section 3: regex-patching modern/tools/vt_label_utility.py and sudo cp over /usr/local/bin/vt-label-utility (the same as this morning's). Owner runs it with section 3 cut out (sections 1, 2, 4 kept: Windows ILSA export of every PLU row, no ACTIVE/department filters; rebuilding ilsa_temp_pricebook.db; vt-sync-ilsa). scripts/bin/vt-tmp now greps the downloaded apply_changes.py and refuses it (output.txt to Drive) if it mentions /usr/local/bin/vt-label-utility, a path under viewtouch-main/modern/{tools,app,ui,core,net,seed,layout,storage}/, or writes vt_label_utility.py.
+- **Why:** Third time a change file undid label utility fixes and the launcher.
+- **Files:** `scripts/bin/vt-tmp`
+- **Next person must know:** A change file that only reads or runs a repo tool under those paths is refused too; commit such work instead, or run the tool by hand. Pi needs: sudo install -m 755 scripts/bin/vt-tmp /usr/local/bin/vt-tmp.
+
 ### 2026-11-03 08:21 ET — Bob (Claude) — Employees: saving uses First name + Last name
 - **What:** saveEmployeeRecord() only read record 'name', but the Employees form has First name / Last name fields (pos_admin_fields.cpp), so a new employee never saved ('Enter the employee's first and last name.') and editing an existing employee's first/last name didn't change it. The first+last combining code had been pasted into the vendors branch of adminSave instead (left there, re-indented). Now saveEmployeeRecord builds the name from firstName + lastName, falling back to name. New test [m4][admin] 'a new employee from the form's First name and Last name'. Not compiled here.
 - **Why:** Owner couldn't save a new employee.
