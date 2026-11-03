@@ -16,7 +16,7 @@ if [ ! -d "$BUILD" ]; then
     echo "No ViewTouch build folder at modern/$BUILD (set BUILD_DIR=... to point at it)."; exit 1
 fi
 echo "Building the ViewTouch tests (only what changed; the first time takes a while)..."
-cmake --build "$BUILD" --target vtm_tests -j2
+cmake --build "$BUILD" --target vtm_tests -j${VT_JOBS:-4}
 
 rm -rf "$OUT"; mkdir -p "$OUT"
 echo "Taking screenshots (a few minutes; nothing shows on screen)..."

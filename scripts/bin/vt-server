@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 cd /home/pi/viewtouch-main
-cmake --build modern/build --target vtmodern -j2
+cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
 sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
 killall -9 vtmodern 2>/dev/null || true
 sleep 1
