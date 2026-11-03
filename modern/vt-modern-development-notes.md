@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:51 ET — Bob (Claude) — vt-guest-display touch: sees the touch
+- **What:** The learn step ran xinput test-xi2 through a pipe (output held back until it exited) and read the master device number; now stdbuf -oL, and it takes the touchscreen's number from the brackets ('device: 2 (7)'); 20 seconds, Touch/ButtonPress/Motion events.
+- **Why:** Owner: 'No touch seen' after touching the guest screen.
+- **Files:** `scripts/bin/vt-guest-display`
+
 ### 2026-11-03 18:43 ET — Bob (Claude) — Two touchscreens: vt-touch-map and vt-guest-display touch
 - **What:** New scripts/bin/vt-touch-map ties each touchscreen to its monitor: the guest's (remembered by USB port, udev ID_PATH, in ~/.vt-guest-touch) to the second monitor, every other one to the first. vt-guest-display touch: 'touch the guest screen' (xinput test-xi2) learns which touchscreen is the guest's (both Wimaxits report wch.cn USB2IIC_CTP_CONTROL). vt-guest-display on and the boot script run vt-touch-map. Roadmap: guest-screen raffles and phone/email entry.
 - **Why:** Owner is adding a second Wimaxit as a touch guest screen (tips, phone, email, raffles).

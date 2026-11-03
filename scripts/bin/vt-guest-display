@@ -14,10 +14,15 @@ if [ "$MODE" = touch ]; then
     command -v xinput >/dev/null || { echo "xinput is missing: sudo apt install xinput"; exit 1; }
     ids=$(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2 | tr '\n' ' ')
     [ -z "$ids" ] && { echo "No touchscreen found. Is the guest monitor's USB touch cable plugged in?"; exit 1; }
-    echo "Touch the GUEST screen (the second monitor) now, within 15 seconds..."
-    hit=$(timeout 15 xinput test-xi2 --root 2>/dev/null | awk -v want=" $ids " '
-        /EVENT type/ { ev = $0 }
-        /device: [0-9]+/ { if (ev ~ /Touch|ButtonPress/) { split($2, a, " "); d = a[1]; if (index(want, " " d " ")) { print d; exit } } }')
+    echo "Touch the GUEST screen (the second monitor) now, within 20 seconds... (tap it a few times)"
+    # Line by line (stdbuf: xinput holds back its output in a pipe). An event reads
+    # "device: 2 (7)": 2 is the Pi's combined pointer, 7 (in brackets) the touchscreen touched.
+    hit=$(timeout 20 stdbuf -oL xinput test-xi2 --root 2>/dev/null | awk -v want=" $ids " '
+        /EVENT type/ { ev = $0; next }
+        /^[ \t]*device: / {
+            if (ev !~ /Touch|ButtonPress|Motion/) next
+            for (i = 2; i <= 3; i++) { d = $i; gsub(/[()]/, "", d); if (index(want, " " d " ")) { print d; fflush(); exit } }
+        }')
     [ -z "$hit" ] && { echo "No touch seen. Run it again and touch the guest screen."; exit 1; }
     node=$(xinput list-props "$hit" | awk -F'"' '/Device Node/{print $2; exit}')
     port=$(udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p')
