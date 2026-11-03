@@ -96,6 +96,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:24 ET — Bob (Claude) — vt-guest-display ties the touchscreen to the POS monitor
+- **What:** With HDMI-2 extended, X spread the touchscreen over both monitors (touches landed wrong). vt-guest-display on now runs xinput map-to-output for touch devices onto the first monitor (X11) or adds <touch mapToOutput> to labwc rc.xml (Wayland); the boot-time commands go in ~/.config/vt-guest-display.sh run by the autostart entry; off removes them.
+- **Why:** Owner: touch acting as an extended monitor, can't hit buttons.
+- **Files:** `scripts/bin/vt-guest-display`
+- **Next person must know:** Pi: sudo install -m 755 scripts/bin/vt-guest-display /usr/local/bin/
+
 ### 2026-11-03 18:11 ET — Bob (Claude) — Roadmap: tablet customer displays with video
 - **What:** Added a future-ideas item to section 5: tablets have no customer display now; for video on them later, Qt Multimedia in the Android build and the Pi serving the MP4.
 - **Why:** Owner: save it in future ideas.

@@ -9,7 +9,8 @@ export DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(
 AUTOSTART="$HOME/.config/autostart/vt-guest-display.desktop"
 
 if [ "$MODE" = off ]; then
-    rm -f "$STATE" "$AUTOSTART"
+    rm -f "$STATE" "$AUTOSTART" "$HOME/.config/vt-guest-display.sh"
+    sed -i '/<touch .*vt-guest-display/d' "$HOME/.config/labwc/rc.xml" 2>/dev/null; labwc --reconfigure >/dev/null 2>&1 || true
     vt-mirror on || true
     vt-server
     exit 0
@@ -38,9 +39,25 @@ elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
 else
     echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
 fi
+# The touchscreen stays on the POS monitor: spread over both, every touch would land in the wrong place.
+if [ -z "$WAYLAND_DISPLAY" ] || ! wlr-randr >/dev/null 2>&1; then
+    touch_cmd="for d in \$(xinput list --name-only | grep -i -E 'touch|ilitek|goodix|egalax|wch|eeti' | sort -u | tr ' ' '#'); do xinput map-to-output \"\$(echo \$d | tr '#' ' ')\" $first; done"
+    cmd="$cmd; sleep 1; $touch_cmd"
+else
+    # labwc (Wayland): <touch mapToOutput> in rc.xml.
+    RC="$HOME/.config/labwc/rc.xml"
+    mkdir -p "$(dirname "$RC")"
+    [ -f "$RC" ] || printf '<?xml version="1.0"?>\n<labwc_config>\n</labwc_config>\n' > "$RC"
+    sed -i '/<touch .*vt-guest-display/d' "$RC"
+    sed -i "s|</labwc_config>|  <touch mapToOutput=\"$first\" /> <!-- vt-guest-display -->\n</labwc_config>|" "$RC"
+    labwc --reconfigure >/dev/null 2>&1 || true
+fi
 eval "$cmd" || { echo "Couldn't put $second beside $first"; exit 1; }
 mkdir -p "$(dirname "$AUTOSTART")"
-printf '[Desktop Entry]\nType=Application\nName=vt-guest-display\nExec=sh -c "sleep 3; %s"\n' "$cmd" > "$AUTOSTART"
+# After every reboot: the monitors side by side and the touchscreen on the POS monitor.
+BOOT="$HOME/.config/vt-guest-display.sh"
+printf '#!/bin/sh\nsleep 3\nexport DISPLAY=:0\n%s\n' "$cmd" > "$BOOT"; chmod +x "$BOOT"
+printf '[Desktop Entry]\nType=Application\nName=vt-guest-display\nExec=%s\n' "$BOOT" > "$AUTOSTART"
 echo window > "$STATE"
 echo "Customer display on $second (the POS stays on $first)."
 vt-server
