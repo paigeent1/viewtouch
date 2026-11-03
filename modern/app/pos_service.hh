@@ -983,6 +983,7 @@ public:
     QString screenMode() const override;
     QString terminalLook() const override;
     QString terminalKeyboard() const override;
+    QString terminalCustomerDisplay() const override;
     QString terminalStartCategory() const override;
 
     // --- pairing devices (manager) -------------------------------------------------

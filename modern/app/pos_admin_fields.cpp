@@ -690,6 +690,11 @@ QVariantList PosService::adminFields(const QString &panel)
             with(field(u"requireName"_s, tr("Phone orders need a name before Send"), u"enum"_s,
                        tr("At this screen, whoever is taking the order. Empty: the person's setting, else the store's.")),
                  u"options"_s, options({{"", "The person's / store setting"}, {"yes", "Yes"}, {"no", "No"}})),
+            with(field(u"customerDisplay"_s, tr("Customer display"), u"enum"_s,
+                       tr("The guest's screen (their order, total, tip choices, price checks) on this screen's second "
+                          "monitor, the Pi's second HDMI. Changing it restarts ViewTouch on that screen.")),
+                 u"options"_s, options({{"", "Off (the second monitor mirrors the first)"},
+                                        {"window", "On: the second monitor faces the guest"}})),
             with(field(u"afterPaying"_s, tr("After a check is paid"), u"enum"_s,
                        tr("Ask: print (choosing the printer), email (cards from a Stripe reader) or no receipt.")),
                  u"options"_s, options({{"", "Nothing (Print Receipt when asked)"}, {"print", "Print a receipt"},

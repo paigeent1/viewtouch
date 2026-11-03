@@ -204,6 +204,10 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         if (!QStringList{QString(), u"print"_s, u"ask"_s}.contains(after))
             return fail(tr("Choose what happens after a check is paid."));
         t.afterPaying = ss(after);
+        const QString guest = record.value(u"customerDisplay"_s).toString();
+        if (!QStringList{QString(), u"window"_s}.contains(guest))
+            return fail(tr("Choose whether this screen has a customer display."));
+        t.customerDisplay = ss(guest);
         t.startCategory = ss(record.value(u"startCategory"_s).toString());
         t.startPage = ss(record.value(u"startPage"_s).toString());
         t.labelPrinter = ss(record.value(u"labelPrinter"_s).toString());

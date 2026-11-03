@@ -948,7 +948,8 @@ QJsonObject toJson(const PosSettings &s)
                                      {u"station"_s, qs(t.station)}, {u"keyboard"_s, qs(t.keyboard)},
                                      {u"requireName"_s, qs(t.requireName)}, {u"cardReader"_s, qs(t.cardReader)},
                                      {u"afterPaying"_s, qs(t.afterPaying)}, {u"startCategory"_s, qs(t.startCategory)}, {u"startPage"_s, qs(t.startPage)},
-                                     {u"labelPrinter"_s, qs(t.labelPrinter)}, {u"textSize"_s, t.textSize}});
+                                     {u"labelPrinter"_s, qs(t.labelPrinter)}, {u"textSize"_s, t.textSize},
+                                     {u"customerDisplay"_s, qs(t.customerDisplay)}});
     QJsonArray printers;
     for (const PrinterConfig &p : s.printers)
         printers.append(toJson(p));
@@ -1248,6 +1249,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         c.requireName = ss(t.value(u"requireName").toString());
         c.cardReader = ss(t.value(u"cardReader").toString());
         c.afterPaying = ss(t.value(u"afterPaying").toString());
+        c.customerDisplay = ss(t.value(u"customerDisplay").toString());
         c.startCategory = ss(t.value(u"startCategory").toString());
         c.startPage = ss(t.value(u"startPage").toString());
         c.labelPrinter = ss(t.value(u"labelPrinter").toString());

@@ -395,6 +395,7 @@ private:
     QVariantMap kept_;
     CardReader cardReader_;
     int readerTokenSeq_ = 0;   // the last connection token handed to the reader
+    void applyCustomerDisplay();
     void takeCard(const QString &tenderId, Done done);
     void cardTaken(const QVariantMap &result);
     // Cards approved while the store couldn't be reached: sent when it can.

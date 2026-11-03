@@ -11,6 +11,7 @@
 
 #include <QCollator>
 #include <QFile>
+#include <QStandardPaths>
 #include <QDate>
 #include <QRegularExpression>
 #include <QSaveFile>
@@ -307,6 +308,7 @@ void LayoutController::setPos(PosSession *pos)
         connect(pos_, &PosSession::qualifierChanged, this, &LayoutController::refresh);
         connect(pos_, &PosSession::adminChanged, this, [this] {
             cardReader_.setKind(pos_->terminalCardReader());   // Manager -> Terminals: this screen's reader
+            applyCustomerDisplay();   // Manager -> Terminals: the guest's screen on the second HDMI
             if (pos_->terminalLook() != lookedId_)
                 updateTerminalLook();   // Manager -> Terminals: this screen's look
             restAtLoginPage();      // a terminal just set to (or from) Time Clock
@@ -1727,6 +1729,28 @@ void LayoutController::runAction(const Action &a, Done done)
 
     setStatus(tr("Action '%1' is not supported yet").arg(type));
     done(false);
+}
+
+void LayoutController::applyCustomerDisplay()
+{
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    // On the Pi: vt-guest-display puts the second HDMI beside the first (or back to mirroring)
+    // and restarts ViewTouch with (or without) the guest's window. Only when it differs from now.
+    if (!pos_ || !pos_->loggedIn())
+        return;
+    const QString tool = QStandardPaths::findExecutable(u"vt-guest-display"_s);
+    if (tool.isEmpty())
+        return;
+    QFile state(QDir::home().filePath(u".vt-customer-display"_s));
+    QString now;
+    if (state.open(QIODevice::ReadOnly))
+        now = QString::fromUtf8(state.readAll()).trimmed();
+    const QString wanted = pos_->terminalCustomerDisplay();
+    if ((now == u"window") == (wanted == u"window"))
+        return;
+    setStatus(tr("Customer display %1: ViewTouch restarts in a moment…").arg(wanted == u"window" ? tr("on") : tr("off")));
+    QProcess::startDetached(u"setsid"_s, {tool, wanted == u"window" ? u"on"_s : u"off"_s});
+#endif
 }
 
 void LayoutController::takeCard(const QString &tenderId, Done done)

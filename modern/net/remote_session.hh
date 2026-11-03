@@ -111,6 +111,7 @@ public:
     QString screenMode() const override { return v(u"screenMode").toString(); }
     QString terminalLook() const override { return v(u"terminalLook").toString(); }
     QString terminalKeyboard() const override { return v(u"terminalKeyboard").toString(); }
+    QString terminalCustomerDisplay() const override { return v(u"terminalCustomerDisplay").toString(); }
     QString terminalStartCategory() const override { return v(u"terminalStartCategory").toString(); }
     QString terminalCardReader() const override { return v(u"cardReader").toString(); }
     QVariantMap readerToken() const override { return v(u"readerToken").toMap(); }

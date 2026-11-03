@@ -227,6 +227,7 @@ class PosSession : public QObject {
     Q_PROPERTY(QString terminalLook READ terminalLook NOTIFY adminChanged)
     // This terminal's on-screen keyboard: "on", "off" or "" (automatic).
     Q_PROPERTY(QString terminalKeyboard READ terminalKeyboard NOTIFY adminChanged)
+    Q_PROPERTY(QString terminalCustomerDisplay READ terminalCustomerDisplay NOTIFY adminChanged)
     // Orders opened on this screen start on this menu category (Terminals).
     Q_PROPERTY(QString terminalStartCategory READ terminalStartCategory NOTIFY adminChanged)
     // This terminal's card reader: "stripe", "simulated" or "" (none).
@@ -397,6 +398,7 @@ public:
     virtual QString screenMode() const = 0;
     virtual QString terminalLook() const = 0;
     virtual QString terminalKeyboard() const = 0;
+    virtual QString terminalCustomerDisplay() const = 0;   // Manager -> Terminals: "window" or ""
     virtual QString terminalStartCategory() const = 0;
     virtual QString terminalCardReader() const = 0;
     virtual QVariantMap readerToken() const = 0;

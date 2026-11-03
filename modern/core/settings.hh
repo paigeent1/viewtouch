@@ -95,6 +95,8 @@ struct TerminalConfig {
     // "counter:tmr_..." (a Stripe reader beside it, run from the store's
     // computer), "simulated" (approves after a moment: for practice), or none.
     std::string cardReader;
+    // A customer display on its second monitor (the Pi's HDMI 2): "window", or empty = none.
+    std::string customerDisplay;
 
     bool operator==(const TerminalConfig &) const = default;
 };

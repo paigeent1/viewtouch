@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:31 ET — Bob (Claude) — Customer display switch in Manager > Terminals
+- **What:** TerminalConfig.customerDisplay ('window' or empty), field 'Customer display' in Manager -> Terminals (Off: second monitor mirrors; On: second monitor faces the guest). New session property terminalCustomerDisplay. On a Linux screen with vt-guest-display installed, LayoutController::applyCustomerDisplay (on adminChanged, logged in) compares it with ~/.vt-customer-display and runs setsid vt-guest-display on|off, which re-lays the monitors and restarts ViewTouch. Tablets ignore it.
+- **Why:** Owner: put the customer display setting in Manager > Terminals, more intuitive than a command.
+- **Files:** `core/settings.hh, app/pos_json.cpp, app/pos_admin_fields.cpp, app/pos_admin_save.cpp, app/pos_admin_records.cpp, app/pos_admin.cpp, app/pos_session.hh/.cpp, app/pos_service.hh, net/remote_session.hh/.cpp, ui/cpp/layoutcontroller.hh/.cpp`
+- **Next person must know:** Needs vt-guest-display and the new vt-server in /usr/local/bin on the Pi.
+
 ### 2026-11-03 17:25 ET — Bob (Claude) — Customer display on the Pi's second HDMI: vt-guest-display
 - **What:** The customer display already exists (--customer-display window: a full-screen guest window on the monitor the POS isn't on), but the Pi never used it: vt-server started vtmodern without the option and vt-mirror makes both HDMIs one screen. New scripts/bin/vt-guest-display on|off: on puts HDMI-2 beside HDMI-1 (xrandr --right-of / wlr-randr --pos, kept after reboots), writes ~/.vt-customer-display = window, restarts; off goes back to mirroring. vt-server now passes --customer-display from ~/.vt-customer-display or VT_CUSTOMER_DISPLAY.
 - **Why:** Owner asked whether the customer display on the second HDMI is available yet.
