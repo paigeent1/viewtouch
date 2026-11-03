@@ -28,6 +28,7 @@ Item {
     // The Order summary panel (WidgetOrderSummary.qml) is this list with no seat/course row, no extra rows
     // and no editing; an Order list can be made the same with props.controls false.
     readonly property bool controls: !(zone && ((zone.props && zone.props.controls === false) || zone.kind === "orderSummary"))
+    readonly property bool taxByClass: !!zone && zone.kind === "orderSummary"
     // The course Fire would send next (the lowest one on hold).
     readonly property int nextCourse: {
         let next = 0
@@ -669,8 +670,24 @@ Item {
             Cell { text: w.totals.subtotal ?? "" }
             Cell { text: qsTr("Discount"); visible: w.totals.hasDiscount ?? false; Layout.fillWidth: true }
             Cell { text: w.totals.discounts ?? ""; visible: w.totals.hasDiscount ?? false }
-            Cell { text: qsTr("Tax"); Layout.fillWidth: true }
-            Cell { text: w.totals.tax ?? "" }
+            // One tax line, or (the Order summary) each tax on its own: food, alcohol, merchandise...
+            Cell { text: qsTr("Tax"); visible: !w.taxByClass; Layout.fillWidth: true }
+            Cell { text: w.totals.tax ?? ""; visible: !w.taxByClass }
+            ColumnLayout {
+                visible: w.taxByClass
+                Layout.columnSpan: 2
+                Layout.fillWidth: true
+                spacing: 0
+                Repeater {
+                    model: w.taxByClass ? (w.totals.taxLines ?? []) : []
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Cell { text: modelData.name; Layout.fillWidth: true }
+                        Cell { text: modelData.amount }
+                    }
+                }
+            }
             Cell { text: qsTr("Gratuity %1%").arg(w.totals.gratuityPercent ?? 0); visible: w.totals.hasGratuity ?? false; Layout.fillWidth: true }
             Cell { text: w.totals.gratuity ?? ""; visible: w.totals.hasGratuity ?? false }
             Cell { text: qsTr("Total"); strong: true; Layout.fillWidth: true }

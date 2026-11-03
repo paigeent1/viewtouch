@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 15:46 ET — Bob (Claude) — Order summary breaks out each tax
+- **What:** WidgetOrderList: taxByClass (true for kind orderSummary) replaces the single Tax row with one row per tax class from totals.taxLines (Food tax, Alcohol tax, Merchandise tax, Room tax), as the Payment panel and receipt show. Order list unchanged.
+- **Why:** Owner: the Order summary must break out food/bev tax and merchandise tax.
+- **Files:** `modern/ui/qml/WidgetOrderList.qml`
+- **Next person must know:** Beverages taxed as Alcohol show as 'Alcohol tax'; if the store wants food and drinks on one line, combine Food+Alcohol in PosService::totals taxLines (or rename).
+
 ### 2026-11-03 15:45 ET — Bob (Claude) — New panel: Order summary
 - **What:** New zone kind orderSummary ('Order summary (items and totals, no seat/course)' in + Panel): WidgetOrderSummary.qml is WidgetOrderList with controls off (WidgetOrderList.controls is false for kind orderSummary): items, choices, voids and totals, no seat/course row, no takeout/another round/suggestion rows, lines not editable. Registered in layout/schema.cpp widgetKinds, ZoneItem builtWidgets, editorcontroller labels, CMake QML_FILES. Starter Pay page's 'items' zone now uses it. Not compiled here.
 - **Why:** Owner: a zone like the order list without seat/course info, to put on the Pay screen.
