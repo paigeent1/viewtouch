@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 15:45 ET — Bob (Claude) — New panel: Order summary
+- **What:** New zone kind orderSummary ('Order summary (items and totals, no seat/course)' in + Panel): WidgetOrderSummary.qml is WidgetOrderList with controls off (WidgetOrderList.controls is false for kind orderSummary): items, choices, voids and totals, no seat/course row, no takeout/another round/suggestion rows, lines not editable. Registered in layout/schema.cpp widgetKinds, ZoneItem builtWidgets, editorcontroller labels, CMake QML_FILES. Starter Pay page's 'items' zone now uses it. Not compiled here.
+- **Why:** Owner: a zone like the order list without seat/course info, to put on the Pay screen.
+- **Files:** `modern/ui/qml/WidgetOrderSummary.qml, modern/ui/qml/WidgetOrderList.qml, modern/layout/schema.cpp, modern/ui/qml/ZoneItem.qml, modern/ui/cpp/editorcontroller.cpp, modern/CMakeLists.txt, modern/seed/pages/settle.json`
+- **Next person must know:** Tablets need a new APK to draw it (until then they show a placeholder for that zone).
+
 ### 2026-11-03 15:08 ET — Bob (Claude) — Pay screen lists the check's items
 - **What:** seed/pages/settle.json: new orderList zone 'items' (x16 y16 440x1048, props.controls false: no seat/course row) on the left; the payment panel moves to x472, 444 wide. Number pad and tender buttons unchanged. The Pay screen never listed items before (only totals), since the baseline.
 - **Why:** Owner: pulling up a check and touching Pay showed no items.

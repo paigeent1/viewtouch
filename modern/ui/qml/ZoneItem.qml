@@ -187,7 +187,7 @@ Item {
     // Widgets with a working implementation (Widget<Kind>.qml); the rest
     // show a placeholder until their milestone.
     readonly property var builtWidgets: ["table", "tableGrid", "staffPicker", "checkHistory", "modifierPicker",
-        "soldOutList", "orderList", "loginPad", "guestCount", "numPad",
+        "soldOutList", "orderList", "orderSummary", "loginPad", "guestCount", "numPad",
         "paymentPanel", "checkList", "keyboard", "clock", "logoutPanel", "statusBar",
         "adminPanel", "reportView", "drawerPanel", "endOfDay", "splitCheck", "kitchenDisplay", "customerInfo",
         "customerLookup", "giftCard", "waitlist", "schedule", "factoryReset", "messageComposer", "network", "receiveDelivery", "stockCount", "wasteLog", "storeCheck", "prepLabels", "retailLabels", "checkSearch", "orderLater", "menuGrid", "menuCategories", "menuBuilder", "timeClock", "dashboard", "checklist", "hostStand", "deliveryBoard", "decor", "floorPlan"]

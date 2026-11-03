@@ -219,6 +219,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetNumPad.qml
             ui/qml/WidgetGuestCount.qml
             ui/qml/WidgetOrderList.qml
+            ui/qml/WidgetOrderSummary.qml
             ui/qml/WidgetPaymentPanel.qml
             ui/qml/WidgetCheckList.qml
             ui/qml/WidgetKeyboard.qml

@@ -13,7 +13,7 @@
   "zones": [
     {
       "id": "items",
-      "kind": "orderList",
+      "kind": "orderSummary",
       "rect": {
         "x": 16,
         "y": 16,
@@ -21,10 +21,7 @@
         "h": 1048
       },
       "shape": "rect",
-      "behavior": "none",
-      "props": {
-        "controls": false
-      }
+      "behavior": "none"
     },
     {
       "id": "payment",

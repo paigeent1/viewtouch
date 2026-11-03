@@ -25,7 +25,9 @@ Item {
     }
     readonly property var totals: pos ? pos.totals : ({})
     readonly property bool paid: pos !== null && pos.payments.length > 0
-    readonly property bool controls: !(zone && zone.props && zone.props.controls === false)
+    // The Order summary panel (WidgetOrderSummary.qml) is this list with no seat/course row, no extra rows
+    // and no editing; an Order list can be made the same with props.controls false.
+    readonly property bool controls: !(zone && ((zone.props && zone.props.controls === false) || zone.kind === "orderSummary"))
     // The course Fire would send next (the lowest one on hold).
     readonly property int nextCourse: {
         let next = 0

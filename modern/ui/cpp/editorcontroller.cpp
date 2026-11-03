@@ -263,6 +263,7 @@ QString EditorController::kindName(const QString &kind) const
         {u"modifierPicker"_s, QT_TR_NOOP("Choices picker")},
         {u"soldOutList"_s, QT_TR_NOOP("Sold out list")},
         {u"orderList"_s, QT_TR_NOOP("Order list")},
+        {u"orderSummary"_s, QT_TR_NOOP("Order summary (items and totals, no seat/course)")},
         {u"loginPad"_s, QT_TR_NOOP("Login keypad")},
         {u"guestCount"_s, QT_TR_NOOP("Guest count")},
         {u"checkList"_s, QT_TR_NOOP("Open checks")},
