@@ -511,6 +511,7 @@ QJsonArray actionTypes()
                             {"noSale", "Open drawer (no sale)"}, {"openDrawerSession", "Start drawer (bank)"},
                             {"countDrawer", "Count drawer"}, {"endOfDay", "End of day"},
                             {"saveExceptionTickets", "Save exception tickets (pictures + PDF)"},
+                            {"xReport", "X report (print sales and drawer so far; nothing resets)"},
                             {"login", "Log in"}, {"logout", "Log out"}, {"clockIn", "Clock in"},
                             {"clockOut", "Clock out"}, {"startCheck", "Start table check"},
                             {"startQuick", "Start quick check"}, {"startTakeout", "Start takeout"},

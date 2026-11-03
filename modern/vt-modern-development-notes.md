@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:39 ET — Bob (Claude) — X Report
+- **What:** New xReport command (anyone allowed to open the drawer): prints X REPORT on the receipt printer, today's Sales report and the Drawer report so far, nothing closed or reset. X Report key on the Reports screen (today); also selectable for any button in the editor. End of day remains the Z.
+- **Why:** Owner wants an X report to check the drawer and sales mid-shift on paper.
+- **Files:** `app/pos_service.hh, app/pos_day.cpp, app/pos_commands.cpp, app/pos_session.hh, layout/schema.cpp, ui/qml/WidgetReportView.qml, tests/test_pos_m4.cpp`
+
 ### 2026-11-03 16:36 ET — Bob (Claude) — EOD Summary PDF in a Daily Reports folder on the Pi
 - **What:** End of day now writes '<date> day <n>/' under 'Daily Reports' on the Pi's desktop (~/Desktop/Daily Reports; ~/Daily Reports without a desktop): 'EOD Summary <date>.pdf' (Sales, Deposit, Drawer, Servers, Tips, Labor, Categories, Items, Hourly, Expenses, Exceptions as tables, empty ones left out, then the exception ticket pictures three across), plus the exception JPEGs and 'Exceptions <date>.pdf' from the previous entry. VT_REPORTS_DIR moves it (for an extra drive later). New print/day_summary.{hh,cpp}; PosPrinter::saveEndOfDay.
 - **Why:** Owner: EOD summary as PDF in a folder called daily reports for now; going paperless, may add a drive for documents.

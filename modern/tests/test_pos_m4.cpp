@@ -618,6 +618,23 @@ TEST_CASE("No Sale on a screen asks why with buttons; the Exceptions report coun
     CHECK(p.printer.drawerKicks == kicks + 2);
 }
 
+TEST_CASE("X report: sales and drawers so far on paper, nothing closed", "[m4][reports][xreport]")
+{
+    Pos p;
+    p.login("1234");
+    p.openDrawer("10000");
+    p.cashSale("cobb", "2000");
+    const auto reports = p.printer.reports.size();
+    REQUIRE(p.pos.xReport());
+    REQUIRE(p.printer.reports.size() == reports + 1);
+    CHECK(p.printer.reports.back() == "X REPORT");
+    const core::Report x = p.pos.buildXReport();
+    CHECK(std::ranges::count_if(x.rows, [](const core::ReportRow &r) { return r.kind == core::ReportRow::Kind::Section; }) == 2);
+    // The drawer stays open and the day goes on.
+    CHECK(p.pos.shared()->drawers.front().open());
+    CHECK(p.pos.shared()->closedToday.size() == 1);
+}
+
 TEST_CASE("Deposit report: cash to the bank, card batch, and the books balance", "[m4][reports][deposit]")
 {
     Pos p;

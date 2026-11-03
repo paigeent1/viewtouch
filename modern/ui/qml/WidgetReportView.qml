@@ -322,6 +322,15 @@ Item {
                 onClicked: w.zone.controller.exportReport(w.report, "pdf")
             }
             WidgetKey {
+                // Today's sales and drawers on paper, nothing reset.
+                visible: w.period === "day" && w.dayIndex === 0
+                Layout.preferredWidth: w.unit * 6
+                Layout.fillHeight: true
+                text: qsTr("X Report")
+                fontScale: 0.36
+                onClicked: w.pos.xReport()
+            }
+            WidgetKey {
                 // Today's exception tickets as pictures + one PDF on the main computer (also saved at end of day).
                 visible: w.reportId === "exceptions" && w.period === "day" && w.dayIndex === 0
                 Layout.preferredWidth: w.unit * 6

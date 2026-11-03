@@ -783,6 +783,10 @@ public:
     bool endOfDay();
     // The day's exception tickets as pictures and a PDF (also done at end of day). Manager.
     bool saveExceptionTickets();
+    // X report: today's sales and the drawers so far on the receipt printer; nothing closes or resets
+    // (End of day is the Z). Anyone who may open the drawer.
+    bool xReport();
+    core::Report buildXReport() const;
     std::vector<PosPrinter::ExceptionTicket> exceptionTickets() const;
     const core::BusinessDay &currentDay() const { return s_->day; }
     const std::vector<core::Check> &closedToday() const { return s_->closedToday; }

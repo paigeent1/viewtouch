@@ -1380,6 +1380,33 @@ std::vector<PosPrinter::ExceptionTicket> PosService::exceptionTickets() const
     return out;
 }
 
+core::Report PosService::buildXReport() const
+{
+    Report x;
+    x.id = "x";
+    x.title = "X REPORT";
+    x.subtitle = "Mid-shift: nothing is closed or reset. " + ss(clockText(now()));
+    for (const QString &id : {u"sales"_s, u"drawer"_s}) {
+        const Report part = buildReport(id);
+        x.section(part.title);
+        for (const ReportRow &row : part.rows)
+            x.rows.push_back(row.kind == ReportRow::Kind::Section ? ReportRow{ReportRow::Kind::Line, {"-- " + (row.cells.empty() ? std::string() : row.cells.front()) + " --"}}
+                                                                  : row);
+    }
+    return x;
+}
+
+bool PosService::xReport()
+{
+    if (!require(perm::Settle, tr("Printing an X report")))
+        return false;
+    if (!s_->printer)
+        return fail(tr("No printer is set up."));
+    s_->printer->printReport(s_->settings, buildXReport(), receiptPrinter());
+    emit notice(tr("X report printed"));
+    return true;
+}
+
 bool PosService::saveExceptionTickets()
 {
     if (!require(perm::Manager, tr("Saving the exception tickets")))
