@@ -1020,6 +1020,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"expoSkips"_s, [&] { QJsonArray a; for (const std::string &r : s.expoSkips) a.append(qs(r)); return a; }()},
         {u"voidReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.voidReasons) a.append(qs(r)); return a; }()},
         {u"compReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.compReasons) a.append(qs(r)); return a; }()},
+        {u"noSaleReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.noSaleReasons) a.append(qs(r)); return a; }()},
         {u"cashDenominations"_s, [&] { QJsonArray a; for (std::int64_t c : s.cashDenominations) a.append(qint64(c)); return a; }()},
         {u"backupCopyDir"_s, qs(s.backupCopyDir)},
         {u"backupKey"_s, qs(s.backupKey)}, {u"backupSalt"_s, qs(s.backupSalt)},
@@ -1271,6 +1272,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.problemsSeen = i64(o.value(u"problemsSeen"));
     s.labelPrinter = ss(o.value(u"labelPrinter").toString());
     for (auto [key, list] : {std::pair{u"voidReasons", &s.voidReasons}, std::pair{u"compReasons", &s.compReasons},
+                             std::pair{u"noSaleReasons", &s.noSaleReasons},
                              std::pair{u"wasteReasons", &s.wasteReasons}, std::pair{u"expoSkips", &s.expoSkips}}) {
         if (!o.value(QStringView(key)).isArray())
             continue;

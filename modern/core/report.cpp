@@ -849,6 +849,17 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
             all += n;
         }
         r.total({"All", count(all), ""});
+        // Why (the No Sale reason buttons).
+        std::map<std::string, std::int64_t> why;
+        for (const DrawerSession &d : drawers)
+            for (const CashMovement &m : d.movements)
+                if (m.kind == CashMovement::Kind::NoSale)
+                    ++why[m.reason.empty() ? std::string("(no reason given)") : m.reason];
+        if (why.size() > 1 || !why.contains("(no reason given)")) {
+            r.section("No sale: why");
+            for (const auto &[reason, n] : why)
+                r.line({reason, count(n), ""});
+        }
     }
 
     if (!any) {

@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:21 ET — Bob (Claude) — No Sale asks why with reason buttons
+- **What:** No Sale now shows reason buttons (the same sheet as voids/comps, titled 'Why open the drawer?') before the drawer opens; Cancel keeps it shut. The reason is kept on the drawer's NoSale movement and the Exceptions report adds a 'No sale: why' section. Reasons are edited in Store Settings > Voids, comps and No Sale (Reasons for No Sale); an empty list turns the question off. Defaults: Make change, Fix a payment, Count or check the drawer, Cash drop or pickup, Manager request.
+- **Why:** Owner asked for buttons for employee input of a No Sale reason.
+- **Files:** `core/settings.hh, app/pos_day.cpp, app/pos_service.cpp, app/pos_json.cpp, app/pos_admin_fields.cpp, app/pos_admin_shared.hh, app/pos_admin_save.cpp, app/pos_admin_records.cpp, core/report.cpp, ui/qml/ReasonSheet.qml, tests/test_pos_m4.cpp`
+
 ### 2026-11-03 16:11 ET — Bob (Claude) — Setting: voids and error corrects on receipts
 - **What:** PosSettings::receiptShowVoids (default off, saved in settings JSON; Store Settings > Receipts 'Voids and error corrects on receipts'). On: the guest receipt prints voided lines as 'VOID <item>' and error corrects as 'ERR CORR <item>' with the price in brackets, not counted; off: left off (today's behavior). Cashier screen and Exceptions report unchanged. Test [receipts] extended. Not compiled here.
 - **Why:** Owner: make omitting voids/error corrects from the customer receipt a setting.

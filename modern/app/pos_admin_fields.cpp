@@ -532,6 +532,10 @@ QVariantList PosService::adminFields(const QString &panel)
                      "The Exceptions report adds them up. Can be set per employee.")),
             asRows(field(u"voidReasons"_s, tr("Reasons for voids"), u"text"_s), tr("+ Add a reason")),
             asRows(field(u"compReasons"_s, tr("Reasons for discounts and comps"), u"text"_s), tr("+ Add a reason")),
+            asRows(field(u"noSaleReasons"_s, tr("Reasons for No Sale"), u"text"_s,
+                         tr("No Sale asks why with these buttons before the drawer opens; the Exceptions report counts them. "
+                            "No reasons: it doesn't ask.")),
+                   tr("+ Add a reason")),
             asRows(field(u"openingChecklist"_s, tr("Opening checklist"), u"text"_s,
                          tr("Staff tick them off on the Checklists page.")),
                    tr("+ Add a task")),

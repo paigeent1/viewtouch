@@ -145,7 +145,7 @@ inline QVariantList storeSections(const QVariantList &fields)
          {"startPage.server", "startPage.bartender", "startPage.cashier", "startPage.host", "startPage.manager"}},
         {"cash", PosService::tr("Cash"), {"cashMode", "terminalsHaveDrawer", "checkoutNeedsClosedChecks", "blindDrawerCount", "cashDenominations",
           "expenseCategories"}},
-        {"reasons", PosService::tr("Voids and comps"), {"askReasons", "voidReasons", "compReasons"}},
+        {"reasons", PosService::tr("Voids, comps and No Sale"), {"askReasons", "voidReasons", "compReasons", "noSaleReasons"}},
         {"hours", PosService::tr("Staff hours"),
          {"laborState", "paidBreaks", "overtimeDailyHours", "doubleTimeDailyHours", "seventhDayRule", "overtimeWeeklyHours", "mealBreakAfterHours", "giftCardCashBelow", "weekStartsOn", "scheduleRequired", "clockInEarlyMinutes", "checksPerServerHour"}},
         {"tips", PosService::tr("Tips"),

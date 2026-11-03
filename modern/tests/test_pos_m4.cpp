@@ -572,6 +572,44 @@ TEST_CASE("Exceptions report: voids, comps, payments taken back, reopened, no sa
     CHECK(app::checkFromJson(app::toJson(c))->events == c.events);
 }
 
+TEST_CASE("No Sale on a screen asks why with buttons; the Exceptions report counts the reasons",
+          "[m4][reports][exceptions][reasons]")
+{
+    Pos p;
+    p.login("1234");
+    p.openDrawer("10000");
+    const int kicks = p.printer.drawerKicks;
+    const auto run = [&](const QString &method) {
+        bool ok = false;
+        p.pos.invoke(method, {}, [&](const QVariant &r) { ok = r.toBool(); });
+        return ok;
+    };
+    // Asks first: the drawer stays shut until answered.
+    CHECK_FALSE(run(u"noSale"_s));
+    QVariantMap ask = p.pos.reasonAsk();
+    REQUIRE(ask[u"kind"_s] == u"noSale"_s);
+    CHECK(ask[u"reasons"_s].toStringList().contains(u"Make change"_s));
+    CHECK(p.printer.drawerKicks == kicks);
+    // Cancel: still shut, nothing recorded.
+    REQUIRE(p.pos.giveReason(QString()));
+    CHECK(p.printer.drawerKicks == kicks);
+    // A reason: it opens, with the reason kept.
+    CHECK_FALSE(run(u"noSale"_s));
+    REQUIRE(p.pos.giveReason(u"Make change"_s));
+    CHECK(p.pos.reasonAsk().isEmpty());
+    CHECK(p.printer.drawerKicks == kicks + 1);
+    const core::CashMovement &m = p.pos.shared()->drawers.front().movements.back();
+    CHECK(m.kind == core::CashMovement::Kind::NoSale);
+    CHECK(m.reason == "Make change");
+    const core::Report r = p.pos.buildReport(u"exceptions"_s);
+    CHECK(rowIn(r, "No sale: why", "Make change") == std::vector<std::string>{"Make change", "1", ""});
+
+    // No reasons in Store Settings: it opens without asking.
+    p.pos.shared()->settings.noSaleReasons.clear();
+    CHECK(run(u"noSale"_s));
+    CHECK(p.printer.drawerKicks == kicks + 2);
+}
+
 TEST_CASE("Deposit report: cash to the bank, card batch, and the books balance", "[m4][reports][deposit]")
 {
     Pos p;

@@ -129,12 +129,17 @@ bool PosService::noSale()
         return fail(tr("%1 has no cash drawer.").arg(terminal_));
     if (!s_->printer)
         return fail(tr("No printer is set up."));
+    // Why the drawer opens (Store Settings > Voids, comps and No Sale): asked with buttons first.
+    if (!haveReason("noSale", tr("Open the drawer with no sale")))
+        return false;
+    const std::string why = takeReason();
     s_->printer->openDrawer(s_->settings, receiptPrinter());
     // Kept with the drawer: who opened it with nothing sold (exceptions report).
     if (DrawerSession *d = myDrawer()) {
         CashMovement m;
         m.id = d->nextMovementId++;
         m.kind = CashMovement::Kind::NoSale;
+        m.reason = why;
         m.by = user() ? user()->name : std::string();
         m.at = now();
         d->movements.push_back(m);

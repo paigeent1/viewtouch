@@ -31,7 +31,8 @@ Rectangle {
             spacing: 10
             Text {
                 Layout.fillWidth: true
-                text: sheet.info.kind === "void" ? qsTr("Why take it off?") : qsTr("Why the discount?")
+                text: sheet.info.kind === "void" ? qsTr("Why take it off?")
+                      : sheet.info.kind === "noSale" ? qsTr("Why open the drawer?") : qsTr("Why the discount?")
                 color: "white"
                 font.pixelSize: 24
                 font.bold: true
