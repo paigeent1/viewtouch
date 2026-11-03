@@ -217,7 +217,8 @@ void LayoutController::screenOn()
 
 void LayoutController::idleTimeout()
 {
-    if (QProcess::execute(u"pgrep"_s, {u"-f"_s, u"vt_label_utility.py"_s}) == 0) {
+    // The label utility is open (by its file name or the /usr/local/bin/vt-label-utility launcher): stay logged in.
+    if (QProcess::execute(u"pgrep"_s, {u"-f"_s, u"vt[_-]label[_-]utility"_s}) == 0) {
         restartIdle();
         return;
     }

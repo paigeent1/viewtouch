@@ -18,7 +18,8 @@ changes what the operator sees or does, raise it, add a line here, and tag the c
   (also `openLabelUtility:<UPC>` or a `upc` argument).
 - `ui/cpp/layoutcontroller.cpp` runs **`/usr/local/bin/vt-label-utility`** (from `scripts/bin/vt-label-utility`),
   adding **`--upc <code>`** when a UPC is given. The utility opens straight to that item's label preview.
-- The idle-logout check looks for a running **`vt_label_utility.py`** (`pgrep -f`). Don't rename the file.
+- The idle-logout check looks for a running **`vt_label_utility.py`** or **`vt-label-utility`** (`pgrep -f 'vt[_-]label[_-]utility'`). Don't rename the file.
+- **`/usr/local/bin/vt-label-utility` must stay the 5-line launcher** from `scripts/bin/vt-label-utility` (it runs the repo copy). Never copy the whole script there: ViewTouch would run that stale copy and Git updates would never show (happened 2026-11-02).
 - `scripts/bin/vt-tmp` backs the file up to Google Drive.
 
 ## Design rules (please keep)

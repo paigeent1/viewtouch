@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 19:52 ET — Bob (Claude) — Label utility: /usr/local/bin/vt-label-utility was a stale full copy; idle check matches both names
+- **What:** On the Pi /usr/local/bin/vt-label-utility had been overwritten with a whole (Neil-edited) label utility instead of the launcher, so ViewTouch's button ran that copy: Git fixes (Next, 6 columns) never showed, no trail lines were logged, and the idle log-out check (pgrep vt_label_utility.py) missed it, so employees were logged out while it was open. Owner reinstalls the launcher from scripts/bin. layoutcontroller.cpp idleTimeout now matches pgrep -f 'vt[_-]label[_-]utility'. LABEL_UTILITY_NOTES.md: the launcher must stay the launcher.
+- **Why:** Owner: Next still unresponsive and 6-column change didn't show; employee should stay logged in while the label utility runs.
+- **Files:** `modern/ui/cpp/layoutcontroller.cpp, modern/tools/LABEL_UTILITY_NOTES.md`
+- **Next person must know:** Never copy vt_label_utility.py to /usr/local/bin; install_label_utility.sh installs the launcher.
+
 ### 2026-11-02 19:46 ET — Bob (Claude) — Label utility: item select screen is 6 columns with touch-size rows
 - **What:** Screen 3 (select items) shows only Selected, Print Qty, UPC on Label, Other UPCs, Description, Price (dropped Category, Item #, Group, Family, Brand); rows 58 px with a 14 pt font (like the template list), bold 12 pt headings, a scroll bar; touching a row keeps the list where it was instead of jumping to the top. Tested: toggling keeps scroll, Next -> screen 4.
 - **Why:** Owner: only the first 6 columns are needed; bigger lines for the touch screen.
