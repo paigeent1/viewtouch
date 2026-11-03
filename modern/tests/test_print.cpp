@@ -582,7 +582,9 @@ TEST_CASE("Every printout fits the paper and stays readable", "[print][fit]")
                 for (const bool accents : {true, false}) {
                     for (const std::string &row : escPosRows(renderEscPos(d, width, accents))) {
                         INFO(width << (accents ? " PC858: " : " plain: ") << row);
-                        CHECK(row.size() <= std::size_t(width));   // one byte, one column
+                        // One byte, one column; rows in the smaller Font B (a choice, "Opened ...") fit 4/3 as
+                        // many across the same paper (print/document.cpp renderEscPos).
+                        CHECK(row.size() <= std::size_t(width) * 4 / 3);
                         CHECK(row.find('?') == std::string::npos);
                         if (!accents)
                             CHECK(std::ranges::none_of(row, [](char ch) { return static_cast<unsigned char>(ch) >= 0x80; }));
@@ -602,14 +604,14 @@ TEST_CASE("Every printout fits the paper and stays readable", "[print][fit]")
     CHECK(contains(renderEscPos(receipt(c, ctx(seed.settings)), 42, false), "EUR"));
 }
 
-TEST_CASE("Receipts leave out free choices; the kitchen gets them all", "[print][fit]")
+TEST_CASE("Receipts print every choice, free ones too (the store's rule); the kitchen gets them all", "[print][fit]")
 {
     auto seed = test::seedPosData();
     const core::Check c = awkwardCheck();
     std::string r = renderText(receipt(c, ctx(seed.settings)), 42);
     CHECK(contains(r, "Extra bacon"));
-    CHECK_FALSE(contains(r, "No onion"));
-    CHECK_FALSE(contains(r, "Medium rare"));
+    CHECK(contains(r, "No onion"));
+    CHECK(contains(r, "Medium rare"));
     const std::string k = renderText(kitchenTicket(c, c.lines, "Kitchen", false, ctx(seed.settings)), 42);
     CHECK(contains(k, "No onion"));
     CHECK(contains(k, "Medium rare"));

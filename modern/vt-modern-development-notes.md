@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 09:31 ET — Bob (Claude) — Print tests match the store's receipt rules
+- **What:** Two [print] tests failed on the Pi since the store's Oct 23/27 changes (not from today's work): ESC/POS rows in Font B (sub-lines) are up to 4/3 of the width in characters (same paper width), and the guest receipt prints every choice, free ones too. test_print.cpp now allows width*4/3 bytes per ESC/POS row and expects free choices on the receipt (test renamed). Pi run 09:31: [receipts],[admin],[labels],[print] otherwise passed (49/51 cases), including the new retail receipt test.
+- **Why:** Pi test failures 09:31.
+- **Files:** `modern/tests/test_print.cpp`
+
 ### 2026-11-03 09:25 ET — Bob (Claude) — Pi builds use 4 cores; 2 GB swap; ccache
 - **What:** Pi 5: 4 cores, 7.9 GB RAM, swap was 200 MB, ccache installed. vt-server and capture_vt_screenshots.sh build with -j${VT_JOBS:-4} (was -j2). Owner sets /etc/dphys-swapfile CONF_SWAPSIZE=2048 and points modern/build at ccache (CMAKE_C/CXX_COMPILER_LAUNCHER=ccache, max 5 GB); notes rule updated.
 - **Why:** Owner: use more cores to speed up builds.
