@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 19:41 ET — Bob (Claude) — Label utility: trail of Next touches and screens in its log
+- **What:** vt_label_utility.py writes INFO lines to /tmp/vt_label_utility.log when Next is touched (and whether it was enabled), when go_next runs (screen, items shown, items ticked), and when each screen starts and is ready. Owner reports Next does nothing with items ticked on the Pi (2d00762, ILSA temp price book 6.7 MB); no error in either log, and it does not reproduce off the Pi (ViewTouch items, small and 45,000-item price books, all modes: screen 4 in under a second).
+- **Why:** Find where Next stops on the Pi without guessing.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** Also confirmed: the idle log-out still skips while vt_label_utility.py runs (layoutcontroller.cpp idleTimeout pgrep); the launcher's command line contains that name.
+
 ### 2026-11-02 19:18 ET — Bob (Claude) — Gift Card screen: Pay in a bottom bar, clear of the page buttons
 - **What:** WidgetGiftCard.qml: Transfer / Replace Card... | Pay the Check from This Card (center, wider; Add Customer / Bypass replaces it when asked) | Cash Out (only when allowed; otherwise a blank space so Pay stays centered) now sit in a bar along the bottom of the gift card area. The left column is shorter, so it no longer runs past the area onto the page's '‹ Back/Manager' button.
 - **Why:** Owner: the Pay button was overlapped by the Manager button. Bob's earlier additions (Purchased For/By, Transfer) made the left column taller than the area.

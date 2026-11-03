@@ -24,6 +24,10 @@ def _log_err(exc, val, tb):
 
 sys.excepthook = _log_err
 tk.Tk.report_callback_exception = lambda self, exc, val, tb: _log_err(exc, val, tb)
+# A short trail of what was touched (Next / Back and which screen opened), so a button that seems to do
+# nothing can be followed in /tmp/vt_label_utility.log even when no error happens.
+_trace = logging.getLogger("vt.trace")
+_trace.setLevel(logging.INFO)
 
 import datetime, glob, json, os, sqlite3, subprocess, tkinter as tk
 from tkinter import ttk, messagebox
@@ -2353,6 +2357,8 @@ class VTRoundedButton(tk.Canvas):
         self.configure(**{key: value})
 
     def _on_press(self, _event=None):
+        if getattr(self, "trace_name", None):
+            _trace.info("%s touched (%s)", self.trace_name, self.btn_state)
         if self.btn_state == "disabled":
             return "break"
         self.pressed = True
@@ -2580,6 +2586,7 @@ class VTLabelUtility(tk.Tk):
 
         self.next_btn = make_vt_btn(bbar, text="Next >>", bg="#047857", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.go_next)
         self.next_btn.pack(side="right", padx=(6, 4), pady=4)
+        self.next_btn.trace_name = "Next"
 
         self.prev_btn = make_vt_btn(bbar, text="<< Previous", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, radius=12, command=self.go_prev)
         self.prev_btn.pack(side="right", padx=6, pady=4)
@@ -2709,6 +2716,7 @@ class VTLabelUtility(tk.Tk):
         folder = os.path.expanduser("~/viewtouch-main/modern/seed/templates")
         subprocess.Popen(["xdg-open", folder if os.path.exists(folder) else os.path.expanduser("~/.local/share/ViewTouch")])
     def show_step(self, step):
+        _trace.info("show screen %s", step)
         self.current_step = step
         for w in self.content.winfo_children():
             w.destroy()
@@ -2733,6 +2741,7 @@ class VTLabelUtility(tk.Tk):
             self.prev_btn.config(state="normal", bg="#0f766e", activebackground="#0f766e")
             self.next_btn.config(state="disabled", bg="#1e293b", activebackground="#1e293b")
             self._build_step4()
+        _trace.info("screen %s ready", step)
 
     def select_mode_and_go(self, m_val):
         self.mode_var.set(m_val)
@@ -3583,6 +3592,9 @@ class VTLabelUtility(tk.Tk):
         qty_ent.focus_force()
 
     def go_next(self):
+        _trace.info("go_next on screen %s: %d items shown, %d ticked", self.current_step,
+                    len(getattr(self, "filtered_items", []) or []),
+                    sum(1 for it in (getattr(self, "filtered_items", []) or []) if it.get("selected")))
         if self.current_step == 1:
             mode = getattr(self, 'mode_var_val', 'tree')
             if hasattr(self, 'mode_var'): mode = self.mode_var.get() or mode
