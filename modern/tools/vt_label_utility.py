@@ -3070,23 +3070,31 @@ class VTLabelUtility(tk.Tk):
         sp.pack(side="right", padx=4)
 
         flow_wrap(top)
-        cols = ("sel", "qty", "upca", "upce", "desc", "price", "dept_name", "dept_num", "dept_grp", "cat", "mfg")
-        self.grid_tree = ttk.Treeview(self.content, columns=cols, show="headings", selectmode="browse")
+        # Six columns and tall rows, for a finger on the touch screen (the tree already chose the category/brand).
+        g_style = ttk.Style(self)
+        g_style.configure("ItemGrid.Treeview", rowheight=58, font=("Sans", 14))
+        g_style.configure("ItemGrid.Treeview.Heading", font=("Sans", 12, "bold"))
+        cols = ("sel", "qty", "upca", "upce", "desc", "price")
+        grid_frame = tk.Frame(self.content, bg="#1e242d")
+        grid_frame.pack(fill="both", expand=True, padx=8, pady=4)
+        self.grid_tree = ttk.Treeview(grid_frame, columns=cols, show="headings", selectmode="browse", style="ItemGrid.Treeview")
         headers = [
-            ("sel", "Selected", 70), ("qty", "Print Qty", 70), ("upca", "UPC on Label", 175),
-            ("upce", "Other UPCs", 150), ("desc", "Description", 250), ("price", "Price", 75),
-            ("dept_name", "Category", 130), ("dept_num", "Item #", 75),
-            ("dept_grp", "Group", 105), ("cat", "Family", 115), ("mfg", "Brand / Mfg", 115)
+            ("sel", "Selected", 110, False), ("qty", "Print Qty", 110, False), ("upca", "UPC on Label", 230, True),
+            ("upce", "Other UPCs", 200, True), ("desc", "Description", 420, True), ("price", "Price", 110, False),
         ]
-        for c_id, h_txt, w in headers:
+        for c_id, h_txt, w, grow in headers:
             self.grid_tree.heading(c_id, text=h_txt)
-            self.grid_tree.column(c_id, width=w, anchor="center" if c_id in ("sel", "qty", "dept_num") else "w")
-
-        self.grid_tree.pack(fill="both", expand=True, padx=8, pady=4)
+            self.grid_tree.column(c_id, width=w, minwidth=w // 2, stretch=grow,
+                                  anchor="center" if c_id in ("sel", "qty") else ("e" if c_id == "price" else "w"))
+        g_scroll = ttk.Scrollbar(grid_frame, orient="vertical", command=self.grid_tree.yview)
+        self.grid_tree.configure(yscrollcommand=g_scroll.set)
+        g_scroll.pack(side="right", fill="y")
+        self.grid_tree.pack(side="left", fill="both", expand=True)
         self.grid_tree.bind("<ButtonRelease-1>", self.on_toggle_row)
         self._populate_grid()
 
     def _populate_grid(self):
+        top = self.grid_tree.yview()[0] if self.grid_tree.get_children() else 0.0   # touching a row keeps the list where it was
         self.grid_tree.delete(*self.grid_tree.get_children())
         q = getattr(self, "filter_var", tk.StringVar()).get().strip().lower()
         for idx, it in enumerate(self.filtered_items):
@@ -3098,9 +3106,11 @@ class VTLabelUtility(tk.Tk):
             on_label = it["upc"] if lbl == "Primary UPC" else f"{it['upc']}  [{lbl}]"
             others = ", ".join(c for _, c in it.get("upc_choices", []) if c != it["upc"])
             self.grid_tree.insert("", "end", iid=str(idx), values=(
-                chk, it["qty"], on_label, others, it["name"], f"${it['price']:.2f}",
-                it["dept_name"], it["dept_num"], it["dept_group"], it["category"], it["manufacturer"]
+                chk, it["qty"], on_label, others, it["name"], f"${it['price']:.2f}"
             ))
+        if top:
+            self.grid_tree.update_idletasks()
+            self.grid_tree.yview_moveto(top)
 
     def on_toggle_row(self, _event=None):
         sel = self.grid_tree.selection()

@@ -93,6 +93,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 19:46 ET — Bob (Claude) — Label utility: item select screen is 6 columns with touch-size rows
+- **What:** Screen 3 (select items) shows only Selected, Print Qty, UPC on Label, Other UPCs, Description, Price (dropped Category, Item #, Group, Family, Brand); rows 58 px with a 14 pt font (like the template list), bold 12 pt headings, a scroll bar; touching a row keeps the list where it was instead of jumping to the top. Tested: toggling keeps scroll, Next -> screen 4.
+- **Why:** Owner: only the first 6 columns are needed; bigger lines for the touch screen.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-02 19:44 ET — Bob (Claude) — Label utility: Next fixed; Neil's deeper ILSA tree merged safely
 - **What:** Cause of 'Next does nothing with items ticked': an uncommitted edit on the Pi (Neil) indented show_step() into the screen-2 branch of go_next, so screen 3 never advanced. That edit also left 'items = []' inside the price-book if (NameError without a price book) and replaced the parse_vt_menu_dict item builder (losing the 17:34 fixes). Merged its good part into main: price book rows read dept_grp when the table has it (PRAGMA check), plus prod_grp, sub_grp, cost, pack_qty; mfg GENERAL or a number falls back to the name; items sorted. Tree is dept group > category > brand > product group > sub group (root says ILSA INVENTORY HIERARCHY for the price book; categories start closed above 2,000 items). Next on screen 2 filters by the chosen node and its parents (a brand under one category). Tested: tree, every level's filter, Next screen 3 -> 4, $120.00 stays $120.00, alt UPCs kept.
 - **Why:** Owner: label utility Next unresponsive with items selected.
