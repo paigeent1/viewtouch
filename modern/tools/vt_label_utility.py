@@ -2787,7 +2787,7 @@ class VTLabelUtility(tk.Tk):
             self.next_btn.config(state="normal", text="Next >>", bg="#047857", activebackground="#047857")
             self._build_step1()
         elif step == 2:
-            self.header_banner.config(text="ViewTouch Label Utility — Select Category / Brand from viewtouch.db")
+            self.header_banner.config(text="ViewTouch Label Utility — Select Category / Manufacturer / Product Group")
             self.prev_btn.config(state="normal", bg="#0f766e", activebackground="#0f766e")
             self.next_btn.config(state="normal", text="Next >>", bg="#047857", activebackground="#047857")
             self._build_step2()
@@ -3032,7 +3032,7 @@ class VTLabelUtility(tk.Tk):
         t_style.configure("TouchTree.Vertical.TScrollbar", arrowsize=34, width=34)
 
         # The left list goes down the tree one level per touch: categories, then that category's
-        # manufacturers, then that manufacturer's brands, then sub groups. "‹ Back" goes up a level.
+        # manufacturers, then that manufacturer's product groups, then sub groups. "‹ Back" goes up a level.
         self.drill_title = tk.Label(left, text="", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold"),
                                     anchor="w", justify="left", wraplength=330)
         self.drill_title.pack(anchor="w", fill="x")
@@ -3048,7 +3048,7 @@ class VTLabelUtility(tk.Tk):
 
         right = tk.Frame(self.content, bg="#1e242d")
         right.pack(side="right", fill="both", expand=True, padx=8, pady=8)
-        tk.Label(right, text="Category > Manufacturer > Brand > Sub group   (Next >> prints the level chosen)",
+        tk.Label(right, text="Category > Manufacturer > Product group > Sub group   (Next >> prints the level chosen)",
                  bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
 
         tree_box = tk.Frame(right, bg="#1e242d")
@@ -3068,7 +3068,7 @@ class VTLabelUtility(tk.Tk):
     # The levels the left list goes down, with the item field each one is, and how the tree names a blank.
     DRILL_LEVELS = [("CAT", "category", "Categories", "GENERAL"),
                     ("MFG", "manufacturer", "Manufacturers", "GENERAL"),
-                    ("PGRP", "prod_grp", "Brands", ""),
+                    ("PGRP", "prod_grp", "Product groups", ""),
                     ("SGRP", "sub_grp", "Sub groups", "")]
 
     def _drill_value(self, it, level):
@@ -3154,7 +3154,7 @@ class VTLabelUtility(tk.Tk):
         ilsa = any(it.get("source") == "ilsa_temp" for it in self.all_items[:1])
         root_text = "ILSA INVENTORY HIERARCHY" if ilsa else "VIEWTOUCH CATALOG (viewtouch.db)"
         root_node = self.cat_tree.insert("", "end", text=root_text, open=True, values=("ALL", ""))
-        # Department group > category > manufacturer > brand (product group) > sub group (the last two only
+        # Department group > category > manufacturer > product group > sub group (the last two only
         # when the items have them, as ILSA's price book does). Categories start folded.
         tree_map = {}
         for it in self.all_items:
@@ -3180,7 +3180,7 @@ class VTLabelUtility(tk.Tk):
                     for pg in sorted(tree_map[dg][cat][mfg].keys()):
                         if not pg:
                             continue
-                        pg_id = self.cat_tree.insert(mfg_id, "end", text=f"B  {pg}", open=False, values=("PGRP", pg, mfg, cat))
+                        pg_id = self.cat_tree.insert(mfg_id, "end", text=f"P  {pg}", open=False, values=("PGRP", pg, mfg, cat))
                         k_pg = k_mfg + (("PGRP", pg),)
                         self._tree_nodes[k_pg] = pg_id
                         for sg in sorted(tree_map[dg][cat][mfg][pg]):

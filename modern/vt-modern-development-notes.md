@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:53 ET — Bob (Claude) — Label utility Tree View: Product groups, not Brands
+- **What:** Third drill level renamed 'Product groups' (ILSA prod_grp); tree rows tagged P; screen header 'Select Category / Manufacturer / Product Group'. Levels: Category > Manufacturer > Product group > Sub group.
+- **Why:** Owner: it's product group, not brand.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 10:48 ET — Bob (Claude) — Label utility Tree View: drill down Category > Manufacturer > Brand > Sub group
 - **What:** Screen 2's left list drills down one level per touch (DRILL_LEVELS: categories, then the category's manufacturers, then brands = ILSA product group, then sub groups), with item counts, a '‹ Back' row, and a title showing the path. The right tree (categories now always start folded) follows: only the chosen path open, the chosen level selected (Next prints it), its next level visible but folded; tree rows tagged M (manufacturer) / B (brand). drill_path is kept, so Previous from the item list returns to the same level; choosing Tree View starts at the categories. Tested: PREMIUM CIGARS -> its manufacturers -> brands, Back, Next (5 items of that manufacturer in that category), Previous back to the same level.
 - **Why:** Owner: touching Premium Cigars opened everything; manufacturer should come next, then brand, folded, and the left list should move down the tree.
