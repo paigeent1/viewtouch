@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 07:15 ET — Bob (Claude) — Tablet app run 41632511817 (4e3b8bc) succeeded
+- **What:** Android build of 4e3b8bc succeeded: tablet Labels screen in steps (label styles, tree levels with Show Items, items, To Print), label preview, print order, step-by-step Back; Gift Card screen with Transfer/Cash Out beside the balance and Pay centered. A duplicate run 41632598473 of the same commit was also started.
+- **Why:** Owner asked to watch the build.
+- **Files:** `(none)`
+- **Next person must know:** Install: copy the artifact to apks/ (the owner's watch command does it), then vt-tablets. ViewTouch on the Pi already runs 2ca46d0 (07:00); 4e3b8bc only changes the Gift Card QML, picked up at the next vt-server.
+
 ### 2026-11-03 07:02 ET — Bob (Claude) — Gift Card screen: Pay bar width without a layout loop
 - **What:** The centered Pay bar's width came from its ColumnLayout parent (parent.width * 0.5), which made Qt Quick Layouts report a recursive rearrange in the tests; it now uses the widget's own width (w.width / w.zoom * 0.5). Pi build 07:00 (2ca46d0): vtm_tests [labels],[customers],[giftcards] all passed (403 assertions), vt-server restarted.
 - **Why:** Warning in the Pi test run.
