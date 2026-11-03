@@ -13,7 +13,8 @@
   "hiddenZones": [
     "ask-tip",
     "off-amount",
-    "off-percent"
+    "off-percent",
+    "items"
   ],
   "zones": [
     {

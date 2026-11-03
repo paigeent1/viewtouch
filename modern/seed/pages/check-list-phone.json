@@ -41,5 +41,8 @@
         "h": 220
       }
     }
+  ],
+  "hiddenZones": [
+    "retail-mode-btn"
   ]
 }

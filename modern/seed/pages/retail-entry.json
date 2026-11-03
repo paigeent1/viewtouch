@@ -48,6 +48,30 @@
       ]
     },
     {
+      "id": "rtl-scan",
+      "kind": "button",
+      "rect": {
+        "x": 968,
+        "y": 16,
+        "w": 288,
+        "h": 72
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "\ud83d\udcf7 SCAN",
+      "style": {
+        "normal": {
+          "fill": "#16a34a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "scanCamera"
+        }
+      ]
+    },
+    {
       "id": "item-lookup",
       "kind": "button",
       "label": "\ud83d\udd0d Item / UPC Builder",
@@ -95,7 +119,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "discounts"
+          "page": "settle"
         }
       ]
     },
@@ -398,13 +422,7 @@
           "text": "#ffffff"
         }
       },
-      "actions": [
-        {
-          "type": "jump",
-          "mode": "push",
-          "page": "reasons"
-        }
-      ]
+      "actions": []
     },
     {
       "id": "rtl-void",
@@ -453,7 +471,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "timeclock"
+          "page": "time-clock"
         }
       ]
     },
@@ -477,9 +495,8 @@
       },
       "actions": [
         {
-          "type": "jump",
-          "mode": "push",
-          "page": "order"
+          "type": "addItem",
+          "item": "Lighter Refill"
         }
       ]
     },
@@ -503,9 +520,8 @@
       },
       "actions": [
         {
-          "type": "jump",
-          "mode": "push",
-          "page": "order"
+          "type": "addItem",
+          "item": "Empty Box"
         }
       ]
     },
@@ -607,9 +623,8 @@
       },
       "actions": [
         {
-          "type": "jump",
-          "mode": "push",
-          "page": "order"
+          "type": "addItem",
+          "item": "Misc Txbl"
         }
       ]
     },

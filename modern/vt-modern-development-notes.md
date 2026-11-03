@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 15:54 ET — Bob (Claude) — Page checks pass: phone versions and retail page jumps
+- **What:** Layout::validate failures in the [editor] tests: settle-phone now hides the new 'items' zone; tables-phone and check-list-phone hide 'retail-mode-btn' (Oct 27); retail-entry.json: DISCOUNTS -> settle (Pay screen), TIME CLOCK -> time-clock, ITEM RETURN -> no action (returns not built; page 'reasons' never existed), Lighter Refill / EMPTY BOX / MISC TXBL -> addItem by name (were jumps to a page 'order' that doesn't exist). New zone rtl-scan '📷 SCAN' (scanCamera) at x968 y16 288x72. Found: the store's retail screen is the zone page retail-entry.json; WidgetRetailEntry.qml is not used by any page (its SCAN button/ringInput fix never showed).
+- **Why:** Pi [editor] tests failed (5 cases), one from today's Pay-page zone, the rest pre-existing since Oct 27.
+- **Files:** `modern/seed/pages/retail-entry.json, modern/seed/pages/settle-phone.json, modern/seed/pages/tables-phone.json, modern/seed/pages/check-list-phone.json`
+- **Next person must know:** addItem by name needs menu items named Lighter Refill, Empty Box, Misc Txbl; otherwise the button says the item isn't on the menu. If the store's retail page was edited, these fixes don't reach it (do them in the editor).
+
 ### 2026-11-03 15:46 ET — Bob (Claude) — Order summary breaks out each tax
 - **What:** WidgetOrderList: taxByClass (true for kind orderSummary) replaces the single Tax row with one row per tax class from totals.taxLines (Food tax, Alcohol tax, Merchandise tax, Room tax), as the Payment panel and receipt show. Order list unchanged.
 - **Why:** Owner: the Order summary must break out food/bev tax and merchandise tax.
