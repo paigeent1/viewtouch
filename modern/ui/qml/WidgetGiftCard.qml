@@ -282,8 +282,9 @@ Item {
         // (‹ Back / ‹ Manager on the left, Pay › on the right) never cover it.
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: parent.width * 0.5
-            Layout.maximumWidth: parent.width * 0.5
+            // Half of the screen's width (taken from the widget, not the layout, so the layout doesn't loop).
+            Layout.preferredWidth: w.width / w.zoom * 0.5
+            Layout.maximumWidth: w.width / w.zoom * 0.5
             spacing: 12
             visible: w.found && !w.closed
             Button {

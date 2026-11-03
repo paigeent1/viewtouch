@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 07:02 ET — Bob (Claude) — Gift Card screen: Pay bar width without a layout loop
+- **What:** The centered Pay bar's width came from its ColumnLayout parent (parent.width * 0.5), which made Qt Quick Layouts report a recursive rearrange in the tests; it now uses the widget's own width (w.width / w.zoom * 0.5). Pi build 07:00 (2ca46d0): vtm_tests [labels],[customers],[giftcards] all passed (403 assertions), vt-server restarted.
+- **Why:** Warning in the Pi test run.
+- **Files:** `modern/ui/qml/WidgetGiftCard.qml`
+- **Next person must know:** On the Pi, gh needs -R paigeent1/viewtouch (or gh repo set-default) to start the Android build.
+
 ### 2026-11-03 06:47 ET — Bob (Claude) — Labels page: one Back (the screen's own)
 - **What:** seed/pages/labels.json: removed the page's ‹ Back zone. WidgetRetailLabels.qml: the first screen (label styles) has its own ‹ Back that leaves the page (zone.controller.goBack()); every later screen's ‹ Back steps back one screen.
 - **Why:** Owner: Back should back out of each step, not leave the label screen; two Back buttons with different jobs would confuse.
