@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 08:38 ET — Bob (Claude) — Store Settings: Gift card location under The store
+- **What:** The 'Gift card location' field (added 2026-11-02) wasn't in any Store Settings section, so it fell into 'More' and test 'Store Settings: every setting is in a section' failed on the Pi. Now in The store, after Store name. Checked: all 121 store fields have a section. Pi [admin] run otherwise passed (12/13), including the new employee first/last name test.
+- **Why:** Pi test failure 08:38.
+- **Files:** `modern/app/pos_admin_shared.hh`
+
 ### 2026-11-03 08:35 ET — Bob (Claude) — vt-tmp refuses change files that patch ViewTouch's code or the launcher
 - **What:** Neil's new apply_changes.py (08:35) still had section 3: regex-patching modern/tools/vt_label_utility.py and sudo cp over /usr/local/bin/vt-label-utility (the same as this morning's). Owner runs it with section 3 cut out (sections 1, 2, 4 kept: Windows ILSA export of every PLU row, no ACTIVE/department filters; rebuilding ilsa_temp_pricebook.db; vt-sync-ilsa). scripts/bin/vt-tmp now greps the downloaded apply_changes.py and refuses it (output.txt to Drive) if it mentions /usr/local/bin/vt-label-utility, a path under viewtouch-main/modern/{tools,app,ui,core,net,seed,layout,storage}/, or writes vt_label_utility.py.
 - **Why:** Third time a change file undid label utility fixes and the launcher.
