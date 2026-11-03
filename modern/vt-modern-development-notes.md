@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:19 ET — Bob (Claude) — Reprint Receipt: pick from the last 7 days
+- **What:** Retail 'Reprint Receipt' now opens new page reprint-receipt: the check search starting at 7 days (Week) and listing them at once (checkSearch props days and showAll); touch a check, then Reprint. Other ranges still a touch away.
+- **Why:** Owner: reprint should open a list of checks from the last 7 days and select the receipt.
+- **Files:** `ui/qml/WidgetCheckSearch.qml, seed/pages/reprint-receipt.json, seed/pages/retail-entry.json`
+
 ### 2026-11-03 17:18 ET — Bob (Claude) — Cancel Sale: reasons, Cancel #n, no stock, an exception
 - **What:** New PosService::cancelSale (commands cancelSale; the retail page's cancelCheck maps to it). Asks why (Store Settings > Voids, comps, No Sale and Cancel Sale: Reasons for Cancel Sale; defaults Price, Customer changed mind, No ID). Saved as Cancel #1, #2... for the day (Check.cancelNumber, status discarded, businessDay set; PosShared.cancelledToday, loaded at start, cleared at end of day). Not a sale; sent lines go back to stock and the kitchen gets a void; a held card is let go; paid sales must have payments taken back first; an empty sale is just put away (no number). Exceptions report: Cancelled sales by employee and by reason; exception ticket picture cancel-<n>.
 - **Why:** Owner: CANCEL SALE button cancels the sale, numbered daily, no inventory effect, reasons, counts as an exception.

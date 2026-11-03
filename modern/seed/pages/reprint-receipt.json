@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "reprint-receipt",
+  "name": "Reprint Receipt",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1504,
+        "h": 72
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Reprint a receipt: the last 7 days. Touch a check, then Reprint"
+    },
+    {
+      "id": "search",
+      "kind": "checkSearch",
+      "rect": {
+        "x": 16,
+        "y": 104,
+        "w": 1888,
+        "h": 960
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "props": {
+        "days": 7,
+        "showAll": true
+      }
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "label": "‹ Back",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1536,
+        "y": 16,
+        "w": 368,
+        "h": 72
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

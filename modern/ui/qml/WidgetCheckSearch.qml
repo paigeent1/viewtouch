@@ -15,8 +15,10 @@ Item {
     readonly property var info: pos ? pos.checkSearch : ({})
     readonly property var found: info.results ?? []
     readonly property var check: info.selected ?? null
-    // How far back: days (0: every check ever).
-    property int days: 365
+    // How far back: days (0: every check ever); props.days sets where it starts, and
+    // props.showAll lists those checks as soon as the screen opens (Reprint Receipt: 7 days).
+    property int days: zone && zone.props && zone.props.days !== undefined ? zone.props.days : 365
+    Component.onCompleted: if (pos && zone && zone.props && zone.props.showAll === true) fresh("")
     property string asked: ""          // the search ("" with Show All: every check)
     property bool searched: false
     property var offsets: [0]         // where each page began (for ‹ Newer)

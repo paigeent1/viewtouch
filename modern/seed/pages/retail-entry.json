@@ -374,8 +374,9 @@
       },
       "actions": [
         {
-          "type": "command",
-          "name": "printReceipt"
+          "type": "jump",
+          "mode": "push",
+          "page": "reprint-receipt"
         }
       ]
     },
