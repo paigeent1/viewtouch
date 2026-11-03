@@ -263,10 +263,16 @@ Rectangle {
                         }
                     }
                     Text {
-                        anchors.centerIn: parent
+                        anchors.fill: parent
+                        anchors.margins: d.unit * 0.4
                         visible: (d.loyalty.member ?? "") === ""
                         text: qsTr("Earn rewards: touch to add your phone")
                         color: "white"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        wrapMode: Text.WordWrap
+                        fontSizeMode: Text.Fit   // the left third is narrow: smaller rather than past the box
+                        minimumPixelSize: Math.round(d.unit * 0.5)
                         font.pixelSize: d.unit
                     }
                     TapHandler {

@@ -96,6 +96,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:31 ET — Bob (Claude) — Customer display: rewards text fits its box
+- **What:** The 'Earn rewards: touch to add your phone' text wraps and shrinks to fit the narrower rewards box in the left third.
+- **Why:** Owner's photo: it ran past the box.
+- **Files:** `ui/qml/CustomerDisplay.qml`
+
 ### 2026-11-03 18:27 ET — Bob (Claude) — vt-guest-display: touchscreen step can't fail the rest
 - **What:** The touch mapping is wrapped ({ ...; } 2>/dev/null || true) so an xinput error no longer reports 'Couldn't put HDMI-2 beside HDMI-1' and stops before the restart.
 - **Why:** Owner's run: an xinput BadMatch stopped vt-guest-display after the monitors were already side by side.
