@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 19:44 ET — Bob (Claude) — Label utility: Next fixed; Neil's deeper ILSA tree merged safely
+- **What:** Cause of 'Next does nothing with items ticked': an uncommitted edit on the Pi (Neil) indented show_step() into the screen-2 branch of go_next, so screen 3 never advanced. That edit also left 'items = []' inside the price-book if (NameError without a price book) and replaced the parse_vt_menu_dict item builder (losing the 17:34 fixes). Merged its good part into main: price book rows read dept_grp when the table has it (PRAGMA check), plus prod_grp, sub_grp, cost, pack_qty; mfg GENERAL or a number falls back to the name; items sorted. Tree is dept group > category > brand > product group > sub group (root says ILSA INVENTORY HIERARCHY for the price book; categories start closed above 2,000 items). Next on screen 2 filters by the chosen node and its parents (a brand under one category). Tested: tree, every level's filter, Next screen 3 -> 4, $120.00 stays $120.00, alt UPCs kept.
+- **Why:** Owner: label utility Next unresponsive with items selected.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** Pi: the uncommitted edit was saved to ~/label_utility_pi_edit_*.diff, then discarded so main could be pulled. Neil: change the label utility through Git commits (AGENTS.md), not edits on the Pi.
+
 ### 2026-11-02 19:41 ET — Bob (Claude) — Label utility: trail of Next touches and screens in its log
 - **What:** vt_label_utility.py writes INFO lines to /tmp/vt_label_utility.log when Next is touched (and whether it was enabled), when go_next runs (screen, items shown, items ticked), and when each screen starts and is ready. Owner reports Next does nothing with items ticked on the Pi (2d00762, ILSA temp price book 6.7 MB); no error in either log, and it does not reproduce off the Pi (ViewTouch items, small and 45,000-item price books, all modes: screen 4 in under a second).
 - **Why:** Find where Next stops on the Pi without guessing.

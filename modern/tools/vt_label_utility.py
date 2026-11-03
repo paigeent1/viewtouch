@@ -549,22 +549,42 @@ def load_from_viewtouch_db():
             t_conn = sqlite3.connect(f"file:{temp_db}?mode=ro", uri=True)
             t_cur = t_conn.cursor()
             t_items, t_seen = [], set()
-            for row in t_cur.execute("SELECT upc, name, dept_num, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc FROM items"):
-                u, nm, dn, cat, pr, cs, mf, pg, sg, pq, alts = row
+            cols = {r[1] for r in t_cur.execute("PRAGMA table_info(items)")}
+            dg_col = "dept_grp" if "dept_grp" in cols else "''"   # Neil's newer price books have the ILSA dept group
+            for row in t_cur.execute(f"SELECT upc, name, dept_num, {dg_col}, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc FROM items"):
+                u, nm, dn, dg, cat, pr, cs, mf, pg, sg, pq, alts = row
                 alt_list = [a.strip() for a in alts.split(";") if a.strip()] if alts else []
+                # A manufacturer of GENERAL or a number isn't a brand: let the name decide.
+                mf = str(mf or "").strip()
+                if mf.upper() == "GENERAL" or mf.isdigit():
+                    mf = ""
                 # Made like a ViewTouch menu item, so every screen (tree, UPC choice, prices) works the same.
                 try:
                     cents = int(round(float(pr or 0) * 100))
                 except (TypeError, ValueError):
                     cents = 0
+                before = len(t_items)
                 parse_vt_menu_dict({"name": nm, "barcodes": [u] + alt_list, "priceCents": cents,
-                                    "family": cat or "Retail", "manufacturer": mf or "", "taxClass": "merchandise",
+                                    "family": cat or "Retail", "manufacturer": mf, "taxClass": "merchandise",
                                     "number": dn}, t_seen, t_items)
-            for it in t_items:
+                if len(t_items) == before:
+                    continue
+                it = t_items[-1]
                 it["source"] = "ilsa_temp"
+                it["is_retail"] = True
+                if dg and str(dg).strip():
+                    it["dept_group"] = str(dg).strip().upper()
+                it["prod_grp"] = str(pg or "").strip().upper()
+                it["sub_grp"] = str(sg or "").strip().upper()
+                try:
+                    it["cost"] = float(cs or 0)
+                except (TypeError, ValueError):
+                    it["cost"] = 0.0
+                if str(pq or "").isdigit() and int(pq) > 0:
+                    it["pack_qty"] = int(pq)
             t_conn.close()
             if t_items:
-                return t_items
+                return sorted(t_items, key=lambda x: (x["dept_group"], x["category"], x["manufacturer"], x["name"]))
         except Exception as e:
             print(f"Warning reading temp pricebook, falling back to viewtouch.db: {e}")
     # --------------------------------------------------------------------------------
@@ -2992,22 +3012,36 @@ class VTLabelUtility(tk.Tk):
 
     def _populate_category_tree(self, filter_cat=None):
         self.cat_tree.delete(*self.cat_tree.get_children())
-        root_node = self.cat_tree.insert("", "end", text="VIEWTOUCH CATALOG (viewtouch.db)", open=True, values=("ALL", ""))
+        ilsa = any(it.get("source") == "ilsa_temp" for it in self.all_items[:1])
+        root_text = "ILSA INVENTORY HIERARCHY" if ilsa else "VIEWTOUCH CATALOG (viewtouch.db)"
+        root_node = self.cat_tree.insert("", "end", text=root_text, open=True, values=("ALL", ""))
+        # Department group > category > brand > product group > sub group (the last two only when the
+        # items have them, as ILSA's price book does).
         tree_map = {}
         for it in self.all_items:
-            if filter_cat and it["category"] != filter_cat:
+            if filter_cat and it.get("category") != filter_cat:
                 continue
-            dg = it["dept_group"]
-            cat = it["category"]
-            mfg = it["manufacturer"]
-            tree_map.setdefault(dg, {}).setdefault(cat, set()).add(mfg)
+            dg = it.get("dept_group") or "RETAIL"
+            cat = it.get("category") or "GENERAL"
+            mfg = it.get("manufacturer") or "GENERAL"
+            pg = it.get("prod_grp") or ""
+            sg = it.get("sub_grp") or ""
+            tree_map.setdefault(dg, {}).setdefault(cat, {}).setdefault(mfg, {}).setdefault(pg, set()).add(sg)
 
+        many = len(self.all_items) > 2000   # a big catalog starts with the categories closed
         for dg in sorted(tree_map.keys()):
             dg_id = self.cat_tree.insert(root_node, "end", text=dg, open=True, values=("DG", dg))
             for cat in sorted(tree_map[dg].keys()):
-                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=True, values=("CAT", cat))
-                for mfg in sorted(tree_map[dg][cat]):
-                    self.cat_tree.insert(cat_id, "end", text=f"M  {mfg}", values=("MFG", mfg))
+                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=not many, values=("CAT", cat))
+                for mfg in sorted(tree_map[dg][cat].keys()):
+                    mfg_id = self.cat_tree.insert(cat_id, "end", text=f"M  {mfg}", open=False, values=("MFG", mfg, cat))
+                    for pg in sorted(tree_map[dg][cat][mfg].keys()):
+                        if not pg:
+                            continue
+                        pg_id = self.cat_tree.insert(mfg_id, "end", text=f"  ↳ {pg}", open=False, values=("PGRP", pg, mfg, cat))
+                        for sg in sorted(tree_map[dg][cat][mfg][pg]):
+                            if sg:
+                                self.cat_tree.insert(pg_id, "end", text=f"    ▪ {sg}", values=("SGRP", sg, pg, mfg, cat))
 
     def _build_step3(self):
         top = tk.Frame(self.content, bg="#1e242d")
@@ -3603,13 +3637,19 @@ class VTLabelUtility(tk.Tk):
         elif self.current_step == 2:
             sel = self.cat_tree.selection()
             if sel:
-                vals = self.cat_tree.item(sel[0], "values")
-                if vals and vals[0] == "MFG":
-                    self.filtered_items = [it for it in self.all_items if it["manufacturer"] == vals[1]]
-                elif vals and vals[0] == "CAT":
-                    self.filtered_items = [it for it in self.all_items if it["category"] == vals[1]]
-                elif vals and vals[0] == "DG":
-                    self.filtered_items = [it for it in self.all_items if it["dept_group"] == vals[1]]
+                vals = list(self.cat_tree.item(sel[0], "values") or [])
+                kind = vals[0] if vals else "ALL"
+                # Each level also matches the levels above it (a brand under one category, not every category).
+                fields = {"SGRP": ["sub_grp", "prod_grp", "manufacturer", "category"],
+                          "PGRP": ["prod_grp", "manufacturer", "category"],
+                          "MFG": ["manufacturer", "category"],
+                          "CAT": ["category"],
+                          "DG": ["dept_group"]}.get(kind)
+                blank = {"dept_group": "RETAIL", "category": "GENERAL", "manufacturer": "GENERAL"}   # as the tree shows them
+                if fields:
+                    want = list(zip(fields, vals[1:]))
+                    self.filtered_items = [it for it in self.all_items
+                                           if all((it.get(f) or blank.get(f, "")) == str(v) for f, v in want)]
                 else:
                     self.filtered_items = list(self.all_items)
             else:
