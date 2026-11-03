@@ -43,9 +43,14 @@ Item {
         scale: w.zoom
         transformOrigin: Item.TopLeft
 
-        GridLayout {
+        ColumnLayout {
             anchors.fill: parent
             anchors.margins: 12
+            spacing: 12
+
+        GridLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             columns: w.narrow ? 1 : 3   // the controls | a separator | the history
             rowSpacing: 18
             columnSpacing: 18
@@ -155,37 +160,6 @@ Item {
                     opacity: 0.6
                     text: qsTr("No number? A new one is made and printed on the receipt. A card works once its check is paid.")
                 }
-                Button {
-                    visible: !w.askingCustomer; Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 18; highlighted: true
-                    enabled: w.found && !w.closed && (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
-                    text: qsTr("Pay the Check from This Card")
-                    onClicked: { if (w.checkHasCustomer) w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
-                }
-                RowLayout {
-                    visible: w.askingCustomer; Layout.fillWidth: true; spacing: 8
-                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…"); onClicked: { w.askingCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
-                    Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; text: qsTr("Bypass & Pay Now"); onClicked: { w.askingCustomer = false; w.pos.payWithGiftCard(w.card.number, 0) } }
-                }
-                // State law (California: under $10): a small balance in cash, when the guest asks.
-                Button {
-                    objectName: "giftCashOut"
-                    visible: w.found && (w.card.cashOut ?? false)
-                    Layout.fillWidth: true
-                    implicitHeight: 56
-                    font.pixelSize: 17
-                    text: qsTr("Cash Out %1 (under %2)").arg(w.card.balance ?? "").arg(w.card.cashOutBelow ?? "")
-                    onClicked: w.pos.cashOutGiftCard()
-                }
-                // Managers: a lost card replaced, or two cards combined. The old card closes for good.
-                Button {
-                    objectName: "giftTransfer"
-                    visible: w.found && !w.closed && (w.card.balanceCents ?? 0) > 0 && !w.transferring
-                    Layout.fillWidth: true
-                    implicitHeight: 56
-                    font.pixelSize: 17
-                    text: qsTr("Transfer / Replace Card…")
-                    onClicked: { newCard.text = ""; w.transferring = true }
-                }
                 ColumnLayout {
                     visible: w.transferring
                     Layout.fillWidth: true
@@ -277,6 +251,58 @@ Item {
                     }
                 }
             }
+        }
+
+        // The card's actions along the bottom: Pay in the middle, clear of the page's own buttons below.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            visible: w.found && !w.closed
+            // Managers: a lost card replaced, or two cards combined. The old card closes for good.
+            Button {
+                objectName: "giftTransfer"
+                Layout.preferredWidth: 1
+                Layout.fillWidth: true
+                implicitHeight: 64
+                font.pixelSize: 17
+                enabled: (w.card.balanceCents ?? 0) > 0 && !w.transferring
+                text: qsTr("Transfer / Replace Card…")
+                onClicked: { newCard.text = ""; w.transferring = true }
+            }
+            Button {
+                objectName: "giftPay"
+                visible: !w.askingCustomer
+                Layout.preferredWidth: 2
+                Layout.fillWidth: true
+                implicitHeight: 64
+                font.pixelSize: 19
+                highlighted: true
+                enabled: (w.card.balanceCents ?? 0) > 0 && w.pos !== null && w.pos.hasCheck
+                text: qsTr("Pay the Check from This Card")
+                onClicked: { if (w.checkHasCustomer) w.pos.payWithGiftCard(w.card.number, 0); else w.askingCustomer = true }
+            }
+            RowLayout {
+                visible: w.askingCustomer
+                Layout.preferredWidth: 2
+                Layout.fillWidth: true
+                spacing: 8
+                Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; highlighted: true; text: qsTr("Add Customer…"); onClicked: { w.askingCustomer = false; if (w.zone && w.zone.controller) w.zone.controller.jumpTo("customers") } }
+                Button { Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 17; text: qsTr("Bypass & Pay Now"); onClicked: { w.askingCustomer = false; w.pos.payWithGiftCard(w.card.number, 0) } }
+            }
+            // State law (California: under $10): a small balance in cash, when the guest asks.
+            Button {
+                objectName: "giftCashOut"
+                Layout.preferredWidth: 1
+                Layout.fillWidth: true
+                implicitHeight: 64
+                font.pixelSize: 17
+                // Only where state law makes a small balance cashable; otherwise an empty space, so Pay stays centered.
+                enabled: w.card.cashOut ?? false
+                opacity: enabled ? 1 : 0
+                text: qsTr("Cash Out %1 (under %2)").arg(w.card.balance ?? "").arg(w.card.cashOutBelow ?? "")
+                onClicked: w.pos.cashOutGiftCard()
+            }
+        }
         }
     }
 }

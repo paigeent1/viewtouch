@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 19:18 ET — Bob (Claude) — Gift Card screen: Pay in a bottom bar, clear of the page buttons
+- **What:** WidgetGiftCard.qml: Transfer / Replace Card... | Pay the Check from This Card (center, wider; Add Customer / Bypass replaces it when asked) | Cash Out (only when allowed; otherwise a blank space so Pay stays centered) now sit in a bar along the bottom of the gift card area. The left column is shorter, so it no longer runs past the area onto the page's '‹ Back/Manager' button.
+- **Why:** Owner: the Pay button was overlapped by the Manager button. Bob's earlier additions (Purchased For/By, Transfer) made the left column taller than the area.
+- **Files:** `modern/ui/qml/WidgetGiftCard.qml`
+- **Next person must know:** Not compiled here: Pi build + APK. The widget's buttons still aren't editable in edit mode (option: split them into page buttons, discussed with the owner).
+
 ### 2026-11-02 18:28 ET — Bob (Claude) — Known-good version recorded for rollback
 - **What:** New 'Known-good versions (for rollback)' table above the roadmap: 2026-11-02 18:28 = main 31acd71, Pi ViewTouch built 17:32 from d2e5300, tablet app run 41539109241 (d007756), label utility v1.1; with how to roll back.
 - **Why:** Owner wants today's stable version written down for rollback, without version numbering yet.
