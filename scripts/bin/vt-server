@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 cd /home/pi/viewtouch-main
+# Video on the customer display needs Qt Multimedia: installed once, the first time it's missing.
+if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
+    echo "Installing Qt Multimedia (video on the customer display)..."
+    sudo apt-get install -y qt6-multimedia-dev qml6-module-qtmultimedia >/dev/null \
+        && { sudo apt-get install -y qt6-ffmpeg-multimedia-plugin >/dev/null 2>&1 \
+             || sudo apt-get install -y qt6-gstreamer-multimedia-plugin >/dev/null 2>&1 || true; } \
+        && touch modern/CMakeLists.txt \
+        || echo "Couldn't install Qt Multimedia; ViewTouch builds without video (pictures and GIFs still work)."
+fi
 cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
 sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
 killall -9 vtmodern 2>/dev/null || true
