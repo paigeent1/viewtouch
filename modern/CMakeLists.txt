@@ -65,7 +65,7 @@ if(Qt6_FOUND)
         app/pos_service.hh app/pos_service.cpp
         app/pos_day.cpp app/pos_admin.cpp app/pos_admin_shared.hh app/pos_admin_fields.cpp app/pos_admin_records.cpp app/pos_admin_save.cpp app/pos_changes.cpp app/pos_checks.cpp app/pos_menu.cpp app/pos_customers.cpp app/pos_waitlist.cpp app/pos_inventory.cpp app/pos_schedule.cpp app/pos_demo.cpp app/pos_loyalty.cpp app/pos_kiosk.cpp app/pos_search.cpp app/pos_images.cpp app/pos_setup.cpp app/pos_punches.cpp app/pos_dashboard.cpp app/pos_kitchen.cpp app/pos_commands.cpp app/pos_store_check.cpp app/pos_requests.cpp app/pos_phone_orders.cpp app/pos_cards.cpp app/pos_holds.cpp app/pos_forecast.cpp app/pos_refunds.cpp app/pos_receipts.cpp app/pos_menu_builder.cpp app/menu_import.hh app/menu_import.cpp app/menu_templates.cpp
     )
-    target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core)
+    target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core Qt6::Sql)   # Sql: the Labels screen reads the ILSA price book
     # Phrase files for the screens' languages (see app/i18n.hh)
     qt_add_resources(vtm_pos "vtm_i18n" PREFIX "/i18n" BASE i18n FILES i18n/en.json i18n/es.json i18n/fr.json i18n/pt.json i18n/zh.json)
     # PosService is exposed to QML via QML_FOREIGN (ui/cpp/posforeign.hh),

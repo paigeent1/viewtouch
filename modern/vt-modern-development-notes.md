@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 20:08 ET — Bob (Claude) — Tablet Labels screen lists Neil's ILSA price book while it exists
+- **What:** PosService::retailLabels(): when ~/.local/share/ViewTouch/ilsa_temp_pricebook.db exists, the Labels screen (tablets, End of shift > Labels) browses and finds the price book's items instead of ViewTouch's menu, built like vt_label_utility.py: group = dept_grp (else CIGARS/RETAIL), category, brand = mfg unless GENERAL/number (then from the name); primary + alt UPCs (11 digits get a check digit); price $x.xx. Read-only via QSQLITE, cached until the file changes; deleting the file switches back to the menu. vtm_pos links Qt6::Sql. New test [labels] in test_customers.cpp (temp HOME). Not compiled here (no Qt): build and run vtm_tests on the Pi.
+- **Why:** Owner: have tablets use Neil's database for now (the Pi's label utility already prints from it, so items missing from the menu were skipped).
+- **Files:** `modern/app/pos_inventory.cpp, modern/CMakeLists.txt, modern/tests/test_customers.cpp`
+- **Next person must know:** Computed on the Pi (session state), so no new APK is needed: rebuild vtmodern and restart ViewTouch. Jan 1: deleting the price book switches tablets back too.
+
 ### 2026-11-02 19:52 ET — Bob (Claude) — Label utility: /usr/local/bin/vt-label-utility was a stale full copy; idle check matches both names
 - **What:** On the Pi /usr/local/bin/vt-label-utility had been overwritten with a whole (Neil-edited) label utility instead of the launcher, so ViewTouch's button ran that copy: Git fixes (Next, 6 columns) never showed, no trail lines were logged, and the idle log-out check (pgrep vt_label_utility.py) missed it, so employees were logged out while it was open. Owner reinstalls the launcher from scripts/bin. layoutcontroller.cpp idleTimeout now matches pgrep -f 'vt[_-]label[_-]utility'. LABEL_UTILITY_NOTES.md: the launcher must stay the launcher.
 - **Why:** Owner: Next still unresponsive and 6-column change didn't show; employee should stay logged in while the label utility runs.

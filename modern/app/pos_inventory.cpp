@@ -13,12 +13,16 @@
 #include <map>
 
 #include <QSet>
+#include <tuple>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QFileInfo>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QDateTime>
 
 using namespace Qt::StringLiterals;
@@ -691,6 +695,117 @@ QString noLeadingZeros(const QString &s)
     return s.mid(i);
 }
 
+QString brandFromName(const QString &upperName)
+{
+    for (const char *p : {"ALEC BRADLEY", "AJ FERNANDEZ", "CASA FERNANDEZ", "BAHAMA MAMA", "ARMANDO RAMOS", "BUENA VISTA",
+                          "CROWNED HEADS", "ROMEO Y", "MONTECRISTO", "ARTURO FUENTE", "DREW ESTATE", "LA AROMA",
+                          "MY FATHER", "OLIVA", "PADRON", "PERDOMO", "ROCKY PATEL", "MACANUDO"})
+        if (upperName.startsWith(QLatin1String(p)))
+            return QLatin1String(p);
+    return upperName.section(u' ', 0, 0, QString::SectionSkipEmpty);
+}
+
+// One item on the Labels screen, from ViewTouch's menu or from the ILSA price book.
+struct LabelItem {
+    QString id, name, price;
+    QStringList at;        // group, category, brand
+    QVariantList upcs;     // [{label, code}]
+    QStringList codes;     // the same codes, for scanning
+};
+
+// While ~/.local/share/ViewTouch/ilsa_temp_pricebook.db exists (Neil's ILSA price book, until Jan 1), the
+// label utility prints from it, so the Labels screen lists it too: same groups, brands and UPCs as
+// tools/vt_label_utility.py load_from_viewtouch_db(). Read-only; read again only when the file changes.
+QString pricebookPath()
+{
+    return QDir::homePath() + u"/.local/share/ViewTouch/ilsa_temp_pricebook.db"_s;
+}
+
+QString withCheckDigit(QString d)   // normalize_upc(): 11 digits get their GS1 check digit
+{
+    if (d.size() != 11)
+        return d;
+    int total = 0;
+    for (qsizetype i = 0; i < d.size(); ++i)
+        total += d.at(d.size() - 1 - i).digitValue() * (i % 2 == 0 ? 3 : 1);
+    return d + QString::number((10 - total % 10) % 10);
+}
+
+const std::vector<LabelItem> &pricebookItems()
+{
+    static std::vector<LabelItem> items;
+    static QDateTime stamp;
+    const QFileInfo fi(pricebookPath());
+    if (!fi.exists()) {
+        items.clear();
+        stamp = {};
+        return items;
+    }
+    if (fi.lastModified() == stamp)
+        return items;
+    stamp = fi.lastModified();
+    items.clear();
+    const QString conn = u"vt_label_pricebook"_s;
+    {
+        QSqlDatabase db = QSqlDatabase::contains(conn) ? QSqlDatabase::database(conn, false) : QSqlDatabase::addDatabase(u"QSQLITE"_s, conn);
+        db.setDatabaseName(fi.absoluteFilePath());
+        db.setConnectOptions(u"QSQLITE_OPEN_READONLY"_s);
+        if (db.open()) {
+            QStringList cols;
+            QSqlQuery info(u"PRAGMA table_info(items)"_s, db);
+            while (info.next())
+                cols << info.value(1).toString();
+            const QString dg = cols.contains(u"dept_grp"_s) ? u"dept_grp"_s : u"''"_s;
+            QSqlQuery q(db);
+            q.setForwardOnly(true);
+            if (q.exec(u"SELECT upc, name, %1, category, price, mfg, altupc FROM items"_s.arg(dg))) {
+                QSet<QString> seen;
+                while (q.next()) {
+                    LabelItem it;
+                    it.name = q.value(1).toString().trimmed().toUpper();
+                    if (it.name.isEmpty())
+                        continue;
+                    QStringList raw{q.value(0).toString()};
+                    raw += q.value(6).toString().split(u';', Qt::SkipEmptyParts);
+                    for (const QString &r : raw) {
+                        const QString c = withCheckDigit(digitsOnly(r));
+                        if (c.isEmpty() || std::ranges::any_of(it.codes, [&](const QString &x) { return noLeadingZeros(x) == noLeadingZeros(c); }))
+                            continue;
+                        it.upcs.append(QVariantMap{{u"label"_s, it.codes.isEmpty() ? QObject::tr("Primary UPC") : QObject::tr("Alt UPC %1").arg(it.codes.size())},
+                                                   {u"code"_s, c}});
+                        it.codes << c;
+                    }
+                    if (it.codes.isEmpty() || seen.contains(it.name + u'|' + it.codes.first()))
+                        continue;
+                    seen.insert(it.name + u'|' + it.codes.first());
+                    QString cat = q.value(3).toString().trimmed().toUpper();
+                    if (cat.isEmpty())
+                        cat = u"RETAIL"_s;
+                    QString group = q.value(2).toString().trimmed().toUpper();
+                    if (group.isEmpty())
+                        group = (cat.contains(u"CIGAR"_s) || it.name.contains(u"CIGAR"_s)) ? u"CIGARS"_s : u"RETAIL"_s;
+                    QString brand = q.value(5).toString().trimmed().toUpper();
+                    bool numeric = !brand.isEmpty();
+                    for (QChar ch : brand)
+                        numeric = numeric && ch.isDigit();
+                    if (brand.isEmpty() || brand == u"GENERAL"_s || numeric)
+                        brand = brandFromName(it.name);
+                    it.at = {group, cat, brand.isEmpty() ? u"GENERAL"_s : brand};
+                    it.id = u"ilsa:"_s + it.codes.first();
+                    bool ok = false;
+                    const double price = q.value(4).toDouble(&ok);
+                    it.price = u"$"_s + QString::number(ok ? price : 0.0, 'f', 2);
+                    items.push_back(std::move(it));
+                }
+            }
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(conn);
+    std::ranges::sort(items, [](const LabelItem &a, const LabelItem &b) { return std::tie(a.at, a.name) < std::tie(b.at, b.name); });
+    return items;
+}
+
 } // namespace
 
 QVariantMap PosService::retailLabels() const
@@ -710,43 +825,55 @@ QVariantMap PosService::retailLabels() const
     }
     QVariantList matches;
     const QString q = labelQuery_.trimmed();
+    // The items: Neil's ILSA price book while it's there (the label utility prints from it), else ViewTouch's menu.
+    std::vector<LabelItem> fromMenu;
+    const std::vector<LabelItem> &book = pricebookItems();
+    if (book.empty()) {
+        std::map<QString, QString> categoryNames;
+        for (const MenuCategory &c : s_->categories())
+            categoryNames[qs(c.id)] = qs(c.name);
+        for (const MenuItem &m : s_->menu) {
+            LabelItem it;
+            for (const std::string &b : m.barcodes) {
+                const QString c = digitsOnly(qs(b));
+                if (!c.isEmpty()) {
+                    it.upcs.append(QVariantMap{{u"label"_s, it.upcs.isEmpty() ? tr("Primary UPC") : tr("Alt UPC %1").arg(it.upcs.size())}, {u"code"_s, c}});
+                    it.codes << c;
+                }
+            }
+            for (const RecipeLine &r : m.recipe)
+                if (r.ingredientId.starts_with("__parent__:"))
+                    if (const QString c = digitsOnly(qs(r.ingredientId.substr(11))); !c.isEmpty()) {
+                        it.upcs.append(QVariantMap{{u"label"_s, tr("Carton UPC")}, {u"code"_s, c}});
+                        it.codes << c;
+                    }
+            if (it.codes.isEmpty())
+                continue;
+            const auto cn = categoryNames.find(qs(m.family));
+            const QString category = cn != categoryNames.end() && !cn->second.isEmpty() ? cn->second : (m.family.empty() ? tr("Other") : qs(m.family));
+            it.id = qs(m.id);
+            it.name = qs(m.name);
+            it.price = format(m.price);
+            it.at = {labelGroup(m, category), category, labelBrand(m)};
+            fromMenu.push_back(std::move(it));
+        }
+    }
+    const std::vector<LabelItem> &items = book.empty() ? fromMenu : book;
+    const auto entry = [](const LabelItem &it) {
+        return QVariantMap{{u"id"_s, it.id}, {u"name"_s, it.name}, {u"price"_s, it.price}, {u"upcs"_s, it.upcs}};
+    };
     // Browsing the tree: the names one level down from the path (with how many items), or, at a
     // brand, its items.
-    std::map<QString, QString> categoryNames;
-    for (const MenuCategory &c : s_->categories())
-        categoryNames[qs(c.id)] = qs(c.name);
-    const auto categoryOf = [&](const MenuItem &m) {
-        const auto it = categoryNames.find(qs(m.family));
-        return it != categoryNames.end() && !it->second.isEmpty() ? it->second : (m.family.empty() ? tr("Other") : qs(m.family));
-    };
-    const auto upcsOf = [](const MenuItem &m) {
-        QVariantList upcs;
-        for (const std::string &b : m.barcodes) {
-            const QString c = digitsOnly(qs(b));
-            if (!c.isEmpty())
-                upcs.append(QVariantMap{{u"label"_s, upcs.isEmpty() ? tr("Primary UPC") : tr("Alt UPC %1").arg(upcs.size())}, {u"code"_s, c}});
-        }
-        for (const RecipeLine &r : m.recipe)
-            if (r.ingredientId.starts_with("__parent__:"))
-                if (const QString c = digitsOnly(qs(r.ingredientId.substr(11))); !c.isEmpty())
-                    upcs.append(QVariantMap{{u"label"_s, tr("Carton UPC")}, {u"code"_s, c}});
-        return upcs;
-    };
     QVariantList children;
     if (q.isEmpty() && labelBrowsing_) {
         std::map<QString, int> counts;
-        for (const MenuItem &m : s_->menu) {
-            if (upcsOf(m).isEmpty())
+        for (const LabelItem &it : items) {
+            if (it.at.mid(0, labelPath_.size()) != labelPath_)
                 continue;
-            const QString category = categoryOf(m);
-            const QStringList at{labelGroup(m, category), category, labelBrand(m)};
-            if (at.mid(0, labelPath_.size()) != labelPath_)
-                continue;
-            if (labelPath_.size() < 3) {
-                ++counts[at.at(labelPath_.size())];
-            } else if (matches.size() < 200) {
-                matches.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"price"_s, format(m.price)}, {u"upcs"_s, upcsOf(m)}});
-            }
+            if (labelPath_.size() < 3)
+                ++counts[it.at.at(labelPath_.size())];
+            else if (matches.size() < 200)
+                matches.append(entry(it));
         }
         for (const auto &[name, n] : counts)
             children.append(QVariantMap{{u"name"_s, name}, {u"count"_s, n}});
@@ -755,32 +882,17 @@ QVariantMap PosService::retailLabels() const
         const QString code = digitsOnly(q);
         const bool byCode = code.size() >= 4 && code.size() == q.size();
         const QStringList words = q.toLower().split(u' ', Qt::SkipEmptyParts);
-        for (const MenuItem &m : s_->menu) {
-            QVariantList upcs;
+        for (const LabelItem &it : items) {
             bool hit = false;
-            for (const std::string &b : m.barcodes) {
-                const QString c = digitsOnly(qs(b));
-                if (c.isEmpty())
-                    continue;
-                upcs.append(QVariantMap{{u"label"_s, upcs.isEmpty() ? tr("Primary UPC") : tr("Alt UPC %1").arg(upcs.size())}, {u"code"_s, c}});
-                hit = hit || (byCode && noLeadingZeros(c) == noLeadingZeros(code));
-            }
-            for (const RecipeLine &r : m.recipe) {
-                if (r.ingredientId.starts_with("__parent__:")) {
-                    const QString c = digitsOnly(qs(r.ingredientId.substr(11)));
-                    if (!c.isEmpty()) {
-                        upcs.append(QVariantMap{{u"label"_s, tr("Carton UPC")}, {u"code"_s, c}});
-                        hit = hit || (byCode && noLeadingZeros(c) == noLeadingZeros(code));
-                    }
-                }
-            }
-            if (!byCode) {
-                const QString name = qs(m.name).toLower();
+            if (byCode) {
+                hit = std::ranges::any_of(it.codes, [&](const QString &c) { return noLeadingZeros(c) == noLeadingZeros(code); });
+            } else {
+                const QString name = it.name.toLower();
                 hit = !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return name.contains(w); });
             }
-            if (!hit || upcs.isEmpty())
+            if (!hit)
                 continue;
-            matches.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"price"_s, format(m.price)}, {u"upcs"_s, upcs}});
+            matches.append(entry(it));
             if (matches.size() >= 40)
                 break;
         }

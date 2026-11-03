@@ -8,6 +8,10 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDir>
+#include <QFile>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 
 using namespace Qt::StringLiterals;
@@ -413,4 +417,46 @@ TEST_CASE("Customer detail report: visits, spending, last visit and favorite, be
     CHECK(lines[0][1] == "2");
     CHECK(lines[1][0].starts_with("Walk-in Sam"));
     CHECK(lines[1][1] == "1");
+}
+
+TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labels]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    QDir().mkpath(home.path() + u"/.local/share/ViewTouch"_s);
+    const QString book = home.path() + u"/.local/share/ViewTouch/ilsa_temp_pricebook.db"_s;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, u"test_pricebook"_s);
+        db.setDatabaseName(book);
+        REQUIRE(db.open());
+        QSqlQuery q(db);
+        REQUIRE(q.exec(u"CREATE TABLE items(upc, name, dept_num, dept_grp, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc)"_s));
+        REQUIRE(q.exec(u"INSERT INTO items VALUES('076452361243','RYJ 1875 Clem Tubo','20','CIGARS','PREMIUM CIGARS',120.0,8,"
+                       "'ROMEO Y JULIETA','','',1,'076452361250')"_s));
+        REQUIRE(q.exec(u"INSERT INTO items VALUES('01234567890','ZIPPO CLASSIC','30','','LIGHTERS',22.5,10,'GENERAL','','',1,NULL)"_s));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(u"test_pricebook"_s);
+
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.browseRetailLabels({}));
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"CIGARS"_s, u"RETAIL"_s});
+    REQUIRE(pos.browseRetailLabels({u"RETAIL"_s, u"LIGHTERS"_s}));
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"ZIPPO"_s});   // GENERAL: brand from the name
+    REQUIRE(pos.browseRetailLabels({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s}));
+    const QVariantList at = pos.retailLabels()[u"matches"_s].toList();
+    REQUIRE(at.size() == 1);
+    CHECK(at.first().toMap()[u"price"_s].toString() == u"$120.00"_s);
+    CHECK(at.first().toMap()[u"upcs"_s].toList().size() == 2);
+    REQUIRE(pos.findRetailLabels(u"076452361250"_s));                                    // an alternate UPC scans
+    CHECK(names(pos.retailLabels()[u"matches"_s].toList()) == QStringList{u"RYJ 1875 CLEM TUBO"_s});
+    REQUIRE(pos.findRetailLabels(u"012345678905"_s));                                    // 11 digits got their check digit
+    CHECK(names(pos.retailLabels()[u"matches"_s].toList()) == QStringList{u"ZIPPO CLASSIC"_s});
+
+    QFile::remove(book);                                                                  // gone: back to ViewTouch's menu
+    REQUIRE(pos.findRetailLabels(u"zippo"_s));
+    CHECK(pos.retailLabels()[u"matches"_s].toList().isEmpty());
+    qputenv("HOME", oldHome);
 }
