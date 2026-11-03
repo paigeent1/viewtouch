@@ -24,7 +24,7 @@
     {
       "id": "hosp-mode",
       "kind": "button",
-      "label": "\ud83c\udf7d\ufe0f Hospitality Mode",
+      "label": "🍽️ Hospitality Mode",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -58,7 +58,7 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "\ud83d\udcf7 SCAN",
+      "label": "📷 SCAN",
       "style": {
         "normal": {
           "fill": "#16a34a"
@@ -74,7 +74,7 @@
     {
       "id": "item-lookup",
       "kind": "button",
-      "label": "\ud83d\udd0d Item / UPC Builder",
+      "label": "🔍 Item / UPC Builder",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -119,7 +119,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "settle"
+          "page": "retail-discounts"
         }
       ]
     },
@@ -229,7 +229,7 @@
     {
       "id": "rtl-boxstick",
       "kind": "button",
-      "label": "\ud83d\udce6 BOX \u2194 STICK",
+      "label": "📦 BOX ↔ STICK",
       "shape": "rect",
       "behavior": "blink",
       "rect": {

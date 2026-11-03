@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "id": "retail-discount-sale",
+  "name": "Retail Subtotal Discount",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "sale",
+      "kind": "orderList",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 640,
+        "h": 1048
+      }
+    },
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 680,
+        "y": 16,
+        "w": 1224,
+        "h": 80
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Subtotal discount: everything in the sale"
+    },
+    {
+      "id": "pct-5",
+      "kind": "button",
+      "label": "5%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 112,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 5
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-10",
+      "kind": "button",
+      "label": "10%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1096,
+        "y": 112,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 10
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-15",
+      "kind": "button",
+      "label": "15%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1512,
+        "y": 112,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 15
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-20",
+      "kind": "button",
+      "label": "20%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 408,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 20
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-25",
+      "kind": "button",
+      "label": "25%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1096,
+        "y": 408,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 25
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-30",
+      "kind": "button",
+      "label": "30%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1512,
+        "y": 408,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 30
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-35",
+      "kind": "button",
+      "label": "35%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 704,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 35
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-100",
+      "kind": "button",
+      "label": "COMP\n100%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1096,
+        "y": 704,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#dc2626",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": 100
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "pct-var",
+      "kind": "button",
+      "label": "VARIABLE\n%",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1512,
+        "y": 704,
+        "w": 392,
+        "h": 272
+      },
+      "style": {
+        "normal": {
+          "fill": "#a78bfa",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "clear"
+        },
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "retail-discount-sale-variable"
+        }
+      ]
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "label": "‹ Back to the sale",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 976,
+        "w": 1224,
+        "h": 88
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

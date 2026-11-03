@@ -162,6 +162,9 @@ struct MenuCategory {
     // Its items without their own color: shades of its color, each a little
     // different.
     bool shades = false;
+    // Its items can't be discounted or comped (cigarettes at the state minimum):
+    // set on all of them when saved, and new items in it start that way.
+    bool noDiscount = false;
 
     bool operator==(const MenuCategory &) const = default;
 };

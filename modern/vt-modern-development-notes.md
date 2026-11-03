@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:16 ET — Bob (Claude) — Retail discounts: item/subtotal grid; No discounts protects cigarettes
+- **What:** Retail DISCOUNTS now opens retail-discounts: ITEM DISCOUNT (last item rung, or the one touched) or SUBTOTAL DISCOUNT (whole sale), each a 3x3 grid 5/10/15/20/25/30/35%, COMP (100%), VARIABLE (numPad then Apply). New Payment.lineId (item discount on one line), PosService::discountPercent(bp, item), controller commands itemDiscount/subtotalDiscount {percent: N|"typed"}. Totals: discounts only ever come off items not marked No discounts (and not gift cards), fixed amounts capped too; tax shares follow the discounted items; Totals.discountable and discountBy (receipt and Pay screen show what each discount really took). No discounts toggle on items and on categories (category sets it on all its items) in the Item/UPC Builder. Page key actions (retail keypad) now type into the entry.
+- **Why:** Owner: Discounts button -> item or subtotal; 3x3 percent grid with Comp and Variable; cigarettes at state minimum must never be discounted.
+- **Files:** `core/check.hh, core/core.cpp, core/menu.hh, app/pos_service.hh/.cpp, app/pos_commands.cpp, app/pos_json.cpp, app/pos_menu.cpp, app/pos_menu_builder.cpp, print/tickets.cpp, ui/cpp/layoutcontroller.cpp, ui/qml/WidgetMenuBuilder.qml, layout/schema.cpp, seed/pages/retail-entry.json, seed/pages/retail-discount*.json, tests/test_check.cpp`
+- **Next person must know:** Second '10%' in the owner's list read as 15%.
+
 ### 2026-11-03 16:39 ET — Bob (Claude) — X Report
 - **What:** New xReport command (anyone allowed to open the drawer): prints X REPORT on the receipt printer, today's Sales report and the Drawer report so far, nothing closed or reset. X Report key on the Reports screen (today); also selectable for any button in the editor. End of day remains the Z.
 - **Why:** Owner wants an X report to check the drawer and sales mid-shift on paper.

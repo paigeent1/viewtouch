@@ -193,7 +193,7 @@ Item {
     function itemDraft(i) {
         return i ? { id: i.id, name: i.name, price: i.priceValue.toFixed(2), family: i.family, image: i.image,
                      groups: i.groups.slice(), onIt: i.onIt.join(", "), available: i.availableSet,
-                     kioskHide: i.kioskHide, description: i.description, favorite: i.favorite,
+                     kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
                      allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode,
                      buttonColor: i.buttonColor, prepMinutes: i.prepMinutes ? String(i.prepMinutes) : "",
                      takeoutPrice: i.takeoutPrice, periodPrices: Object.assign({}, i.periodPrices),
@@ -201,6 +201,7 @@ Item {
                      section: i.section ?? "", breakBefore: i.breakBefore ?? "" }
                  : { id: "", name: "", price: "", family: categoryId, image: "", groups: [], onIt: "",
                      available: true, kioskHide: false, description: "", favorite: false, allergens: [],
+                     noDiscount: category ? category.noDiscount === true : false,
                      kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode, buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
                      section: "", breakBefore: "",
                      // what its category's items start with
@@ -210,9 +211,10 @@ Item {
     function categoryDraft(c) {
         return c ? { id: c.id, name: c.name, color: c.color, periods: c.periods.slice(), printer: c.printer,
                      station: c.station, taxClass: c.taxClass, buttonSize: c.buttonSize ?? "", photos: c.photos === true,
-                     hidePrice: c.hidePrice === true, shades: c.shades === true }
+                     hidePrice: c.hidePrice === true, shades: c.shades === true, noDiscount: c.noDiscount === true }
                  : { id: "", name: "", color: StoreColors.starters[categories.length % StoreColors.starters.length], periods: [],
-                     printer: "kitchen", station: "", taxClass: "food", buttonSize: "", photos: false, hidePrice: false, shades: false }
+                     printer: "kitchen", station: "", taxClass: "food", buttonSize: "", photos: false, hidePrice: false, shades: false,
+                     noDiscount: false }
     }
     function groupDraft(g) {
         const kind = !g ? "one" : g.max === 1 ? "one" : g.max === 0 ? "any" : "upTo"
@@ -1620,6 +1622,14 @@ Item {
                                     checked: !(w.draft.kioskHide ?? false)
                                     onToggled: w.set("kioskHide", !checked)
                                 }
+                                Label { text: qsTr("🚫 No discounts") }
+                                Switch {
+                                    objectName: "builderNoDiscount"
+                                    checked: w.draft.noDiscount === true
+                                    onToggled: w.set("noDiscount", checked)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Never discounted or comped, by an item or a subtotal discount (cigarettes at the state minimum).")
+                                }
                             }
 
                             // What's on it, Allergens, and Choice Groups (Hospitality items only)
@@ -2231,6 +2241,14 @@ Item {
                                     objectName: "builderCategoryPrices"
                                     checked: w.draft.hidePrice !== true
                                     onToggled: w.set("hidePrice", !checked)
+                                }
+                                Label { text: qsTr("🚫 No discounts") }
+                                Switch {
+                                    objectName: "builderCategoryNoDiscount"
+                                    checked: w.draft.noDiscount === true
+                                    onToggled: w.set("noDiscount", checked)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("None of its items can be discounted or comped (cigarettes): set on all of them when saved.")
                                 }
                             }
                             Label { text: qsTr("New items in it start with"); font.pixelSize: 16; font.bold: true }

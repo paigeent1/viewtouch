@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "id": "retail-discount-sale-variable",
+  "name": "Retail Subtotal Discount: Variable",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "sale",
+      "kind": "orderList",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 640,
+        "h": 1048
+      }
+    },
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 680,
+        "y": 16,
+        "w": 1224,
+        "h": 80
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Type the percent off (15 for 15%), then Apply"
+    },
+    {
+      "id": "pad",
+      "kind": "numPad",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 680,
+        "y": 112,
+        "w": 760,
+        "h": 840
+      }
+    },
+    {
+      "id": "apply",
+      "kind": "button",
+      "label": "APPLY\n% OFF",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1464,
+        "y": 112,
+        "w": 440,
+        "h": 400
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#111827"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "subtotalDiscount",
+          "args": {
+            "percent": "typed"
+          }
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "cancel",
+      "kind": "button",
+      "label": "Cancel",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1464,
+        "y": 536,
+        "w": 440,
+        "h": 416
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "key",
+          "key": "clear"
+        },
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

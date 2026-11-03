@@ -163,8 +163,11 @@ Document receipt(const Check &check, const TicketContext &ctx)
     d.rule();
     d.columns(ctx.tr("Subtotal"), ctx.money(t.items));
     for (const Payment &p : check.payments) {
-        if (p.kind == TenderKind::Discount)
-            d.columns(p.tenderName, ctx.money(-t.items.percent(p.percentBp)));
+        if (p.kind == TenderKind::Discount) {
+            const auto off = t.discountBy.find(p.id);
+            if (off != t.discountBy.end())   // what it actually took off (not items marked No discounts)
+                d.columns(p.tenderName, ctx.money(-off->second));
+        }
     }
     for (const auto &[cls, amount] : t.taxByClass)
         d.columns(taxName(cls, ctx), ctx.money(amount));

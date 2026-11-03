@@ -513,61 +513,91 @@ Totals Check::totals(const TaxRates &rates) const
     Totals t;
 
     std::map<TaxClass, Money> byClass;
+    std::map<TaxClass, Money> discountableByClass;   // None: untaxed lines
     Money discountable, staffDiscountable;   // what percent discounts and staff meals apply to
+    const auto mayDiscount = [](const OrderLine &l) { return !l.voided && !l.isGiftCard() && !l.noDiscount; };
     for (const OrderLine &l : lines) {
         const Money lt = l.total();
         t.items += lt;
-        if (!l.isGiftCard() && !l.noDiscount)
+        if (mayDiscount(l)) {
             discountable += lt;
-        if (!l.isGiftCard() && !l.noDiscount && !l.noStaffDiscount)
+            discountableByClass[l.taxClass] += lt;
+        }
+        if (mayDiscount(l) && !l.noStaffDiscount)
             staffDiscountable += lt;
         if (l.taxClass != TaxClass::None)
             byClass[l.taxClass] += lt;
     }
+    t.discountable = discountable;
 
-    // Discounts: each is a share of the items total; together they never
-    // exceed it.
+    // Discounts: only on what may be discounted (items marked No discounts, like
+    // cigarettes at the state minimum, and gift cards never), together never more.
+    // An item discount comes off its own line; the rest are shared over the check.
+    Money shared;
+    std::map<TaxClass, Money> onLines;
     for (const Payment &p : payments) {
         if (p.kind != TenderKind::Discount)
             continue;
-        // Percent off what may be discounted, or a fixed amount (rewards, promotions).
-        const Money off = (p.staffMeal ? staffDiscountable : discountable).percent(p.percentBp) + p.amount;
+        Money off;
+        const OrderLine *line = nullptr;
+        if (p.lineId != 0) {
+            const auto it = std::ranges::find(lines, p.lineId, &OrderLine::id);
+            if (it == lines.end() || !mayDiscount(*it))
+                continue;   // its item was voided or can't be discounted: nothing off
+            line = &*it;
+            const Money base = line->total();
+            off = base.percent(p.percentBp) + p.amount;
+            if (off > base)
+                off = base;
+        } else {
+            // Percent off what may be discounted, or a fixed amount (rewards, promotions).
+            off = (p.staffMeal ? staffDiscountable : discountable).percent(p.percentBp) + p.amount;
+        }
+        const Money room = discountable - t.discounts;
+        if (off > room)
+            off = room;
+        if (off.cents() <= 0)
+            continue;
         t.discounts += off;
+        t.discountBy[p.id] = off;
         if (p.staffMeal)
             t.staffMeals += off;
+        if (line)
+            onLines[line->taxClass] += off;
+        else
+            shared += off;
     }
-    if (t.discounts > t.items)
-        t.discounts = t.items;
     t.subtotal = t.items - t.discounts;
 
-    // Spread the discount over tax classes in proportion to their sales,
-    // giving rounding leftovers to the largest class, then tax each class
-    // on its net total.
-    Money taxableTotal;
-    for (const auto &[cls, amount] : byClass)
-        taxableTotal += amount;
-    // The part of the discount that falls on taxable sales (comments and
-    // untaxed lines take the rest).
-    const Money taxableDiscount = taxableTotal.cents() > 0 && t.items.cents() > 0
-        ? Money::fromCents(t.discounts.cents() * taxableTotal.cents() / t.items.cents())
-        : Money();
+    // The tax classes' share of the discount: an item discount on its own
+    // item's class; the check's discounts spread over what may be discounted
+    // in proportion (rounding leftovers to the largest), then each class is
+    // taxed on its net total.
+    Money sharedRoom;
+    for (const auto &[cls, amount] : discountableByClass)
+        sharedRoom += amount;
+    for (const auto &[cls, off] : onLines)
+        discountableByClass[cls] -= off;
+    sharedRoom = sharedRoom - (t.discounts - shared);
     Money allocated;
     TaxClass largest = TaxClass::None;
     Money largestAmount;
-    std::map<TaxClass, Money> discountShare;
-    for (const auto &[cls, amount] : byClass) {
-        if (largest == TaxClass::None || amount > largestAmount) {
+    bool any = false;
+    std::map<TaxClass, Money> discountShare = onLines;
+    for (const auto &[cls, amount] : discountableByClass) {
+        if (!any || amount > largestAmount) {
             largest = cls;
             largestAmount = amount;
+            any = true;
         }
-        if (taxableTotal.cents() > 0) {
-            const Money share = Money::fromCents(taxableDiscount.cents() * amount.cents() / taxableTotal.cents());
-            discountShare[cls] = share;
+        if (sharedRoom.cents() > 0) {
+            const Money share = Money::fromCents(shared.cents() * amount.cents() / sharedRoom.cents());
+            discountShare[cls] += share;
             allocated += share;
         }
     }
-    if (largest != TaxClass::None)
-        discountShare[largest] += taxableDiscount - allocated;
+    if (any)
+        discountShare[largest] += shared - allocated;
 
     for (const auto &[cls, amount] : byClass) {
         if (cls == TaxClass::Food && type == CheckType::Takeout && !rates.taxTakeoutFood)

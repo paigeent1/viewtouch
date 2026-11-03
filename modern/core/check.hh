@@ -139,7 +139,8 @@ struct Payment {
     std::string tenderName;
     TenderKind kind = TenderKind::Cash;
     Money amount;                 // Cash/Card: what it pays toward the check; Discount: a fixed amount off
-    std::int64_t percentBp = 0;   // Discount, applied to the current items total
+    std::int64_t percentBp = 0;   // Discount, applied to the current items total (or to lineId's line)
+    std::int64_t lineId = 0;      // Discount: only this line (an item discount); 0: the whole check
     Money tip;                    // Card: tip on top of the amount (owed to the server)
     std::string reference;        // GiftCard: the card number; HouseAccount: the customer id; staff meal: who ate;
                                   // a card through a reader: the processor's payment id (Stripe's pi_...)
@@ -226,6 +227,8 @@ struct Totals {
     Money tips;          // card tips, on top of the total
     Money cashPaid;      // cash tendered
     Money staffMeals;    // the part of `discounts` that is staff meals
+    Money discountable;  // what discounts may come off: items not marked No discounts, no gift cards
+    std::map<std::int64_t, Money> discountBy;   // each discount payment's id -> what it took off
     Money rounding;      // cash rounding (TaxRates::cashRoundingCents): -2 to +2 cents...
     Money balance;       // total + rounding - paid (negative = change owed)
     Money change;        // max(0, -balance), always given in cash

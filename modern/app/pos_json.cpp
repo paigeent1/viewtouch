@@ -147,7 +147,7 @@ QJsonObject toJson(const Check &c)
             {u"kind"_s, qs(toString(p.kind))}, {u"amount"_s, qint64(p.amount.cents())}, {u"percentBp"_s, qint64(p.percentBp)},
             {u"tip"_s, qint64(p.tip.cents())}, {u"reference"_s, qs(p.reference)}, {u"staffMeal"_s, p.staffMeal},
             {u"processor"_s, qs(p.processor)}, {u"cardBrand"_s, qs(p.cardBrand)}, {u"last4"_s, qs(p.last4)},
-            {u"offline"_s, qs(p.offline)},
+            {u"offline"_s, qs(p.offline)}, {u"lineId"_s, qint64(p.lineId)},
         });
     }
     QJsonArray events;
@@ -265,6 +265,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         p.kind = tenderKindFromString(ss(po.value(u"kind").toString()));
         p.amount = money(po.value(u"amount"));
         p.percentBp = i64(po.value(u"percentBp"));
+        p.lineId = i64(po.value(u"lineId"));
         p.tip = money(po.value(u"tip"));
         p.reference = ss(po.value(u"reference").toString());
         p.staffMeal = po.value(u"staffMeal").toBool();
@@ -997,7 +998,8 @@ QJsonObject toJson(const PosSettings &s)
                                         {u"periods"_s, periods}, {u"printer"_s, qs(c.printer)},
                                         {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
                                         {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos},
-                                        {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades}});
+                                        {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
+                                        {u"noDiscount"_s, c.noDiscount}});
              }
              return out;
          }()},
@@ -1516,6 +1518,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         cat.photos = c.value(u"photos").toBool();
         cat.hidePrice = c.value(u"hidePrice").toBool();
         cat.shades = c.value(u"shades").toBool();
+        cat.noDiscount = c.value(u"noDiscount").toBool();
         if (!cat.id.empty())
             s.menuCategories.push_back(std::move(cat));
     }

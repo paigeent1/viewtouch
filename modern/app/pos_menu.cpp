@@ -632,7 +632,8 @@ QVariantList PosService::menuCategoriesNow() const
                                {u"now"_s, c.periods.empty() || std::ranges::find(c.periods, period) != c.periods.end()},
                                {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)},
                                {u"taxClass"_s, qs(c.taxClass)}, {u"buttonSize"_s, qs(c.buttonSize)},
-                               {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades}});
+                               {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
+                               {u"noDiscount"_s, c.noDiscount}});
     }
     return out;
 }
@@ -733,6 +734,7 @@ QVariantList PosService::menuItemsNow() const
                                {u"onIt"_s, onItOf(m)}, {u"sizes"_s, sizesOf(m)}, {u"taxClass"_s, qs(toString(m.taxClass))},
                                {u"printer"_s, qs(m.printer)}, {u"station"_s, qs(m.station)},
                                {u"description"_s, qs(m.description)}, {u"kioskHide"_s, m.kioskHide},
+                               {u"noDiscount"_s, m.noDiscount},
                                {u"availableSet"_s, m.available}, {u"favorite"_s, m.favorite},
                                {u"kitchenName"_s, qs(m.kitchenName)}, {u"prepMinutes"_s, m.prepMinutes},
                                {u"section"_s, qs(m.section)}, {u"breakBefore"_s, qs(m.breakBefore)},

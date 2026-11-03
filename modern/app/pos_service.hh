@@ -629,6 +629,10 @@ public:
     bool removePayment();
     // A discount of the amount typed: dollars (cents typed) or a percent.
     bool customDiscount(bool percent);
+    // A percent off (`percentBp`: 500 = 5%, 10000 = comp; 0: the percent typed): on the
+    // selected (else the last rung) item when `item`, else on the whole sale. Items marked
+    // No discounts (cigarettes at the state minimum) are never discounted either way.
+    bool discountPercent(qint64 percentBp, bool item);
     bool closeCheck();
     // The current check, else the last one closed on this terminal.
     bool printReceipt();

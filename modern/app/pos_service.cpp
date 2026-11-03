@@ -1796,6 +1796,64 @@ bool PosService::tender(const QString &tenderId, std::optional<std::int64_t> amo
     return true;
 }
 
+bool PosService::discountPercent(qint64 percentBp, bool item)
+{
+    Check *c = current();
+    if (!c)
+        return fail(tr("No check is open."));
+    if (percentBp <= 0) {   // Variable: the percent the cashier typed
+        const std::int64_t typed = entry_.toLongLong();
+        if (typed <= 0)
+            return fail(tr("Type the percent (15 for 15%), then Apply."));
+        percentBp = typed * 100;
+    }
+    if (percentBp > 10000)
+        return fail(tr("A discount is 100% at most."));
+    const bool comp = percentBp == 10000;
+    const QString pct = comp ? tr("Comp") : tr("%1% off").arg(double(percentBp) / 100.0);
+    const Totals before = c->totals(s_->settings.tax);
+    OrderLine *l = nullptr;
+    if (item) {
+        l = c->line(selectedLine_);
+        if (!l || l->voided || l->isComment()) {
+            l = nullptr;   // the last item rung in
+            for (auto it = c->lines.rbegin(); it != c->lines.rend() && !l; ++it)
+                if (!it->voided && !it->isComment())
+                    l = &*it;
+        }
+        if (!l)
+            return fail(tr("Ring in the item first."));
+        if (l->noDiscount || l->isGiftCard())
+            return fail(tr("%1 can't be discounted.").arg(qs(l->displayName())));
+        if (std::ranges::any_of(c->payments, [&](const Payment &p) { return p.kind == TenderKind::Discount && p.lineId == l->id; }))
+            return fail(tr("%1 already has a discount (Undo Payment takes it off).").arg(qs(l->displayName())));
+    } else if (before.discountable - before.discounts <= Money()) {
+        return fail(before.discountable.cents() <= 0 ? tr("Nothing in this sale can be discounted.")
+                                                     : tr("This sale is already discounted all the way."));
+    }
+    const QString what = item ? tr("%1 %2").arg(pct, qs(l->displayName())) : pct;
+    if (!haveReason("comp", what))
+        return false;
+    if (!require(perm::Discount, tr("Discounts and comps")))
+        return false;
+    Tender t;
+    t.id = item ? "item-discount" : "subtotal-discount";
+    t.kind = TenderKind::Discount;
+    t.percentBp = percentBp;
+    t.name = ss(item ? (comp ? tr("Comp: %1").arg(qs(l->displayName())) : tr("%1 (%2)").arg(pct, qs(l->displayName())))
+                     : (comp ? tr("Comp (sale)") : tr("%1 (sale)").arg(pct)));
+    Payment &p = c->addPayment(t, Money());
+    if (l)
+        p.lineId = l->id;
+    entry_.clear();
+    emit entryChanged();
+    const Totals after = c->totals(s_->settings.tax);
+    noteEvent(*c, tr("Discount: %1").arg(qs(t.name)), "discount", after.discounts - before.discounts, takeReason());
+    emit notice(tr("%1: %2 off").arg(qs(t.name), format(after.discounts - before.discounts)));
+    changed(*c);
+    return true;
+}
+
 bool PosService::customDiscount(bool percent)
 {
     Check *c = current();
@@ -1808,8 +1866,10 @@ bool PosService::customDiscount(bool percent)
     if (percent && typed > 100)
         return fail(tr("A discount is 100% at most."));
     const Totals before = c->totals(s_->settings.tax);
-    if (!percent && Money::fromCents(typed) > before.items - before.discounts)
-        return fail(tr("That's more than the items on the check."));
+    if (before.discountable - before.discounts <= Money())
+        return fail(tr("Nothing in this sale can be discounted."));
+    if (!percent && Money::fromCents(typed) > before.discountable - before.discounts)
+        return fail(tr("That's more than can be discounted (%1).").arg(format(before.discountable - before.discounts)));
     if (!haveReason("comp", percent ? tr("%1% off").arg(typed) : tr("%1 off").arg(format(Money::fromCents(typed)))))
         return false;
     if (!require(perm::Discount, tr("Discounts and comps")))
@@ -2184,11 +2244,13 @@ QVariantList PosService::payments() const
     const Check *c = currentCheck();
     if (!c)
         return out;
-    const Money items = c->totals(s_->settings.tax).items;
+    const Totals totals = c->totals(s_->settings.tax);
     for (const Payment &p : c->payments) {
+        const auto off = totals.discountBy.find(p.id);
+        const Money taken = off == totals.discountBy.end() ? Money() : off->second;
         const QString amount = p.kind != TenderKind::Discount ? format(p.amount)
-            : p.percentBp == 0 ? format(-p.amount)   // a fixed amount off (reward, promotion)
-            : u"%1 (%2%)"_s.arg(format(-items.percent(p.percentBp))).arg(double(p.percentBp) / 100.0);
+            : p.percentBp == 0 ? format(-taken)   // a fixed amount off (reward, promotion)
+            : u"%1 (%2%)"_s.arg(format(-taken)).arg(double(p.percentBp) / 100.0);
         // A card from a reader: which one ("Credit Card · Visa •••• 4242").
         QString name = qs(p.tenderName);
         if (!p.last4.empty()) {

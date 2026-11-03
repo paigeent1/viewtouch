@@ -263,3 +263,50 @@ TEST_CASE("Cash rounding: to the nearest 5 cents when paid in cash, cards exact"
     CHECK(down.totals(r).rounding.cents() == 0);
     CHECK(down.totals(r).balance.cents() == 2);
 }
+
+TEST_CASE("No discounts items (cigarettes) are left out of item and subtotal discounts", "[check][discounts]")
+{
+    TaxRates r;
+    r.foodPpm = 82500;
+    r.alcoholPpm = 100000;
+    Check c;
+    MenuItem smokes = item("Marlboro", 1000, TaxClass::Food);
+    smokes.noDiscount = true;
+    const std::int64_t smokesId = c.addItem(smokes).id;
+    const std::int64_t cigarId = c.addItem(item("Cigar", 1000, TaxClass::Alcohol)).id;
+
+    Tender pct{"sale", "10% (sale)", TenderKind::Discount, 1000};
+    const std::int64_t saleId = c.addPayment(pct, Money()).id;
+    Totals t = c.totals(r);
+    CHECK(t.discountable == usd(1000));
+    CHECK(t.discounts == usd(100));                         // 10% of the cigar only
+    CHECK(t.discountBy.at(saleId) == usd(100));
+    CHECK(t.taxByClass.at(TaxClass::Food) == usd(1000).ppm(82500));   // the cigarettes' tax untouched
+    CHECK(t.taxByClass.at(TaxClass::Alcohol) == usd(90));   // 10% of 9.00
+
+    // A fixed amount off can't reach the cigarettes either.
+    Tender off{"off", "$50 off", TenderKind::Discount, 0};
+    c.addPayment(off, Money()).amount = usd(5000);
+    t = c.totals(r);
+    CHECK(t.discounts == usd(1000));
+    CHECK(t.subtotal == usd(1000));
+
+    // Item discounts: on the cigar's own line; on the cigarettes, nothing.
+    Check d;
+    const std::int64_t s2 = d.addItem(smokes).id;
+    const std::int64_t c2 = d.addItem(item("Cigar", 2000, TaxClass::Alcohol)).id;
+    Tender line{"item", "25% (Cigar)", TenderKind::Discount, 2500};
+    Payment &onCigar = d.addPayment(line, Money());
+    onCigar.lineId = c2;
+    const std::int64_t onCigarId = onCigar.id;
+    Payment &onSmokes = d.addPayment(line, Money());
+    onSmokes.lineId = s2;
+    const std::int64_t onSmokesId = onSmokes.id;
+    t = d.totals(r);
+    CHECK(t.discounts == usd(500));
+    CHECK(t.discountBy.at(onCigarId) == usd(500));
+    CHECK_FALSE(t.discountBy.contains(onSmokesId));
+    CHECK(t.taxByClass.at(TaxClass::Alcohol) == usd(150));   // 10% of 15.00
+    (void)smokesId;
+    (void)cigarId;
+}

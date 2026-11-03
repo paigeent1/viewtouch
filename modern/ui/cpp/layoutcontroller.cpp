@@ -1711,6 +1711,15 @@ void LayoutController::runAction(const Action &a, Done done)
     if (type == u"command")
         return runCommand(a.str(u"name"), a.data.value(u"args").toObject().toVariantMap(), std::move(done));
 
+    // A number key placed on the page (the retail keypad): types into the entry, as the numPad does
+    // ("0"-"9", "00", ".", "clear", "back").
+    if (type == u"key") {
+        const QString key = a.str(u"key");
+        if (!pos_ || key.isEmpty() || key == u".")   // amounts are typed in cents: no point
+            return done(true);
+        return call(u"entryKey"_s, {key}, [done](const QVariant &) { done(true); });
+    }
+
     setStatus(tr("Action '%1' is not supported yet").arg(type));
     done(false);
 }
@@ -2078,6 +2087,12 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         return call(u"payout"_s, {name}, [done](const QVariant &ok) { done(ok.toBool()); });
 
     if (pos_) {
+        // Retail discount grid: {percent: 5..100, or "typed"} off the last item or the whole sale.
+        if (name == u"itemDiscount" || name == u"subtotalDiscount") {
+            const QVariant pct = args.value(u"percent"_s);
+            const qint64 bp = pct.toString() == u"typed" ? 0 : qint64(pct.toDouble() * 100);
+            return call(u"discountPercent"_s, {bp, name == u"itemDiscount"}, [done](const QVariant &ok) { done(ok.toBool()); });
+        }
         if (const auto it = operations.constFind(name); it != operations.cend())
             return call(it->first, it->second, [done](const QVariant &ok) { done(ok.toBool()); });
     }

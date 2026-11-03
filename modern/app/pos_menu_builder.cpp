@@ -278,6 +278,20 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.hidePrice = record.value(u"hidePrice"_s).toBool();
     if (record.contains(u"shades"_s))
         c.shades = record.value(u"shades"_s).toBool();
+    // No discounts for the whole category: on (or off) for every item in it.
+    if (record.contains(u"noDiscount"_s)) {
+        const bool was = c.noDiscount;
+        c.noDiscount = record.value(u"noDiscount"_s).toBool();
+        if (c.noDiscount != was)
+            for (int i = 0; i < int(s_->menu.size()); ++i) {
+                MenuItem &m = s_->menu[i];
+                if (m.family != c.id || m.noDiscount == c.noDiscount)
+                    continue;
+                m.noDiscount = c.noDiscount;
+                if (s_->sink)
+                    s_->sink->saveMenuItem(m, i);
+            }
+    }
     if (it != list.end())
         *it = c;
     else
@@ -643,6 +657,8 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
     }
     if (card.contains(u"kioskHide"_s))
         item.kioskHide = card.value(u"kioskHide"_s).toBool();
+    if (card.contains(u"noDiscount"_s))   // never discounted or comped (cigarettes at the state minimum)
+        item.noDiscount = card.value(u"noDiscount"_s).toBool();
     if (card.contains(u"favorite"_s))
         item.favorite = card.value(u"favorite"_s).toBool();
     if (card.contains(u"allergens"_s)) {
