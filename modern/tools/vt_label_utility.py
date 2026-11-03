@@ -3023,32 +3023,58 @@ class VTLabelUtility(tk.Tk):
         left = tk.Frame(self.content, bg="#1e242d", width=290)
         left.pack(side="left", fill="y", padx=8, pady=8)
 
-        tk.Label(left, text="ViewTouch Department Groups", bg="#1e242d", fg="#f2f4f7", font=("Sans", 11, "bold")).pack(anchor="w")
-        self.nvs_list = tk.Listbox(left, font=("Sans", 11), height=18, exportselection=False)
-        self.nvs_list.pack(fill="both", expand=True, pady=4)
+        # Touch-sized rows (a finger, not a mouse): tall lines, bigger type, a wide scroll bar.
+        t_style = ttk.Style(self)
+        t_style.configure("TouchTree.Treeview", rowheight=52, font=("Sans", 15), indent=34)
+        t_style.configure("TouchTree.Vertical.TScrollbar", arrowsize=34, width=34)
+
+        tk.Label(left, text="Categories", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
+        left_box = tk.Frame(left, bg="#1e242d")
+        left_box.pack(fill="both", expand=True, pady=4)
+        self.nvs_list = ttk.Treeview(left_box, show="tree", selectmode="browse", style="TouchTree.Treeview")
+        self.nvs_list.column("#0", width=300)
+        nvs_scroll = ttk.Scrollbar(left_box, orient="vertical", command=self.nvs_list.yview, style="TouchTree.Vertical.TScrollbar")
+        self.nvs_list.configure(yscrollcommand=nvs_scroll.set)
+        nvs_scroll.pack(side="right", fill="y")
+        self.nvs_list.pack(side="left", fill="both", expand=True)
 
         groups = sorted({it["category"] for it in self.all_items})
-        self.nvs_list.insert("end", "ALL VIEWTOUCH CATEGORIES")
-        for g in groups:
-            self.nvs_list.insert("end", g)
-        self.nvs_list.selection_set(0)
-        self.nvs_list.bind("<<ListboxSelect>>", self._on_left_group_select)
+        self.nvs_list.insert("", "end", iid="__all__", text="ALL CATEGORIES")
+        for i, g in enumerate(groups):
+            self.nvs_list.insert("", "end", iid=f"g{i}", text=g)
+        self.nvs_list.selection_set("__all__")
+        self.nvs_list.bind("<<TreeviewSelect>>", self._on_left_group_select)
 
         right = tk.Frame(self.content, bg="#1e242d")
         right.pack(side="right", fill="both", expand=True, padx=8, pady=8)
-        tk.Label(right, text="ViewTouch Category & Brand Hierarchy (Double-Click or Select & Click Next >>)", bg="#1e242d", fg="#f2f4f7", font=("Sans", 11, "bold")).pack(anchor="w")
+        tk.Label(right, text="Group > Category > Brand (touch one, then Next >>; ▷ opens a level)", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
 
-        self.cat_tree = ttk.Treeview(right, show="tree", selectmode="browse")
-        self.cat_tree.pack(fill="both", expand=True, pady=4)
+        tree_box = tk.Frame(right, bg="#1e242d")
+        tree_box.pack(fill="both", expand=True, pady=4)
+        self.cat_tree = ttk.Treeview(tree_box, show="tree", selectmode="browse", style="TouchTree.Treeview")
+        tree_scroll = ttk.Scrollbar(tree_box, orient="vertical", command=self.cat_tree.yview, style="TouchTree.Vertical.TScrollbar")
+        self.cat_tree.configure(yscrollcommand=tree_scroll.set)
+        tree_scroll.pack(side="right", fill="y")
+        self.cat_tree.pack(side="left", fill="both", expand=True)
         self._populate_category_tree()
         self.cat_tree.bind("<Double-1>", lambda _e: self.go_next())
+        self.cat_tree.bind("<ButtonRelease-1>", self._toggle_tree_row, add="+")
+
+    def _toggle_tree_row(self, e):
+        """A finger can't hit the little ▷: touching anywhere on a row with levels under it opens or closes it
+        (the row is also chosen, for Next)."""
+        row = self.cat_tree.identify_row(e.y)
+        if not row or not self.cat_tree.get_children(row):
+            return
+        if "indicator" in str(self.cat_tree.identify_element(e.x, e.y)):
+            return   # the ▷ itself: Tk already opened/closed it
+        self.cat_tree.item(row, open=not self.cat_tree.item(row, "open"))
 
     def _on_left_group_select(self, _e=None):
-        sel = self.nvs_list.curselection()
+        sel = self.nvs_list.selection()
         if not sel:
             return
-        chosen = self.nvs_list.get(sel[0])
-        self._populate_category_tree(None if chosen == "ALL VIEWTOUCH CATEGORIES" else chosen)
+        self._populate_category_tree(None if sel[0] == "__all__" else self.nvs_list.item(sel[0], "text"))
 
     def _populate_category_tree(self, filter_cat=None):
         self.cat_tree.delete(*self.cat_tree.get_children())

@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:35 ET — Bob (Claude) — Label utility tree screen: touch-sized rows
+- **What:** Screen 2 (Tree View): the left list (now 'Categories', was a Tk Listbox) and the Group > Category > Brand tree are ttk Treeviews with style TouchTree.Treeview (rowheight 52, Sans 15, indent 34) and 34 px scroll bars; touching anywhere on a row with levels under it opens/closes it (the small ▷ is hard to hit) and chooses it for Next. Tested off the Pi: rows render 52 px, category filter, open/close by touch, Next to screen 3.
+- **Why:** Owner: taller lines between department groups and category/brand, more touch friendly.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** Python only: git pull on the Pi, then reopen the label utility.
+
 ### 2026-11-03 10:00 ET — Bob (Claude) — Labels page: red Close in the top banner
 - **What:** seed/pages/labels.json: title label narrowed to 1632 px; new button 'close' (✕ Close, fill #dc2626, x 1664 y 16 240x80, jump back) at the right of the banner, on every step, leaving the Labels screen. The widget's own ‹ Back still steps back one screen. Page change only: reaches tablets with vt-server (no APK).
 - **Why:** Owner: a persistent red Close button in the upper right of the tablet label screen's top banner.
