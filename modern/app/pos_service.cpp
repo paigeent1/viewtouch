@@ -373,8 +373,8 @@ bool PosService::haveReason(const char *kind, const QString &what)
         QT_TR_NOOP("Wrong item rung in"), QT_TR_NOOP("Guest changed their mind"), QT_TR_NOOP("Took too long"),
         QT_TR_NOOP("Guest didn't like it"), QT_TR_NOOP("Kitchen mistake"), QT_TR_NOOP("Guest unhappy"),
         QT_TR_NOOP("Manager's guest"), QT_TR_NOOP("Regular / VIP"),
-        QT_TR_NOOP("Make change"), QT_TR_NOOP("Fix a payment"), QT_TR_NOOP("Count or check the drawer"),
-        QT_TR_NOOP("Cash drop or pickup"), QT_TR_NOOP("Manager request"),
+        QT_TR_NOOP("Make Change"), QT_TR_NOOP("Forgot to put cash in"), QT_TR_NOOP("Retrieved Item"),
+        QT_TR_NOOP("Other"),
     };
     QStringList reasons;
     for (const std::string &r : list)

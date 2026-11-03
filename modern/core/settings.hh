@@ -250,8 +250,8 @@ struct PosSettings {
     std::vector<std::string> compReasons{"Guest unhappy", "Took too long", "Manager's guest", "Kitchen mistake",
                                          "Regular / VIP"};
     // No Sale asks why the drawer opens (buttons from this list; empty: it doesn't ask).
-    std::vector<std::string> noSaleReasons{"Make change", "Fix a payment", "Count or check the drawer",
-                                           "Cash drop or pickup", "Manager request"};
+    std::vector<std::string> noSaleReasons{"Make Change", "Forgot to put cash in", "Retrieved Item",
+                                           "Other"};
     std::vector<std::int64_t> cashDenominations{10000, 5000, 2000, 1000, 500, 100, 25, 10, 5, 1};
     // A second folder every backup is also copied to (a USB drive, a
     // network share), so one dead disk can't take the backups with it.

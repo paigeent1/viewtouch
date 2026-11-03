@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:24 ET — Bob (Claude) — No Sale reasons: the store's four
+- **What:** Default No Sale reasons are now Make Change, Forgot to put cash in, Retrieved Item, Other (editable in Store Settings > Voids, comps and No Sale).
+- **Why:** Owner's list.
+- **Files:** `core/settings.hh, app/pos_service.cpp, tests/test_pos_m4.cpp, tests/test_print.cpp`
+
 ### 2026-11-03 16:23 ET — Bob (Claude) — No Sale slip: ****No Sale**** ticket, numbered, from the retail NO SALE button
 - **What:** No Sale now prints a slip on the drawer's printer like a kitchen ticket (no logo): ****No Sale****, No Sale #n for the day, drawer, who, why, date and time, and the drawer kicks in the same job (print log: 'No Sale #n'). The reason question from the previous entry comes first. Retail screen NO SALE button now names the noSale command (the screen already mapped its old openDrawer to noSale, so customized retail pages work without editing).
 - **Why:** Owner: retail NO SALE asks why, opens the drawer and prints a No Sale slip logged as a ticket.
