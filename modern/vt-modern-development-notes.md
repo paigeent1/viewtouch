@@ -85,6 +85,7 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Front-End Ticket Counter, Mode Buttons & Importers**: Live item/quantity counter (`Items: X (Qty: Y)`) in `WidgetOrderList.qml`, Cashier/Manager mode buttons, variable-weight scale barcode parsing, separate `UPC`/`ALTUPC` CSV columns (`app/menu_import.cpp`), and ILSA batch staging (`stage_batch.py`).
 * **Secondary HDMI Customer-Facing Display (CFD)**: Split-screen mode (`--customer-display window`) on Pi 5 Micro-HDMI 1 with 50% live receipt (`CustomerReceiptView.qml`) and 50% dynamic promo/pairing panel (`goesWith`).
   *Already working (not this item):* the basic customer display (`ui/qml/CustomerDisplay.qml`, `CustomerDisplayWindow.qml`: order, total, tips, thank-you, price checks), turned on in Manager -> Terminals -> Customer display (runs `vt-guest-display on`: HDMI-2 beside HDMI-1, not mirrored). Don't launch vtmodern with `--customer-display` while the monitors are mirrored.
+* **Tablet customer displays with video (future idea)**: The Bar 1/2/3 tablets have no customer display today. If they get one later: add `-m qtmultimedia` to the Android workflow's `aqt install-qt` so `VideoPanel.qml` builds into the APK, and serve the Store Settings > Customer display video (an MP4 on the Pi) to the tablets over the network (a file on the Pi isn't reachable from a tablet). Until then tablets fall back to the picture/GIF.
 * **4-Node Multi-Store Hub & Web Portal**: `store_config.json` and `corp_sync.py` across `CORP_HUB`, `HCAH_DANBURY`, `BHT_DANBURY`, and `BHT_GAYLORDSVILLE`, plus InMotion PHP/MySQL online ordering with Pi background polling and ESC/POS kitchen auto-printing (`192.168.1.77:9100`).
 * **Corporate ViewTouch & shared gift cards (planned, to be implemented later)**: The owner will build a Corporate ViewTouch
   instance on a separate Pi before the Buttheads stores launch. Then: one shared card list so balances work at all three
@@ -94,6 +95,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-03 18:11 ET — Bob (Claude) — Roadmap: tablet customer displays with video
+- **What:** Added a future-ideas item to section 5: tablets have no customer display now; for video on them later, Qt Multimedia in the Android build and the Pi serving the MP4.
+- **Why:** Owner: save it in future ideas.
+- **Files:** `modern/vt-modern-development-notes.md`
 
 ### 2026-11-03 18:11 ET — Bob (Claude) — vt-server installs Qt Multimedia once
 - **What:** vt-server checks dpkg for qt6-multimedia-dev; if missing it apt-installs it with qml6-module-qtmultimedia and the ffmpeg (else gstreamer) multimedia plugin, touches CMakeLists so the build reconfigures and picks up video. Failure just prints a note; ViewTouch builds without video.
