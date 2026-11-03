@@ -199,7 +199,18 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 10
-                Label { text: qsTr("Choose a label"); font.pixelSize: 22; font.bold: true }
+                RowLayout {
+                    spacing: 12
+                    // The first screen's Back leaves the Labels screen (later screens' Back steps back here).
+                    Button {
+                        implicitHeight: 56
+                        implicitWidth: 120
+                        font.pixelSize: 18
+                        text: qsTr("‹ Back")
+                        onClicked: if (w.zone && w.zone.controller) w.zone.controller.goBack()
+                    }
+                    Label { text: qsTr("Choose a label"); font.pixelSize: 22; font.bold: true }
+                }
                 Flow {
                     Layout.fillWidth: true
                     spacing: 10
