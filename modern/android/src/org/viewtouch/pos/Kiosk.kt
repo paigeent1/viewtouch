@@ -75,8 +75,25 @@ object Kiosk {
     }
 
     // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
+    // Wi-Fi kept at full power while ViewTouch runs: Android's power saving otherwise turns the
+    // radio down when the screen is off, and the tablet drops off the network (Bar 3, 2026-11-03).
+    private var wifiLock: WifiManager.WifiLock? = null
+    @JvmStatic
+    fun keepWifiAwake(ctx: Context) {
+        if (wifiLock?.isHeld == true) return
+        try {
+            val wm = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            val lock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ViewTouch")
+            lock.setReferenceCounted(false)
+            lock.acquire()
+            wifiLock = lock
+        } catch (_: Exception) {}
+    }
+
     @JvmStatic
     fun ensureWirelessAdb(ctx: Context) {
+        keepWifiAwake(ctx)
         // Wireless debugging back on after every restart, so the Pi can reach the tablet again
         // (vt-adb-ensure then switches it to port 5555). Android lets a device owner change only a
         // few global settings, and these aren't among them: this needs WRITE_SECURE_SETTINGS, granted
@@ -107,6 +124,7 @@ object Kiosk {
     }
     @JvmStatic
     fun wifiInfo(activity: Activity): Int {
+        keepWifiAwake(activity)
         return try {
             val cm = activity.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             val caps = cm?.getNetworkCapabilities(cm.activeNetwork)

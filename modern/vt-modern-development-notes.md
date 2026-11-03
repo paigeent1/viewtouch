@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 07:36 ET — Bob (Claude) — Tablets: Wi-Fi kept awake; reconnect without mDNS; USB install
+- **What:** Morning 2026-11-03: Pi saw no tablet over ADB (mDNS lists nothing on the Pi; Bar 1 had lost its pairing with the Pi; Bar 3 off Wi-Fi). Bar 1/2 reconnected after re-pairing and got app 145 (run 41632598473). Fixes: Kiosk.kt keepWifiAwake(): WIFI_MODE_FULL_HIGH_PERF WifiLock held while ViewTouch runs (boot and every status poll). vt-adb-ensure: (3) a tablet that answers ping but isn't on 5555 has ports 30000-50000 tried for its Wireless debugging port (needs the Pi still paired), then tcpip 5555 (flock, once per 30 min per tablet, since ViewTouch runs it ~every minute); (4) on every reached tablet: dumpsys deviceidle whitelist +org.viewtouch.pos, wifi_sleep_policy 2, pm grant WRITE_SECURE_SETTINGS. vt-tablets: installs over USB first (any USB tablet), then the Wi-Fi ones.
+- **Why:** Owner: tablets lost ADB overnight though it was meant to persist; Bar 3 install failed; asked about a Wi-Fi sleep setting.
+- **Files:** `modern/android/src/org/viewtouch/pos/Kiosk.kt, scripts/bin/vt-adb-ensure, scripts/bin/vt-tablets`
+- **Next person must know:** The Pi runs copies in /usr/local/bin: sudo install -m 755 scripts/bin/vt-adb-ensure scripts/bin/vt-tablets /usr/local/bin/. If a tablet forgets the Pi's pairing again, only USB or re-pairing (Wireless debugging > Pair device with pairing code; adb pair ip:port code) brings it back. WifiLock needs the next APK.
+
 ### 2026-11-03 07:15 ET — Bob (Claude) — Tablet app run 41632511817 (4e3b8bc) succeeded
 - **What:** Android build of 4e3b8bc succeeded: tablet Labels screen in steps (label styles, tree levels with Show Items, items, To Print), label preview, print order, step-by-step Back; Gift Card screen with Transfer/Cash Out beside the balance and Pay centered. A duplicate run 41632598473 of the same commit was also started.
 - **Why:** Owner asked to watch the build.

@@ -1,7 +1,19 @@
 #!/bin/bash
-/usr/local/bin/vt-adb-ensure
 APK=$(ls -t /home/pi/viewtouch-main/apks/*.apk 2>/dev/null | head -n 1)
 if [ -z "$APK" ]; then echo "No APK found in ~/viewtouch-main/apks/"; exit 1; fi
+# First a tablet plugged into the Pi by USB (e.g. one off Wi-Fi), over the cable (before vt-adb-ensure
+# switches it to Wi-Fi mode).
+for u in $(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1}'); do
+    echo -n "[USB $u - Wi-Fi $(adb -s "$u" shell ip -4 addr show wlan0 2>/dev/null | awk '/inet /{print $2}')] "
+    if adb -s "$u" install -r -d "$APK" >/tmp/adb_inst.log 2>&1; then
+        adb -s "$u" shell am force-stop org.viewtouch.pos >/dev/null 2>&1 || true
+        adb -s "$u" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1 || true
+        echo "✅ PASS (over USB)"
+    else
+        echo "❌ FAIL ($(tr '\n' ' ' < /tmp/adb_inst.log))"
+    fi
+done
+/usr/local/bin/vt-adb-ensure
 mkdir -p /home/pi/.local/share/ViewTouch/ViewTouch/updates
 cp -f "$APK" /home/pi/.local/share/ViewTouch/ViewTouch/updates/
 echo "=== Pushing $(basename "$APK") to Bar 1, Bar 2 & Bar 3 ==="

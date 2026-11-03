@@ -26,3 +26,34 @@ for ip in 192.168.1.220 192.168.1.215 192.168.1.210; do
     fi
     adb connect "${ip}:5555" >/dev/null 2>&1 || true
 done
+
+# 3. A tablet on the network but not on 5555 (restarted): find its Wireless debugging port without
+#    mDNS (the Pi's mDNS finds nothing) by trying ports 30000-50000, then switch it to 5555. Needs the
+#    Pi still paired on that tablet. One search at a time, each tablet at most every 30 minutes
+#    (ViewTouch runs this script about once a minute).
+exec 9>/tmp/vt-adb-ensure.lock
+if flock -n 9; then
+    for ip in 192.168.1.220 192.168.1.215 192.168.1.210; do
+        adb devices | grep -q "^${ip}:5555[[:space:]]*device" && continue
+        stamp=/tmp/vt-adb-scan-${ip}
+        [ -f "$stamp" ] && [ $(( $(date +%s) - $(stat -c %Y "$stamp") )) -lt 1800 ] && continue
+        ping -c1 -W1 "$ip" >/dev/null 2>&1 || continue
+        touch "$stamp"
+        for p in $(seq 30000 50000); do
+            if timeout 0.3 bash -c "echo >/dev/tcp/$ip/$p" 2>/dev/null; then
+                if adb connect "$ip:$p" 2>/dev/null | grep -q "connected"; then
+                    adb -s "$ip:$p" tcpip 5555 >/dev/null 2>&1 || true
+                    sleep 3
+                    adb connect "${ip}:5555" >/dev/null 2>&1 || true
+                fi
+                break
+            fi
+        done
+    done
+fi
+
+# 4. On every tablet reached: ViewTouch left out of Android's battery saving (so Wi-Fi stays up with
+#    the screen off) and Wi-Fi kept on during sleep. Both survive a restart.
+for d in $(adb devices | awk 'NR>1 && $2=="device" {print $1}'); do
+    adb -s "$d" shell "dumpsys deviceidle whitelist +org.viewtouch.pos; settings put global wifi_sleep_policy 2; pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS" >/dev/null 2>&1 || true
+done
