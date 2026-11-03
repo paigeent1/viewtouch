@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:57 ET — Bob (Claude) — Label utility Tree View starts at department groups, folded
+- **What:** DRILL_LEVELS starts with Department groups (dept_group, blank = RETAIL): left list Department groups > Categories > Manufacturers > Product groups > Sub groups; right tree's department nodes start folded (everything folded), node keys include the department. Header 'Select Department / Category / Manufacturer / Product Group'. Tested: start shows 4 departments folded, CIGARS > its categories > PREMIUM CIGARS > manufacturers, Back x2, Next on a department -> its 60 items.
+- **Why:** Owner: start with department collapsed in the Pi label utility.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 10:56 ET — Bob (Claude) — Tablet Labels tree: level titles
 - **What:** retailLabels() adds levelTitle (Department groups / Categories / Manufacturers / Product groups / Sub groups by path depth); WidgetRetailLabels shows it above the level's buttons. The tablet tree already drills Department group > Category > Manufacturer > Product group > Sub group, one screen per level (owner: keep department group); Find/scan unchanged. Test [labels] extended. Not compiled here.
 - **Why:** Owner: tablet label search like the Pi's drill-down, keeping department group and Find/scan.
