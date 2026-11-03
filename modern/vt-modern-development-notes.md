@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:00 ET — Bob (Claude) — Labels page: red Close in the top banner
+- **What:** seed/pages/labels.json: title label narrowed to 1632 px; new button 'close' (✕ Close, fill #dc2626, x 1664 y 16 240x80, jump back) at the right of the banner, on every step, leaving the Labels screen. The widget's own ‹ Back still steps back one screen. Page change only: reaches tablets with vt-server (no APK).
+- **Why:** Owner: a persistent red Close button in the upper right of the tablet label screen's top banner.
+- **Files:** `modern/seed/pages/labels.json`
+- **Next person must know:** Starter pages nobody edited update automatically; if the store's Labels page was edited, add the button in the page editor.
+
 ### 2026-11-03 09:48 ET — Bob (Claude) — Humidor runner routing, on when a humidor printer/screen exists
 - **What:** PosService::addItem: a retail item (recipe __retail__, a single of a box, or taxed Merchandise) whose printer is empty or 'kitchen' and has no station goes to the humidor: printer = humidorPrinter() (a printer with id or name 'humidor', type not none) or else the humidor station id; station = humidorStation() (a Store Settings > Kitchen station named Humidor). With neither, the line is kitchenHide (nowhere, not the kitchen). TicketPrinter::printKitchen: a line routed to a station that has no printer prints no ticket (was: fell back to the kitchen printer). Items rung on the Retail screen stay handed (never routed). Test [humidor] in test_cards.cpp.
 - **Why:** Owner: build the humidor runner printer in, turned on when/if a humidor printer is added.

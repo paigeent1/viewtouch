@@ -16,12 +16,36 @@
       "rect": {
         "x": 16,
         "y": 16,
-        "w": 1888,
+        "w": 1632,
         "h": 80
       },
       "shape": "rect",
       "behavior": "none",
       "label": "Labels: shelf, price, cigar"
+    },
+    {
+      "id": "close",
+      "kind": "button",
+      "rect": {
+        "x": 1664,
+        "y": 16,
+        "w": 240,
+        "h": 80
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "\u2715 Close",
+      "style": {
+        "normal": {
+          "fill": "#dc2626"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
     },
     {
       "id": "labels",
