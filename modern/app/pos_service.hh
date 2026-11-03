@@ -177,6 +177,7 @@ struct PosData {
     std::int64_t lastDrawerId = 0;
     std::vector<PastDay> pastDays;                // newest first
     std::vector<core::Refund> refundsToday;       // this business day's refunds (any check's)
+    std::vector<core::Check> cancelledToday;      // this business day's cancelled sales (Cancel #n)
     std::int64_t lastRefundId = 0;
     std::vector<core::Change> changesToday;       // this business day's changes (the Changes report)
     std::int64_t lastChangeId = 0;
@@ -316,6 +317,7 @@ public:
     std::int64_t lastDrawerId = 0;
     std::vector<PastDay> pastDays;
     std::vector<core::Refund> refundsToday;
+    std::vector<core::Check> cancelledToday;   // Cancel Sale: Cancel #1, #2... (not sales)
     std::int64_t lastRefundId = 0;
     std::vector<core::Change> changesToday;
     std::int64_t lastChangeId = 0;
@@ -633,6 +635,10 @@ public:
     // selected (else the last rung) item when `item`, else on the whole sale. Items marked
     // No discounts (cigarettes at the state minimum) are never discounted either way.
     bool discountPercent(qint64 percentBp, bool item);
+    // Cancel Sale: the sale in progress is cancelled (asks why), kept as Cancel #n for the day:
+    // not a sale, nothing taken out of stock (put back if it was), an exception. Payments must be
+    // taken back first.
+    bool cancelSale();
     bool closeCheck();
     // The current check, else the last one closed on this terminal.
     bool printReceipt();

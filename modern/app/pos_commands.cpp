@@ -97,6 +97,7 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"lineLess"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.changeLineQuantity(a.value(0).toLongLong(), -1)); }},
         {u"anotherRound"_s, [](PosService &p, const QVariantList &) { return QVariant(p.anotherRound()); }},
         {u"customDiscount"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customDiscount(a.value(0).toBool())); }},
+        {u"cancelSale"_s, [](PosService &p, const QVariantList &) { return QVariant(p.cancelSale()); }},
         {u"discountPercent"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.discountPercent(a.value(0).toLongLong(), a.value(1).toBool())); }},
         {u"timeClockStart"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.timeClockStart(a.value(0).toString())); }},
         {u"timeClockAct"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.timeClockAct(a.value(0).toString())); }},

@@ -57,6 +57,7 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
     , lastDrawerId(data.lastDrawerId)
     , pastDays(std::move(data.pastDays))
     , refundsToday(std::move(data.refundsToday))
+    , cancelledToday(std::move(data.cancelledToday))
     , lastRefundId(data.lastRefundId)
     , changesToday(std::move(data.changesToday))
     , lastChangeId(data.lastChangeId)
@@ -362,9 +363,12 @@ bool PosService::haveReason(const char *kind, const QString &what)
         return true;
     const Employee *e = user();
     const bool noSale = std::string_view(kind) == "noSale";
-    // No Sale always asks when the store has reasons for it; voids and comps as the store / employee says.
-    const bool ask = noSale || (e && !e->reasons.empty() ? e->reasons == "ask" : s_->settings.askReasons);
+    const bool cancel = std::string_view(kind) == "cancel";
+    // No Sale and Cancel Sale always ask when the store has reasons for them; voids and comps as the
+    // store / employee says.
+    const bool ask = noSale || cancel || (e && !e->reasons.empty() ? e->reasons == "ask" : s_->settings.askReasons);
     const auto &list = noSale ? s_->settings.noSaleReasons
+                     : cancel ? s_->settings.cancelReasons
                      : std::string_view(kind) == "void" ? s_->settings.voidReasons : s_->settings.compReasons;
     if (!ask || list.empty())
         return true;
@@ -374,7 +378,7 @@ bool PosService::haveReason(const char *kind, const QString &what)
         QT_TR_NOOP("Guest didn't like it"), QT_TR_NOOP("Kitchen mistake"), QT_TR_NOOP("Guest unhappy"),
         QT_TR_NOOP("Manager's guest"), QT_TR_NOOP("Regular / VIP"),
         QT_TR_NOOP("Make Change"), QT_TR_NOOP("Forgot to put cash in"), QT_TR_NOOP("Retrieved Item"),
-        QT_TR_NOOP("Other"),
+        QT_TR_NOOP("Other"), QT_TR_NOOP("Price"), QT_TR_NOOP("Customer changed mind"), QT_TR_NOOP("No ID"),
     };
     QStringList reasons;
     for (const std::string &r : list)
@@ -1095,6 +1099,60 @@ bool PosService::openCheck(std::int64_t checkId)
     checkFilter_.clear();
     emit checkChanged();
     emit s_->checksChanged();
+    return true;
+}
+
+bool PosService::cancelSale()
+{
+    if (!require(perm::Settle, tr("Cancelling a sale")))
+        return false;
+    Check *c = current();
+    if (!c)
+        return fail(tr("No sale to cancel."));
+    if (std::ranges::any_of(c->payments, [](const Payment &p) { return p.kind != TenderKind::Discount; }))
+        return fail(tr("Take the payment back first (Undo Payment), then Cancel Sale."));
+    const bool anything = std::ranges::any_of(c->lines, [](const OrderLine &l) { return !l.voided && !l.isComment(); });
+    if (!anything) {   // nothing rung in: just put away, no number used
+        releaseCheck();
+        emit notice(tr("Nothing to cancel"));
+        return true;
+    }
+    if (!c->training && !haveReason("cancel", tr("Cancel this sale (%1)").arg(format(c->totals(s_->settings.tax).total))))
+        return false;
+    const std::string why = takeReason();
+    if (c->training)
+        return closePractice(*c);
+    // Nothing comes out of stock: what was already taken (sent) goes back; the kitchen hears of it.
+    std::vector<OrderLine> sent;
+    for (const OrderLine &l : c->lines)
+        if (l.sent && !l.voided)
+            sent.push_back(l);
+    if (!sent.empty()) {
+        takeStock(sent, -1);
+        if (s_->printer)
+            s_->printer->printKitchen(s_->settings, *c, sent, true);
+    }
+    letHoldGo(*c, tr("Held card let go"));
+    const Money worth = c->totals(s_->settings.tax).total;
+    c->cancelNumber = int(s_->cancelledToday.size()) + 1;
+    noteEvent(*c, tr("Cancel #%1: %2").arg(c->cancelNumber).arg(format(worth)), "cancel", worth, why);
+    c->status = CheckStatus::Discarded;
+    c->closedAt = now();
+    c->businessDay = s_->day.id;
+    if (s_->sink)
+        s_->sink->saveCheck(*c);
+    s_->cancelledToday.push_back(*c);
+    const qint64 id = c->id;
+    const int number = c->cancelNumber;
+    unlockCheck(id);
+    s_->open.erase(id);
+    currentId_ = 0;
+    selectedLine_ = 0;
+    selectedPayment_ = 0;
+    emit notice(tr("Sale cancelled: Cancel #%1").arg(number));
+    emit checkChanged();
+    emit s_->checksChanged();
+    emit s_->dayChanged();
     return true;
 }
 

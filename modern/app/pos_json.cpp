@@ -193,6 +193,7 @@ QJsonObject toJson(const Check &c)
              return a;
          }()}, {u"driverId"_s, qs(c.driverId)}, {u"driverName"_s, qs(c.driverName)},
         {u"outAt"_s, qint64(c.outAt)}, {u"deliveredAt"_s, qint64(c.deliveredAt)}, {u"pointsEarned"_s, c.pointsEarned}, {u"training"_s, c.training},
+        {u"cancelNumber"_s, c.cancelNumber},
     };
 }
 
@@ -317,6 +318,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     }
     c.pointsEarned = o.value(u"pointsEarned").toInt();
     c.training = o.value(u"training").toBool();
+    c.cancelNumber = o.value(u"cancelNumber").toInt();
     for (const QJsonValue &v : o.value(u"events").toArray()) {
         const QJsonObject e = v.toObject();
         c.events.push_back({i64(e.value(u"at")), ss(e.value(u"who").toString()), ss(e.value(u"what").toString()),
@@ -1023,6 +1025,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"voidReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.voidReasons) a.append(qs(r)); return a; }()},
         {u"compReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.compReasons) a.append(qs(r)); return a; }()},
         {u"noSaleReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.noSaleReasons) a.append(qs(r)); return a; }()},
+        {u"cancelReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.cancelReasons) a.append(qs(r)); return a; }()},
         {u"cashDenominations"_s, [&] { QJsonArray a; for (std::int64_t c : s.cashDenominations) a.append(qint64(c)); return a; }()},
         {u"backupCopyDir"_s, qs(s.backupCopyDir)},
         {u"backupKey"_s, qs(s.backupKey)}, {u"backupSalt"_s, qs(s.backupSalt)},
@@ -1274,7 +1277,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.problemsSeen = i64(o.value(u"problemsSeen"));
     s.labelPrinter = ss(o.value(u"labelPrinter").toString());
     for (auto [key, list] : {std::pair{u"voidReasons", &s.voidReasons}, std::pair{u"compReasons", &s.compReasons},
-                             std::pair{u"noSaleReasons", &s.noSaleReasons},
+                             std::pair{u"noSaleReasons", &s.noSaleReasons}, std::pair{u"cancelReasons", &s.cancelReasons},
                              std::pair{u"wasteReasons", &s.wasteReasons}, std::pair{u"expoSkips", &s.expoSkips}}) {
         if (!o.value(QStringView(key)).isArray())
             continue;

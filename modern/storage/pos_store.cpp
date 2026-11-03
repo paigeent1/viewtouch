@@ -415,6 +415,16 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
             }
         }
     }
+    if (data.currentDay) {   // today's cancelled sales (Cancel #n)
+        q.prepare(u"SELECT json FROM checks WHERE status = 'discarded' AND business_day = ? ORDER BY id"_s);
+        q.addBindValue(qint64(data.currentDay->id));
+        if (q.exec()) {
+            while (q.next()) {
+                if (auto c = app::checkFromJson(parse(q.value(0))); c && c->cancelNumber > 0)
+                    data.cancelledToday.push_back(std::move(*c));
+            }
+        }
+    }
     if (data.currentDay) {
         q.prepare(u"SELECT json FROM refunds WHERE day = ? ORDER BY id"_s);
         q.addBindValue(qint64(data.currentDay->id));

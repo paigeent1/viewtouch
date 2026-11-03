@@ -1308,6 +1308,7 @@ bool PosService::endOfDay()
     s_->kitchenDone.clear();
     s_->expoDone.clear();
     s_->refundsToday.clear();
+    s_->cancelledToday.clear();
     s_->changesToday.clear();
     // Finished punches stay a week, for weekly overtime.
     for (const TimePunch &p : s_->punches) {
@@ -1363,6 +1364,16 @@ std::vector<PosPrinter::ExceptionTicket> PosService::exceptionTickets() const
         for (std::size_t i = 0; i < why.size(); ++i)
             title += (i ? ", " : "") + why[i];
         out.push_back({"check-" + std::to_string(c->id), title, *c, std::nullopt, 0, {}});
+    }
+    // Each cancelled sale (Cancel #n), as it stood.
+    for (const Check &c : s_->cancelledToday) {
+        std::string reason;
+        for (const CheckEvent &e : c.events)
+            if (e.kind == "cancel")
+                reason = e.reason;
+        out.push_back({"cancel-" + std::to_string(c.cancelNumber),
+                       "Cancel #" + std::to_string(c.cancelNumber) + (reason.empty() ? "" : ": " + reason), c,
+                       std::nullopt, 0, {}});
     }
     // Each No Sale slip, numbered for the day as printed.
     std::vector<std::pair<const CashMovement *, const DrawerSession *>> noSales;
@@ -1488,6 +1499,8 @@ Report PosService::buildReport(const QString &id) const
         for (const auto &[id, c] : s_->open)
             if (!c.training)
                 checks.push_back(&c);
+        for (const Check &c : s_->cancelledToday)   // Cancel Sale: not sales, but exceptions
+            checks.push_back(&c);
         return id == u"audit" ? auditReport(checks, ctx) : exceptionsReport(checks, s_->drawers, ctx);
     }
     if (id == u"deposit") {

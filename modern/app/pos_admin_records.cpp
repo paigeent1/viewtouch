@@ -128,6 +128,7 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"voidReasons"_s, [&] { QStringList l; for (const std::string &t : s_->settings.voidReasons) l << qs(t); return l.join(u'\n'); }()},
              {u"compReasons"_s, [&] { QStringList l; for (const std::string &t : s_->settings.compReasons) l << qs(t); return l.join(u'\n'); }()},
              {u"noSaleReasons"_s, [&] { QStringList l; for (const std::string &t : s_->settings.noSaleReasons) l << qs(t); return l.join(u'\n'); }()},
+             {u"cancelReasons"_s, [&] { QStringList l; for (const std::string &t : s_->settings.cancelReasons) l << qs(t); return l.join(u'\n'); }()},
              {u"openingChecklist"_s, [&] { QStringList l; for (const std::string &t : s_->settings.openingChecklist) l << qs(t); return l.join(u'\n'); }()},
              {u"closingChecklist"_s, [&] { QStringList l; for (const std::string &t : s_->settings.closingChecklist) l << qs(t); return l.join(u'\n'); }()},
              {u"kitchenStations"_s, [&] {

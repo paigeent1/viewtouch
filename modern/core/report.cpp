@@ -367,7 +367,7 @@ Report auditReport(const std::vector<const Check *> &checks, const ReportContext
     }
     r.section("Summary");
     const std::pair<const char *, const char *> kinds[] = {
-        {"void", "Voids"}, {"errorCorrect", "Error corrects"}, {"discount", "Discounts"}, {"promo", "Coupons and rewards"}, {"reopen", "Reopened checks"},
+        {"void", "Voids"}, {"errorCorrect", "Error corrects"}, {"discount", "Discounts"}, {"promo", "Coupons and rewards"}, {"reopen", "Reopened checks"}, {"cancel", "Cancelled sales"},
         {"transfer", "Transfers"}, {"move", "Table moves"}, {"merge", "Merges"}};
     for (const auto &[kind, label] : kinds) {
         if (const auto it = counts.find(kind); it != counts.end())
@@ -718,6 +718,7 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
         {"Discounts and comps", {"discount"}, true},
         {"Payments and discounts taken back", {"unpay", "undiscount"}, true},
         {"Reopened checks", {"reopen"}, true},
+        {"Cancelled sales", {"cancel"}, true},
         {"Moved, transferred or merged", {"move", "transfer", "merge"}, false},
     };
     struct Big { Money amount; std::string what; const Check *check; std::string who; };
@@ -814,7 +815,7 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
         r.total({"All", count(all.times), k.money ? ctx.money(all.amount) : ""});
 
         // Voids and comps: why, when the screen asked.
-        if (k.kinds.front() != "void" && k.kinds.front() != "discount")
+        if (k.kinds.front() != "void" && k.kinds.front() != "discount" && k.kinds.front() != "cancel")
             continue;
         std::map<std::string, Tally> byReason;
         bool reasons = false;
@@ -828,7 +829,9 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
                 }
         if (!reasons)
             continue;
-        r.section(k.kinds.front() == "void" ? "Voids by reason" : "Discounts and comps by reason");
+        r.section(k.kinds.front() == "void"     ? "Voids by reason"
+                  : k.kinds.front() == "cancel" ? "Cancelled sales by reason"
+                                                : "Discounts and comps by reason");
         std::vector<std::pair<std::string, Tally>> why(byReason.begin(), byReason.end());
         std::ranges::stable_sort(why, [](const auto &a, const auto &b) { return a.second.amount.cents() > b.second.amount.cents(); });
         for (const auto &[reason, t] : why)

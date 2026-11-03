@@ -618,6 +618,49 @@ TEST_CASE("No Sale on a screen asks why with buttons; the Exceptions report coun
     CHECK(p.printer.drawerKicks == kicks + 2);
 }
 
+TEST_CASE("Cancel Sale asks why, numbers the cancel for the day, isn't a sale, and is an exception",
+          "[m4][reports][exceptions][cancel]")
+{
+    Pos p;
+    p.login("1234");
+    p.openDrawer("10000");
+    const auto run = [&](const QString &method) {
+        bool ok = false;
+        p.pos.invoke(method, {}, [&](const QVariant &r) { ok = r.toBool(); });
+        return ok;
+    };
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.addItem(u"cobb"_s));
+    CHECK_FALSE(run(u"cancelSale"_s));
+    REQUIRE(p.pos.reasonAsk()[u"kind"_s] == u"cancel"_s);
+    CHECK(p.pos.reasonAsk()[u"reasons"_s].toStringList().contains(u"No ID"_s));
+    REQUIRE(p.pos.giveReason(u"No ID"_s));
+    REQUIRE(p.pos.shared()->cancelledToday.size() == 1);
+    CHECK(p.pos.shared()->cancelledToday.front().cancelNumber == 1);
+    CHECK(p.pos.shared()->closedToday.empty());   // not a sale
+    CHECK(p.pos.shared()->open.empty());
+
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.addItem(u"caesar"_s));
+    CHECK_FALSE(run(u"cancelSale"_s));
+    REQUIRE(p.pos.giveReason(u"Price"_s));
+    CHECK(p.pos.shared()->cancelledToday.back().cancelNumber == 2);
+
+    // Paid: take the payment back first.
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.addItem(u"cobb"_s));
+    p.entry("2000");
+    REQUIRE(p.pos.tender(u"cash"_s));
+    CHECK_FALSE(p.pos.cancelSale());
+
+    const core::Report r = p.pos.buildReport(u"exceptions"_s);
+    CHECK(rowIn(r, "Cancelled sales", "Morgan (Manager)")[1] == "2");
+    CHECK(!rowIn(r, "Cancelled sales by reason", "No ID").empty());
+    const auto tickets = p.pos.exceptionTickets();
+    CHECK(std::ranges::count_if(tickets, [](const auto &t) { return t.file.rfind("cancel-", 0) == 0; }) == 2);
+    CHECK(p.pos.buildReport(u"sales"_s).find("Checks").at(1) == "0");
+}
+
 TEST_CASE("X report: sales and drawers so far on paper, nothing closed", "[m4][reports][xreport]")
 {
     Pos p;

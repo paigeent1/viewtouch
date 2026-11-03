@@ -283,6 +283,9 @@ struct Check {
     int firedCourse = 1;              // courses up to this one go out on Send
     int pointsEarned = 0;             // loyalty points it gave its customer (taken back on reopen)
     bool training = false;            // a practice check: not a sale, never to the kitchen
+    // Cancelled before it was paid (Cancel Sale): Cancel #n for the day (status Discarded),
+    // not a sale and nothing out of stock; an exception with its reason.
+    int cancelNumber = 0;
     bool rush = false;                // the kitchen does it first
     bool vip = false;                 // the kitchen takes extra care
     std::vector<std::string> allergies;   // the guest's (allergen ids): the kitchen sees them

@@ -512,6 +512,7 @@ QJsonArray actionTypes()
                             {"countDrawer", "Count drawer"}, {"endOfDay", "End of day"},
                             {"saveExceptionTickets", "Save exception tickets (pictures + PDF)"},
                             {"xReport", "X report (print sales and drawer so far; nothing resets)"},
+                            {"cancelSale", "Cancel sale (asks why; Cancel #n, an exception)"},
                             {"itemDiscount", "Item discount: args.percent (or \"typed\") off the last item"},
                             {"subtotalDiscount", "Subtotal discount: args.percent (or \"typed\") off the sale"},
                             {"login", "Log in"}, {"logout", "Log out"}, {"clockIn", "Clock in"},

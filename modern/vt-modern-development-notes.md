@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:18 ET — Bob (Claude) — Cancel Sale: reasons, Cancel #n, no stock, an exception
+- **What:** New PosService::cancelSale (commands cancelSale; the retail page's cancelCheck maps to it). Asks why (Store Settings > Voids, comps, No Sale and Cancel Sale: Reasons for Cancel Sale; defaults Price, Customer changed mind, No ID). Saved as Cancel #1, #2... for the day (Check.cancelNumber, status discarded, businessDay set; PosShared.cancelledToday, loaded at start, cleared at end of day). Not a sale; sent lines go back to stock and the kitchen gets a void; a held card is let go; paid sales must have payments taken back first; an empty sale is just put away (no number). Exceptions report: Cancelled sales by employee and by reason; exception ticket picture cancel-<n>.
+- **Why:** Owner: CANCEL SALE button cancels the sale, numbered daily, no inventory effect, reasons, counts as an exception.
+- **Files:** `core/check.hh, core/settings.hh, core/report.cpp, app/pos_service.hh/.cpp, app/pos_commands.cpp, app/pos_json.cpp, app/pos_admin_*.cpp/.hh, app/pos_day.cpp, storage/pos_store.cpp, ui/cpp/layoutcontroller.cpp, ui/qml/ReasonSheet.qml, layout/schema.cpp, tests/test_pos_m4.cpp`
+
 ### 2026-11-03 17:16 ET — Bob (Claude) — Retail discounts: item/subtotal grid; No discounts protects cigarettes
 - **What:** Retail DISCOUNTS now opens retail-discounts: ITEM DISCOUNT (last item rung, or the one touched) or SUBTOTAL DISCOUNT (whole sale), each a 3x3 grid 5/10/15/20/25/30/35%, COMP (100%), VARIABLE (numPad then Apply). New Payment.lineId (item discount on one line), PosService::discountPercent(bp, item), controller commands itemDiscount/subtotalDiscount {percent: N|"typed"}. Totals: discounts only ever come off items not marked No discounts (and not gift cards), fixed amounts capped too; tax shares follow the discounted items; Totals.discountable and discountBy (receipt and Pay screen show what each discount really took). No discounts toggle on items and on categories (category sets it on all its items) in the Item/UPC Builder. Page key actions (retail keypad) now type into the entry.
 - **Why:** Owner: Discounts button -> item or subtotal; 3x3 percent grid with Comp and Variable; cigarettes at state minimum must never be discounted.
