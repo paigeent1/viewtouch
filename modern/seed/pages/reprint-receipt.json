@@ -10,7 +10,7 @@
   "grid": 8,
   "zones": [
     {
-      "id": "title",
+      "id": "rpr-title",
       "kind": "label",
       "rect": {
         "x": 16,
@@ -23,7 +23,7 @@
       "label": "Reprint a receipt: the last 7 days. Touch a check, then Reprint"
     },
     {
-      "id": "search",
+      "id": "rpr-search",
       "kind": "checkSearch",
       "rect": {
         "x": 16,
@@ -39,7 +39,7 @@
       }
     },
     {
-      "id": "back",
+      "id": "rpr-back",
       "kind": "button",
       "label": "‹ Back",
       "shape": "pill",

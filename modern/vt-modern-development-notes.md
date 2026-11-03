@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:35 ET — Bob (Claude) — Fix seed validate: duplicate zone id on retail-discounts
+- **What:** retail-discounts had the order list and the Subtotal button both called 'sale' ([seed]/[editor] validate failures on the Pi). Button renamed rds-subtotal; the new discount and reprint pages' zones also prefixed (rd-/rds-/rpr-).
+- **Why:** Owner's Pi test run: 5 failures, all this.
+- **Files:** `seed/pages/retail-discount*.json, seed/pages/reprint-receipt.json`
+
 ### 2026-11-03 17:31 ET — Bob (Claude) — Customer display switch in Manager > Terminals
 - **What:** TerminalConfig.customerDisplay ('window' or empty), field 'Customer display' in Manager -> Terminals (Off: second monitor mirrors; On: second monitor faces the guest). New session property terminalCustomerDisplay. On a Linux screen with vt-guest-display installed, LayoutController::applyCustomerDisplay (on adminChanged, logged in) compares it with ~/.vt-customer-display and runs setsid vt-guest-display on|off, which re-lays the monitors and restarts ViewTouch. Tablets ignore it.
 - **Why:** Owner: put the customer display setting in Manager > Terminals, more intuitive than a command.

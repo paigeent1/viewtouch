@@ -10,7 +10,7 @@
   "grid": 8,
   "zones": [
     {
-      "id": "sale",
+      "id": "rds-sale",
       "kind": "orderList",
       "shape": "rect",
       "behavior": "none",
@@ -22,7 +22,7 @@
       }
     },
     {
-      "id": "title",
+      "id": "rds-title",
       "kind": "label",
       "rect": {
         "x": 680,
@@ -35,7 +35,7 @@
       "label": "Discount: which?"
     },
     {
-      "id": "item",
+      "id": "rds-item",
       "kind": "button",
       "label": "ITEM DISCOUNT\n\nthe last item rung\n(or the one touched)",
       "shape": "pill",
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "id": "sale",
+      "id": "rds-subtotal",
       "kind": "button",
       "label": "SUBTOTAL DISCOUNT\n\neverything in the sale",
       "shape": "pill",
@@ -87,7 +87,7 @@
       ]
     },
     {
-      "id": "note",
+      "id": "rds-note",
       "kind": "label",
       "rect": {
         "x": 680,
@@ -100,7 +100,7 @@
       "label": "Items marked No discounts (cigarettes) are never discounted."
     },
     {
-      "id": "back",
+      "id": "rds-back",
       "kind": "button",
       "label": "‹ Back to the sale",
       "shape": "pill",

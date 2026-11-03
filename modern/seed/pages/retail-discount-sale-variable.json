@@ -10,7 +10,7 @@
   "grid": 8,
   "zones": [
     {
-      "id": "sale",
+      "id": "rd-sale-variable-sale",
       "kind": "orderList",
       "shape": "rect",
       "behavior": "none",
@@ -22,7 +22,7 @@
       }
     },
     {
-      "id": "title",
+      "id": "rd-sale-variable-title",
       "kind": "label",
       "rect": {
         "x": 680,
@@ -35,7 +35,7 @@
       "label": "Type the percent off (15 for 15%), then Apply"
     },
     {
-      "id": "pad",
+      "id": "rd-sale-variable-pad",
       "kind": "numPad",
       "shape": "rect",
       "behavior": "none",
@@ -47,7 +47,7 @@
       }
     },
     {
-      "id": "apply",
+      "id": "rd-sale-variable-apply",
       "kind": "button",
       "label": "APPLY\n% OFF",
       "shape": "pill",
@@ -79,7 +79,7 @@
       ]
     },
     {
-      "id": "cancel",
+      "id": "rd-sale-variable-cancel",
       "kind": "button",
       "label": "Cancel",
       "shape": "pill",

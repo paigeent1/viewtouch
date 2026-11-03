@@ -10,7 +10,7 @@
   "grid": 8,
   "zones": [
     {
-      "id": "sale",
+      "id": "rd-item-sale",
       "kind": "orderList",
       "shape": "rect",
       "behavior": "none",
@@ -22,7 +22,7 @@
       }
     },
     {
-      "id": "title",
+      "id": "rd-item-title",
       "kind": "label",
       "rect": {
         "x": 680,
@@ -35,7 +35,7 @@
       "label": "Item discount: the last item rung (or the one touched)"
     },
     {
-      "id": "pct-5",
+      "id": "rd-item-pct-5",
       "kind": "button",
       "label": "5%",
       "shape": "rect",
@@ -67,7 +67,7 @@
       ]
     },
     {
-      "id": "pct-10",
+      "id": "rd-item-pct-10",
       "kind": "button",
       "label": "10%",
       "shape": "rect",
@@ -99,7 +99,7 @@
       ]
     },
     {
-      "id": "pct-15",
+      "id": "rd-item-pct-15",
       "kind": "button",
       "label": "15%",
       "shape": "rect",
@@ -131,7 +131,7 @@
       ]
     },
     {
-      "id": "pct-20",
+      "id": "rd-item-pct-20",
       "kind": "button",
       "label": "20%",
       "shape": "rect",
@@ -163,7 +163,7 @@
       ]
     },
     {
-      "id": "pct-25",
+      "id": "rd-item-pct-25",
       "kind": "button",
       "label": "25%",
       "shape": "rect",
@@ -195,7 +195,7 @@
       ]
     },
     {
-      "id": "pct-30",
+      "id": "rd-item-pct-30",
       "kind": "button",
       "label": "30%",
       "shape": "rect",
@@ -227,7 +227,7 @@
       ]
     },
     {
-      "id": "pct-35",
+      "id": "rd-item-pct-35",
       "kind": "button",
       "label": "35%",
       "shape": "rect",
@@ -259,7 +259,7 @@
       ]
     },
     {
-      "id": "pct-100",
+      "id": "rd-item-pct-100",
       "kind": "button",
       "label": "COMP\n100%",
       "shape": "rect",
@@ -291,7 +291,7 @@
       ]
     },
     {
-      "id": "pct-var",
+      "id": "rd-item-pct-var",
       "kind": "button",
       "label": "VARIABLE\n%",
       "shape": "rect",
@@ -321,7 +321,7 @@
       ]
     },
     {
-      "id": "back",
+      "id": "rd-item-back",
       "kind": "button",
       "label": "‹ Back to the sale",
       "shape": "pill",
