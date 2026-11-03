@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:00 ET — Bob (Claude) — Label utility Tree View: A-Z letter pad
+- **What:** A 7x4 letter pad (# for digits/other, A-Z) above the left drill list: touching a letter scrolls the list so the first entry starting with it is at the top (yview_moveto(1.0) then see(row): exact) and highlights it; letters nothing starts with at the current level are greyed and can't be touched (updated on every level). Tested on 39 manufacturers: A->ACID, C->CAMACHO, H->H UPMANN, M->MACANUDO, #->1502.
+- **Why:** Owner: jump by letter instead of scrolling by touch.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 10:57 ET — Bob (Claude) — Label utility Tree View starts at department groups, folded
 - **What:** DRILL_LEVELS starts with Department groups (dept_group, blank = RETAIL): left list Department groups > Categories > Manufacturers > Product groups > Sub groups; right tree's department nodes start folded (everything folded), node keys include the department. Header 'Select Department / Category / Manufacturer / Product Group'. Tested: start shows 4 departments folded, CIGARS > its categories > PREMIUM CIGARS > manufacturers, Back x2, Next on a department -> its 60 items.
 - **Why:** Owner: start with department collapsed in the Pi label utility.

@@ -3036,6 +3036,18 @@ class VTLabelUtility(tk.Tk):
         self.drill_title = tk.Label(left, text="", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold"),
                                     anchor="w", justify="left", wraplength=330)
         self.drill_title.pack(anchor="w", fill="x")
+        # A letter pad: touch a letter to jump to it (no long scrolling by finger).
+        pad = tk.Frame(left, bg="#1e242d")
+        pad.pack(fill="x", pady=(4, 0))
+        self.letter_buttons = {}
+        for i, ch in enumerate("#ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+            b = tk.Button(pad, text=ch, font=("Sans", 14, "bold"), relief="flat", bd=0, highlightthickness=0,
+                          bg="#334155", fg="#f8fafc", activebackground="#0284c7", activeforeground="#ffffff",
+                          disabledforeground="#64748b", command=lambda c=ch: self._jump_to_letter(c))
+            b.grid(row=i // 7, column=i % 7, sticky="nsew", padx=2, pady=2, ipady=6)
+            self.letter_buttons[ch] = b
+        for c in range(7):
+            pad.grid_columnconfigure(c, weight=1, uniform="letters")
         left_box = tk.Frame(left, bg="#1e242d")
         left_box.pack(fill="both", expand=True, pady=4)
         self.nvs_list = ttk.Treeview(left_box, show="tree", selectmode="browse", style="TouchTree.Treeview")
@@ -3102,7 +3114,29 @@ class VTLabelUtility(tk.Tk):
         else:
             self.drill_title.config(text=here + "\n" + f"{len(items)} items: Next >>")
         self.nvs_list.yview_moveto(0)
+        # Only the letters something at this level starts with can be touched.
+        present = {self._letter_of(v) for v in self._drill_rows.values()}
+        for ch, b in getattr(self, "letter_buttons", {}).items():
+            b.config(state="normal" if ch in present else "disabled",
+                     bg="#334155" if ch in present else "#1e293b")
         self._show_path_in_tree()
+
+    @staticmethod
+    def _letter_of(text):
+        c = str(text or "").strip()[:1].upper()
+        return c if "A" <= c <= "Z" else "#"
+
+    def _jump_to_letter(self, ch):
+        """Scroll the left list so the first entry starting with ch is at the top."""
+        rows = [r for r in self.nvs_list.get_children() if r in self._drill_rows]
+        for r in rows:
+            if self._letter_of(self._drill_rows[r]) == ch:
+                # From the bottom, "see" scrolls up just far enough: the entry lands at the top.
+                self.nvs_list.yview_moveto(1.0)
+                self.nvs_list.update_idletasks()
+                self.nvs_list.see(r)
+                self.nvs_list.selection_set(r)
+                return
 
     def _on_drill_touch(self, e):
         row = self.nvs_list.identify_row(e.y)
