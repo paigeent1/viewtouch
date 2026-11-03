@@ -240,6 +240,13 @@ TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy
     const QImage drawn = ticketImage(text, 42);
     CHECK(!drawn.isNull());
     CHECK(drawn.pixelColor(2, 2) == QColor(Qt::white));
+
+    // End of day: the same folder gets the summary PDF (the reports, then the ticket pictures).
+    const QString eod = printer.saveEndOfDay(seed.settings, {r}, r, tickets, 7, 1'700'000'000'000);
+    REQUIRE(eod == out);
+    const QStringList pdfs = QDir(eod).entryList({u"EOD Summary *.pdf"_s}, QDir::Files);
+    REQUIRE(pdfs.size() == 1);
+    CHECK(QFileInfo(QDir(eod).filePath(pdfs.front())).size() > 1000);
 }
 
 TEST_CASE("TicketPrinter sends labels in the label printer's language, or as slips", "[print][labels]")

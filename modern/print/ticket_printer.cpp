@@ -6,6 +6,7 @@
 #include "app/pos_session.hh"
 #include "print/raster.hh"
 #include "print/ticket_image.hh"
+#include "print/day_summary.hh"
 
 #include <algorithm>
 #include <QCryptographicHash>
@@ -221,12 +222,8 @@ QString TicketPrinter::saveExceptionTickets(const PosSettings &settings, const R
                                            std::int64_t dayOpenedAt)
 {
     const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
-    const bool defaultPlace = exceptionsDir_.isEmpty() && qEnvironmentVariableIsEmpty("VT_EXCEPTIONS_DIR");
-    const QString base = !exceptionsDir_.isEmpty() ? exceptionsDir_
-                         : !defaultPlace           ? qEnvironmentVariable("VT_EXCEPTIONS_DIR")
-                                                   : QDir::home().filePath(u"ViewTouch Exports/Exceptions"_s);
     const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
-    const QString dir = QDir(base).filePath(u"%1 day %2"_s.arg(date).arg(dayId));
+    const QString dir = dayFolder(dayId, dayOpenedAt);
     if (!QDir().mkpath(dir))
         return {};
     // The store's copy: every void and error correct shows, whatever the customer's receipt hides.
@@ -316,14 +313,38 @@ QString TicketPrinter::saveExceptionTickets(const PosSettings &settings, const R
             p.end();
         }
     }
-    // Next to the other saved reports on the Pi's desktop.
-    if (defaultPlace && QDir::home().exists(u"Desktop"_s)) {
-        const QString reports = QDir::home().filePath(u"Desktop/Reports"_s);
-        QDir().mkpath(reports);
-        const QString copy = QDir(reports).filePath(QFileInfo(pdfFile).fileName());
-        QFile::remove(copy);
-        QFile::copy(pdfFile, copy);
-    }
+    return dir;
+}
+
+QString TicketPrinter::dayFolder(std::int64_t dayId, std::int64_t dayOpenedAt) const
+{
+    QString base = exceptionsDir_;
+    if (base.isEmpty())
+        base = qEnvironmentVariable("VT_REPORTS_DIR");
+    if (base.isEmpty())
+        base = QDir::home().exists(u"Desktop"_s) ? QDir::home().filePath(u"Desktop/Daily Reports"_s)
+                                                 : QDir::home().filePath(u"Daily Reports"_s);
+    const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
+    return QDir(base).filePath(u"%1 day %2"_s.arg(date).arg(dayId));
+}
+
+QString TicketPrinter::saveEndOfDay(const PosSettings &settings, const std::vector<Report> &summary,
+                                    const Report &exceptions, const std::vector<ExceptionTicket> &tickets,
+                                    std::int64_t dayId, std::int64_t dayOpenedAt)
+{
+    const QString dir = saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
+    if (dir.isEmpty())
+        return {};
+    QStringList pictures;
+    for (const ExceptionTicket &t : tickets)
+        for (const char *ext : {".jpg", ".png"})
+            if (const QString f = QDir(dir).filePath(QString::fromStdString(t.file) + QLatin1StringView(ext)); QFile::exists(f)) {
+                pictures << f;
+                break;
+            }
+    const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
+    const QString heading = QString::fromStdString(settings.storeName) + u" · End of day %1 (day %2)"_s.arg(date).arg(dayId);
+    writeDaySummaryPdf(QDir(dir).filePath(u"EOD Summary %1.pdf"_s.arg(date)), heading, summary, pictures);
     return dir;
 }
 

@@ -123,6 +123,15 @@ public:
         (void)settings; (void)exceptions; (void)tickets; (void)dayId; (void)dayOpenedAt;
         return {};
     }
+    // End of day: the exception tickets (above) and, in the same folder, the day's summary PDF
+    // (`summary`: the reports in order, then the ticket pictures). Returns the folder.
+    virtual QString saveEndOfDay(const core::PosSettings &settings, const std::vector<core::Report> &summary,
+                                 const core::Report &exceptions, const std::vector<ExceptionTicket> &tickets,
+                                 std::int64_t dayId, std::int64_t dayOpenedAt)
+    {
+        (void)summary;
+        return saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
+    }
     virtual void printOrderSlip(const core::PosSettings &settings, const core::Check &check,
                                 const std::string &printerId, bool sent)
     {

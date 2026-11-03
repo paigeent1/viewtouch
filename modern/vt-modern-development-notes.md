@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:36 ET — Bob (Claude) — EOD Summary PDF in a Daily Reports folder on the Pi
+- **What:** End of day now writes '<date> day <n>/' under 'Daily Reports' on the Pi's desktop (~/Desktop/Daily Reports; ~/Daily Reports without a desktop): 'EOD Summary <date>.pdf' (Sales, Deposit, Drawer, Servers, Tips, Labor, Categories, Items, Hourly, Expenses, Exceptions as tables, empty ones left out, then the exception ticket pictures three across), plus the exception JPEGs and 'Exceptions <date>.pdf' from the previous entry. VT_REPORTS_DIR moves it (for an extra drive later). New print/day_summary.{hh,cpp}; PosPrinter::saveEndOfDay.
+- **Why:** Owner: EOD summary as PDF in a folder called daily reports for now; going paperless, may add a drive for documents.
+- **Files:** `print/day_summary.hh/.cpp, print/ticket_printer.hh/.cpp, app/pos_service.hh, app/pos_day.cpp, CMakeLists.txt, tests/test_print.cpp`
+- **Next person must know:** Not the GitHub repo (public). Email/Google Drive not built yet; drive: set VT_REPORTS_DIR in the vt-server environment.
+
 ### 2026-11-03 16:33 ET — Bob (Claude) — Exception tickets saved as JPEGs + one PDF (no stapled second receipt)
 - **What:** At end of day (and from a new Tickets button on the Exceptions report, today) the server saves the day's exception tickets to ~/ViewTouch Exports/Exceptions/<date> day <n>/: exceptions-report.jpg, check-<id>.jpg for every check with a void, error correct, employee discount/comp, payment or discount taken back, or reopen (store copy: voids always shown, headed STORE COPY: EXCEPTION and why), nosale-<n>.jpg for each No Sale slip, and 'Exceptions <date>.pdf' with all of them (report first, tickets three across), copied to ~/Desktop/Reports. Coupons and loyalty rewards are now event kind 'promo' (system discounts): not counted as employee discounts on the Exceptions report and no ticket picture. New print/ticket_image (Document -> QImage, the printer's own layout). Command saveExceptionTickets (manager) for buttons. VT_EXCEPTIONS_DIR overrides the folder.
 - **Why:** Owner: employees print a second receipt for discounts/voids and staple it to paperwork; wants the tickets as pictures in the daily exception report/EOD summary instead.

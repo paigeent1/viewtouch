@@ -1294,9 +1294,14 @@ bool PosService::endOfDay()
     s_->pastDays.insert(s_->pastDays.begin(), PastDay{s_->day, reports});
     if (s_->printer) {
         s_->printer->printReport(s_->settings, buildReport(u"sales"_s), receiptPrinter());
-        // The exception tickets as pictures, with the Exceptions report: nothing to staple.
-        s_->printer->saveExceptionTickets(s_->settings, buildReport(u"exceptions"_s), exceptionTickets(), s_->day.id,
-                                          s_->day.openedAt);
+        // The day's summary PDF and the exception tickets as pictures, in the day's folder
+        // ("Daily Reports" on the Pi): nothing to staple.
+        std::vector<Report> summary;
+        for (const QString &id : {u"sales"_s, u"deposit"_s, u"drawer"_s, u"servers"_s, u"tips"_s, u"labor"_s,
+                                  u"categories"_s, u"items"_s, u"hourly"_s, u"expenses"_s, u"exceptions"_s})
+            summary.push_back(buildReport(id));
+        s_->printer->saveEndOfDay(s_->settings, summary, buildReport(u"exceptions"_s), exceptionTickets(), s_->day.id,
+                                  s_->day.openedAt);
     }
 
     s_->closedToday.clear();

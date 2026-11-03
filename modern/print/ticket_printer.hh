@@ -38,8 +38,13 @@ public:
     QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
                                  const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
                                  std::int64_t dayOpenedAt) override;
-    // Where the day's exception folders go (default: $VT_EXCEPTIONS_DIR, else ~/ViewTouch Exports/Exceptions).
+    QString saveEndOfDay(const core::PosSettings &settings, const std::vector<core::Report> &summary,
+                         const core::Report &exceptions, const std::vector<ExceptionTicket> &tickets,
+                         std::int64_t dayId, std::int64_t dayOpenedAt) override;
+    // Where each day's folder goes: $VT_REPORTS_DIR (an extra drive later), else "Daily Reports"
+    // on the Pi's desktop (or in the home folder without one).
     void setExceptionsDir(QString dir) { exceptionsDir_ = std::move(dir); }
+    QString dayFolder(std::int64_t dayId, std::int64_t dayOpenedAt) const;
     void printLabels(const core::PosSettings &settings,
                      const std::vector<std::pair<std::string, std::vector<std::string>>> &labels,
                      const std::string &printerId) override;
