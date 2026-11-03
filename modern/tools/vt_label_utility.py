@@ -402,9 +402,9 @@ def calc_gs1_check_digit(digits_11):
     return str((10 - (total % 10)) % 10)
 
 def normalize_upc(raw_code, fallback=""):
+    """The code's digits exactly as stored: no check digit added or corrected (labels are scanned back
+    in, so they must give the same number the price book / ViewTouch has)."""
     clean = "".join(ch for ch in str(raw_code).strip() if ch.isdigit())
-    if len(clean) == 11:
-        clean += calc_gs1_check_digit(clean)
     return clean if clean else str(raw_code or fallback or "000000000000").strip()
 
 def infer_brand(item_name, category):
@@ -427,7 +427,7 @@ def _clean_code(code):
         return ""
     d = "".join(ch for ch in c if ch.isdigit())
     if d and all(ch.isdigit() or ch in " -" for ch in c):
-        return normalize_upc(d) if len(d) == 11 else d     # numeric codes: digits only, 11 digits get a check digit
+        return d                                           # numeric codes: their digits, exactly as stored
     return c                                               # other codes print exactly as ViewTouch stores them
 
 def collect_item_upcs(m):
@@ -632,9 +632,11 @@ GLOBAL_FIELD_CATALOG = [
     ("category", "DBText — Category / Department"),
     ("upc", "DBText — UPC / PLU Number"),
     ("db_calc", "DBCalc — Pack / Box Calculation"),
-    ("barcode_img", "DBBarCode — Code 128"),
-    ("barcode_upca", "DBBarCode — UPC-A 12-Digit"),
-    ("barcode_upce", "DBBarCode — UPC-E Short"),
+    # The UPC/EAN fields print the code exactly as stored: its own symbol (UPC-A / EAN-13 / UPC-E) when
+    # it is a valid one, else Code 128 of the exact code (barcode_modules).
+    ("barcode_img", "DBBarCode — UPC / EAN as stored (else Code 128)"),
+    ("barcode_upca", "DBBarCode — UPC / EAN as stored (UPC-A, EAN-13)"),
+    ("barcode_upce", "DBBarCode — UPC-E when the item has one"),
     ("barcode_code39", "DBBarCode — Code 39"),
 ]
 GLOBAL_FIELD_KEYS = [k for k, _ in GLOBAL_FIELD_CATALOG]
@@ -860,36 +862,48 @@ def _modules_from_reportlab(kind, value):
     return "".join(out), str(value)
 
 
+def gs1_symbol_kind(code):
+    """'upca' / 'ean13' / 'upce' when code (digits only) already is a complete, valid symbol of that
+    kind (right length and check digit), else None."""
+    d = str(code or "")
+    if not d.isdigit():
+        return None
+    if len(d) == 12 and _check_digit_mod10(d[:11]) == d[11]:
+        return "upca"
+    if len(d) == 13 and _check_digit_mod10(d[:12]) == d[12]:
+        return "ean13"
+    if len(d) == 8 and d[0] in "01" and _check_digit_mod10(upce_to_upca(d[:7])) == d[7]:
+        return "upce"
+    return None
+
+
 def barcode_modules(field, item):
-    """Pick the symbology for a barcode field and return (module_string, encoded_value) or (None, raw)."""
+    """Pick the symbology for a barcode field and return (module_string, encoded_value) or (None, raw).
+
+    The label prints the code exactly as stored, because it is scanned back in (receiving, the register):
+    UPC-A / EAN-13 / UPC-E only when the stored code already is that symbol (right length, right check
+    digit); anything else (11 digits, a wrong check digit, letters) as Code 128 of the exact code. No
+    digit is ever added, removed or corrected. A UPC-A field with an EAN-13 or UPC-E code prints that
+    code's own symbol, so the scan matches what's stored."""
     raw = str(item.get("upc", "") or "").strip()
-    digits = _digits(raw)
     try:
-        if field == "barcode_upce":
-            # Follow the UPC picked for this label; otherwise the item's own UPC-E
-            picked = item.get("upc_label") not in (None, "Primary UPC")
-            res = _modules_upce(raw if picked else item.get("upce", ""), fallback_upca=raw)
-            if res:
-                return res
-            field = "barcode_upca"
-        if field == "barcode_upca" and len(digits) in (11, 12):
-            return _modules_upca(digits)
-        if field == "barcode_code39" and raw:
+        if not raw:
+            return None, raw
+        if field == "barcode_code39":
             return _modules_from_reportlab("code39", raw)
-        # An 8-digit UPC-E stored in the UPC column (common on cigarettes) with a valid check digit
-        if len(digits) == len(raw) == 8 and digits[0] in "01" and \
-                _check_digit_mod10(upce_to_upca(digits[:7])) == digits[7]:
-            if field == "barcode_upca":
-                return _modules_upca(upce_to_upca(digits[:7]))
-            if field in ("barcode_img", "barcode"):
-                return _modules_upce(digits)
-        if field in ("barcode_img", "barcode_upca", "barcode_ean13", "barcode"):
-            if len(digits) == len(raw) and len(digits) in (11, 12):
-                return _modules_upca(digits)
-            if len(digits) == len(raw) and len(digits) == 13:
-                return _modules_ean13(digits)
-        if raw:
-            return _modules_from_reportlab("code128", raw)
+        kind = gs1_symbol_kind(raw)
+        if field == "barcode_upce" and kind == "upca" and item.get("upc_label") in (None, "Primary UPC"):
+            # A UPC-E field on the primary UPC: the item's own stored UPC-E code, if it has a valid one
+            own = str(item.get("upce", "") or "").strip()
+            if gs1_symbol_kind(own) == "upce":
+                return _modules_upce(own)
+        if kind == "upca":
+            return _modules_upca(raw)
+        if kind == "ean13":
+            return _modules_ean13(raw)
+        if kind == "upce":
+            return _modules_upce(raw)
+        return _modules_from_reportlab("code128", raw)
     except Exception:
         pass
     return None, raw
@@ -1420,9 +1434,8 @@ def export_pdf_labels(items_to_print, tpl, out_pdf):
                     if f_type == "barcode_code39":
                         bc = code39.Standard39(raw_c.upper(), barHeight=bh*0.85, barWidth=max(0.45, bw/180.0), checksum=0)
                         bc.drawOn(c, max(2, bx + (bw - bc.width)/2.0), max(2, by_bottom))
-                    elif f_type in ("barcode_upca", "barcode_upce"):
-                        u12 = normalize_upc(raw_c)[:12].zfill(12)
-                        w_bc = eanbc.UPCA(u12, barHeight=bh*0.85, barWidth=max(0.55, bw/115.0))
+                    elif f_type in ("barcode_upca", "barcode_upce") and gs1_symbol_kind(raw_c) == "upca":
+                        w_bc = eanbc.UPCA(raw_c, barHeight=bh*0.85, barWidth=max(0.55, bw/115.0))
                         d = Drawing(bw, bh); d.add(w_bc); renderPDF.draw(d, c, max(2, bx + (bw - w_bc.width)/2.0), max(2, by_bottom))
                     else:
                         bc = code128.Code128(raw_c, barHeight=bh, barWidth=max(0.45, bw / 160.0))

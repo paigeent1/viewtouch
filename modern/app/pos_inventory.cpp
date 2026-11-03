@@ -721,16 +721,6 @@ QString pricebookPath()
     return QDir::homePath() + u"/.local/share/ViewTouch/ilsa_temp_pricebook.db"_s;
 }
 
-QString withCheckDigit(QString d)   // normalize_upc(): 11 digits get their GS1 check digit
-{
-    if (d.size() != 11)
-        return d;
-    int total = 0;
-    for (qsizetype i = 0; i < d.size(); ++i)
-        total += d.at(d.size() - 1 - i).digitValue() * (i % 2 == 0 ? 3 : 1);
-    return d + QString::number((10 - total % 10) % 10);
-}
-
 const std::vector<LabelItem> &pricebookItems()
 {
     static std::vector<LabelItem> items;
@@ -770,7 +760,7 @@ const std::vector<LabelItem> &pricebookItems()
                     QStringList raw{q.value(0).toString()};
                     raw += q.value(6).toString().split(u';', Qt::SkipEmptyParts);
                     for (const QString &r : raw) {
-                        const QString c = withCheckDigit(digitsOnly(r));
+                        const QString c = digitsOnly(r);   // exactly as the price book has it
                         if (c.isEmpty() || std::ranges::any_of(it.codes, [&](const QString &x) { return noLeadingZeros(x) == noLeadingZeros(c); }))
                             continue;
                         it.upcs.append(QVariantMap{{u"label"_s, it.codes.isEmpty() ? QObject::tr("Primary UPC") : QObject::tr("Alt UPC %1").arg(it.codes.size())},

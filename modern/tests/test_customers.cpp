@@ -461,8 +461,10 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     CHECK(at.first().toMap()[u"upcs"_s].toList().size() == 2);
     REQUIRE(pos.findRetailLabels(u"076452361250"_s));                                    // an alternate UPC scans
     CHECK(names(pos.retailLabels()[u"matches"_s].toList()) == QStringList{u"RYJ 1875 CLEM TUBO"_s});
-    REQUIRE(pos.findRetailLabels(u"012345678905"_s));                                    // 11 digits got their check digit
+    REQUIRE(pos.findRetailLabels(u"01234567890"_s));                                     // codes exactly as the price book has them
     CHECK(names(pos.retailLabels()[u"matches"_s].toList()) == QStringList{u"ZIPPO CLASSIC"_s});
+    CHECK(pos.retailLabels()[u"matches"_s].toList().first().toMap()[u"upcs"_s].toList().first().toMap()[u"code"_s].toString()
+          == u"01234567890"_s);                                                           // no check digit added
 
     QFile::remove(book);                                                                  // gone: back to ViewTouch's menu
     REQUIRE(pos.findRetailLabels(u"zippo"_s));

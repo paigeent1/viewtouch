@@ -70,3 +70,8 @@ Record every change, time-stamped, at the top of `modern/vt-modern-development-n
 - `vt-label-utility --print-job job.json` prints with no window: `{"template", "items": [{"upc", "qty"}], "qty"}`, in the items' order.
 - `vt-label-utility --preview-job job.json --out label.png` draws one label exactly as it prints: `{"template", "upc"}` (exit 3: UPC not found).
 - Both look items up in the same list the window uses (the ILSA temp price book while it exists).
+
+## Barcodes print the code exactly as stored (2026-11-03)
+- Labels are scanned back in (receiving, the register), so the barcode always gives the same number the price book / ViewTouch has.
+- A valid UPC-A (12), EAN-13 (13) or UPC-E (8) prints as that symbol; anything else (11 digits, a wrong check digit, letters) prints as Code 128 of the exact code. No check digit is ever added or corrected (`gs1_symbol_kind`, `barcode_modules`). Code 39 fields stay Code 39.
+- There is no per-item barcode type in ViewTouch or the ILSA price book; the code decides.

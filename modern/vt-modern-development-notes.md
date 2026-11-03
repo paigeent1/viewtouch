@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 07:58 ET — Bob (Claude) — Labels print every UPC/EAN exactly as stored
+- **What:** vt_label_utility.py: normalize_upc and _clean_code no longer add a check digit to 11-digit codes; new gs1_symbol_kind(); barcode_modules() prints UPC-A / EAN-13 / UPC-E only when the stored code already is that valid symbol (length + check digit), else Code 128 of the exact code; never adds, drops or corrects a digit (before: 11 digits got a check digit, a wrong check digit was 'corrected', an 8-digit UPC-E on a UPC-A field was expanded to 12). Designer field names say so. Tablet Labels list (pos_inventory.cpp) lists price book codes as stored (withCheckDigit removed); test updated. Checked by decoding the drawn bars: 12-digit UPC-A and its 13-digit leading-0 form give identical bars; EAN-13, UPC-E, 11 digits, bad check digits, letters, 14 digits all encode the stored value. LABEL_UTILITY_NOTES.md section added.
+- **Why:** Owner: labels must print the UPC/EAN as entered in the price book, because items are entered by scanning labels. No per-item barcode type exists in ViewTouch or the price book.
+- **Files:** `modern/tools/vt_label_utility.py, modern/tools/LABEL_UTILITY_NOTES.md, modern/app/pos_inventory.cpp, modern/tests/test_customers.cpp`
+- **Next person must know:** Pi: git pull is enough for the label utility; the tablet list change needs vt-server (C++).
+
 ### 2026-11-03 07:36 ET — Bob (Claude) — Tablets: Wi-Fi kept awake; reconnect without mDNS; USB install
 - **What:** Morning 2026-11-03: Pi saw no tablet over ADB (mDNS lists nothing on the Pi; Bar 1 had lost its pairing with the Pi; Bar 3 off Wi-Fi). Bar 1/2 reconnected after re-pairing and got app 145 (run 41632598473). Fixes: Kiosk.kt keepWifiAwake(): WIFI_MODE_FULL_HIGH_PERF WifiLock held while ViewTouch runs (boot and every status poll). vt-adb-ensure: (3) a tablet that answers ping but isn't on 5555 has ports 30000-50000 tried for its Wireless debugging port (needs the Pi still paired), then tcpip 5555 (flock, once per 30 min per tablet, since ViewTouch runs it ~every minute); (4) on every reached tablet: dumpsys deviceidle whitelist +org.viewtouch.pos, wifi_sleep_policy 2, pm grant WRITE_SECURE_SETTINGS. vt-tablets: installs over USB first (any USB tablet), then the Wi-Fi ones.
 - **Why:** Owner: tablets lost ADB overnight though it was meant to persist; Bar 3 install failed; asked about a Wi-Fi sleep setting.
