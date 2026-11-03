@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 08:21 ET — Bob (Claude) — Employees: saving uses First name + Last name
+- **What:** saveEmployeeRecord() only read record 'name', but the Employees form has First name / Last name fields (pos_admin_fields.cpp), so a new employee never saved ('Enter the employee's first and last name.') and editing an existing employee's first/last name didn't change it. The first+last combining code had been pasted into the vendors branch of adminSave instead (left there, re-indented). Now saveEmployeeRecord builds the name from firstName + lastName, falling back to name. New test [m4][admin] 'a new employee from the form's First name and Last name'. Not compiled here.
+- **Why:** Owner couldn't save a new employee.
+- **Files:** `modern/app/pos_admin_save.cpp, modern/tests/test_pos_m4.cpp`
+
 ### 2026-11-03 08:08 ET — Bob (Claude) — Neil's apply_changes_tree_branches re-patched the label utility and the launcher
 - **What:** Ran on the Pi ~06:38: (good) ILSA export with 5 tree levels, rebuilt ilsa_temp_pricebook.db, vt-sync-ilsa; (bad) regex-patched modern/tools/vt_label_utility.py in the working tree (older price-book loader, losing the parse_vt_menu_dict fixes) and copied it over /usr/local/bin/vt-label-utility again. Owner discards the edit (saved as ~/label_utility_pi_edit_*.diff), pulls, reinstalls the launcher from scripts/bin. AGENTS.md: two new rules (no Pi-side patches of repo files; the launcher stays a launcher). Note to Neil in Drive (BOB_TO_NEIL_stop_patching_label_utility.md).
 - **Why:** Owner's git pull failed on a local change to vt_label_utility.py.

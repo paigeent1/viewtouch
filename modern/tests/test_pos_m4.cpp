@@ -462,6 +462,27 @@ TEST_CASE("Admin: employees and PIN rules", "[m4][admin]")
     CHECK_FALSE(t.pos.loginWithPin(u"4321"_s));
 }
 
+TEST_CASE("Admin: a new employee from the form's First name and Last name", "[m4][admin]")
+{
+    Pos t;
+    t.login("1234");
+    QVariantMap e = t.pos.adminNewRecord(u"employees"_s);   // as the form sends it: no "name"
+    e[u"pin"_s] = u"5678"_s;
+    CHECK_FALSE(t.pos.adminSave(u"employees"_s, -1, e));       // no name yet
+    e[u"firstName"_s] = u"Jordan"_s;
+    e[u"lastName"_s] = u"Avery"_s;
+    REQUIRE(t.pos.adminSave(u"employees"_s, -1, e));
+    const int jordan = int(t.pos.employees().size()) - 1;
+    CHECK(t.pos.employees()[jordan].name == "Jordan Avery");
+
+    // Changing the last name of someone already on file changes it.
+    QVariantMap again = t.pos.adminRecords(u"employees"_s)[jordan].toMap();
+    CHECK(again[u"firstName"_s].toString() == u"Jordan"_s);
+    again[u"lastName"_s] = u"Avery-Lee"_s;
+    REQUIRE(t.pos.adminSave(u"employees"_s, jordan, again));
+    CHECK(t.pos.employees()[jordan].name == "Jordan Avery-Lee");
+}
+
 TEST_CASE("Admin: tax change re-totals open checks; settings are saved", "[m4][admin]")
 {
     struct SettingsSink : test::RecordingSink {

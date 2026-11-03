@@ -107,9 +107,9 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
     } else if (panel == u"vendors") {
         auto &list = s_->settings.vendors;
         const QString fn = record.value(u"firstName"_s).toString().trimmed();
-    const QString ln = record.value(u"lastName"_s).toString().trimmed();
-    const QString combined = (fn + u" "_s + ln).trimmed();
-    const QString name = !combined.isEmpty() ? combined : record.value(u"name"_s).toString().trimmed();
+        const QString ln = record.value(u"lastName"_s).toString().trimmed();
+        const QString combined = (fn + u" "_s + ln).trimmed();
+        const QString name = !combined.isEmpty() ? combined : record.value(u"name"_s).toString().trimmed();
         if (name.isEmpty())
             return fail(tr("The vendor needs a name."));
         if (index >= int(list.size()))
@@ -740,7 +740,12 @@ bool PosService::saveEmployeeRecord(int index, const QVariantMap &record)
 {
     if (index >= int(s_->employees.size()))
         return false;
-    const QString name = record.value(u"name"_s).toString().trimmed();
+    // The form has First name and Last name; the employee's name is the two together (older callers
+    // send only "name").
+    const QString first = record.value(u"firstName"_s).toString().trimmed();
+    const QString last = record.value(u"lastName"_s).toString().trimmed();
+    const QString combined = (first + u" "_s + last).trimmed();
+    const QString name = !combined.isEmpty() ? combined : record.value(u"name"_s).toString().trimmed();
     const QString pin = record.value(u"pin"_s).toString();
     const QString role = record.value(u"role"_s).toString();
     const bool active = record.value(u"active"_s, true).toBool();
