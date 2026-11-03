@@ -73,6 +73,7 @@ Newest first. To go back: on the Pi, `cd ~/viewtouch-main && git checkout <commi
 
 | Date | Main commit | Pi ViewTouch | Tablet app | Label utility | What's in it |
 |---|---|---|---|---|---|
+| 2026-11-03 08:11 ET | `eb9fb29` | built 08:11 from `eb9fb29` ([labels] tests passed) | run 41632598473 (`4e3b8bc`) on Bar 1-3 (Bar 3 to confirm) | v1.1 (`eb9fb29`) | Tablet Labels in steps (label styles, tree levels incl. ILSA product/sub group, Show Items, To Print, preview, print order, step Back); tablets list the ILSA price book; Pi label utility: Next fixed, 6-column touch select screen, heading sort, barcodes exactly as stored; Gift Card screen: Transfer/Cash Out beside balance, Pay centered; launcher restored. Not yet in the tablet app: Wi-Fi lock (Kiosk.kt). |
 | 2026-11-02 18:28 ET | `31acd71` | built 17:32 from `d2e5300` | run 41539109241 (`d007756`) on Bar 1-3 | v1.1 (`31acd71`) | Gift cards: location, Luhn check, manager transfer/replace, Purchased By/For, subscription (9...) cards + Subscription-only promotions; tablet Labels screen (browse/find/scan, printed by the Pi); End of shift Labels button; screen saver logo fallback; tablets reconnect ADB after restart (paired, permission granted); ILSA temp price book fix; label utility full screen. |
 
 ## 5. Pending Roadmap & Backlog
