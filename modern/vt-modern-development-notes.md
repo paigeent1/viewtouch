@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:56 ET — Bob (Claude) — Tablet Labels tree: level titles
+- **What:** retailLabels() adds levelTitle (Department groups / Categories / Manufacturers / Product groups / Sub groups by path depth); WidgetRetailLabels shows it above the level's buttons. The tablet tree already drills Department group > Category > Manufacturer > Product group > Sub group, one screen per level (owner: keep department group); Find/scan unchanged. Test [labels] extended. Not compiled here.
+- **Why:** Owner: tablet label search like the Pi's drill-down, keeping department group and Find/scan.
+- **Files:** `modern/app/pos_inventory.cpp, modern/ui/qml/WidgetRetailLabels.qml, modern/tests/test_customers.cpp`
+- **Next person must know:** Title needs vt-server (Pi) and a new APK (shows on tablets).
+
 ### 2026-11-03 10:53 ET — Bob (Claude) — Label utility Tree View: Product groups, not Brands
 - **What:** Third drill level renamed 'Product groups' (ILSA prod_grp); tree rows tagged P; screen header 'Select Category / Manufacturer / Product Group'. Levels: Category > Manufacturer > Product group > Sub group.
 - **Why:** Owner: it's product group, not brand.

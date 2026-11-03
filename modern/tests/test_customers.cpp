@@ -443,6 +443,7 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     PosService pos(test::seedPosData(), nullptr);
     REQUIRE(pos.browseRetailLabels({}));
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"CIGARS"_s, u"RETAIL"_s});
+    CHECK(pos.retailLabels()[u"levelTitle"_s].toString() == u"Department groups"_s);
     REQUIRE(pos.browseRetailLabels({u"RETAIL"_s, u"LIGHTERS"_s}));
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"ZIPPO"_s});   // GENERAL: brand from the name
     REQUIRE(pos.showRetailLabelItems({}));                                               // Show Items at the top: everything
@@ -451,6 +452,7 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     REQUIRE(pos.browseRetailLabels({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s}));
     CHECK_FALSE(pos.retailLabels()[u"showingItems"_s].toBool());                         // ILSA's product group below the brand
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"CHURCHILL"_s});
+    CHECK(pos.retailLabels()[u"levelTitle"_s].toString() == u"Product groups"_s);
     REQUIRE(pos.browseRetailLabels({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s, u"CHURCHILL"_s, u"TUBO"_s}));
     CHECK(pos.retailLabels()[u"showingItems"_s].toBool());                               // the bottom: its items
     REQUIRE(pos.showRetailLabelItems({u"CIGARS"_s, u"PREMIUM CIGARS"_s, u"ROMEO Y JULIETA"_s}));

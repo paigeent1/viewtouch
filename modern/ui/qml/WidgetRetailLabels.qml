@@ -303,6 +303,12 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 10
+                Label {
+                    visible: (w.info.children ?? []).length > 0
+                    text: w.info.levelTitle ?? ""
+                    font.pixelSize: 20
+                    font.bold: true
+                }
                 Button {
                     Layout.fillWidth: true
                     implicitHeight: 64

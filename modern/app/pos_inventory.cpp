@@ -904,6 +904,12 @@ QVariantMap PosService::retailLabels() const
     return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
             {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)},
             {u"itemCount"_s, itemCount}, {u"showingItems"_s, showingItems}, {u"showItemsAsked"_s, labelShowItems_},
+            // What the next level's buttons are, as on the main computer's label utility.
+            {u"levelTitle"_s, [&] {
+                const QStringList titles{tr("Department groups"), tr("Categories"), tr("Manufacturers"),
+                                         tr("Product groups"), tr("Sub groups")};
+                return labelPath_.size() < titles.size() ? titles.at(labelPath_.size()) : QString();
+            }()},
             {u"preview"_s, labelPreview_}, {u"previewName"_s, labelPreviewName_}, {u"previewBusy"_s, labelPreviewBusy_},
             {u"previewError"_s, labelPreviewError_}};
 }
