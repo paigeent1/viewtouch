@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:37 ET — Bob (Claude) — Label utility: a category chosen on the left opens in the tree
+- **What:** _populate_category_tree(filter_cat): the chosen category's node is open (brands showing) and selected (Next uses it), and scrolled into view; before, with over 2,000 items categories started closed, so touching e.g. PREMIUM CIGARS on the left showed it folded. Tested with 45,000 items: category opens with its brands, Next -> its items.
+- **Why:** Owner: touching Premium Cigars didn't expand the hierarchy.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-03 10:35 ET — Bob (Claude) — Label utility tree screen: touch-sized rows
 - **What:** Screen 2 (Tree View): the left list (now 'Categories', was a Tk Listbox) and the Group > Category > Brand tree are ttk Treeviews with style TouchTree.Treeview (rowheight 52, Sans 15, indent 34) and 34 px scroll bars; touching anywhere on a row with levels under it opens/closes it (the small ▷ is hard to hit) and chooses it for Next. Tested off the Pi: rows render 52 px, category filter, open/close by touch, Next to screen 3.
 - **Why:** Owner: taller lines between department groups and category/brand, more touch friendly.

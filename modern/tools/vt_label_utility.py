@@ -3098,7 +3098,11 @@ class VTLabelUtility(tk.Tk):
         for dg in sorted(tree_map.keys()):
             dg_id = self.cat_tree.insert(root_node, "end", text=dg, open=True, values=("DG", dg))
             for cat in sorted(tree_map[dg].keys()):
-                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=not many, values=("CAT", cat))
+                # A category chosen on the left opens (its brands showing) and is chosen for Next.
+                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=bool(filter_cat) or not many, values=("CAT", cat))
+                if filter_cat:
+                    self.cat_tree.selection_set(cat_id)
+                    self.cat_tree.see(cat_id)
                 for mfg in sorted(tree_map[dg][cat].keys()):
                     mfg_id = self.cat_tree.insert(cat_id, "end", text=f"M  {mfg}", open=False, values=("MFG", mfg, cat))
                     for pg in sorted(tree_map[dg][cat][mfg].keys()):
