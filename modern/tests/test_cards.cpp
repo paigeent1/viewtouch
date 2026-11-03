@@ -642,3 +642,47 @@ TEST_CASE("Retail: the UPC prints above the item; an error correct stays on the 
     CHECK(back->lines[0].upc == "4006381333931");
     CHECK(back->lines[2].handed);
 }
+
+TEST_CASE("Retail items: to the humidor printer or screen when there is one, never to the kitchen", "[receipts][humidor]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    auto &settings = pos.shared()->settings;
+    for (core::MenuItem &m : pos.shared()->menu)
+        if (m.id == "cobb") {                      // a cigar, for the test
+            m.taxClass = core::TaxClass::Merchandise;
+            m.printer.clear();
+            m.station.clear();
+        }
+    std::erase_if(settings.printers, [](const core::PrinterConfig &p) { return p.id == "humidor"; });
+    std::erase_if(settings.stations, [](const core::Station &s) { return s.id == "humidor"; });
+
+    // No humidor yet: nowhere (not the kitchen).
+    REQUIRE(pos.addItem(u"cobb"_s));
+    core::Check &c = pos.shared()->open.begin()->second;
+    CHECK_FALSE(c.lines.back().forKitchen());
+
+    // A humidor printer: its ticket, for a runner.
+    core::PrinterConfig p;
+    p.id = "humidor";
+    p.name = "Humidor";
+    p.type = "network";
+    p.host = "192.168.1.30";
+    settings.printers.push_back(p);
+    REQUIRE(pos.addItem(u"cobb"_s));
+    CHECK(c.lines.back().forKitchen());
+    CHECK(c.lines.back().printer == "humidor");
+
+    // A screen only (a Humidor station, no printer): on that screen, and printKitchen skips it.
+    settings.printers.pop_back();
+    settings.stations.push_back({"humidor", "Humidor"});
+    REQUIRE(pos.addItem(u"cobb"_s));
+    CHECK(c.lines.back().forKitchen());
+    CHECK(c.lines.back().station == "humidor");
+    CHECK(c.lines.back().printer == "humidor");
+    CHECK_FALSE(settings.printer("humidor"));
+
+    // Food stays as it was.
+    REQUIRE(pos.addItem(u"coffee"_s));
+    CHECK(c.lines.back().printer != "humidor");
+}

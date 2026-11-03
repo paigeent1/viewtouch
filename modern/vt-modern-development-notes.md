@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 09:48 ET — Bob (Claude) — Humidor runner routing, on when a humidor printer/screen exists
+- **What:** PosService::addItem: a retail item (recipe __retail__, a single of a box, or taxed Merchandise) whose printer is empty or 'kitchen' and has no station goes to the humidor: printer = humidorPrinter() (a printer with id or name 'humidor', type not none) or else the humidor station id; station = humidorStation() (a Store Settings > Kitchen station named Humidor). With neither, the line is kitchenHide (nowhere, not the kitchen). TicketPrinter::printKitchen: a line routed to a station that has no printer prints no ticket (was: fell back to the kitchen printer). Items rung on the Retail screen stay handed (never routed). Test [humidor] in test_cards.cpp.
+- **Why:** Owner: build the humidor runner printer in, turned on when/if a humidor printer is added.
+- **Files:** `modern/app/pos_service.hh, modern/app/pos_service.cpp, modern/print/ticket_printer.cpp, modern/tests/test_cards.cpp`
+- **Next person must know:** Routing is decided when the item is rung: lines rung before the humidor printer/screen is added stay as they were.
+
 ### 2026-11-03 09:43 ET — Bob (Claude) — Items rung on the Retail screen never go to a printer or station
 - **What:** OrderLine::handed (saved in JSON): set when the item is rung on the Retail screen (LayoutController::scanned passes retail = page is retail-entry to noteScan; typed codes and quick keys go through scanned too). forKitchen() is false for handed lines, so closing a counter sale (which sends what's unsent) prints no ticket and shows nothing on a station screen, and a merged counter sale doesn't send a runner. Bar/table items keep routing by their Printer (empty/unknown printer still = kitchen). Retail screen gets a '📷 SCAN' button (scanCamera: the tablet camera; on the Pi it says to use the handheld scanner). Test [receipts] extended.
 - **Why:** Owner: only kitchen and bar items should print/show at kitchen and bar; a humidor printer/screen for a runner to bring retail items to tables; a bartender sells cigars to walk-ins by switching to Retail mode and scanning with the tablet camera.

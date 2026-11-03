@@ -1154,6 +1154,20 @@ bool PosService::cancelWeighing()
     return true;
 }
 
+namespace {
+// A retail item (cigars, merchandise): marked retail, a single of a box, or taxed as merchandise.
+bool isRetailItem(const MenuItem &m)
+{
+    for (const RecipeLine &rl : m.recipe) {
+        if (rl.ingredientId == "__retail__")
+            return rl.quantity > 0.5;
+        if (rl.ingredientId.starts_with("__parent__:"))
+            return true;
+    }
+    return m.taxClass == TaxClass::Merchandise;
+}
+} // namespace
+
 bool PosService::addItem(const QString &idOrName)
 {
     if (!require(perm::Order, tr("Ordering")))
@@ -1217,6 +1231,15 @@ bool PosService::addItem(const QString &idOrName)
             priced.name += " (" + ss(i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(item->eventAt),
                                                          u"ddd MMM d, h:mm AP"_s)) + ")";
         OrderLine &line = c.addItem(priced, q);
+        // Retail items go to the humidor's printer/screen for a runner, never to the kitchen; until the store
+        // has a humidor printer or station, nowhere.
+        if (isRetailItem(*item) && (line.printer.empty() || line.printer == "kitchen") && line.station.empty()) {
+            const std::string printer = humidorPrinter(), station = humidorStation();
+            if (printer.empty() && station.empty())
+                line.kitchenHide = true;
+            line.printer = !printer.empty() ? printer : station;   // a screen only: no ticket (printKitchen)
+            line.station = station;
+        }
         if (scan.itemId == qs(item->id)) {
             if (!scan.code.isEmpty())
                 line.upc = ss(scan.code);
@@ -1360,6 +1383,29 @@ bool PosService::errorCorrect()
     selectedLine_ = 0;
     changed(*c);
     return true;
+}
+
+namespace {
+bool namedHumidor(const std::string &s)
+{
+    return QString::fromStdString(s).trimmed().compare(u"humidor"_s, Qt::CaseInsensitive) == 0;
+}
+} // namespace
+
+std::string PosService::humidorPrinter() const
+{
+    for (const PrinterConfig &p : s_->settings.printers)
+        if (p.type != "none" && (namedHumidor(p.id) || namedHumidor(p.name)))
+            return p.id;
+    return {};
+}
+
+std::string PosService::humidorStation() const
+{
+    for (const Station &st : s_->settings.stations)
+        if (namedHumidor(st.id) || namedHumidor(st.name))
+            return st.id;
+    return {};
 }
 
 bool PosService::noteScan(const QString &code, const QString &itemId, bool retail)

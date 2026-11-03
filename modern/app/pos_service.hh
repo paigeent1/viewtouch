@@ -546,6 +546,11 @@ public:
     // check, voided and marked as an error correct, for the cashier to see; the Exceptions report counts it.
     // A line already sent is voided as usual (voidItem).
     bool errorCorrect();
+    // Where retail items (cigars, merchandise) go when ordered on a bar or table check, for a runner to
+    // bring them out: the humidor's printer and/or station screen (id or name "humidor"); empty when the
+    // store has neither (then they go nowhere, not to the kitchen).
+    std::string humidorPrinter() const;
+    std::string humidorStation() const;
     // The barcode about to ring in itemId (the scanner): the line keeps that code (receipts print it).
     // retail: rung on the Retail screen, so the customer has it (OrderLine::handed: no ticket, no screen).
     bool noteScan(const QString &code, const QString &itemId, bool retail = false);

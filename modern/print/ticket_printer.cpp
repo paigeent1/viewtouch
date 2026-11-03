@@ -6,6 +6,7 @@
 #include "app/pos_session.hh"
 #include "print/raster.hh"
 
+#include <algorithm>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -76,8 +77,12 @@ void TicketPrinter::printKitchen(const PosSettings &settings, const Check &check
         if (!l.isComment() && !l.forKitchen())   // gift cards, hidden items: nothing to make
             continue;
         std::string station = l.printer.empty() ? "kitchen" : l.printer;
-        if (!settings.printer(station))
+        if (!settings.printer(station)) {
+            // Routed to a station that has a screen and no printer (the humidor, for a runner): no ticket.
+            if (std::ranges::any_of(settings.stations, [&](const Station &s) { return s.id == station; }))
+                continue;
             station = "kitchen";
+        }
         byStation[station].push_back(l);
     }
     const TicketContext ctx = context(settings);
