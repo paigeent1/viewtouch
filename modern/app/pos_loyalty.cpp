@@ -364,6 +364,8 @@ bool PosService::customerEmail(const QString &email)
     Check *c = current();
     if (!c)
         return fail(tr("No check is open."));
+    if (c->training)
+        return fail(tr("Practice check: nothing is saved."));
     CustomerRecord *r = s_->customer(c->customerId);
     if (!r)
         return fail(tr("Add your phone number first."));

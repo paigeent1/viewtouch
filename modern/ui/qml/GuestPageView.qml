@@ -2,8 +2,8 @@ import QtQuick
 
 // The Customer Display page (Edit Pages -> Customer Display) on the guest's screen, scaled to
 // fit like any page. Its widgets (guestOrder, guestMessages, guestMedia, guestHeader, labels,
-// pictures) show the cashier's check; its buttons don't run (the guest's screen must not move
-// the cashier's).
+// pictures) show the cashier's check; its buttons don't run, and other widgets aren't shown
+// there (LayoutController::refreshGuest): the guest's screen must not move the cashier's.
 Item {
     id: view
     required property LayoutController controller

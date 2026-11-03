@@ -1262,7 +1262,6 @@ bool LayoutController::showPage(const QString &pageId)
     return navigate(Navigator::Mode::Replace, pageId) || nav_.current() == pageId;
 }
 
-// A zone's show/hide rules (its "showWhen"), as ZoneItem.qml applies them.
 void LayoutController::refreshGuest()
 {
     // The Customer Display page as designed (the editor's draft while editing): no phone layout,
@@ -1272,8 +1271,14 @@ void LayoutController::refreshGuest()
     const vt::layout::Page *page = l.page(id);
     QList<ZoneModel::Row> rows;
     if (page) {
+        // Only what belongs on the guest's screen: the guest widgets and plain labels, pictures and
+        // decorations. An order screen's widget there would work the cashier's check.
+        static const QStringList guestKinds{u"guestOrder"_s, u"guestMessages"_s, u"guestMedia"_s, u"guestHeader"_s,
+                                            u"label"_s, u"image"_s, u"button"_s, u"comment"_s, u"clock"_s, u"decor"_s};
         for (const Layout::PlacedZone &pz : l.effectiveZones(id)) {
             const vt::layout::Zone &z = *pz.zone;
+            if (!guestKinds.contains(z.kind))
+                continue;
             rows.append({
                 {ZoneModel::ZoneIdRole, z.id},
                 {ZoneModel::KindRole, z.kind},
@@ -1312,6 +1317,7 @@ void LayoutController::refreshGuest()
     }
 }
 
+// A zone's show/hide rules (its "showWhen"), as ZoneItem.qml applies them.
 bool LayoutController::ruleShows(const QJsonObject &rule) const
 {
     if (rule.isEmpty())

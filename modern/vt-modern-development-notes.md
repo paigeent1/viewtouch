@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:58 ET — Bob (Claude) — Customer Display page: review fixes
+- **What:** Independent review fixes: keypad and email keyboard stop touches from reaching the page under them (MouseArea), and the guest order widget ignores taps while one is open (overlayOpen); the email keyboard closes when the check changes or the cashier asks for a tip; tip choices hide while it's open; the guest page shows only guest widgets, labels, pictures, buttons (which don't run), clocks and decorations, so no order-screen widget can work the cashier's check from there; customerEmail refuses practice checks; showWhen comment back above ruleShows; controller test now moves the cashier's page and checks the guest page stays.
+- **Why:** Reviewer's findings on the Customer Display page change.
+- **Files:** `ui/qml/CustomerDisplay.qml, ui/qml/WidgetGuestOrder.qml, ui/qml/GuestPageView.qml, ui/cpp/layoutcontroller.cpp, app/pos_loyalty.cpp, tests/test_controller.cpp`
+
 ### 2026-11-03 18:50 ET — Bob (Claude) — vt-guest-display: POS monitor progressive
 - **What:** On X11 it now sets the first monitor to its current resolution by name (progressive) before placing the second beside it, now and at boot; the owner's HDMI-1 was on 1920x1080i 50 Hz.
 - **Why:** Owner's xrandr output.

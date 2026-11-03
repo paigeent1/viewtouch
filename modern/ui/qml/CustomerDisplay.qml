@@ -53,7 +53,13 @@ Rectangle {
         target: d.pos
         function onCheckClosed() { d.thanking = true; d.receiptDone = false; thanks.restart() }
     }
-    onHasCheckChanged: if (hasCheck) { thanking = false; keypad.close() }
+    // A new check, or none: what the last guest was typing goes away (not onto the next guest).
+    onHasCheckChanged: { emailPad.close(); if (hasCheck) { thanking = false; keypad.close() } }
+    // The cashier asks for a tip: the tip choices come first.
+    readonly property bool askingTip: prompt.askingTip ?? false
+    onAskingTipChanged: if (askingTip) emailPad.close()
+    // For the page's widgets: a keypad or keyboard is up (touches are its own).
+    readonly property bool overlayOpen: keypad.visible || emailPad.visible
 
     // --- the Customer Display page, when the store has one ---
     Loader {
@@ -396,7 +402,7 @@ Rectangle {
     // --- tip choices, when the cashier asks ---
     Rectangle {
         anchors.fill: parent
-        visible: (d.prompt.askingTip ?? false) && !keypad.visible
+        visible: (d.prompt.askingTip ?? false) && !keypad.visible && !emailPad.visible
         color: "#ee0f1318"
         ColumnLayout {
             anchors.centerIn: parent
@@ -479,6 +485,8 @@ Rectangle {
         id: keypad
         anchors.fill: parent
         visible: false
+        // Touches stop here: nothing under the keypad (the page's widgets) takes them too.
+        MouseArea { anchors.fill: parent }
         color: "#f00f1318"
         property string title
         property bool money: false
@@ -550,6 +558,7 @@ Rectangle {
         id: emailPad
         anchors.fill: parent
         visible: false
+        MouseArea { anchors.fill: parent }   // touches stop here (see the keypad)
         color: "#f00f1318"
         property string title
         property string entry: ""

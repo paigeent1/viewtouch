@@ -98,7 +98,7 @@ Item {
                 enabled: w.hasCheck
                 onTapped: {
                     const h = w.host()
-                    if (!h) return
+                    if (!h || h.overlayOpen) return
                     if ((w.loyalty.member ?? "") === "")
                         h.askPhone(qsTr("Your phone number"), phone => w.pos.customerJoin(phone))
                     else if (!(w.loyalty.hasEmail ?? true) && w.props.email !== false)

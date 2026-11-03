@@ -189,7 +189,10 @@ TEST_CASE("The Customer Display page reaches the guest's screen, apart from the 
     CHECK(kinds.contains(u"guestMedia"_s));
     CHECK(kinds.contains(u"guestHeader"_s));
     // The cashier's screen goes on its own way; the guest page stays.
-    const QString before = c.pageId();
-    CHECK(before != u"customer-display"_s);
-    CHECK(c.guestZones()->rowCount() == kinds.size());
+    REQUIRE(c.jumpTo(u"library"_s));
+    CHECK(c.pageId() == u"library"_s);
+    QStringList after;
+    for (int i = 0; i < c.guestZones()->rowCount(); ++i)
+        after << c.guestZones()->data(c.guestZones()->index(i), ZoneModel::KindRole).toString();
+    CHECK(after == kinds);
 }
