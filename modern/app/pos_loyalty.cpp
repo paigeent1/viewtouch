@@ -6,6 +6,7 @@
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
 
+#include <QRegularExpression>
 #include <QDateTime>
 
 #include <algorithm>
@@ -354,6 +355,27 @@ bool PosService::customerJoin(const QString &phone)
     if (it != s_->customers.end())
         return useCustomer(qs(it->id));
     return saveCustomer({{u"phone"_s, phone.trimmed()}, {u"name"_s, QString()}});
+}
+
+bool PosService::customerEmail(const QString &email)
+{
+    if (!require(perm::Order, tr("Rewards sign-up")))
+        return false;
+    Check *c = current();
+    if (!c)
+        return fail(tr("No check is open."));
+    CustomerRecord *r = s_->customer(c->customerId);
+    if (!r)
+        return fail(tr("Add your phone number first."));
+    const QString e = email.trimmed();
+    static const QRegularExpression valid(u"^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"_s);
+    if (!valid.match(e).hasMatch())
+        return fail(tr("That email address doesn't look right."));
+    r->email = ss(e.left(120));
+    saveCustomerRecord(*r);
+    emit notice(tr("Email saved"));
+    emit sessionChanged();
+    return true;
 }
 
 bool PosService::sendReceipt(const QString &how, const QString &to)

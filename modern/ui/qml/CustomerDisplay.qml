@@ -11,6 +11,14 @@ import QtQuick.Layouts
 Rectangle {
     id: d
     property PosService pos
+    // The screen's controller: with a Customer Display page (Edit Pages), the guest sees that page;
+    // without one (or no controller), the built-in layout below.
+    property LayoutController controller: null
+    readonly property bool usePage: controller !== null && controller.hasGuestPage
+    // For the page's widgets: they find the customer display (the phone keypad) through this.
+    readonly property bool guestHost: true
+    function askPhone(title, done) { keypad.ask(title, false, done) }
+    function askEmail(title, done) { emailPad.ask(title, done) }
     readonly property bool hasCheck: pos !== null && pos.hasCheck
     readonly property var lines: hasCheck ? pos.lines : []
     readonly property var totals: hasCheck ? pos.totals : ({})
@@ -47,9 +55,17 @@ Rectangle {
     }
     onHasCheckChanged: if (hasCheck) { thanking = false; keypad.close() }
 
+    // --- the Customer Display page, when the store has one ---
+    Loader {
+        anchors.fill: parent
+        active: d.usePage
+        sourceComponent: GuestPageView { controller: d.controller }
+    }
+
     // --- header: logo or name, and the check ---
     Rectangle {
         id: header
+        visible: !d.usePage
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: d.unit * 3.4
         color: d.accent
@@ -79,14 +95,14 @@ Rectangle {
 
     Item {
         id: body
-        anchors { left: parent.left; right: parent.right; top: header.bottom; bottom: parent.bottom }
+        anchors { left: parent.left; right: parent.right; top: d.usePage ? parent.top : header.bottom; bottom: parent.bottom }
 
         // --- between guests: messages and pictures in turn ---
         Item {
             id: idle
             // Between guests: the whole screen; during a sale: the two thirds beside the order.
             anchors { left: d.hasCheck || d.panelShown ? orderPanel.right : parent.left; right: parent.right; top: parent.top; bottom: parent.bottom }
-            visible: !d.thanking || d.hasCheck
+            visible: (!d.thanking || d.hasCheck) && !d.usePage
             readonly property var slides: d.prompt.slides ?? []
             property int index: 0
             Timer {
@@ -138,6 +154,12 @@ Rectangle {
             }
         }
 
+        // On the page: the thank-you covers it.
+        Rectangle {
+            anchors.fill: parent
+            visible: d.usePage && d.thanking && !d.hasCheck
+            color: "#0f1318"
+        }
         // --- thank you ---
         ColumnLayout {
             anchors.centerIn: parent
@@ -197,7 +219,7 @@ Rectangle {
             id: orderPanel
             anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
             width: d.hasCheck || d.panelShown ? parent.width / 3 : 0
-            visible: d.hasCheck || d.panelShown
+            visible: (d.hasCheck || d.panelShown) && !d.usePage
             color: "#151a22"
             border.color: "#2c3442"
             border.width: 1
@@ -519,6 +541,108 @@ Rectangle {
                 color: "#9aa4b5"
                 font.pixelSize: d.unit * 1.1
                 TapHandler { onTapped: keypad.close() }
+            }
+        }
+    }
+
+    // --- a keyboard for the guest: their email address ---
+    Rectangle {
+        id: emailPad
+        anchors.fill: parent
+        visible: false
+        color: "#f00f1318"
+        property string title
+        property string entry: ""
+        property var done: null
+        function ask(t, then) { title = t; entry = ""; done = then; visible = true }
+        function close() { visible = false; done = null }
+        onVisibleChanged: if (visible) keypad.close()
+        readonly property var rows: [["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+                                     ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+                                     ["a", "s", "d", "f", "g", "h", "j", "k", "l", "@"],
+                                     ["z", "x", "c", "v", "b", "n", "m", ".", "_", "-"],
+                                     ["@gmail.com", ".com", "⌫"]]
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(parent.width * 0.92, d.unit * 44)
+            spacing: d.unit * 0.4
+            Text { Layout.alignment: Qt.AlignHCenter; text: emailPad.title; color: "white"; font.pixelSize: d.unit * 1.5; font.bold: true }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: d.unit * 2.8
+                radius: d.unit * 0.4
+                color: "#1b222c"
+                Text {
+                    anchors.fill: parent
+                    anchors.margins: d.unit * 0.5
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: emailPad.entry || " "
+                    color: "white"
+                    elide: Text.ElideLeft
+                    font.pixelSize: d.unit * 1.5
+                }
+            }
+            Repeater {
+                model: emailPad.rows
+                delegate: RowLayout {
+                    id: keyRow
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: d.unit * 0.3
+                    Repeater {
+                        model: keyRow.modelData
+                        delegate: Rectangle {
+                            id: ekey
+                            required property string modelData
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: modelData.length > 2 ? 3 : 1
+                            Layout.preferredHeight: d.unit * 2.6
+                            radius: d.unit * 0.35
+                            color: etap.pressed ? Qt.lighter(d.accent, 1.3) : "#2a313d"
+                            Text { anchors.centerIn: parent; text: ekey.modelData; color: "white"; font.pixelSize: d.unit * 1.2 }
+                            TapHandler {
+                                id: etap
+                                onTapped: {
+                                    if (ekey.modelData === "⌫")
+                                        emailPad.entry = emailPad.entry.slice(0, -1)
+                                    else if (emailPad.entry.length < 80)
+                                        emailPad.entry += ekey.modelData
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: d.unit * 0.3
+                spacing: d.unit * 0.6
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: d.unit * 2.8
+                    radius: d.unit * 0.4
+                    color: "#2a313d"
+                    Text { anchors.centerIn: parent; text: qsTr("Cancel"); color: "#c7cedb"; font.pixelSize: d.unit * 1.2 }
+                    TapHandler { onTapped: emailPad.close() }
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: d.unit * 2.8
+                    radius: d.unit * 0.4
+                    readonly property bool ok: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailPad.entry)
+                    color: ok ? d.accent : "#3a4150"
+                    Text { anchors.centerIn: parent; text: qsTr("Done"); color: "white"; font.pixelSize: d.unit * 1.2; font.bold: true }
+                    TapHandler {
+                        onTapped: {
+                            if (!parent.ok) return
+                            const then = emailPad.done
+                            const value = emailPad.entry
+                            emailPad.close()
+                            if (then) then(value)
+                        }
+                    }
+                }
             }
         }
     }

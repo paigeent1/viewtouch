@@ -717,6 +717,8 @@ public:
     bool redeemReward(int index);
     // The guest types their phone on the customer display: found or signed up.
     bool customerJoin(const QString &phone);
+    // The guest's email (typed on the customer display), kept with their rewards.
+    bool customerEmail(const QString &email);
     // After paying: "print", "text" (to a phone) or "none".
     bool sendReceipt(const QString &how, const QString &to = {});
     // A code a scanner read (it types it, then Enter), on whatever screen:

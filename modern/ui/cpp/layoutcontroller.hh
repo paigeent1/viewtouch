@@ -48,6 +48,12 @@ class LayoutController : public QObject {
     Q_PROPERTY(QVariantMap background READ background NOTIFY pageChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY pageChanged)
     Q_PROPERTY(ZoneModel *zones READ zones CONSTANT)
+    // The Customer Display page (id "customer-display"), for the guest's screen: its zones,
+    // canvas and background, kept apart from the page this screen is showing.
+    Q_PROPERTY(ZoneModel *guestZones READ guestZones CONSTANT)
+    Q_PROPERTY(bool hasGuestPage READ hasGuestPage NOTIFY guestPageChanged)
+    Q_PROPERTY(QSize guestCanvas READ guestCanvas NOTIFY guestPageChanged)
+    Q_PROPERTY(QVariantMap guestBackground READ guestBackground NOTIFY guestPageChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
     // What a held button does: {title, text}; empty when nothing is explained.
     Q_PROPERTY(QVariantMap explanation READ explanation NOTIFY explanationChanged)
@@ -114,6 +120,10 @@ public:
     QVariantMap background() const;
     bool canGoBack() const { return nav_.canGoBack(); }
     ZoneModel *zones() { return &zones_; }
+    ZoneModel *guestZones() { return &guestZones_; }
+    bool hasGuestPage() const { return guestCanvas_.isValid(); }
+    QSize guestCanvas() const { return guestCanvas_; }
+    QVariantMap guestBackground() const { return guestBackground_; }
     QString statusText() const { return status_; }
     bool editing() const { return editing_; }
     bool asleep() const { return asleep_; }
@@ -293,6 +303,7 @@ public:
 
 signals:
     void pageChanged();
+    void guestPageChanged();
     void formFactorChanged();
     // A manager asked to close ViewTouch (the closeApp command).
     void closeRequested();
@@ -354,6 +365,10 @@ private:
     vt::layout::Layout layout_;
     vt::app::Navigator nav_;
     ZoneModel zones_;
+    ZoneModel guestZones_;
+    QSize guestCanvas_;
+    QVariantMap guestBackground_;
+    void refreshGuest();
     QString status_;
     // The pages in this terminal's own look (Manager -> Terminals), when it has one.
     std::optional<vt::layout::Layout> lookedLayout_;

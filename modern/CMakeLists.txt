@@ -171,6 +171,11 @@ if(Qt6_FOUND)
             ui/qml/DrawerCount.qml
             ui/qml/ReasonSheet.qml
             ui/qml/PriceCheckOverlay.qml
+            ui/qml/WidgetGuestOrder.qml
+            ui/qml/WidgetGuestMessages.qml
+            ui/qml/WidgetGuestMedia.qml
+            ui/qml/WidgetGuestHeader.qml
+            ui/qml/GuestPageView.qml
             ui/qml/TouchKeyboard.qml
             ui/qml/ApprovalPad.qml
         ui/qml/ScanAddOverlay.qml

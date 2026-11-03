@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "id": "customer-display",
+  "name": "Customer Display",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "manager",
+  "background": {
+    "fill": "#0f1318"
+  },
+  "zones": [
+    {
+      "id": "cd-header",
+      "kind": "guestHeader",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1920,
+        "h": 144
+      },
+      "shape": "rect",
+      "behavior": "none"
+    },
+    {
+      "id": "cd-media",
+      "kind": "guestMedia",
+      "rect": {
+        "x": 0,
+        "y": 144,
+        "w": 640,
+        "h": 936
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "style": {
+        "normal": {
+          "fill": "#151a22"
+        }
+      },
+      "showWhen": {
+        "check": "none"
+      }
+    },
+    {
+      "id": "cd-order",
+      "kind": "guestOrder",
+      "rect": {
+        "x": 0,
+        "y": 144,
+        "w": 640,
+        "h": 936
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "style": {
+        "normal": {
+          "fill": "#151a22",
+          "textColor": "#ffffff"
+        }
+      },
+      "showWhen": {
+        "check": "open"
+      }
+    },
+    {
+      "id": "cd-messages",
+      "kind": "guestMessages",
+      "rect": {
+        "x": 640,
+        "y": 144,
+        "w": 1280,
+        "h": 936
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "style": {
+        "normal": {
+          "textColor": "#ffffff"
+        }
+      }
+    }
+  ]
+}

@@ -1105,6 +1105,7 @@ QVariantMap PosService::customerPrompt() const
                                     : !r->name.empty() ? qs(r->name.substr(0, r->name.find(' ')))
                                     : tr("...%1").arg(qs(digits.size() > 4 ? digits.substr(digits.size() - 4) : digits)));
         loyalty.insert(u"named"_s, r && !r->name.empty());
+        loyalty.insert(u"hasEmail"_s, r && !r->email.empty());
         loyalty.insert(u"points"_s, r ? r->points : 0);
         loyalty.insert(u"earning"_s, pointsFor(*c));
         QVariantList rewards;

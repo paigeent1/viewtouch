@@ -174,3 +174,22 @@ TEST_CASE("Unknown targets and disabled zones do nothing", "[controller]")
     CHECK(pages.isEmpty());
     CHECK(c.pageId() == u"library"_s);
 }
+
+TEST_CASE("The Customer Display page reaches the guest's screen, apart from the page shown", "[controller][guest]")
+{
+    LayoutController c = seedController();
+    REQUIRE(c.hasGuestPage());
+    CHECK(c.guestCanvas() == QSize(1920, 1080));
+    CHECK(c.guestBackground().value(u"fill"_s).toString() == u"#0f1318"_s);
+    QStringList kinds;
+    for (int i = 0; i < c.guestZones()->rowCount(); ++i)
+        kinds << c.guestZones()->data(c.guestZones()->index(i), ZoneModel::KindRole).toString();
+    CHECK(kinds.contains(u"guestOrder"_s));
+    CHECK(kinds.contains(u"guestMessages"_s));
+    CHECK(kinds.contains(u"guestMedia"_s));
+    CHECK(kinds.contains(u"guestHeader"_s));
+    // The cashier's screen goes on its own way; the guest page stays.
+    const QString before = c.pageId();
+    CHECK(before != u"customer-display"_s);
+    CHECK(c.guestZones()->rowCount() == kinds.size());
+}

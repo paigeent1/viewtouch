@@ -468,7 +468,8 @@ std::unique_ptr<QQmlApplicationEngine> showUi(const Args &cli, const Options &o,
         return nullptr;
     present(window, cli, o);
     if (display == u"window" && controller.pos()) {
-        engine->setInitialProperties({{u"pos"_s, QVariant::fromValue(controller.pos())}});
+        engine->setInitialProperties({{u"pos"_s, QVariant::fromValue(controller.pos())},
+                                      {u"controller"_s, QVariant::fromValue(&controller)}});
         engine->load(QUrl(u"qrc:/ViewTouch/ui/qml/CustomerDisplayWindow.qml"_s));
         auto *guest = qobject_cast<QQuickWindow *>(engine->rootObjects().constLast());
         const QList<QScreen *> screens = QGuiApplication::screens();

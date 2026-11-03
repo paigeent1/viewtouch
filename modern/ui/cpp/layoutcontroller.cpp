@@ -1263,6 +1263,55 @@ bool LayoutController::showPage(const QString &pageId)
 }
 
 // A zone's show/hide rules (its "showWhen"), as ZoneItem.qml applies them.
+void LayoutController::refreshGuest()
+{
+    // The Customer Display page as designed (the editor's draft while editing): no phone layout,
+    // no left-handed swap, no sold-out marks; its buttons don't run (the guest's screen).
+    const Layout &l = activeLayout();
+    static const QString id = u"customer-display"_s;
+    const vt::layout::Page *page = l.page(id);
+    QList<ZoneModel::Row> rows;
+    if (page) {
+        for (const Layout::PlacedZone &pz : l.effectiveZones(id)) {
+            const vt::layout::Zone &z = *pz.zone;
+            rows.append({
+                {ZoneModel::ZoneIdRole, z.id},
+                {ZoneModel::KindRole, z.kind},
+                {ZoneModel::ZoneNameRole, z.name},
+                {ZoneModel::LabelRole, z.label},
+                {ZoneModel::ZoneXRole, z.rect.x()},
+                {ZoneModel::ZoneYRole, z.rect.y()},
+                {ZoneModel::ZoneWRole, z.rect.width()},
+                {ZoneModel::ZoneHRole, z.rect.height()},
+                {ZoneModel::ShapeRole, z.shape},
+                {ZoneModel::BehaviorRole, z.behavior},
+                {ZoneModel::ZoneEnabledRole, z.enabled},
+                {ZoneModel::InheritedRole, pz.inherited},
+                {ZoneModel::CurrentRole, false},
+                {ZoneModel::HotkeyRole, QString()},
+                {ZoneModel::GroupRole, z.group},
+                {ZoneModel::ImagePathRole, z.imagePath},
+                {ZoneModel::StyleNormalRole, l.resolveStyle(z, id, ZoneState::Normal).toVariantMap()},
+                {ZoneModel::StyleSelectedRole, l.resolveStyle(z, id, ZoneState::Selected).toVariantMap()},
+                {ZoneModel::StyleDisabledRole, l.resolveStyle(z, id, ZoneState::Disabled).toVariantMap()},
+                {ZoneModel::PropsRole, z.props.toVariantMap()},
+                {ZoneModel::SoldOutRole, false},
+                {ZoneModel::ShowWhenRole, z.extra.value(u"showWhen").toObject().toVariantMap()},
+                {ZoneModel::ItemIdRole, QString()},
+                {ZoneModel::RotationRole, vt::layout::rotationOf(z)},
+            });
+        }
+    }
+    guestZones_.setRows(std::move(rows));
+    const QSize canvas = page ? page->canvas : QSize();
+    const QVariantMap bg = page ? l.resolveBackground(id).toVariantMap() : QVariantMap();
+    if (canvas != guestCanvas_ || bg != guestBackground_) {
+        guestCanvas_ = canvas;
+        guestBackground_ = bg;
+        emit guestPageChanged();
+    }
+}
+
 bool LayoutController::ruleShows(const QJsonObject &rule) const
 {
     if (rule.isEmpty())
@@ -2252,6 +2301,7 @@ void LayoutController::refresh()
         });
     }
     zones_.setRows(std::move(rows));
+    refreshGuest();
     if (const QVariantMap colors = l.theme.extra.value(u"status").toObject().toVariantMap(); colors != statusColors_) {
         statusColors_ = colors;
         emit statusColorsChanged();

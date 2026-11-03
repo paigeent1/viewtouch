@@ -5,10 +5,11 @@ import QtQuick
 Window {
     id: win
     required property PosService pos
+    property LayoutController controller: null   // the screen's: its Customer Display page
     width: 1024
     height: 600
     visible: true
     color: "#0f1318"
     title: qsTr("ViewTouch — Customer Display")
-    CustomerDisplay { anchors.fill: parent; pos: win.pos }
+    CustomerDisplay { anchors.fill: parent; pos: win.pos; controller: win.controller }
 }

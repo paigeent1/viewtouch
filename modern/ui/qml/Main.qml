@@ -132,7 +132,7 @@ ApplicationWindow {
         x: root.posWidth
         width: root.width - root.posWidth
         height: root.height
-        sourceComponent: CustomerDisplay { pos: root.controller.pos as PosService }
+        sourceComponent: CustomerDisplay { pos: root.controller.pos as PosService; controller: root.controller }
     }
 
     ColumnLayout {

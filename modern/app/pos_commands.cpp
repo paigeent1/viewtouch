@@ -213,6 +213,7 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"applyCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.applyCoupon(a.value(0).toString())); }},
         {u"removeCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeCoupon(a.value(0).toString())); }},
         {u"customerJoin"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerJoin(a.value(0).toString())); }},
+        {u"customerEmail"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerEmail(a.value(0).toString())); }},
         {u"sendReceipt"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.sendReceipt(a.value(0).toString(), a.value(1).toString())); }},
         {u"addShift"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.addShift(a.value(0).toMap())); }},

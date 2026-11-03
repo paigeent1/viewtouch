@@ -59,6 +59,12 @@ TEST_CASE("Loyalty: points for what's spent, rewards off the check, taken back o
     QVariantMap loyalty = pos.customerPrompt()[u"loyalty"_s].toMap();
     CHECK(loyalty[u"earning"_s] == 50);
     CHECK(loyalty[u"points"_s] == 0);
+    // Their email too, typed on the guest's screen.
+    CHECK_FALSE(loyalty[u"hasEmail"_s].toBool());
+    CHECK_FALSE(pos.customerEmail(u"not an email"_s));
+    REQUIRE(pos.customerEmail(u"guest@example.com"_s));
+    CHECK(pos.customerPrompt()[u"loyalty"_s].toMap()[u"hasEmail"_s].toBool());
+    CHECK(pos.shared()->customers.back().email == "guest@example.com");
     CHECK_FALSE(pos.redeemReward(0));                          // not enough points yet
     REQUIRE(pos.tender(u"cash"_s));
     REQUIRE(pos.closeCheck());
