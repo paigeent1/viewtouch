@@ -2809,6 +2809,7 @@ class VTLabelUtility(tk.Tk):
         # Retail / Receiving / All go straight to the items, so Previous from there goes back to the start;
         # Tree View goes through the category screen, so Previous goes back to it.
         self.from_top_button = m_val != 'tree'
+        self.drill_path = []   # Tree View starts at the categories
         if m_val == 'tree':
             self.filtered_items = list(self.all_items)
             self.show_step(2)
@@ -3030,26 +3031,25 @@ class VTLabelUtility(tk.Tk):
         t_style.configure("TouchTree.Treeview", rowheight=52, font=("Sans", 15), indent=34)
         t_style.configure("TouchTree.Vertical.TScrollbar", arrowsize=34, width=34)
 
-        tk.Label(left, text="Categories", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
+        # The left list goes down the tree one level per touch: categories, then that category's
+        # manufacturers, then that manufacturer's brands, then sub groups. "‹ Back" goes up a level.
+        self.drill_title = tk.Label(left, text="", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold"),
+                                    anchor="w", justify="left", wraplength=330)
+        self.drill_title.pack(anchor="w", fill="x")
         left_box = tk.Frame(left, bg="#1e242d")
         left_box.pack(fill="both", expand=True, pady=4)
         self.nvs_list = ttk.Treeview(left_box, show="tree", selectmode="browse", style="TouchTree.Treeview")
-        self.nvs_list.column("#0", width=300)
+        self.nvs_list.column("#0", width=330)
         nvs_scroll = ttk.Scrollbar(left_box, orient="vertical", command=self.nvs_list.yview, style="TouchTree.Vertical.TScrollbar")
         self.nvs_list.configure(yscrollcommand=nvs_scroll.set)
         nvs_scroll.pack(side="right", fill="y")
         self.nvs_list.pack(side="left", fill="both", expand=True)
-
-        groups = sorted({it["category"] for it in self.all_items})
-        self.nvs_list.insert("", "end", iid="__all__", text="ALL CATEGORIES")
-        for i, g in enumerate(groups):
-            self.nvs_list.insert("", "end", iid=f"g{i}", text=g)
-        self.nvs_list.selection_set("__all__")
-        self.nvs_list.bind("<<TreeviewSelect>>", self._on_left_group_select)
+        self.nvs_list.bind("<ButtonRelease-1>", self._on_drill_touch)
 
         right = tk.Frame(self.content, bg="#1e242d")
         right.pack(side="right", fill="both", expand=True, padx=8, pady=8)
-        tk.Label(right, text="Group > Category > Brand (touch one, then Next >>; ▷ opens a level)", bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
+        tk.Label(right, text="Category > Manufacturer > Brand > Sub group   (Next >> prints the level chosen)",
+                 bg="#1e242d", fg="#f2f4f7", font=("Sans", 13, "bold")).pack(anchor="w")
 
         tree_box = tk.Frame(right, bg="#1e242d")
         tree_box.pack(fill="both", expand=True, pady=4)
@@ -3061,6 +3061,82 @@ class VTLabelUtility(tk.Tk):
         self._populate_category_tree()
         self.cat_tree.bind("<Double-1>", lambda _e: self.go_next())
         self.cat_tree.bind("<ButtonRelease-1>", self._toggle_tree_row, add="+")
+        if not hasattr(self, "drill_path"):
+            self.drill_path = []
+        self._drill_refresh()
+
+    # The levels the left list goes down, with the item field each one is, and how the tree names a blank.
+    DRILL_LEVELS = [("CAT", "category", "Categories", "GENERAL"),
+                    ("MFG", "manufacturer", "Manufacturers", "GENERAL"),
+                    ("PGRP", "prod_grp", "Brands", ""),
+                    ("SGRP", "sub_grp", "Sub groups", "")]
+
+    def _drill_value(self, it, level):
+        _kind, field, _title, blank = self.DRILL_LEVELS[level]
+        return str(it.get(field) or blank)
+
+    def _drill_refresh(self):
+        path = self.drill_path
+        depth = len(path)
+        items = [it for it in self.all_items
+                 if all(self._drill_value(it, i) == v for i, (_k, v) in enumerate(path))]
+        self.nvs_list.delete(*self.nvs_list.get_children())
+        self._drill_rows = {}
+        if depth:
+            self.nvs_list.insert("", "end", iid="__up__", text="‹ Back")
+        counts = {}
+        if depth < len(self.DRILL_LEVELS):
+            for it in items:
+                v = self._drill_value(it, depth)
+                if v:
+                    counts[v] = counts.get(v, 0) + 1
+        for i, v in enumerate(sorted(counts)):
+            iid = f"v{i}"
+            self._drill_rows[iid] = v
+            self.nvs_list.insert("", "end", iid=iid, text=f"{v}   ({counts[v]})")
+        here = " › ".join(v for _k, v in path)
+        if counts:
+            title = self.DRILL_LEVELS[depth][2]
+            self.drill_title.config(text=(here + "\n" + title) if here else title)
+        else:
+            self.drill_title.config(text=here + "\n" + f"{len(items)} items: Next >>")
+        self.nvs_list.yview_moveto(0)
+        self._show_path_in_tree()
+
+    def _on_drill_touch(self, e):
+        row = self.nvs_list.identify_row(e.y)
+        if row == "__up__":
+            self.drill_path = self.drill_path[:-1]
+        elif row in getattr(self, "_drill_rows", {}):
+            self.drill_path = self.drill_path + [(self.DRILL_LEVELS[len(self.drill_path)][0], self._drill_rows[row])]
+        else:
+            return
+        self._drill_refresh()
+
+    def _show_path_in_tree(self):
+        """The tree on the right follows the left list: only the chosen path open, the level chosen
+        highlighted (Next prints it), its next level showing but folded."""
+        for node in getattr(self, "_tree_opened", []):
+            if self.cat_tree.exists(node):
+                self.cat_tree.item(node, open=False)
+        self._tree_opened = []
+        key, node = (), None
+        for step in self.drill_path:
+            key = key + (step,)
+            node = self._tree_nodes.get(key)
+            if not node:
+                break
+            self.cat_tree.item(node, open=True)
+            self._tree_opened.append(node)
+        if node and self.drill_path:
+            self.cat_tree.selection_set(node)
+            kids = self.cat_tree.get_children(node)
+            if kids:
+                self.cat_tree.see(kids[-1])   # its next level in view...
+            self.cat_tree.see(node)           # ...and the chosen row itself
+        else:
+            self.cat_tree.selection_remove(*self.cat_tree.selection())
+            self.cat_tree.yview_moveto(0)
 
     def _toggle_tree_row(self, e):
         """A finger can't hit the little ▷: touching anywhere on a row with levels under it opens or closes it
@@ -3072,19 +3148,14 @@ class VTLabelUtility(tk.Tk):
             return   # the ▷ itself: Tk already opened/closed it
         self.cat_tree.item(row, open=not self.cat_tree.item(row, "open"))
 
-    def _on_left_group_select(self, _e=None):
-        sel = self.nvs_list.selection()
-        if not sel:
-            return
-        self._populate_category_tree(None if sel[0] == "__all__" else self.nvs_list.item(sel[0], "text"))
-
     def _populate_category_tree(self, filter_cat=None):
         self.cat_tree.delete(*self.cat_tree.get_children())
+        self._tree_nodes = {}
         ilsa = any(it.get("source") == "ilsa_temp" for it in self.all_items[:1])
         root_text = "ILSA INVENTORY HIERARCHY" if ilsa else "VIEWTOUCH CATALOG (viewtouch.db)"
         root_node = self.cat_tree.insert("", "end", text=root_text, open=True, values=("ALL", ""))
-        # Department group > category > brand > product group > sub group (the last two only when the
-        # items have them, as ILSA's price book does).
+        # Department group > category > manufacturer > brand (product group) > sub group (the last two only
+        # when the items have them, as ILSA's price book does). Categories start folded.
         tree_map = {}
         for it in self.all_items:
             if filter_cat and it.get("category") != filter_cat:
@@ -3096,24 +3167,26 @@ class VTLabelUtility(tk.Tk):
             sg = it.get("sub_grp") or ""
             tree_map.setdefault(dg, {}).setdefault(cat, {}).setdefault(mfg, {}).setdefault(pg, set()).add(sg)
 
-        many = len(self.all_items) > 2000   # a big catalog starts with the categories closed
         for dg in sorted(tree_map.keys()):
             dg_id = self.cat_tree.insert(root_node, "end", text=dg, open=True, values=("DG", dg))
             for cat in sorted(tree_map[dg].keys()):
-                # A category chosen on the left opens (its brands showing) and is chosen for Next.
-                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=bool(filter_cat) or not many, values=("CAT", cat))
-                if filter_cat:
-                    self.cat_tree.selection_set(cat_id)
-                    self.cat_tree.see(cat_id)
+                cat_id = self.cat_tree.insert(dg_id, "end", text=cat, open=False, values=("CAT", cat))
+                k_cat = (("CAT", cat),)
+                self._tree_nodes.setdefault(k_cat, cat_id)
                 for mfg in sorted(tree_map[dg][cat].keys()):
                     mfg_id = self.cat_tree.insert(cat_id, "end", text=f"M  {mfg}", open=False, values=("MFG", mfg, cat))
+                    k_mfg = k_cat + (("MFG", mfg),)
+                    self._tree_nodes[k_mfg] = mfg_id
                     for pg in sorted(tree_map[dg][cat][mfg].keys()):
                         if not pg:
                             continue
-                        pg_id = self.cat_tree.insert(mfg_id, "end", text=f"  ↳ {pg}", open=False, values=("PGRP", pg, mfg, cat))
+                        pg_id = self.cat_tree.insert(mfg_id, "end", text=f"B  {pg}", open=False, values=("PGRP", pg, mfg, cat))
+                        k_pg = k_mfg + (("PGRP", pg),)
+                        self._tree_nodes[k_pg] = pg_id
                         for sg in sorted(tree_map[dg][cat][mfg][pg]):
                             if sg:
-                                self.cat_tree.insert(pg_id, "end", text=f"    ▪ {sg}", values=("SGRP", sg, pg, mfg, cat))
+                                sg_id = self.cat_tree.insert(pg_id, "end", text=f"    ▪ {sg}", values=("SGRP", sg, pg, mfg, cat))
+                                self._tree_nodes[k_pg + (("SGRP", sg),)] = sg_id
 
     def _build_step3(self):
         top = tk.Frame(self.content, bg="#1e242d")

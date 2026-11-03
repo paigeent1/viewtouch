@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 10:48 ET — Bob (Claude) — Label utility Tree View: drill down Category > Manufacturer > Brand > Sub group
+- **What:** Screen 2's left list drills down one level per touch (DRILL_LEVELS: categories, then the category's manufacturers, then brands = ILSA product group, then sub groups), with item counts, a '‹ Back' row, and a title showing the path. The right tree (categories now always start folded) follows: only the chosen path open, the chosen level selected (Next prints it), its next level visible but folded; tree rows tagged M (manufacturer) / B (brand). drill_path is kept, so Previous from the item list returns to the same level; choosing Tree View starts at the categories. Tested: PREMIUM CIGARS -> its manufacturers -> brands, Back, Next (5 items of that manufacturer in that category), Previous back to the same level.
+- **Why:** Owner: touching Premium Cigars opened everything; manufacturer should come next, then brand, folded, and the left list should move down the tree.
+- **Files:** `modern/tools/vt_label_utility.py`
+- **Next person must know:** Brand = ILSA PROD_GRP (resolved through RTLINV_CATGRP in Neil's export); if the store means something else by brand, change DRILL_LEVELS.
+
 ### 2026-11-03 10:38 ET — Bob (Claude) — Label utility: Previous steps back through Tree View
 - **What:** select_mode_and_go set from_top_button for every mode, so in Tree View Previous on the item list jumped to the start instead of the category screen. Now only Retail / Receiving / All (which skip the category screen) set it. Tested: Tree 2->3->4, Previous 4->3->2->1; Retail 3, Previous ->1. Bug was Bob's (0958845, Nov 2), not Neil's.
 - **Why:** Owner: Previous at bottom right went back to the utility's home screen.
