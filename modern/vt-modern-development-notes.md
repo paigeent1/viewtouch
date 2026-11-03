@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:25 ET — Bob (Claude) — Customer display on the Pi's second HDMI: vt-guest-display
+- **What:** The customer display already exists (--customer-display window: a full-screen guest window on the monitor the POS isn't on), but the Pi never used it: vt-server started vtmodern without the option and vt-mirror makes both HDMIs one screen. New scripts/bin/vt-guest-display on|off: on puts HDMI-2 beside HDMI-1 (xrandr --right-of / wlr-randr --pos, kept after reboots), writes ~/.vt-customer-display = window, restarts; off goes back to mirroring. vt-server now passes --customer-display from ~/.vt-customer-display or VT_CUSTOMER_DISPLAY.
+- **Why:** Owner asked whether the customer display on the second HDMI is available yet.
+- **Files:** `scripts/bin/vt-server, scripts/bin/vt-guest-display`
+- **Next person must know:** Pi: sudo install -m 755 scripts/bin/vt-server scripts/bin/vt-guest-display /usr/local/bin/
+
 ### 2026-11-03 17:22 ET — Bob (Claude) — Price check test uses real items
 - **What:** The price check test picks the first two non-modifier menu items (commit c5fb2e8, made without its note).
 - **Why:** Seed menu order isn't guaranteed.

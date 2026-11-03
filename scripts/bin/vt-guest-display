@@ -1,0 +1,46 @@
+#!/bin/bash
+# The customer display (the guest's order, total, tip choices, price checks) on the Pi's second HDMI.
+#   vt-guest-display on    second monitor = customer display (stops mirroring; kept after reboots)
+#   vt-guest-display off   back to mirroring the first monitor on the second
+# Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
+MODE="${1:-on}"
+STATE="$HOME/.vt-customer-display"
+export DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+AUTOSTART="$HOME/.config/autostart/vt-guest-display.desktop"
+
+if [ "$MODE" = off ]; then
+    rm -f "$STATE" "$AUTOSTART"
+    vt-mirror on || true
+    vt-server
+    exit 0
+fi
+
+# Side by side instead of mirrored: the POS on the first, the guest's screen on the second.
+vt-mirror off >/dev/null 2>&1 || true
+cmd=""
+for wd in "$WAYLAND_DISPLAY" wayland-0 wayland-1; do
+    [ -n "$wd" ] && WAYLAND_DISPLAY="$wd" wlr-randr >/dev/null 2>&1 && { export WAYLAND_DISPLAY="$wd"; break; }
+done
+if command -v wlr-randr >/dev/null && wlr-randr >/dev/null 2>&1; then
+    outs=$(wlr-randr | awk '/^[A-Za-z]/{print $1}')
+    first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
+    w=$(wlr-randr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /current/{split($1,a,"x"); print a[1]; exit}')
+    cmd="wlr-randr --output $second --on --preferred --pos ${w:-1920},0"
+    LABWC="$HOME/.config/labwc/autostart"
+    sed -i "/# vt-guest-display/d" "$LABWC" 2>/dev/null
+    mkdir -p "$(dirname "$LABWC")"; echo "(sleep 3; $cmd) & # vt-guest-display" >> "$LABWC"
+elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
+    outs=$(xrandr | awk '/ connected/{print $1}')
+    first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
+    cmd="xrandr --output $second --auto --right-of $first"
+else
+    echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
+fi
+eval "$cmd" || { echo "Couldn't put $second beside $first"; exit 1; }
+mkdir -p "$(dirname "$AUTOSTART")"
+printf '[Desktop Entry]\nType=Application\nName=vt-guest-display\nExec=sh -c "sleep 3; %s"\n' "$cmd" > "$AUTOSTART"
+echo window > "$STATE"
+echo "Customer display on $second (the POS stays on $first)."
+vt-server
