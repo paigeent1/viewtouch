@@ -1288,6 +1288,33 @@ def run_print_job(path):
     return 1 if failures else 0
 
 
+def run_preview_job(path, out_png):
+    """A picture of one label for ViewTouch's Labels screen (tablets), drawn exactly as it prints:
+    {"template": "...", "upc": "..."} (no upc: a label without product fields). Writes out_png."""
+    with open(path, "r", encoding="utf-8") as f:
+        job = json.load(f)
+    templates = load_templates()
+    name = str(job.get("template", ""))
+    if name not in templates:
+        logging.error("Labels screen preview: template %r not found", name)
+        return 2
+    tpl = templates[name]
+    all_items = load_from_viewtouch_db()
+    code = str(job.get("upc", "") or "")
+    if code:
+        found, choice = find_item_by_code(all_items, code)
+        if not found:
+            logging.error("Labels screen preview: UPC %s not found", code)
+            return 3
+        it = dict(found)
+        set_item_upc(it, choice[1], choice[0])
+    else:
+        it = dict(all_items[0]) if all_items else {"name": "", "upc": "", "price": 0.0}
+    img = render_label_pil_image(tpl, it, dpi=label_dpi(tpl))
+    img.convert("L").save(out_png, "PNG", optimize=True)
+    return 0
+
+
 def pil_1bit_to_zpl_gfa(img_1bit):
     """Converts a 1-bit PIL image (0=black, 1=white) into a ZPL ^GFA command."""
     from PIL import ImageOps
@@ -3084,6 +3111,8 @@ class VTLabelUtility(tk.Tk):
         ]
         for c_id, h_txt, w, grow in headers:
             self.grid_tree.heading(c_id, text=h_txt)
+            if c_id in ("upca", "desc"):   # touch to sort; labels print in the list's order
+                self.grid_tree.heading(c_id, command=lambda c=c_id: self.sort_grid(c))
             self.grid_tree.column(c_id, width=w, minwidth=w // 2, stretch=grow,
                                   anchor="center" if c_id in ("sel", "qty") else ("e" if c_id == "price" else "w"))
         g_scroll = ttk.Scrollbar(grid_frame, orient="vertical", command=self.grid_tree.yview)
@@ -3111,6 +3140,19 @@ class VTLabelUtility(tk.Tk):
         if top:
             self.grid_tree.update_idletasks()
             self.grid_tree.yview_moveto(top)
+
+    def sort_grid(self, col):
+        """Sort the items by description or by the UPC on the label (touch again: reverse). Printing follows this order."""
+        last = getattr(self, "grid_sort", None)
+        reverse = bool(last and last[0] == col and not last[1])
+        key = (lambda it: it["name"]) if col == "desc" else (lambda it: (len(str(it["upc"])), str(it["upc"])))
+        self.filtered_items.sort(key=key, reverse=reverse)
+        self.grid_sort = (col, reverse)
+        for c_id, h_txt in (("upca", "UPC on Label"), ("desc", "Description")):
+            arrow = (" ▼" if reverse else " ▲") if c_id == col else ""
+            self.grid_tree.heading(c_id, text=h_txt + arrow)
+        self.grid_tree.yview_moveto(0)
+        self._populate_grid()
 
     def on_toggle_row(self, _event=None):
         sel = self.grid_tree.selection()
@@ -3681,9 +3723,13 @@ if __name__ == "__main__":
     _ap = argparse.ArgumentParser(description="ViewTouch Label Utility")
     _ap.add_argument("--upc", default="", help="open straight to the label preview for this UPC")
     _ap.add_argument("--print-job", default="", help="print a job file from ViewTouch's Labels screen, with no window")
+    _ap.add_argument("--preview-job", default="", help="draw one label of a job file as a PNG (ViewTouch's Labels screen preview)")
+    _ap.add_argument("--out", default="", help="the PNG --preview-job writes")
     _args, _unknown = _ap.parse_known_args()
     if _args.print_job:
         sys.exit(run_print_job(_args.print_job))
+    if _args.preview_job:
+        sys.exit(run_preview_job(_args.preview_job, _args.out or _args.preview_job + ".png"))
     START_UPC = _args.upc.strip()
     app = VTLabelUtility()
     app.mainloop()

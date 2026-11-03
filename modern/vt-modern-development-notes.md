@@ -93,6 +93,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-02 20:20 ET — Bob (Claude) — Labels: preview on tablets; print order by description or UPC
+- **What:** Tablet Labels screen: Preview button on each queued item and by the Print button opens the label as it will print, drawn on the Pi by vt_label_utility.py --preview-job (render_label_pil_image at the template's DPI, PNG) and sent as a data: URL in retailLabels().preview (previewBusy/previewError/previewName); a newer preview wins; Print from the preview. Print order buttons: As added / Description / UPC (the list shows and prints in that order). PosService::previewRetailLabel/closeRetailLabelPreview (QProcess, async) + commands + Q_INVOKABLEs. Pi label utility: touching the Description or UPC on Label heading sorts the select screen (again: reverse); printing follows the list order. Tested here: --preview-job (alt UPC drawn, missing UPC exit 3), grid sort + Next. C++/QML not compiled here.
+- **Why:** Owner: label preview before printing on tablets; sort by UPC or description for printing.
+- **Files:** `modern/tools/vt_label_utility.py, modern/tools/LABEL_UTILITY_NOTES.md, modern/app/pos_inventory.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_commands.cpp, modern/ui/qml/WidgetRetailLabels.qml`
+- **Next person must know:** QML change needs a new APK for the tablets; the C++ part is on the Pi (vt-server).
+
 ### 2026-11-02 20:08 ET — Bob (Claude) — Tablet Labels screen lists Neil's ILSA price book while it exists
 - **What:** PosService::retailLabels(): when ~/.local/share/ViewTouch/ilsa_temp_pricebook.db exists, the Labels screen (tablets, End of shift > Labels) browses and finds the price book's items instead of ViewTouch's menu, built like vt_label_utility.py: group = dept_grp (else CIGARS/RETAIL), category, brand = mfg unless GENERAL/number (then from the name); primary + alt UPCs (11 digits get a check digit); price $x.xx. Read-only via QSQLITE, cached until the file changes; deleting the file switches back to the menu. vtm_pos links Qt6::Sql. New test [labels] in test_customers.cpp (temp HOME). Not compiled here (no Qt): build and run vtm_tests on the Pi.
 - **Why:** Owner: have tablets use Neil's database for now (the Pi's label utility already prints from it, so items missing from the menu were skipped).

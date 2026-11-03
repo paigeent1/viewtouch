@@ -567,6 +567,8 @@ public:
     Q_INVOKABLE void browseRetailLabels(const QStringList &path) { invoke(QStringLiteral("browseRetailLabels"), {path}); }
     // {template, items: [{upc, qty}]} (no items: qty of a label without product fields).
     Q_INVOKABLE void printRetailLabels(const QVariantMap &job) { invoke(QStringLiteral("printRetailLabels"), {job}); }
+    Q_INVOKABLE void previewRetailLabel(const QVariantMap &job) { invoke(QStringLiteral("previewRetailLabel"), {job}); }
+    Q_INVOKABLE void closeRetailLabelPreview() { invoke(QStringLiteral("closeRetailLabelPreview"), {}); }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

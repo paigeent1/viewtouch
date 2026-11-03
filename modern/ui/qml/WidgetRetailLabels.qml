@@ -14,8 +14,31 @@ Item {
     property string chosen: ""
     readonly property var chosenOne: templates.find(t => t.name === chosen)
     readonly property bool product: chosenOne ? chosenOne.product : true
-    // [{name, upcs: [{label, code}], pick (index into upcs), qty}]
+    // [{name, upcs: [{label, code}], pick (index into upcs), qty, seq (order added)}]
     property var queue: []
+    property int added: 0
+    // The order labels print in (and the list shows): as added, by description, or by the UPC on the label.
+    property string sortBy: "added"
+    onSortByChanged: queue = sorted(queue)
+    function sorted(list) {
+        const code = q => q.upcs[q.pick].code
+        const by = {
+            added: (a, b) => a.seq - b.seq,
+            name: (a, b) => a.name.localeCompare(b.name) || a.seq - b.seq,
+            upc: (a, b) => (code(a).length - code(b).length) || code(a).localeCompare(code(b)) || a.seq - b.seq
+        }[sortBy]
+        return list.slice().sort(by)
+    }
+    property bool previewOpen: false
+    function preview(q) {
+        previewOpen = true
+        if (q) pos.previewRetailLabel({ template: chosen, upc: q.upcs[q.pick].code, name: q.name })
+        else pos.previewRetailLabel({ template: chosen })
+    }
+    function closePreview() {
+        previewOpen = false
+        pos.closeRetailLabelPreview()
+    }
     property int aloneQty: 1
     property bool browsing: true   // the tree (group > category > brand > items), or Find
     readonly property var path: info.path ?? []
@@ -25,13 +48,13 @@ Item {
         const i = queue.findIndex(q => q.name === m.name)
         const next = queue.slice()
         if (i >= 0) next[i] = Object.assign({}, next[i], { qty: next[i].qty + 1 })
-        else next.push({ name: m.name, upcs: m.upcs, pick: 0, qty: 1 })
-        queue = next
+        else next.push({ name: m.name, upcs: m.upcs, pick: 0, qty: 1, seq: ++added })
+        queue = sorted(next)
     }
     function change(i, fields) {
         const next = queue.slice()
         next[i] = Object.assign({}, next[i], fields)
-        queue = next
+        queue = sorted(next)
     }
     function remove(i) {
         const next = queue.slice()
@@ -43,6 +66,7 @@ Item {
         pos.printRetailLabels({ template: chosen, items: items, qty: aloneQty })
         queue = []
         aloneQty = 1
+        if (previewOpen) closePreview()
     }
     Component.onCompleted: {
         if (templates.length > 0 && chosen === "") chosen = templates[0].name
@@ -205,6 +229,25 @@ Item {
                     text: w.product ? qsTr("To print") : qsTr("How many")
                     opacity: 0.8
                 }
+                RowLayout {
+                    visible: w.product
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Label { text: qsTr("Print order"); opacity: 0.8 }
+                    Repeater {
+                        model: [{ key: "added", text: qsTr("As added") }, { key: "name", text: qsTr("Description") },
+                                { key: "upc", text: qsTr("UPC") }]
+                        delegate: Button {
+                            required property var modelData
+                            implicitHeight: 44
+                            font.pixelSize: 15
+                            checkable: true
+                            checked: w.sortBy === modelData.key
+                            text: modelData.text
+                            onClicked: w.sortBy = modelData.key
+                        }
+                    }
+                }
                 ListView {
                     visible: w.product
                     Layout.fillWidth: true
@@ -236,6 +279,9 @@ Item {
                         Label { text: modelData.qty; font.pixelSize: 20; font.bold: true; Layout.preferredWidth: 36; horizontalAlignment: Text.AlignHCenter }
                         Button { implicitWidth: 48; implicitHeight: 48; font.pixelSize: 20; text: "+"
                             onClicked: w.change(index, { qty: Math.min(500, modelData.qty + 1) }) }
+                        Button { implicitHeight: 48; font.pixelSize: 14; text: qsTr("Preview")
+                            enabled: w.chosen !== "" && (w.info.ready ?? true)
+                            onClicked: w.preview(modelData) }
                         Button { implicitWidth: 48; implicitHeight: 48; font.pixelSize: 18; text: "✕"
                             onClicked: w.remove(index) }
                     }
@@ -256,15 +302,94 @@ Item {
                 }
                 Item { visible: !w.product; Layout.fillHeight: true }
 
-                Button {
-                    objectName: "retailLabelPrint"
+                RowLayout {
                     Layout.fillWidth: true
-                    implicitHeight: 64
+                    spacing: 8
+                    Button {
+                        objectName: "retailLabelPreview"
+                        implicitHeight: 64
+                        font.pixelSize: 17
+                        enabled: w.chosen !== "" && (w.info.ready ?? true) && (!w.product || w.queue.length > 0)
+                        text: qsTr("Preview")
+                        onClicked: w.preview(w.product ? w.queue[0] : null)
+                    }
+                    Button {
+                        objectName: "retailLabelPrint"
+                        Layout.fillWidth: true
+                        implicitHeight: 64
+                        font.pixelSize: 18
+                        highlighted: true
+                        enabled: w.chosen !== "" && w.total > 0 && (w.info.ready ?? true)
+                        text: qsTr("Print %n Label(s)", "", w.total)
+                        onClicked: w.printLabels()
+                    }
+                }
+            }
+        }
+
+        // The label as it will print, drawn by the label utility on the main computer.
+        Rectangle {
+            anchors.fill: parent
+            visible: w.previewOpen
+            color: "#e6000000"
+            z: 10
+            MouseArea { anchors.fill: parent }   // nothing underneath takes the touch
+            ColumnLayout {
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 40, 760)
+                spacing: 12
+                Label {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                     font.pixelSize: 18
-                    highlighted: true
-                    enabled: w.chosen !== "" && w.total > 0 && (w.info.ready ?? true)
-                    text: qsTr("Print %n Label(s)", "", w.total)
-                    onClicked: w.printLabels()
+                    font.bold: true
+                    text: w.info.previewName ?? ""
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(w.height / w.zoom * 0.55, 420)
+                    color: "white"
+                    radius: 6
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        fillMode: Image.PreserveAspectFit
+                        smooth: false
+                        source: w.info.preview ?? ""
+                    }
+                    BusyIndicator {
+                        anchors.centerIn: parent
+                        running: w.info.previewBusy ?? false
+                        visible: running
+                    }
+                    Label {
+                        anchors.centerIn: parent
+                        width: parent.width - 40
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#b91c1c"
+                        font.pixelSize: 16
+                        visible: text !== ""
+                        text: w.info.previewError ?? ""
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    opacity: 0.7
+                    visible: w.info.previewBusy ?? false
+                    text: qsTr("Drawing the label…")
+                }
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+                    Button { implicitHeight: 60; implicitWidth: 180; font.pixelSize: 17; text: qsTr("Close")
+                        onClicked: w.closePreview() }
+                    Button { implicitHeight: 60; implicitWidth: 260; font.pixelSize: 17; highlighted: true
+                        enabled: w.chosen !== "" && w.total > 0 && (w.info.ready ?? true)
+                        text: qsTr("Print %n Label(s)", "", w.total)
+                        onClicked: w.printLabels() }
                 }
             }
         }

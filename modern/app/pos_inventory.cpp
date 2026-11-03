@@ -898,7 +898,9 @@ QVariantMap PosService::retailLabels() const
         }
     }
     return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
-            {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)}};
+            {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)},
+            {u"preview"_s, labelPreview_}, {u"previewName"_s, labelPreviewName_}, {u"previewBusy"_s, labelPreviewBusy_},
+            {u"previewError"_s, labelPreviewError_}};
 }
 
 bool PosService::browseRetailLabels(const QStringList &path)
@@ -914,6 +916,68 @@ bool PosService::findRetailLabels(const QString &query)
 {
     labelQuery_ = query.trimmed();
     labelBrowsing_ = false;
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::previewRetailLabel(const QVariantMap &job)
+{
+    const QString tpl = job.value(u"template"_s).toString();
+    if (tpl.isEmpty() || !labelTemplates().contains(tpl))
+        return fail(tr("Choose a label."));
+    if (!QFile::exists(kLabelLauncher))
+        return fail(tr("The label utility isn't installed on the main computer."));
+    const QString base = QDir::tempPath() + u"/vt_label_preview_"_s + QString::number(now());
+    QFile f(base + u".json"_s);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return fail(tr("Couldn't hand the label to the label utility."));
+    f.write(QJsonDocument(QJsonObject{{u"template"_s, tpl}, {u"upc"_s, digitsOnly(job.value(u"upc"_s).toString())}}).toJson());
+    f.close();
+    const int run = ++labelPreviewRun_;
+    labelPreview_.clear();
+    labelPreviewError_.clear();
+    labelPreviewName_ = job.value(u"name"_s).toString().isEmpty() ? tpl : job.value(u"name"_s).toString() + u"  ·  "_s + tpl;
+    labelPreviewBusy_ = true;
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc, run, base](int code, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        QFile png(base + u".png"_s);
+        const bool ok = status == QProcess::NormalExit && code == 0 && png.open(QIODevice::ReadOnly);
+        const QByteArray bytes = ok ? png.readAll() : QByteArray();
+        png.close();
+        QFile::remove(base + u".png"_s);
+        QFile::remove(base + u".json"_s);
+        if (run != labelPreviewRun_)
+            return;   // a newer preview was asked for
+        labelPreviewBusy_ = false;
+        if (bytes.isEmpty())
+            labelPreviewError_ = tr("Couldn't draw the label (see /tmp/vt_label_utility.log on the main computer).");
+        else
+            labelPreview_ = u"data:image/png;base64,"_s + QString::fromLatin1(bytes.toBase64());
+        emit sessionChanged();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, run](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart)
+            return;
+        proc->deleteLater();
+        if (run != labelPreviewRun_)
+            return;
+        labelPreviewBusy_ = false;
+        labelPreviewError_ = tr("Couldn't start the label utility.");
+        emit sessionChanged();
+    });
+    proc->start(kLabelLauncher, {u"--preview-job"_s, base + u".json"_s, u"--out"_s, base + u".png"_s});
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::closeRetailLabelPreview()
+{
+    ++labelPreviewRun_;
+    labelPreview_.clear();
+    labelPreviewName_.clear();
+    labelPreviewError_.clear();
+    labelPreviewBusy_ = false;
     emit sessionChanged();
     return true;
 }

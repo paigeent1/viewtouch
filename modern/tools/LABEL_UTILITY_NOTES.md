@@ -65,3 +65,8 @@ If you change buttons, screens or behaviour, update and rebuild the manual too.
 
 ## Development notes
 Record every change, time-stamped, at the top of `modern/vt-modern-development-notes.md` (newest first).
+
+## Used by ViewTouch's Labels screen (tablets)
+- `vt-label-utility --print-job job.json` prints with no window: `{"template", "items": [{"upc", "qty"}], "qty"}`, in the items' order.
+- `vt-label-utility --preview-job job.json --out label.png` draws one label exactly as it prints: `{"template", "upc"}` (exit 3: UPC not found).
+- Both look items up in the same list the window uses (the ILSA temp price book while it exists).

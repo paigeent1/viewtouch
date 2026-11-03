@@ -492,6 +492,10 @@ public:
     bool browseRetailLabels(const QStringList &path);
     // Hands the job to the label utility on this (the main) computer, which prints it.
     bool printRetailLabels(const QVariantMap &job);
+    // A picture of one label, drawn by the label utility exactly as it prints ({template, upc}); it
+    // arrives in retailLabels().preview a few seconds later.
+    bool previewRetailLabel(const QVariantMap &job);
+    bool closeRetailLabelPreview();
     std::string labelPrinterId() const;
     const std::vector<core::Waste> &wasteEntries() const { return s_->waste; }
     const std::vector<core::StockCount> &stockCounts() const { return s_->stockCounts; }
@@ -1199,6 +1203,11 @@ private:
     QString labelQuery_;
     QStringList labelPath_;
     bool labelBrowsing_ = false;   // the Labels screen is showing the tree (worked out only then)
+    QString labelPreview_;         // data:image/png;base64,... of the last preview
+    QString labelPreviewName_;     // what it shows
+    QString labelPreviewError_;
+    int labelPreviewRun_ = 0;      // a newer preview wins over one still being drawn
+    bool labelPreviewBusy_ = false;
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;
