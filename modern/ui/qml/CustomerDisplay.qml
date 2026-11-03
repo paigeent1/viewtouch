@@ -77,8 +77,9 @@ Rectangle {
         // --- between guests: messages and pictures in turn ---
         Item {
             id: idle
-            anchors.fill: parent
-            visible: !d.hasCheck && !d.thanking
+            // Between guests: the whole screen; during a sale: the two thirds beside the order.
+            anchors { left: d.hasCheck ? orderPanel.right : parent.left; right: parent.right; top: parent.top; bottom: parent.bottom }
+            visible: !d.thanking || d.hasCheck
             readonly property var slides: d.prompt.slides ?? []
             property int index: 0
             Timer {
@@ -184,67 +185,20 @@ Rectangle {
             }
         }
 
-        // --- the order ---
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: d.unit * 1.2
-            spacing: d.unit * 1.5
+        // --- the order: the left third (the Order summary panel's layout), the messages go on beside it ---
+        Rectangle {
+            id: orderPanel
+            anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+            width: d.hasCheck ? parent.width / 3 : 0
             visible: d.hasCheck
-
-            ListView {
-                id: list
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                model: d.lines
-                spacing: d.unit * 0.35
-                onCountChanged: positionViewAtEnd()   // the newest item stays in view
-                delegate: Column {
-                    id: row
-                    required property var modelData
-                    width: ListView.view.width
-                    visible: !modelData.comment
-                    RowLayout {
-                        width: parent.width
-                        Text {
-                            Layout.fillWidth: true
-                            text: (row.modelData.quantity > 1 ? row.modelData.quantity + " × " : "") + row.modelData.name
-                            color: row.modelData.voided ? "#e06c75" : "white"
-                            font.strikeout: row.modelData.voided ?? false
-                            font.pixelSize: d.unit * 1.25
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            text: row.modelData.voided ? qsTr("void") : row.modelData.price
-                            color: row.modelData.voided ? "#e06c75" : "white"
-                            font.pixelSize: d.unit * 1.25
-                        }
-                    }
-                    Repeater {
-                        model: row.modelData.modifiers ?? []
-                        delegate: RowLayout {
-                            required property var modelData
-                            width: row.width
-                            Text {
-                                Layout.fillWidth: true
-                                leftPadding: d.unit * 1.2
-                                text: "+ " + (modelData.name ?? modelData)
-                                color: "#9aa4b5"
-                                font.pixelSize: d.unit * 0.95
-                                elide: Text.ElideRight
-                            }
-                            // Included in the item's price above.
-                            Text { text: modelData.price ? "+" + modelData.price : ""; color: "#9aa4b5"; font.pixelSize: d.unit * 0.95 }
-                        }
-                    }
-                }
-            }
+            color: "#151a22"
+            border.color: "#2c3442"
+            border.width: 1
 
             ColumnLayout {
-                Layout.preferredWidth: parent.width * 0.4
-                Layout.fillWidth: false
-                Layout.fillHeight: true
-                spacing: d.unit * 0.4
+                anchors.fill: parent
+                anchors.margins: d.unit * 0.8
+                spacing: d.unit * 0.3
 
                 // Rewards: their points, or join.
                 Rectangle {
@@ -291,15 +245,67 @@ Rectangle {
                     }
                 }
 
-                Item { Layout.fillHeight: true }
 
+                ListView {
+                    id: list
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    model: d.lines
+                    spacing: d.unit * 0.3
+                    onCountChanged: positionViewAtEnd()   // the newest item stays in view
+                    delegate: Column {
+                        id: row
+                        required property var modelData
+                        width: ListView.view.width
+                        visible: !modelData.comment
+                        RowLayout {
+                            width: parent.width
+                            Text {
+                                Layout.fillWidth: true
+                                text: (row.modelData.quantity > 1 ? row.modelData.quantity + " × " : "") + row.modelData.name
+                                color: row.modelData.voided ? "#e06c75" : "white"
+                                font.strikeout: row.modelData.voided ?? false
+                                font.pixelSize: d.unit * 0.85
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignTop
+                                text: row.modelData.voided ? qsTr("void") : row.modelData.price
+                                color: row.modelData.voided ? "#e06c75" : "white"
+                                font.pixelSize: d.unit * 0.85
+                            }
+                        }
+                        Repeater {
+                            model: row.modelData.modifiers ?? []
+                            delegate: RowLayout {
+                                required property var modelData
+                                width: row.width
+                                Text {
+                                    Layout.fillWidth: true
+                                    leftPadding: d.unit
+                                    text: "+ " + (modelData.name ?? modelData)
+                                    color: "#9aa4b5"
+                                    font.pixelSize: d.unit * 0.7
+                                    elide: Text.ElideRight
+                                }
+                                // Included in the item's price above.
+                                Text { text: modelData.price ? "+" + modelData.price : ""; color: "#9aa4b5"; font.pixelSize: d.unit * 0.7 }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 2; color: "#2c3442" }
                 component Line: RowLayout {
                     property alias label: l.text
                     property alias value: v.text
-                    property real size: 1.15
+                    property real size: 0.85
                     property color ink: "white"
                     Layout.fillWidth: true
-                    Text { id: l; Layout.fillWidth: true; color: "#c7cedb"; font.pixelSize: d.unit * parent.size }
+                    Text { id: l; Layout.fillWidth: true; color: "#c7cedb"; font.pixelSize: d.unit * parent.size; elide: Text.ElideRight }
                     Text { id: v; color: parent.ink; font.pixelSize: d.unit * parent.size }
                 }
                 Line { label: qsTr("Subtotal"); value: d.totals.items ?? "" }
@@ -309,13 +315,22 @@ Rectangle {
                     visible: d.totals.hasDiscount ?? false
                     ink: "#7ee2a8"
                 }
-                Line { label: qsTr("Tax"); value: d.totals.tax ?? "" }
+                // Each tax on its own (food and beverage, merchandise...), as the Order summary panel shows them.
+                Line { label: qsTr("Tax"); value: d.totals.tax ?? ""; visible: (d.totals.taxLines ?? []).length === 0 }
+                Repeater {
+                    model: d.totals.taxLines ?? []
+                    delegate: Line {
+                        required property var modelData
+                        label: modelData.name
+                        value: modelData.amount
+                    }
+                }
                 Line { label: qsTr("Gratuity"); value: d.totals.gratuity ?? ""; visible: d.totals.hasGratuity ?? false }
                 Line { label: qsTr("Tip"); value: d.prompt.tip || d.totals.tips || ""; visible: (d.prompt.tipChosen ?? false) || (d.totals.hasTips ?? false) }
                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 2; color: "#2c3442" }
-                Line { label: qsTr("Total"); value: d.totals.total ?? ""; size: 2.3 }
+                Line { label: qsTr("Total"); value: d.totals.total ?? ""; size: 1.6 }
                 Line { label: qsTr("Paid"); value: d.totals.paid ?? ""; visible: d.hasCheck && d.pos.payments.length > 0 }
-                Line { label: qsTr("Change"); value: d.totals.change ?? ""; visible: d.totals.hasChange ?? false; size: 1.7 }
+                Line { label: qsTr("Change"); value: d.totals.change ?? ""; visible: d.totals.hasChange ?? false; size: 1.2 }
             }
         }
     }

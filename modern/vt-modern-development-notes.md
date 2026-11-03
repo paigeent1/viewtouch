@@ -95,6 +95,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:07 ET — Bob (Claude) — Customer display: order in the left third, messages beside it
+- **What:** CustomerDisplay.qml: during a sale the order is a panel on the left third (rewards box, items with choices and voids, Subtotal, Discounts, each tax on its own from totals.taxLines like the Order summary panel, Gratuity, Tip, Total, Paid, Change); the rotating messages and pictures keep going in the right two thirds. Between guests they use the whole screen as before; thank-you, tip choices, receipt choice and price check unchanged.
+- **Why:** Owner: a modified customer screen with the order summary panel on the left 1/3, keeping the rotating lines.
+- **Files:** `ui/qml/CustomerDisplay.qml`
+
 ### 2026-11-03 17:43 ET — Bob (Claude) — Roadmap note: the basic customer display exists
 - **What:** Section 5's CFD item is the 50/50 receipt + promo design (not built); added a line under it that the basic customer display is built and how to turn it on, after a desktop shortcut put the guest screen on both mirrored monitors.
 - **Why:** Avoid the next person reading the roadmap as 'no customer display'.
