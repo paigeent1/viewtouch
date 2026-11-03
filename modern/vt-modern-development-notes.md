@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:15 ET — Bob (Claude) — Pi display: two Wimaxit M1410CT mirrored at 1920x1080 (X11)
+- **What:** The Pi runs the X11 desktop (xrandr, outputs HDMI-1 / HDMI-2). New monitors: Wimaxit M1410CT 14-inch touch, native 1920x1080; the Pi had kept 1024x768 (black bars). Set with xrandr --mode 1920x1080 on both, HDMI-2 --same-as HDMI-1, saved by vt-mirror (~/.config/autostart/vt-mirror.desktop).
+- **Why:** Owner swapped monitors and wanted the second HDMI to mirror the first.
+- **Files:** `(none: Pi settings)`
+- **Next person must know:** After a monitor swap: run vt-mirror again to save the new mode; ViewTouch refits itself (b2fb471).
+
 ### 2026-11-03 11:11 ET — Bob (Claude) — vt-mirror: the second HDMI shows the first
 - **What:** New scripts/bin/vt-mirror (on|off): Wayland (wlr-randr, labwc/wayfire): second output placed at 0,0 with the first output's current mode; kept after reboots via ~/.config/labwc/autostart (marked line) and ~/.config/autostart/vt-mirror.desktop. X11: xrandr --same-as (autostart .desktop). Prints what it did. Untested on the Pi.
 - **Why:** Owner: mirror the first display on the second HDMI for now.
