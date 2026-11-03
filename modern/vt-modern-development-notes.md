@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 16:24 ET — Bob (Claude) — No Sale tests use the new reason names
+- **What:** Tests updated to 'Make Change'.
+- **Why:** Previous commit missed the test files.
+- **Files:** `tests/test_pos_m4.cpp, tests/test_print.cpp`
+
 ### 2026-11-03 16:24 ET — Bob (Claude) — No Sale reasons: the store's four
 - **What:** Default No Sale reasons are now Make Change, Forgot to put cash in, Retrieved Item, Other (editable in Store Settings > Voids, comps and No Sale).
 - **Why:** Owner's list.

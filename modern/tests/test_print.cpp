@@ -178,7 +178,7 @@ TEST_CASE("No Sale prints a slip like a kitchen ticket (no logo) and opens the d
     core::CashMovement m;
     m.kind = core::CashMovement::Kind::NoSale;
     m.by = "Morgan";
-    m.reason = "Make change";
+    m.reason = "Make Change";
     m.at = 1'700'000'000'000;
     const Document d = noSaleTicket(m, 3, "Drawer 1", ctx(seed.settings));
     CHECK(d.kickDrawer);
@@ -188,7 +188,7 @@ TEST_CASE("No Sale prints a slip like a kitchen ticket (no logo) and opens the d
     const QString out = readFile(dir.filePath(u"receipt.txt"_s));
     CHECK(out.contains(u"****No Sale****"_s));
     CHECK(out.contains(u"No Sale #3"_s));
-    CHECK(out.contains(u"Make change"_s));
+    CHECK(out.contains(u"Make Change"_s));
     CHECK(out.contains(u"Morgan"_s));
     CHECK(out.contains(u"[drawer opened]"_s));
 }

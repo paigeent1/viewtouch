@@ -588,21 +588,21 @@ TEST_CASE("No Sale on a screen asks why with buttons; the Exceptions report coun
     CHECK_FALSE(run(u"noSale"_s));
     QVariantMap ask = p.pos.reasonAsk();
     REQUIRE(ask[u"kind"_s] == u"noSale"_s);
-    CHECK(ask[u"reasons"_s].toStringList().contains(u"Make change"_s));
+    CHECK(ask[u"reasons"_s].toStringList().contains(u"Make Change"_s));
     CHECK(p.printer.drawerKicks == kicks);
     // Cancel: still shut, nothing recorded.
     REQUIRE(p.pos.giveReason(QString()));
     CHECK(p.printer.drawerKicks == kicks);
     // A reason: it opens, with the reason kept.
     CHECK_FALSE(run(u"noSale"_s));
-    REQUIRE(p.pos.giveReason(u"Make change"_s));
+    REQUIRE(p.pos.giveReason(u"Make Change"_s));
     CHECK(p.pos.reasonAsk().isEmpty());
     CHECK(p.printer.drawerKicks == kicks + 1);
     const core::CashMovement &m = p.pos.shared()->drawers.front().movements.back();
     CHECK(m.kind == core::CashMovement::Kind::NoSale);
-    CHECK(m.reason == "Make change");
+    CHECK(m.reason == "Make Change");
     const core::Report r = p.pos.buildReport(u"exceptions"_s);
-    CHECK(rowIn(r, "No sale: why", "Make change") == std::vector<std::string>{"Make change", "1", ""});
+    CHECK(rowIn(r, "No sale: why", "Make Change") == std::vector<std::string>{"Make Change", "1", ""});
 
     // No reasons in Store Settings: it opens without asking.
     p.pos.shared()->settings.noSaleReasons.clear();
