@@ -94,6 +94,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 17:22 ET — Bob (Claude) — Price check test uses real items
+- **What:** The price check test picks the first two non-modifier menu items (commit c5fb2e8, made without its note).
+- **Why:** Seed menu order isn't guaranteed.
+- **Files:** `tests/test_pos_m4.cpp`
+
 ### 2026-11-03 17:22 ET — Bob (Claude) — Price check mode
 - **What:** PRICE CHECK (retail; command priceCheck -> togglePriceCheck) turns price check on: '*PRICE CHECK*' flashes at the top (PriceCheckOverlay in Main.qml); touch again for off. While on, any scan (scanner, camera, serial) goes to priceCheckCode instead of ringing in: a floating window shows the item, price, UPC, No discounts / Sold out, and its box (Parent UPC, 'Box of N') or its singles (items with it as Parent UPC); touch to close. The customer display shows the same item and prices (guest copy). New session property priceCheck (synced to tablets).
 - **Why:** Owner: price check toggle with flashing banner; scanned item shows with its parent or child in a floating window and on the customer display.
