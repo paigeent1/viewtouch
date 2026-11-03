@@ -96,6 +96,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 18:27 ET — Bob (Claude) — vt-guest-display: touchscreen by device id
+- **What:** Map touch pointers by xinput id (the store's touchscreen 'wch.cn USB2IIC_CTP_CONTROL' is listed twice, so map-to-output by name is refused); match ctp/touch/ilitek/goodix/egalax/eeti pointer devices.
+- **Why:** Owner's xinput list.
+- **Files:** `scripts/bin/vt-guest-display`
+
 ### 2026-11-03 18:24 ET — Bob (Claude) — vt-guest-display ties the touchscreen to the POS monitor
 - **What:** With HDMI-2 extended, X spread the touchscreen over both monitors (touches landed wrong). vt-guest-display on now runs xinput map-to-output for touch devices onto the first monitor (X11) or adds <touch mapToOutput> to labwc rc.xml (Wayland); the boot-time commands go in ~/.config/vt-guest-display.sh run by the autostart entry; off removes them.
 - **Why:** Owner: touch acting as an extended monitor, can't hit buttons.

@@ -41,7 +41,8 @@ else
 fi
 # The touchscreen stays on the POS monitor: spread over both, every touch would land in the wrong place.
 if [ -z "$WAYLAND_DISPLAY" ] || ! wlr-randr >/dev/null 2>&1; then
-    touch_cmd="for d in \$(xinput list --name-only | grep -i -E 'touch|ilitek|goodix|egalax|wch|eeti' | sort -u | tr ' ' '#'); do xinput map-to-output \"\$(echo \$d | tr '#' ' ')\" $first; done"
+    # By device number: a touchscreen often shows up twice under one name (wch.cn USB2IIC_CTP_CONTROL).
+    touch_cmd="for id in \$(xinput list | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -i pointer | grep -o 'id=[0-9]*' | cut -d= -f2); do xinput map-to-output \$id $first; done"
     cmd="$cmd; sleep 1; $touch_cmd"
 else
     # labwc (Wayland): <touch mapToOutput> in rc.xml.
