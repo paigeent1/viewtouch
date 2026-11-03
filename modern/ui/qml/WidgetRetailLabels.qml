@@ -35,6 +35,56 @@ Item {
     onSortByChanged: queue = sorted(queue)
     property bool previewOpen: false
 
+    // The items list: A to Z by description, or by UPC; a letter row jumps to a letter (as on the main
+    // computer's label utility).
+    property string itemSort: "name"
+    readonly property var shownItems: {
+        const first = x => (x.upcs && x.upcs.length ? String(x.upcs[0].code) : "")
+        const list = (info.matches ?? []).slice()
+        return list.sort(itemSort === "upc"
+                         ? (a, b) => (first(a).length - first(b).length) || first(a).localeCompare(first(b))
+                         : (a, b) => String(a.name).localeCompare(String(b.name)))
+    }
+    function letterOf(text) {
+        const c = String(text ?? "").trim().charAt(0).toUpperCase()
+        return c >= "A" && c <= "Z" ? c : "#"
+    }
+    // A row of letters; those nothing in `names` starts with are greyed.
+    // (Self-contained: an inline component can't see this file's ids.)
+    component LetterRow: RowLayout {
+        id: lr
+        property var names: []
+        signal picked(string letter)
+        function letterOf(text) {
+            const c = String(text ?? "").trim().charAt(0).toUpperCase()
+            return c >= "A" && c <= "Z" ? c : "#"
+        }
+        readonly property var present: {
+            const seen = {}
+            for (const n of names)
+                seen[lr.letterOf(n)] = true
+            return seen
+        }
+        spacing: 2
+        Repeater {
+            model: "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")
+            delegate: Button {
+                required property string modelData
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.minimumWidth: 0
+                leftPadding: 0
+                rightPadding: 0
+                implicitHeight: 50
+                font.pixelSize: 16
+                font.bold: true
+                enabled: lr.present[modelData] === true
+                text: modelData
+                onClicked: lr.picked(modelData)
+            }
+        }
+    }
+
     function sorted(list) {
         const code = q => q.upcs[q.pick].code
         const by = {
@@ -318,6 +368,16 @@ Item {
                     text: qsTr("Show Items (%1)").arg(w.info.itemCount ?? 0)
                     onClicked: w.showItems()
                 }
+                LetterRow {
+                    visible: (w.info.children ?? []).length > 8
+                    Layout.fillWidth: true
+                    names: (w.info.children ?? []).map(c => c.name)
+                    onPicked: (letter) => {
+                        const i = (w.info.children ?? []).findIndex(c => w.letterOf(c.name) === letter)
+                        if (i >= 0)
+                            levels.positionViewAtIndex(i, GridView.Beginning)
+                    }
+                }
                 GridView {
                     id: levels
                     Layout.fillWidth: true
@@ -364,6 +424,25 @@ Item {
                                            : qsTr("Touch an item to add a label.")
                         }
                     }
+                    Label { visible: (w.info.matches ?? []).length > 1; text: qsTr("Sort"); opacity: 0.8 }
+                    Button {
+                        visible: (w.info.matches ?? []).length > 1
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        checkable: true
+                        checked: w.itemSort === "name"
+                        text: qsTr("A–Z")
+                        onClicked: w.itemSort = "name"
+                    }
+                    Button {
+                        visible: (w.info.matches ?? []).length > 1
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        checkable: true
+                        checked: w.itemSort === "upc"
+                        text: qsTr("UPC")
+                        onClicked: w.itemSort = "upc"
+                    }
                     Button {
                         visible: (w.info.matches ?? []).length > 1
                         implicitHeight: 52
@@ -372,12 +451,24 @@ Item {
                         onClicked: { for (const m of (w.info.matches ?? [])) w.add(m) }
                     }
                 }
+                LetterRow {
+                    visible: (w.info.matches ?? []).length > 8
+                    Layout.fillWidth: true
+                    names: w.shownItems.map(m => m.name)
+                    onPicked: (letter) => {
+                        w.itemSort = "name"   // letters go with A to Z
+                        const i = w.shownItems.findIndex(m => w.letterOf(m.name) === letter)
+                        if (i >= 0)
+                            itemList.positionViewAtIndex(i, ListView.Beginning)
+                    }
+                }
                 ListView {
+                    id: itemList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
                     spacing: 4
-                    model: w.info.matches ?? []
+                    model: w.shownItems
                     delegate: Button {
                         required property var modelData
                         width: ListView.view.width - 20

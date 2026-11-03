@@ -94,6 +94,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 11:23 ET — Bob (Claude) — Tablet Labels: A-Z / UPC sort and letter rows
+- **What:** WidgetRetailLabels.qml: inline component LetterRow (# A-Z buttons, greyed when nothing starts with the letter; self-contained since inline components don't share ids); tree levels with more than 8 buttons get a letter row (GridView.positionViewAtIndex); the items list gets Sort A–Z / UPC buttons (itemSort, shownItems sorted copy of matches) and a letter row (switches to A–Z, ListView.positionViewAtIndex). Not compiled here: the Pi build (qmlcachegen) checks it.
+- **Why:** Owner: same sort and letter selection as the Pi label utility on the tablets.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml`
+- **Next person must know:** Needs a new APK for the tablets.
+
 ### 2026-11-03 11:20 ET — Bob (Claude) — Label utility item list: A-Z / UPC sort buttons and a letter row
 - **What:** Screen 3 toolbar: 'Sort: A–Z' and 'UPC' buttons (sort_grid(col, False): always ascending; the column headings still toggle); a full-width row of letter buttons (#, A-Z) above the list jumps to the first description starting with that letter (sorts A to Z first), letters with no item greyed (updated with the list). Quick Search (top center) unchanged: filters by description, any UPC, manufacturer or category as you type (needs a keyboard on the Pi). Tested: UPC sort, M/#/D jumps, Next.
 - **Why:** Owner: sort by UPC/alpha and letter selection on the label utility item list; asked what the top center text box does.
