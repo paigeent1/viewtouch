@@ -55,4 +55,9 @@ Document drawerKick();
 Document noSaleTicket(const core::CashMovement &noSale, int number, const std::string &drawer,
                       const TicketContext &ctx);
 
+// The full privacy notice on the receipt printer, for a customer who asks.
+Document privacyNoticeTicket(const TicketContext &ctx);
+// A receipt carries the short notice when the check has a customer's details.
+bool receiptNeedsPrivacy(const core::Check &check, const core::PosSettings &settings);
+
 } // namespace vt::print

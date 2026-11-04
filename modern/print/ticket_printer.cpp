@@ -14,6 +14,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QImageWriter>
 #include <QPageSize>
 #include <QPainter>
@@ -150,6 +151,33 @@ void TicketPrinter::printOrderSlip(const PosSettings &settings, const Check &che
             ctx.logo = logoFor(settings, p->width);
         send(settings, *p, orderSlip(check, sent, ctx), u"Order slip #%1"_s.arg(check.id));
     }
+}
+
+void TicketPrinter::printPrivacyNotice(const PosSettings &settings, const std::string &printerId)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    if (const PrinterConfig *p = receiptPrinter(settings, printerId)) {
+        TicketContext ctx = context(settings);
+        if (settings.receiptLogo && p->effectiveFormat() == "escpos")
+            ctx.logo = logoFor(settings, p->width);
+        send(settings, *p, privacyNoticeTicket(ctx), u"Privacy notice"_s);
+    }
+}
+
+QString TicketPrinter::savePrivacyNotice(const PosSettings &settings)
+{
+    // Next to the Daily Reports folder (on the Pi: the Desktop).
+    const QString reports = QFileInfo(dayFolder(0, 0)).absolutePath();
+    const QString path = QDir(QFileInfo(reports).absolutePath()).filePath(u"Privacy Notice.txt"_s);
+    const QByteArray text = QByteArray::fromStdString(privacyText(settings, true)) + '\n';
+    QFile f(path);
+    if (f.open(QIODevice::ReadOnly) && f.readAll() == text)
+        return path;
+    f.close();
+    QSaveFile out(path);
+    if (!out.open(QIODevice::WriteOnly) || out.write(text) != text.size() || !out.commit())
+        return {};
+    return path;
 }
 
 void TicketPrinter::printReport(const PosSettings &settings, const Report &report, const std::string &printerId)

@@ -988,6 +988,9 @@ QJsonObject toJson(const PosSettings &s)
         {u"receiptShowVoids"_s, s.receiptShowVoids},
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
+        {u"minimumAge"_s, QJsonObject{{u"alcohol"_s, s.ageAlcohol}, {u"tobacco"_s, s.ageTobacco}}},
+        {u"privacy"_s, QJsonObject{{u"onReceipts"_s, s.privacyOnReceipts}, {u"short"_s, qs(s.privacyShort)},
+                                   {u"full"_s, qs(s.privacyFull)}, {u"updatedAt"_s, qint64(s.privacyUpdatedAt)}}},
         {u"gratuity"_s, QJsonObject{{u"percent"_s, double(s.gratuityBp) / 100.0}, {u"minGuests"_s, s.gratuityMinGuests}}},
         {u"terminals"_s, terminals},
         {u"mealPeriods"_s, mealPeriods},
@@ -1362,6 +1365,18 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.receiptLogo = o.value(u"receiptLogo").toBool();
     s.receiptFreeChoices = o.value(u"receiptFreeChoices").toBool(false);
     s.receiptShowVoids = o.value(u"receiptShowVoids").toBool(false);
+    {
+        const QJsonObject age = o.value(u"minimumAge").toObject();
+        s.ageAlcohol = std::clamp(age.value(u"alcohol").toInt(21), 0, 99);
+        s.ageTobacco = std::clamp(age.value(u"tobacco").toInt(21), 0, 99);
+    }
+    {
+        const QJsonObject privacy = o.value(u"privacy").toObject();
+        s.privacyOnReceipts = privacy.value(u"onReceipts").toBool(true);
+        s.privacyShort = ss(privacy.value(u"short").toString());
+        s.privacyFull = ss(privacy.value(u"full").toString());
+        s.privacyUpdatedAt = privacy.value(u"updatedAt").toInteger();
+    }
     s.soldOutBackNextDay = o.value(u"soldOutBackNextDay").toBool(true);
     s.displayAccent = ss(display.value(u"accent").toString(u"#2f6fd6"_s));
     for (const QJsonValue &v : display.value(u"slides").toArray())
@@ -1602,6 +1617,7 @@ QJsonObject toJson(const CustomerRecord &c)
              return toJson(holder).value(u"lines"_s);
          }()},
         {u"lastOrderAt"_s, qint64(c.lastOrderAt)},
+        {u"privacyAcceptedAt"_s, qint64(c.privacyAcceptedAt)},
     };
 }
 
@@ -1628,6 +1644,7 @@ CustomerRecord customerFromJson(const QJsonObject &o)
         if (const std::optional<Check> holder = checkFromJson(QJsonObject{{u"id"_s, 0}, {u"lines"_s, last}}))
             c.lastOrder = holder->lines;
     c.lastOrderAt = i64(o.value(u"lastOrderAt"));
+    c.privacyAcceptedAt = i64(o.value(u"privacyAcceptedAt"));
     return c;
 }
 

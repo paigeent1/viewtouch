@@ -17,8 +17,10 @@ Rectangle {
     readonly property bool usePage: controller !== null && controller.hasGuestPage
     // For the page's widgets: they find the customer display (the phone keypad) through this.
     readonly property bool guestHost: true
-    function askPhone(title, done) { keypad.ask(title, false, done) }
-    function askEmail(title, done) { emailPad.ask(title, done) }
+    // Adding their phone or email: the store's privacy notice first, accepted once per check.
+    function askPhone(title, done) { privacyPad.first(() => keypad.ask(title, false, done)) }
+    function askEmail(title, done) { privacyPad.first(() => emailPad.ask(title, done)) }
+    property bool privacyAccepted: false
     // The check, while the cashier works it: not over the tables or Manager with one still open.
     readonly property bool hasCheck: pos !== null && pos.hasCheck && (controller === null || controller.selling)
     readonly property var lines: hasCheck ? pos.lines : []
@@ -55,12 +57,12 @@ Rectangle {
         function onCheckClosed() { d.thanking = true; d.receiptDone = false; thanks.restart() }
     }
     // A new check, or none: what the last guest was typing goes away (not onto the next guest).
-    onHasCheckChanged: { emailPad.close(); if (hasCheck) { thanking = false; keypad.close() } }
+    onHasCheckChanged: { emailPad.close(); privacyPad.close(); privacyAccepted = false; if (hasCheck) { thanking = false; keypad.close() } }
     // The cashier asks for a tip: the tip choices come first.
     readonly property bool askingTip: prompt.askingTip ?? false
-    onAskingTipChanged: if (askingTip) emailPad.close()
+    onAskingTipChanged: if (askingTip) { emailPad.close(); privacyPad.close() }
     // For the page's widgets: a keypad or keyboard is up (touches are its own).
-    readonly property bool overlayOpen: keypad.visible || emailPad.visible
+    readonly property bool overlayOpen: keypad.visible || emailPad.visible || privacyPad.visible
 
     // --- the Customer Display page, when the store has one ---
     Loader {
@@ -308,7 +310,7 @@ Rectangle {
                     }
                     TapHandler {
                         enabled: (d.loyalty.member ?? "") === ""
-                        onTapped: keypad.ask(qsTr("Your phone number"), false, phone => d.pos.customerJoin(phone))
+                        onTapped: d.askPhone(qsTr("Your phone number"), phone => d.pos.customerJoin(phone, d.privacyAccepted))
                     }
                 }
 
@@ -667,5 +669,73 @@ Rectangle {
         z: 100
         pos: d.pos
         guest: true
+    }
+
+    // --- the privacy notice, before a guest gives their phone or email ---
+    Rectangle {
+        id: privacyPad
+        objectName: "guestPrivacy"
+        anchors.fill: parent
+        visible: false
+        MouseArea { anchors.fill: parent }   // touches stop here (see the keypad)
+        color: "#f00f1318"
+        property var then: null
+        readonly property string text: d.prompt.privacy ?? ""
+        // Accepted already on this check, or no notice set: straight on.
+        function first(next) {
+            if (d.privacyAccepted || text === "") { next(); return }
+            then = next
+            visible = true
+        }
+        function close() { visible = false; then = null }
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(parent.width * 0.9, d.unit * 40)
+            spacing: d.unit * 0.8
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: qsTr("Your privacy")
+                color: "white"; font.bold: true; font.pixelSize: d.unit * 1.6
+            }
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                text: privacyPad.text
+                color: "#d9dee7"
+                wrapMode: Text.WordWrap
+                font.pixelSize: d.unit * 0.95
+                lineHeight: 1.15
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: d.unit * 0.4
+                spacing: d.unit * 0.6
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: d.unit * 2.8
+                    radius: d.unit * 0.4
+                    color: "#2a313d"
+                    Text { anchors.centerIn: parent; text: qsTr("No Thanks"); color: "#c7cedb"; font.pixelSize: d.unit * 1.2 }
+                    TapHandler { onTapped: privacyPad.close() }
+                }
+                Rectangle {
+                    objectName: "guestPrivacyAccept"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: d.unit * 2.8
+                    radius: d.unit * 0.4
+                    color: d.accent
+                    Text { anchors.centerIn: parent; text: qsTr("Accept"); color: "white"; font.bold: true; font.pixelSize: d.unit * 1.2 }
+                    TapHandler {
+                        onTapped: {
+                            const next = privacyPad.then
+                            d.privacyAccepted = true
+                            privacyPad.close()
+                            if (next) next()
+                        }
+                    }
+                }
+            }
+        }
     }
 }

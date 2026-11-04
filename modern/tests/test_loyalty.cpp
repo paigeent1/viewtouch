@@ -62,7 +62,9 @@ TEST_CASE("Loyalty: points for what's spent, rewards off the check, taken back o
     // Their email too, typed on the guest's screen.
     CHECK_FALSE(loyalty[u"hasEmail"_s].toBool());
     CHECK_FALSE(pos.customerEmail(u"not an email"_s));
-    REQUIRE(pos.customerEmail(u"guest@example.com"_s));
+    REQUIRE(pos.customerEmail(u"guest@example.com"_s, true));    // after Accept on the privacy notice
+    CHECK(pos.shared()->customers.back().privacyAcceptedAt > 0);
+    CHECK(pos.customerPrompt()[u"privacy"_s].toString().startsWith(u"PRIVACY:"_s));   // shown before they type
     CHECK(pos.customerPrompt()[u"loyalty"_s].toMap()[u"hasEmail"_s].toBool());
     CHECK(pos.shared()->customers.back().email == "guest@example.com");
     CHECK_FALSE(pos.redeemReward(0));                          // not enough points yet

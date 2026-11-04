@@ -131,6 +131,15 @@ Item {
                         opacity: 0.6
                     }
                 }
+                // A customer asks what we do with their details: the full notice on the receipt printer.
+                Button {
+                    objectName: "printPrivacyNotice"
+                    Layout.fillWidth: true
+                    implicitHeight: 40
+                    flat: true
+                    text: qsTr("Print Privacy Notice")
+                    onClicked: w.pos.printPrivacyNotice()
+                }
                 Button {
                     Layout.fillWidth: true
                     implicitHeight: 48

@@ -220,6 +220,30 @@ Document receipt(const Check &check, const TicketContext &ctx)
         d.center(ctx.tr("Thank you!"));
     for (const std::string &l : footer)
         d.center(l);
+    if (receiptNeedsPrivacy(check, ctx.settings)) {
+        d.blank();
+        for (const std::string &l : splitLines(privacyText(ctx.settings, false)))
+            d.text(l);
+    }
+    return d;
+}
+
+bool receiptNeedsPrivacy(const Check &check, const PosSettings &settings)
+{
+    return settings.privacyOnReceipts && !check.training
+        && (!check.customerId.empty() || !check.customer.name.empty() || !check.customer.phone.empty()
+            || !check.receiptEmail.empty());
+}
+
+Document privacyNoticeTicket(const TicketContext &ctx)
+{
+    Document d;
+    if (ctx.logo)
+        d.image(ctx.logo);
+    for (const std::string &l : splitLines(privacyText(ctx.settings, true)))
+        d.text(l);
+    d.blank();
+    d.center(ctx.dateTime(ctx.now));
     return d;
 }
 

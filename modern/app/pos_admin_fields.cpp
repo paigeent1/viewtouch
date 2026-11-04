@@ -317,6 +317,21 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"currencySymbol"_s, tr("Currency symbol"), u"string"_s),
             field(u"receiptHeader"_s, tr("Receipt header"), u"text"_s, tr("Address, phone… one per line")),
             field(u"receiptFooter"_s, tr("Receipt footer"), u"text"_s),
+            with(with(field(u"ageAlcohol"_s, tr("Minimum age for alcohol"), u"int"_s,
+                            tr("The youngest a buyer may be (21 in the US). For the ID check on age-restricted sales.")),
+                      u"min"_s, 0), u"max"_s, 99),
+            with(with(field(u"ageTobacco"_s, tr("Minimum age for tobacco"), u"int"_s,
+                            tr("Cigarettes, cigars, rolling papers and e-cigarettes (21 in the US).")),
+                      u"min"_s, 0), u"max"_s, 99),
+            field(u"privacyOnReceipts"_s, tr("Privacy notice on receipts"), u"bool"_s,
+                  tr("On: the short notice prints at the bottom of the receipt whenever a customer's name, phone or email is on the check. "
+                     "The customer display (where there is one) always shows it before a guest adds their phone or email.")),
+            field(u"privacyShort"_s, tr("Short privacy notice (receipt and customer display)"), u"text"_s,
+                  tr("{store} becomes the store name. Clear it to go back to the built-in wording.")),
+            field(u"privacyFull"_s, tr("Full privacy notice"), u"text"_s,
+                  tr("Printed with Print Privacy Notice (Customers screen) and saved on the server as Desktop/Privacy Notice.txt. "
+                     "{store}, {contact} (the receipt header) and {date} (when this notice last changed) are filled in. "
+                     "Clear it to go back to the built-in wording. Not legal advice: have it checked for your state.")),
             field(u"receiptFreeChoices"_s, tr("Free choices on receipts"), u"bool"_s,
                   tr("Off: the guest's receipt shows only choices that change the price (Extra bacon), not No onion or Medium rare. Kitchen tickets show them all.")),
             field(u"receiptShowVoids"_s, tr("Voids and error corrects on receipts"), u"bool"_s,

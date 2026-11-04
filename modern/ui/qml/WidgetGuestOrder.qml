@@ -102,9 +102,9 @@ Item {
                     const h = w.host()
                     if (!h || h.overlayOpen) return
                     if ((w.loyalty.member ?? "") === "")
-                        h.askPhone(qsTr("Your phone number"), phone => w.pos.customerJoin(phone))
+                        h.askPhone(qsTr("Your phone number"), phone => w.pos.customerJoin(phone, h.privacyAccepted))
                     else if (!(w.loyalty.hasEmail ?? true) && w.props.email !== false)
-                        h.askEmail(qsTr("Your email (for offers)"), email => w.pos.customerEmail(email))
+                        h.askEmail(qsTr("Your email (for offers)"), email => w.pos.customerEmail(email, h.privacyAccepted))
                 }
             }
         }

@@ -132,6 +132,10 @@ public:
         (void)summary;
         return saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
     }
+    // The full privacy notice, for a customer who asks (Customers screen).
+    virtual void printPrivacyNotice(const core::PosSettings &, const std::string &) {}
+    // The full privacy notice as a text file on the server (Desktop/Privacy Notice.txt): where it went.
+    virtual QString savePrivacyNotice(const core::PosSettings &) { return {}; }
     virtual void printOrderSlip(const core::PosSettings &settings, const core::Check &check,
                                 const std::string &printerId, bool sent)
     {
@@ -716,9 +720,12 @@ public:
     // Spend reward `index` (PosSettings::rewards) of the check's customer.
     bool redeemReward(int index);
     // The guest types their phone on the customer display: found or signed up.
-    bool customerJoin(const QString &phone);
+    // privacyAccepted: the guest accepted the privacy notice on the customer display (kept on their record).
+    bool customerJoin(const QString &phone, bool privacyAccepted = false);
+    // The full privacy notice on this terminal's receipt printer (a customer asked).
+    bool printPrivacyNotice();
     // The guest's email (typed on the customer display), kept with their rewards.
-    bool customerEmail(const QString &email);
+    bool customerEmail(const QString &email, bool privacyAccepted = false);
     // After paying: "print", "text" (to a phone) or "none".
     bool sendReceipt(const QString &how, const QString &to = {});
     // A code a scanner read (it types it, then Enter), on whatever screen:

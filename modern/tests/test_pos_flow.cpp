@@ -583,12 +583,20 @@ TEST_CASE("UI: the customer display shows the order, asks for a tip, says thank 
                             << " in " << window->width() << "x" << window->height());
         QTest::mouseClick(window, Qt::LeftButton, {}, at.toPoint());
         QTest::qWait(60);
+        // The store's privacy notice first; Accept, then the phone keypad.
+        REQUIRE(named(window->contentItem(), u"guestPrivacy"_s));
+        CHECK_FALSE(named(window->contentItem(), u"guestKeypad"_s));
+        QQuickItem *accept = named(window->contentItem(), u"guestPrivacyAccept"_s);
+        REQUIRE(accept);
+        QTest::mouseClick(window, Qt::LeftButton, {}, accept->mapToScene(QPointF(accept->width() / 2, accept->height() / 2)).toPoint());
+        QTest::qWait(60);
         REQUIRE(named(window->contentItem(), u"guestKeypad"_s));   // the phone keypad came up
     }
     for (const char *k : {"5", "5", "5", "0", "1", "0", "1", "2", "3", "4"})
         tap(QString::fromLatin1(k));
     tap(u"OK"_s);
     CHECK(s.pos.customerPrompt()[u"loyalty"_s].toMap()[u"member"_s].toString() == u"...1234"_s);   // never the whole number
+    CHECK(s.pos.shared()->customers.back().privacyAcceptedAt > 0);   // when they accepted, kept with them
     shot("11-display-order");
 
     REQUIRE(s.pos.askForTip());

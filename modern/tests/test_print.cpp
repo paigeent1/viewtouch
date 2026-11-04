@@ -105,6 +105,28 @@ TEST_CASE("ESC/POS: init, emphasis, cut, drawer kick, letters", "[print]")
     CHECK(std::ranges::none_of(plain, [](char c) { return static_cast<unsigned char>(c) >= 0x80 && c != '\xfa'; }));
 }
 
+TEST_CASE("Privacy notice: on receipts with a customer's details, the full one on its own", "[print][privacy]")
+{
+    auto seed = test::seedPosData();
+    core::Check c = burgerCheck(seed.settings, seed.menu);
+    CHECK_FALSE(contains(renderText(receipt(c, ctx(seed.settings)), 42), "PRIVACY"));   // nobody's details
+    c.customer.phone = "555-010-1234";
+    std::string r = renderText(receipt(c, ctx(seed.settings)), 42);
+    CHECK(contains(r, "PRIVACY: ViewTouch Caf"));                  // {store} filled in
+    CHECK_FALSE(contains(r, "{store}"));
+    seed.settings.privacyOnReceipts = false;
+    CHECK_FALSE(contains(renderText(receipt(c, ctx(seed.settings)), 42), "PRIVACY"));
+    seed.settings.privacyOnReceipts = true;
+    seed.settings.privacyShort = "We keep it safe at {store}.";
+    CHECK(contains(renderText(receipt(c, ctx(seed.settings)), 42), "We keep it safe at ViewTouch"));
+
+    const std::string full = renderText(privacyNoticeTicket(ctx(seed.settings)), 42);
+    CHECK(contains(full, "PRIVACY NOTICE"));
+    CHECK(contains(full, "123 Main Street"));                     // {contact}: the receipt header
+    CHECK(contains(full, "Effective November 4, 2026"));
+    CHECK(contains(full, "do not sell"));
+}
+
 TEST_CASE("Receipt and kitchen ticket contents", "[print]")
 {
     const auto seed = test::seedPosData();

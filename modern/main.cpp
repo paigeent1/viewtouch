@@ -1054,6 +1054,9 @@ int runStore(const Args &cli, const Options &o)
         return f.size() <= 8 * 1024 * 1024 && f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
     });
     pos.setPrinter(&ticketPrinter);
+    // The full privacy notice as a file on the server (Desktop/Privacy Notice.txt).
+    if (const QString notice = ticketPrinter.savePrivacyNotice(shared->settings); !notice.isEmpty())
+        qInfo().noquote() << "Privacy notice:" << notice;
     // How each printer did last, for Manager -> Network.
     auto printerStatus = std::make_shared<QHash<QString, QVariantMap>>();
     QObject::connect(&spooler, &vt::print::PrintSpooler::jobFailed, &pos,
