@@ -278,6 +278,10 @@ struct Check {
     // check's server: in the taker's cash (drawerSession), owed to the server.
     Money cashTip;
     std::int64_t gratuityBp = 0;      // e.g. 1800 = 18% of the subtotal
+    // The tax rates it closed with: its totals are always worked out with
+    // them, so a later change of rates leaves past checks (and the reports
+    // over them) as they were. Reopening forgets them.
+    std::optional<TaxRates> closedRates;
     bool autoGratuity = false;        // added for a large party (not by hand)
     std::vector<CheckEvent> events;   // oldest first
     int firedCourse = 1;              // courses up to this one go out on Send
