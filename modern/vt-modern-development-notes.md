@@ -108,6 +108,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:13 ET — Bob (Claude) — Manual: label templates file name (no 'claude' name left)
+- **What:** manual.html named the old modern/seed/templates/claude_label_templates.json; now label_templates.json. The only other 'claude_label' mentions are code that reads the old file name once to carry old templates over (pos_inventory.cpp, vt_label_utility.py) and history in these notes. The GitHub branch claude-label-utility was deleted 2026-11-02 (no such branch now).
+- **Why:** Owner 2026-11-04 asked why Claude is still referenced for the label utility.
+- **Files:** `modern/docs/manual/manual.html`
+
 ### 2026-11-04 17:39 ET — Bob (Claude) — Backlog: EMPTIED A BOX on Cashier Duty
 - **What:** Section 5: an EMPTIED A BOX button on the Cashier Duty screen (retail mode): scan empty boxes (UPC = cigar + size), several at once; HCA humidor attendant uses a tablet in retail mode.
 - **Why:** Owner 2026-11-04: cashiers shouldn't have to stay at the register while refilling the humidor.
