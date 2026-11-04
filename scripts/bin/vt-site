@@ -1,0 +1,65 @@
+#!/bin/bash
+# This site's hardware settings (kept on this Pi in ~/.config/viewtouch, never in Git):
+#   vt-site                               show them
+#   vt-site init "Store name"             start them for a new site (keeps what's there)
+#   vt-site set KEY value                 SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD
+#   vt-site tablet add "Bar 1" 192.168.1.220
+#   vt-site tablet remove "Bar 1"
+#   vt-site edit                          open the settings in nano
+# Printers, taxes, receipts and the rest are set in ViewTouch itself (Manager); TVs with vt-directv scan --save.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD"
+
+write_template() {
+    mkdir -p "$VT_CONF_DIR"
+    cat > "$VT_SITE_CONF" <<EOF
+# This site's hardware for the ViewTouch scripts (vt-site). Not in Git.
+SITE_NAME="${1:-}"
+# The ViewTouch server's address for pairing tablets. Empty: this Pi's own address.
+SERVER_ADDR=""
+SERVER_PORT=7719
+# The barcode scanner's serial port. Empty: the serial adapter's first port, found by name
+# (/dev/serial/by-id/...-port0). "off": no serial scanner (a USB scanner that types needs none).
+SERIAL_SCANNER=""
+SERIAL_SCANNER_BAUD=9600
+EOF
+}
+
+case "$1" in
+    ""|show)
+        echo "Site: ${SITE_NAME:-(not set: vt-site init \"Store name\")}   settings: $VT_SITE_CONF"
+        echo "Server: $(vt_server_addr):$SERVER_PORT"
+        echo "Scanner: ${SERIAL_SCANNER:-auto: the serial adapter, first port} at $SERIAL_SCANNER_BAUD baud"
+        echo "Tablets:"; t=$(vt_tablets); [ -n "$t" ] && echo "$t" | sed 's/|/  /; s/^/  /' || echo "  (none: vt-site tablet add \"Bar 1\" 192.168.1.x)"
+        n=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$VT_CONF_DIR/tvs.json" 2>/dev/null)
+        echo "TVs: ${n:-none} (vt-directv list / vt-directv scan --save)" ;;
+    init)
+        if [ -f "$VT_SITE_CONF" ]; then
+            echo "Already set up ($VT_SITE_CONF); kept as it is."
+            [ -n "$2" ] && "$0" set SITE_NAME "$2"
+        else
+            write_template "$2"; echo "Started $VT_SITE_CONF"
+        fi
+        vt_tablets_start
+        "$0" show ;;
+    set)
+        [[ " $KEYS " == *" $2 "* ]] || { echo "Settings: $KEYS"; exit 2; }
+        [ -f "$VT_SITE_CONF" ] || write_template
+        val=$(printf '%s' "$3" | tr -d '\042\134\044\140|')   # no quotes, \\, $, backquote or |
+        if grep -q "^$2=" "$VT_SITE_CONF"; then sed -i "s|^$2=.*|$2=\"$val\"|" "$VT_SITE_CONF"
+        else echo "$2=\"$val\"" >> "$VT_SITE_CONF"; fi
+        echo "$2=\"$val\""
+        case "$2" in SERIAL_SCANNER*) echo "Restart ViewTouch for the scanner to use it: vt-server" ;; esac ;;
+    tablet)
+        case "$2" in
+            add) [ -n "$3" ] && [[ "$4" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'vt-site tablet add "Bar 1" 192.168.1.220'; exit 2; }
+                 vt_tablet_set "$3" "$4"; echo "Tablet $3 at $4" ;;
+            remove) vt_tablets_start
+                 grep -v "^$3|" "$VT_TABLETS_FILE" > "$VT_TABLETS_FILE.new"; mv "$VT_TABLETS_FILE.new" "$VT_TABLETS_FILE"; echo "Removed $3" ;;
+            *) echo 'vt-site tablet add "Bar 1" 192.168.1.220 | vt-site tablet remove "Bar 1"'; exit 2 ;;
+        esac ;;
+    edit)
+        [ -f "$VT_SITE_CONF" ] || write_template
+        ${EDITOR:-nano} "$VT_SITE_CONF" ;;
+    *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

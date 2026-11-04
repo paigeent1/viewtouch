@@ -1,15 +1,18 @@
 #!/bin/bash
-# The build number header is in build/generated/ (CMake's VTM_GENERATED).
-LATEST=$(cat /home/pi/viewtouch-main/modern/build/generated/vtm_build_number.hh /home/pi/viewtouch-main/modern/build/vtm_build_number.hh 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
+# Are this site's tablets on the server's build? (tablets: vt-site)
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+LATEST=$(cat "$VT_REPO/modern/build/generated/vtm_build_number.hh" "$VT_REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
 LATEST="${LATEST:-unknown}"
-adb connect 192.168.1.220:5555 >/dev/null 2>&1 || true
-adb connect 192.168.1.215:5555 >/dev/null 2>&1 || true
-adb connect 192.168.1.210:5555 >/dev/null 2>&1 || true
-B1=$(adb -s 192.168.1.220:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
-B2=$(adb -s 192.168.1.215:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
-B3=$(adb -s 192.168.1.210:5555 shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r')
-if [ "$B1" = "$LATEST" ] && [ "$B2" = "$LATEST" ] && [ "$B3" = "$LATEST" ]; then
-  echo "Tablets up to date ($LATEST) | Bar1: $B1 | Bar2: $B2 | Bar3: $B3"
+behind=0; line=""
+while IFS='|' read -r name ip <&3; do
+    [ -z "$ip" ] && continue
+    adb connect "$ip:5555" >/dev/null 2>&1 || true
+    v=$(adb -s "$ip:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r ')
+    [ "$v" = "$LATEST" ] || behind=1
+    line="$line | $name: ${v:-Offline}"
+done 3< <(vt_tablets)
+if [ "$behind" = 0 ]; then
+  echo "Tablets up to date ($LATEST)$line"
 else
-  echo "UPDATE READY ($LATEST) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline} | Bar3: ${B3:-Offline} -> Double-tap 'Tablets (Push)' when ready!"
+  echo "UPDATE READY ($LATEST)$line -> Double-tap 'Tablets (Push)' when ready!"
 fi

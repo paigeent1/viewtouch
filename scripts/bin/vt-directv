@@ -9,7 +9,7 @@
   vt-directv list                         the TVs this script knows
 
 The TV list is ~/.config/viewtouch/tvs.json (not in the repo, not in the
-database). Without it the five bar receivers below are used. `scan --save`
+database), one per site. Start it with `vt-directv scan --save`, which
 adds what it finds, keeping the names already there.
 
 This script never writes ViewTouch's database or its pages (it used to; that
@@ -34,13 +34,7 @@ import urllib.error
 import urllib.request
 
 CONFIG = pathlib.Path(os.path.expanduser("~/.config/viewtouch/tvs.json"))
-DEFAULT_TVS = {
-    "front": {"name": "BAR FRONT", "kind": "directv", "ip": "192.168.6.70"},
-    "bar1":  {"name": "BAR 1",     "kind": "directv", "ip": "192.168.6.74"},
-    "bar2":  {"name": "BAR 2",     "kind": "directv", "ip": "192.168.6.71"},
-    "box72": {"name": "BOX .72",   "kind": "directv", "ip": "192.168.6.72"},
-    "vip":   {"name": "VIP",       "kind": "directv", "ip": "192.168.6.73"},
-}
+DEFAULT_TVS = {}   # each site's own list: vt-directv scan --save (HCA's receivers are in its tvs.json)
 CHANNELS = {
     "206": "ESPN", "209": "ESPN2", "219": "FS1", "212": "NFL Net",
     "213": "MLB Net", "216": "NBA TV", "215": "NHL Net", "221": "CBS Sports",
@@ -65,7 +59,7 @@ def load_tvs():
     except FileNotFoundError:
         pass
     except Exception as e:
-        print(f"Couldn't read {CONFIG}: {e} (using the built-in list)", file=sys.stderr)
+        print(f"Couldn't read {CONFIG}: {e}", file=sys.stderr)
     return dict(DEFAULT_TVS)
 
 

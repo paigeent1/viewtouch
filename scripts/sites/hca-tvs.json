@@ -1,0 +1,7 @@
+{
+  "front": {"name": "BAR FRONT", "kind": "directv", "ip": "192.168.6.70"},
+  "bar1":  {"name": "BAR 1",     "kind": "directv", "ip": "192.168.6.74"},
+  "bar2":  {"name": "BAR 2",     "kind": "directv", "ip": "192.168.6.71"},
+  "box72": {"name": "BOX .72",   "kind": "directv", "ip": "192.168.6.72"},
+  "vip":   {"name": "VIP",       "kind": "directv", "ip": "192.168.6.73"}
+}

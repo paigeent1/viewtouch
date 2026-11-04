@@ -1,6 +1,11 @@
 #!/bin/bash
-for ip in 192.168.1.220 192.168.1.215; do
-  adb connect $ip:5555 >/dev/null 2>&1 || true
-  adb -s $ip:5555 shell am start -a android.settings.SYSTEM_UPDATE_SETTINGS >/dev/null 2>&1 || true
-done
-echo "Opened Android OS Update settings on Bar 1 & Bar 2 tablets."
+# Opens Android's system update screen on each of this site's tablets (tablets: vt-site).
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+names=""
+while IFS='|' read -r name ip <&3; do
+  [ -z "$ip" ] && continue
+  adb connect "$ip:5555" >/dev/null 2>&1 || true
+  adb -s "$ip:5555" shell am start -a android.settings.SYSTEM_UPDATE_SETTINGS >/dev/null 2>&1 || true
+  names="${names:+$names, }$name"
+done 3< <(vt_tablets)
+echo "Opened Android OS Update settings on: ${names:-no tablets listed (vt-site tablet add)}"

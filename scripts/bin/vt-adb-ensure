@@ -1,4 +1,5 @@
 #!/bin/bash
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 export ADB_MDNS_OPENSCREEN=1
 adb start-server >/dev/null 2>&1
 # 1. If any tablet is on mDNS TLS Wireless Debugging, flip it to port 5555 automatically
@@ -11,8 +12,8 @@ while read -r line; do
     fi
 done < <(adb mdns services 2>/dev/null | grep "_adb-tls-connect")
 
-# 2. Only flip USB device to tcpip 5555 if fewer than 3 Wi-Fi tablets are connected
-if [ $(adb devices | grep -c ":5555[[:space:]]*device") -lt 3 ]; then
+# 2. Only flip USB device to tcpip 5555 if fewer than all of this site's tablets are connected on Wi-Fi
+if [ $(adb devices | grep -c ":5555[[:space:]]*device") -lt $(vt_tablet_ips | grep -c .) ]; then
     for u in $(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1}'); do
         adb -s "$u" shell "settings put global adb_wifi_enabled 1; settings put global stay_on_while_plugged_in 7; settings put global wifi_sleep_policy 2" >/dev/null 2>&1 || true
         adb -s "$u" tcpip 5555 >/dev/null 2>&1 || true
@@ -20,7 +21,7 @@ if [ $(adb devices | grep -c ":5555[[:space:]]*device") -lt 3 ]; then
     done
 fi
 
-for ip in 192.168.1.220 192.168.1.215 192.168.1.210; do
+for ip in $(vt_tablet_ips); do
     if adb devices | grep -q "^${ip}:5555[[:space:]]*offline"; then
         adb disconnect "${ip}:5555" >/dev/null 2>&1 || true
     fi
@@ -33,7 +34,7 @@ done
 #    (ViewTouch runs this script about once a minute).
 exec 9>/tmp/vt-adb-ensure.lock
 if flock -n 9; then
-    for ip in 192.168.1.220 192.168.1.215 192.168.1.210; do
+    for ip in $(vt_tablet_ips); do
         adb devices | grep -q "^${ip}:5555[[:space:]]*device" && continue
         stamp=/tmp/vt-adb-scan-${ip}
         [ -f "$stamp" ] && [ $(( $(date +%s) - $(stat -c %Y "$stamp") )) -lt 1800 ] && continue

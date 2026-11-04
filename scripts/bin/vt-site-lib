@@ -1,0 +1,45 @@
+# Sourced by the vt-* scripts: this site's hardware, from files on this Pi (never in Git), so a new
+# store is set up with `vt-site`, not by changing code.
+#   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD
+#   ~/.config/viewtouch/tablets     one tablet per line: Name|IP   (vt-site tablet add/remove)
+#   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
+VT_CONF_DIR="$HOME/.config/viewtouch"
+VT_SITE_CONF="$VT_CONF_DIR/site.conf"
+VT_TABLETS_FILE="$VT_CONF_DIR/tablets"
+VT_REPO="${VT_REPO:-$HOME/viewtouch-main}"
+# shellcheck disable=SC1090
+[ -f "$VT_SITE_CONF" ] && . "$VT_SITE_CONF"
+SERVER_PORT="${SERVER_PORT:-7719}"
+SERIAL_SCANNER_BAUD="${SERIAL_SCANNER_BAUD:-9600}"
+
+# The ViewTouch server's address: SERVER_ADDR, else this Pi's own.
+vt_server_addr() {
+    if [ -n "$SERVER_ADDR" ]; then echo "$SERVER_ADDR"; else hostname -I 2>/dev/null | awk '{print $1}'; fi
+}
+
+# This site's tablets, one "Name|IP" per line (the old ~/.config/viewtouch_tablets.list: "Tablet N").
+vt_tablets() {
+    if [ -f "$VT_TABLETS_FILE" ]; then
+        grep -v '^[[:space:]]*#' "$VT_TABLETS_FILE" | grep '|' | sed 's/[[:space:]]*|[[:space:]]*/|/'
+    elif [ -f "$HOME/.config/viewtouch_tablets.list" ]; then
+        awk 'NF {n++; print "Tablet " n "|" $1}' "$HOME/.config/viewtouch_tablets.list"
+    fi
+}
+vt_tablet_ips() { vt_tablets | cut -d'|' -f2; }
+
+# The tablets file, started from the old list if there is one (read before the file exists).
+vt_tablets_start() {
+    [ -f "$VT_TABLETS_FILE" ] && return
+    local t; t=$(vt_tablets)
+    mkdir -p "$VT_CONF_DIR"
+    { echo "# This site's tablets, one per line: Name|IP (vt-site tablet add / remove)"; [ -n "$t" ] && echo "$t"; } > "$VT_TABLETS_FILE"
+}
+
+# Add (or re-address) a tablet: vt_tablet_set "Bar 1" 192.168.1.220
+vt_tablet_set() {
+    mkdir -p "$VT_CONF_DIR"
+    vt_tablets_start
+    grep -v "^$1|" "$VT_TABLETS_FILE" | grep -v "|$2\$" > "$VT_TABLETS_FILE.new" || true
+    echo "$1|$2" >> "$VT_TABLETS_FILE.new"
+    mv "$VT_TABLETS_FILE.new" "$VT_TABLETS_FILE"
+}

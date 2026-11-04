@@ -1,15 +1,15 @@
 #!/bin/bash
+# The server's build and each tablet's app version (this site's tablets: vt-site).
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 /usr/local/bin/vt-adb-ensure >/dev/null 2>&1 || true
-REPO="/home/pi/viewtouch-main"
-GIT_HASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-LATEST=$(cat "$REPO/modern/build/generated/vtm_build_number.hh" "$REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk "{print \$3}" | tr -d "\"")
-SERVER_VER="${LATEST:-unknown (not built?)}"
-SUBNET=$(hostname -I | awk "{print \$1}" | cut -d. -f1-3)
-SUBNET=${SUBNET:-192.168.1}
-adb connect "${SUBNET}.220:5555" >/dev/null 2>&1 || true
-adb connect "${SUBNET}.215:5555" >/dev/null 2>&1 || true
-adb connect "${SUBNET}.210:5555" >/dev/null 2>&1 || true
-B1=$(adb -s "${SUBNET}.220:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
-B2=$(adb -s "${SUBNET}.215:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
-B3=$(adb -s "${SUBNET}.210:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
-echo "Server: ${SERVER_VER} (Git: ${GIT_HASH}) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline} | Bar3: ${B3:-Offline}"
+GIT_HASH=$(git -C "$VT_REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LATEST=$(cat "$VT_REPO/modern/build/generated/vtm_build_number.hh" "$VT_REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
+line="Server: ${LATEST:-unknown (not built?)} (Git: ${GIT_HASH})"
+while IFS='|' read -r name ip <&3; do
+    [ -z "$ip" ] && continue
+    adb connect "$ip:5555" >/dev/null 2>&1 || true
+    v=$(adb -s "$ip:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r ')
+    line="$line | $name: ${v:-Offline}"
+done 3< <(vt_tablets)
+[ -z "$(vt_tablets)" ] && line="$line | no tablets listed (vt-site tablet add)"
+echo "$line"
