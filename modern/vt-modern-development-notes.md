@@ -100,6 +100,16 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:00 ET — Bob (Claude) — Merged bob/site-name; vt-tablets shows the version code cleanly
+- **What:** Site Setup's store name from Store Settings merged. vt-tablets prints versionCode=90000260 (it printed 90000260minSdk: the rest of dumpsys's line ran into it).
+- **Why:** CI: no new failures. Owner saw the odd versionCode text when pushing 0.9.260 to Bar 1-3 (all installed fine).
+- **Files:** `scripts/bin/vt-tablets`
+
+### 2026-11-04 13:43 ET — Bob (Claude) — Site Setup: store name from Store Settings
+- **What:** Site Setup's 'This site' box shows the store name from Store Settings > The store (read-only, with a Change in Store Settings button) instead of its own field; site.conf's SITE_NAME is kept as a copy of it (on Save, on opening the screen, and when the store name changes) for vt-site.
+- **Why:** Owner 2026-11-04: This site should pull from Settings > The store (one store name, not two).
+- **Files:** `modern/ui/qml/WidgetSiteSetup.qml`
+
 ### 2026-11-04 13:28 ET — Bob (Claude) — Merged bob/site-setup into main; tablet app built from this commit
 - **What:** Site Setup screen merged. The tablet APK is built from this same commit so the Pi and tablets show the same build number.
 - **Why:** CI: no new failures (29 known; the new Site Setup test passes). Owner asked for the tablets to be brought up to date.

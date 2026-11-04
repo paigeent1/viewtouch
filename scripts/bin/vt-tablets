@@ -25,7 +25,7 @@ while IFS='|' read -r NAME IP <&3; do
     if adb -s "${IP}:5555" install -r -d "$APK" >/tmp/adb_inst.log 2>&1; then
         adb -s "${IP}:5555" shell am force-stop org.viewtouch.pos >/dev/null 2>&1 || true
         adb -s "${IP}:5555" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1 || true
-        VC=$(adb -s "${IP}:5555" shell dumpsys package org.viewtouch.pos | awk -F= '/versionCode/{print $2; exit}' | tr -d '\r ')
+        VC=$(adb -s "${IP}:5555" shell dumpsys package org.viewtouch.pos | grep -o -m1 'versionCode=[0-9]*' | cut -d= -f2)
         echo "✅ PASS (Installed & Restarted -> versionCode=$VC)"
     else
         echo "❌ FAIL ($(tr '\n' ' ' < /tmp/adb_inst.log))"

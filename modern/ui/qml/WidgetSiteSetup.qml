@@ -18,11 +18,10 @@ Item {
     property var tablets: []
     property bool dirty: false
     function reload() {
-        draft = { siteName: site.siteName ?? "", serverAddr: site.serverAddr ?? "", serverPort: site.serverPort ?? 7719,
+        draft = { serverAddr: site.serverAddr ?? "", serverPort: site.serverPort ?? 7719,
                   scanner: site.scanner ?? "", scannerBaud: site.scannerBaud ?? 9600 }
         tablets = (site.tablets ?? []).map(t => ({ name: t.name, ip: t.ip }))
         // Typing replaces a field's binding: put the saved values back by hand.
-        siteNameField.text = draft.siteName
         serverAddrField.text = draft.serverAddr
         serverPortBox.value = draft.serverPort
         dirty = false
@@ -32,9 +31,17 @@ Item {
     function save() {
         const v = Object.assign({}, draft)
         v.tablets = tablets
+        v.siteName = storeName   // the name is Store Settings' (the scripts get a copy)
         if (controller.saveSiteSettings(v)) dirty = false
     }
-    Component.onCompleted: reload()
+    // The store's name: Store Settings > The store (one place for it); site.conf keeps a copy for vt-site.
+    readonly property string storeName: pos ? pos.storeName : ""
+    function syncName() {
+        if (admin && controller && (site.configured ?? false) && storeName !== "" && (site.siteName ?? "") !== storeName)
+            controller.saveSiteSettings({ siteName: storeName })
+    }
+    onStoreNameChanged: syncName()
+    Component.onCompleted: { reload(); syncName() }
     onSiteChanged: if (!dirty) reload()
     function when(ms) { return ms ? Qt.locale().toString(new Date(ms), "h:mm:ss AP") : "" }
     function run(action) { if (controller) controller.siteAction(action) }
@@ -86,14 +93,15 @@ Item {
                     title: qsTr("This site")
                     ColumnLayout {
                         anchors.fill: parent
-                        Caption { text: qsTr("Store or site name") }
-                        TextField {
-                            id: siteNameField
+                        Caption { text: qsTr("Store name (Store Settings > The store)") }
+                        Label {
                             objectName: "siteName"
-                            Layout.fillWidth: true; font.pixelSize: 16; font.bold: false
-                            placeholderText: qsTr("e.g. BH Danbury")
-                            onTextEdited: w.set("siteName", text)
+                            Layout.fillWidth: true
+                            font.pixelSize: 18; font.bold: true
+                            elide: Text.ElideRight
+                            text: w.storeName || qsTr("(not set)")
                         }
+                        Tool { text: qsTr("Change in Store Settings"); onClicked: w.controller.jumpTo("admin-store") }
                         Caption { text: qsTr("This Pi's address: %1").arg(w.site.thisAddress || qsTr("(no network)")) }
                         Caption { text: qsTr("Server address for pairing tablets (empty: this Pi)") }
                         TextField {
