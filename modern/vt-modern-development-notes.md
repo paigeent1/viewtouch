@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:46 ET — Bob (Claude) — vt-directv scan: only this Pi's own network
+- **What:** vt-directv scan no longer takes a subnet and no longer sweeps the known TVs' networks. It scans only the network of the Pi's default-route adapter (a network bigger than a /24 is swept as the Pi's /24), and SSDP answers from anywhere else are ignored. With no default route it scans nothing.
+- **Why:** Owner 2026-11-04: each deployment should only look on the local subnet the Pi is on (no reaching into another network, a VPN or a second adapter's network).
+- **Files:** `scripts/bin/vt-directv`
+- **Next person must know:** At Hat City the receivers (192.168.6.x) will be found once the Pi is on that network; until then scan finds nothing there, which is expected.
+
 ### 2026-11-04 09:39 ET — Bob (Claude) — vt-directv rebuilt: no database writes, no frozen screen, TV scan
 - **What:** scripts/bin/vt-directv rewritten. Same command line for the DIRECTV pages (box|all tune <ch> / key <key>), but it no longer rebuilds pages into viewtouch.db and seed/pages after every tune (--init-pages now just says so). TV list moved to ~/.config/viewtouch/tvs.json (built-in five bar receivers if missing). New: 'vt-directv scan [--save] [subnet]' finds DIRECTV receivers and smart TVs by SSDP plus a sweep of this computer's subnets and the known TVs' subnets (DIRECTV 8080, Roku 8060, Samsung 8001, LG webOS 3000, Android/Google 8008); 'list'. Roku TVs can be worked now (ECP keypress); Samsung/LG/Sony/Android TV are found and listed but need a one-time pairing (not built yet). 'all' sends to every receiver at once. LayoutController runs it in the background with a 10 s limit instead of waiting on the UI thread.
 - **Why:** Owner's decision 2026-11-04: rebuild it, and have the Pi find DIRECTV boxes (if they're swapped) and other smart TVs to work them over the network instead of HDMI. Audit: writing viewtouch.db while ViewTouch runs breaks the one-writer rule, overwrote layout edits, rewrote repo files on the Pi (blocking git pull), and the 4 s wait froze the POS when a box was off.

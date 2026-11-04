@@ -4,8 +4,8 @@
   vt-directv <box|all> tune <channel>     DIRECTV: change the channel
   vt-directv <box|all> key <key>          a remote key (chanup, chandown, prev, guide,
                                           exit, info, select, poweron, poweroff...)
-  vt-directv scan [--save] [subnet]       find DIRECTV receivers and smart TVs
-                                          (SSDP, then a sweep of the subnet)
+  vt-directv scan [--save]                find DIRECTV receivers and smart TVs on
+                                          this Pi's own network (SSDP, then a sweep)
   vt-directv list                         the TVs this script knows
 
 The TV list is ~/.config/viewtouch/tvs.json (not in the repo, not in the
@@ -217,23 +217,31 @@ def probe(ip):
 
 
 def local_subnets():
-    nets = []
+    """The network this Pi is on: the one its default route goes out of.
+    Only that one is ever scanned, so a deployment never looks at another
+    store's network, a VPN, or a second adapter's network."""
     try:
-        out = subprocess.run(["ip", "-4", "-o", "addr", "show", "scope", "global"],
+        route = subprocess.run(["ip", "-4", "route", "show", "default"],
+                               capture_output=True, text=True, timeout=3).stdout
+        dev = re.search(r"\bdev (\S+)", route)
+        if not dev:
+            return []
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show", "dev", dev.group(1), "scope", "global"],
                              capture_output=True, text=True, timeout=3).stdout
-        for m in re.finditer(r"inet (\d+\.\d+\.\d+\.\d+/\d+)", out):
-            net = ipaddress.ip_interface(m.group(1)).network
-            if net.prefixlen < 24:          # don't sweep a /16: its /24
-                net = ipaddress.ip_interface(m.group(1).split("/")[0] + "/24").network
-            nets.append(net)
+        m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", out)
+        if not m:
+            return []
+        # A bigger network than a /24 is swept as the /24 the Pi is in.
+        net = ipaddress.ip_interface(f"{m.group(1)}/{max(int(m.group(2)), 24)}").network
+        return [net]
     except Exception:
-        pass
-    return nets
+        return []
 
 
 def scan(save, subnets):
-    print("Looking for DIRECTV receivers and smart TVs (about 30 seconds)...")
-    found = ssdp()
+    print("Looking for DIRECTV receivers and smart TVs on " + ", ".join(map(str, subnets)) + " (about 30 seconds)...")
+    found = {ip: f for ip, f in ssdp().items()
+             if any(ipaddress.ip_address(ip) in net for net in subnets)}
     hosts = [h for net in subnets for h in net.hosts()]
     with concurrent.futures.ThreadPoolExecutor(64) as pool:
         for ip, hit in pool.map(probe, hosts):
@@ -244,8 +252,7 @@ def scan(save, subnets):
     tvs = load_tvs()
     by_ip = {tv.get("ip"): key for key, tv in tvs.items()}
     if not found:
-        print("Nothing found. Is this computer on the TVs' network? (" +
-              ", ".join(map(str, subnets)) + " swept)")
+        print("Nothing found on " + ", ".join(map(str, subnets)) + ". The TVs must be on this Pi's network.")
         return
     for ip in sorted(found, key=lambda a: tuple(int(p) for p in a.split("."))):
         f = found[ip]
@@ -281,18 +288,10 @@ def main(argv):
         return 0
     if argv[0] == "scan":
         save = "--save" in argv
-        nets = [ipaddress.ip_network(a, strict=False) for a in argv[1:] if a != "--save"]
+        nets = local_subnets()
         if not nets:
-            # This computer's networks, and the ones the known TVs are on (the
-            # bar receivers are on 192.168.6.x, not the POS network).
-            nets = local_subnets()
-            for tv in load_tvs().values():
-                try:
-                    net = ipaddress.ip_interface(tv.get("ip", "") + "/24").network
-                except ValueError:
-                    continue
-                if net not in nets:
-                    nets.append(net)
+            print("This Pi isn't on a network (no default route); nothing scanned.")
+            return 1
         scan(save, nets)
         return 0
 
