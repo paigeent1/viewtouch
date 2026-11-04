@@ -337,6 +337,37 @@ Item {
                         w.checkScan()
                     }
                 }
+                // The tablet's camera reads a barcode into the search (the Pi says it has no camera).
+                Rectangle {
+                    objectName: "retailLabelCamera"
+                    visible: w.product && w.step !== "list"
+                    implicitWidth: w.narrow ? 64 : 150
+                    implicitHeight: 56
+                    radius: 8
+                    color: camTap.pressed ? "#d4a017" : "#facc15"
+                    border.color: "#a16207"
+                    Text {
+                        anchors.centerIn: parent
+                        text: w.narrow ? "📷" : qsTr("📷 Scan")
+                        color: "#1f2937"
+                        font.pixelSize: 19
+                        font.bold: true
+                    }
+                    TapHandler {
+                        id: camTap
+                        onTapped: if (w.zone && w.zone.controller) w.zone.controller.command("scanCameraField")
+                    }
+                }
+                Connections {
+                    target: w.zone ? w.zone.controller : null
+                    function onCameraCode(code) {
+                        if (!findField.visible) return
+                        findField.text = code
+                        w.scanCode = code.trim()
+                        w.findItems(code)
+                        w.checkScan()
+                    }
+                }
                 Button {
                     visible: w.product && w.step !== "list"
                     implicitHeight: 56

@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 16:10 ET — Bob (Claude) — Labels screen: yellow camera Scan button beside the search
+- **What:** WidgetRetailLabels: a yellow '📷 Scan' button next to the Find or scan field. On a tablet it opens the camera (new command scanCameraField); the code read fills the search and, like a scanner's Enter, puts the one matching item on the list (LayoutController::cameraCode signal; cameraToField_ routes that one camera scan to the field instead of ringing it in). On the Pi it says 'No camera on this terminal: use the barcode scanner' (or, with a USB camera in /dev/v4l/by-id, that camera scanning is on the tablets).
+- **Why:** Owner 2026-11-04: scan labels from the tablet camera; the Pi has no camera.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml, modern/ui/cpp/layoutcontroller.cpp/.hh`
+- **Next person must know:** Needs a new tablet APK to work on tablets.
+
 ### 2026-11-04 15:57 ET — Bob (Claude) — Merged bob/cashier-duty (Cashier Duty screen, X report, Look Up Checks)
 - **What:** Merged the Cashier Duty page (X report, drawer, no sale, Look Up Checks, open checks, time clock), retail page changes (Cashier Duty and Reprint buttons, big number keys, blank decimal key) and the ILSA-style Look Up Checks screen with gift receipts.
 - **Why:** Tests matched main (same 32 known failures). Owner's 1-7 list from 2026-11-04.

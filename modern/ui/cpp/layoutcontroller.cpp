@@ -1972,7 +1972,11 @@ Java_org_viewtouch_pos_BarcodeScanner_nativeScanned(JNIEnv *env, jclass, jstring
         env->ReleaseStringUTFChars(code, utf);
     if (!scannedCode.isEmpty()) {
         QMetaObject::invokeMethod(s_activeScannerController, [c = scannedCode] {
-            if (s_activeScannerController)
+            if (!s_activeScannerController)
+                return;
+            if (s_activeScannerController->takeCameraToField())
+                emit s_activeScannerController->cameraCode(c);
+            else
                 s_activeScannerController->scanned(c);
         }, Qt::QueuedConnection);
     }
@@ -2028,7 +2032,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Close ViewTouch: a manager's way off a kiosk screen (it then stays
     // closed until the next boot; see vtmodern-kiosk.service).
-    if (name == u"scanCamera" || name == u"scanCameraId") {
+    if (name == u"scanCamera" || name == u"scanCameraId" || name == u"scanCameraField") {
+        cameraToField_ = name == u"scanCameraField";
 #ifdef Q_OS_ANDROID
         s_activeScannerController = this;
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
@@ -2042,7 +2047,12 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         }
         return done(false);
 #else
-        setStatus(tr("Use the handheld barcode scanner, or touch Scan on a tablet."));
+        cameraToField_ = false;
+        // The Pi reads barcodes with its scanner; camera scanning is on the tablets.
+        // (a USB camera shows in /dev/v4l/by-id; the Pi 5's own /dev/video* nodes are there with none)
+        const bool camera = !QDir(u"/dev/v4l/by-id"_s).entryList(QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot).isEmpty();
+        setStatus(camera ? tr("Camera scanning is on the tablets: use the barcode scanner here.")
+                         : tr("No camera on this terminal: use the barcode scanner."));
         return done(true);
 #endif
     }
