@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync: 44e5c6f4 lists trimmed at End of Day
+- **What:** Upstream 44e5c6f4 (a register on for months: done waitlist parties, deliveries over 60 days, past days over 60, and bumped/served tickets over 50 are trimmed at End of Day) plus its soak test (tests/test_soak.cpp). Conflict only in tests/CMakeLists.txt: kept our test list and added test_soak.cpp (upstream's other new test files aren't in this fork).
+- **Why:** The Pi runs for months; memory grew every day.
+- **Files:** `app/pos_day.cpp, tests/test_soak.cpp, tests/CMakeLists.txt`
+
 ### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync, group 1: database and network reliability
 - **What:** From the official ViewTouch (github.com/ViewTouch/viewtouch main), applied with git apply --3way, no conflicts: 7424bf42 a row that can never be written no longer stops every save; 209ec272 database indexes for what's looked up by time; 348bb5ae only plain table and column names go into SQL; ec643be2 the cash tips column added in one transaction; 2e9b9ddc a network message arriving in pieces isn't searched again from its start; 7f1695c0 terminals wait a little longer between tries, no endless wait; bd4291d0 standby takeover limited to five wrong PINs, then waits. Not yet (need hand merges): 44e5c6f4 lists trimmed at End of Day, 2e37ab3a phone waking from sleep, 5f415087 handheld taxes wiped, fc15f44f impossible prices refused.
 - **Why:** Owner left the upstream catch-up to Bob: bring in fixes in small tested groups, recorded by upstream commit id; no Qt 6.12 work (the Pi runs Qt 6.8).
