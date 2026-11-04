@@ -196,3 +196,15 @@ TEST_CASE("The Customer Display page reaches the guest's screen, apart from the 
         after << c.guestZones()->data(c.guestZones()->index(i), ZoneModel::KindRole).toString();
     CHECK(after == kinds);
 }
+
+TEST_CASE("The Customer Display page is only for editing on the cashier's screen", "[controller][guest]")
+{
+    LayoutController c = seedController();
+    CHECK_FALSE(c.showPage(u"customer-display"_s));   // no buttons there: the POS would be stuck
+    CHECK(c.pageId() != u"customer-display"_s);
+    c.enterEditMode();
+    REQUIRE(c.showPage(u"customer-display"_s));
+    CHECK(c.pageId() == u"customer-display"_s);
+    REQUIRE(c.leaveEditMode(false));
+    CHECK(c.pageId() != u"customer-display"_s);       // leaving the editor: back to the POS
+}

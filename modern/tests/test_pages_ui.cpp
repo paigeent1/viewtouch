@@ -60,6 +60,8 @@ TEST_CASE("Every seed page renders cleanly, running and editing", "[ui][pages]")
             g_warnings[i] = where + u": "_s + g_warnings[i];
     };
     for (const QString &id : pageIds) {
+        if (id == u"customer-display"_s)
+            continue;   // the guest's screen: on the cashier's only while editing (below)
         INFO(id.toStdString());
         const qsizetype before = g_warnings.size();
         CHECK(c.showPage(id));

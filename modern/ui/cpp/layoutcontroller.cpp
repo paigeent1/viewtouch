@@ -1259,6 +1259,9 @@ bool LayoutController::showPage(const QString &pageId)
 {
     if (!activeLayout().page(pageId))
         return false;
+    // The Customer Display page is the guest's screen: on this one only to edit it.
+    if (pageId == u"customer-display" && !editing())
+        return false;
     return navigate(Navigator::Mode::Replace, pageId) || nav_.current() == pageId;
 }
 
@@ -1446,6 +1449,12 @@ bool LayoutController::leaveEditMode(bool save)
 
     nav_.setHome(loginPage());
     ensureCurrentPageExists();
+    // Left on the Customer Display page (the guest's screen, no buttons): back to the POS.
+    if (nav_.current() == u"customer-display") {
+        nav_.jump(Navigator::Mode::Back);
+        if (nav_.current() == u"customer-display")
+            nav_.jump(Navigator::Mode::Home);
+    }
     refresh();
     emit pageChanged();
     return true;

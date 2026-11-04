@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 07:42 ET — Bob (Claude) — Leaving the editor on Customer Display goes back to the POS
+- **What:** LayoutController::leaveEditMode: if the cashier's screen is on customer-display, back (else home). showPage refuses customer-display outside editing. Seed page test skips it outside editing; controller test covers both.
+- **Why:** Owner: after editing the Customer Display page, both screens showed it and the POS had no way back (no buttons there).
+- **Files:** `ui/cpp/layoutcontroller.cpp, tests/test_controller.cpp, tests/test_pages_ui.cpp`
+
 ### 2026-11-04 07:40 ET — Bob (Claude) — Customer Display parts get settings in the editor
 - **What:** Inspector Settings for the guest parts (layout/schema.cpp widgetSettings): guestMedia Fit (fill/crop or the whole picture), Size % (10-100, centered), its own Picture and Video; guestMessages line above each message and seconds each; guestOrder rewards box and ask-for-email; guestHeader in the customer display color. WidgetGuestMedia honors props.scale.
 - **Why:** Owner: the Hat City logo is cut off in the left box; wants to scale it down from the editor.
