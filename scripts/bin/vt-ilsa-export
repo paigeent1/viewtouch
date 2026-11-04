@@ -1,0 +1,39 @@
+#!/bin/bash
+# Every table of an ILSA Access database (.mdb) to CSV, on this Pi (the store's data stays here:
+# never in the repo, never uploaded). Then a summary to paste to Bob: table names, row counts and
+# column names only, no customer data.
+#   vt-ilsa-export ~/Downloads/ilsa.mdb            -> ~/ilsa-export/ilsa/<table>.csv
+#   vt-ilsa-export ~/Downloads/IlsaArchive2019.mdb -> ~/ilsa-export/IlsaArchive2019/...
+set -e
+MDB="$1"
+if [ -z "$MDB" ] || [ ! -f "$MDB" ]; then
+    echo "Usage: vt-ilsa-export /path/to/ilsa.mdb"; exit 1
+fi
+if ! command -v mdb-export >/dev/null; then
+    echo "Installing mdbtools (reads Access databases)..."
+    sudo apt-get install -y mdbtools >/dev/null
+fi
+NAME=$(basename "$MDB"); NAME="${NAME%.*}"
+OUT="$HOME/ilsa-export/$NAME"
+mkdir -p "$OUT"; chmod 700 "$HOME/ilsa-export"
+SUMMARY="$OUT/_summary.txt"
+{
+    echo "ILSA export summary: $NAME ($(du -h "$MDB" | cut -f1), $(date '+%Y-%m-%d %H:%M'))"
+    echo "table | rows | columns"
+} > "$SUMMARY"
+mdb-tables -1 "$MDB" | while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    f="$OUT/$(echo "$t" | tr ' /' '__').csv"
+    if mdb-export -D '%Y-%m-%d %H:%M:%S' "$MDB" "$t" > "$f" 2>/dev/null; then
+        rows=$(( $(python3 -c "import csv,sys; print(sum(1 for _ in csv.reader(open(sys.argv[1], newline='', errors='replace'))))" "$f") - 1 ))
+        cols=$(head -n 1 "$f")
+        echo "$t | $rows | $cols" >> "$SUMMARY"
+    else
+        echo "$t | (could not read) |" >> "$SUMMARY"
+    fi
+done
+echo
+cat "$SUMMARY"
+echo
+echo "CSVs: $OUT   (summary: $SUMMARY)"
+echo "Paste the summary above to Bob. It has table and column names only."

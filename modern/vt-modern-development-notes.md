@@ -107,6 +107,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 17:28 ET — Bob (Claude) — Merged bob/ilsa-export
+- **What:** Merged bob/ilsa-export into main (notes/backlog and scripts only, no app code).
+- **Why:** Owner 2026-11-04: hold the Pi/tablet update for now; keep the record of changes in Git.
+- **Files:** `scripts/bin/vt-ilsa-export`
+
 ### 2026-11-04 17:28 ET — Bob (Claude) — Merged bob/backlog-receiving
 - **What:** Merged bob/backlog-receiving into main (notes/backlog and scripts only, no app code).
 - **Why:** Owner 2026-11-04: hold the Pi/tablet update for now; keep the record of changes in Git.
@@ -121,6 +126,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** Added the owner's receiving / inventory / movement decisions to section 5 (Pending Roadmap & Backlog), in build order: receiving by scan (new items, swaps), movement screen, system cost from his worksheet, cost differences review with brand price adjust; target margin field; vendor list additions.
 - **Why:** Owner 2026-11-04: put this on the development list.
 - **Files:** `modern/vt-modern-development-notes.md`
+### 2026-11-04 17:18 ET — Bob (Claude) — vt-ilsa-export: ILSA .mdb tables to CSV on the Pi
+- **What:** New scripts/bin/vt-ilsa-export: installs mdbtools if needed, exports every table of an ILSA Access database to ~/ilsa-export/<db>/<table>.csv (folder mode 700), and prints a summary of table names, row counts and column names (no data) to paste to Bob.
+- **Why:** Owner 2026-11-04: import ILSA history (receipts) into ViewTouch; the data stays on the Pi, not Drive or the repo.
+- **Files:** `scripts/bin/vt-ilsa-export`
+- **Next person must know:** Not merged to main yet (keeps the Pi and tablets on the same build number); the owner fetches it with git show from the branch.
 
 ### 2026-11-04 17:00 ET — Bob (Claude) — Tablet camera scan window: much bigger, centered
 - **What:** BarcodeScanner.kt overlay: the camera card is now 62% of the screen wide and 88% tall, centered (was 400x520 px in the top-right corner); the red guide line is across the middle of the picture (it sat at the top); bigger title and buttons.
