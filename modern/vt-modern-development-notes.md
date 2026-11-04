@@ -100,11 +100,20 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 13:03 ET — Bob (Claude) — Merged bob/guest-no-pointer into main
+- **What:** No mouse pointer over the guest screen.
+- **Why:** CI: no new failures (29 known).
+- **Files:** `modern/ui/qml/CustomerDisplayWindow.qml`
+
 ### 2026-11-04 13:02 ET — Bob (Claude) — Site hardware in settings files, not code (vt-site)
 - **What:** New vt-site (+ vt-site-lib sourced by the scripts): each Pi's hardware lives in ~/.config/viewtouch/ (not in Git): site.conf (SITE_NAME, SERVER_ADDR (empty = this Pi), SERVER_PORT, SERIAL_SCANNER (empty = adapter's first port by name, off), SERIAL_SCANNER_BAUD) and tablets (Name|IP lines; vt-site tablet add/remove; started from the old ~/.config/viewtouch_tablets.list). vt-status, vt-check-tablets, vt-tablets, vt-adb-ensure, vt-os-update loop over this site's tablets (any number) instead of fixed .220/.215/.210; vt-add-tablet pairs with vt_server_addr instead of 192.168.1.219, adds the tablet to the list, and no longer pairs twice (its block was duplicated). vt-server uses  and passes the site's scanner port/baud to vtmodern. vt-directv has no built-in TV list; HCA's receivers are in scripts/sites/hca-tvs.json to copy at HCA.
 - **Why:** Owner 2026-11-04: hardware setups must be variable per store (BH Danbury beta, HCA, new BH Danbury, Gaylordsville, Corporate) without changing code.
 - **Files:** `scripts/bin/vt-site, scripts/bin/vt-site-lib, scripts/bin/vt-status, scripts/bin/vt-check-tablets, scripts/bin/vt-tablets, scripts/bin/vt-adb-ensure, scripts/bin/vt-os-update, scripts/bin/vt-add-tablet, scripts/bin/vt-server, scripts/bin/vt-directv, scripts/sites/`
 - **Next person must know:** Every /usr/local/bin/vt-* must be a symlink to scripts/bin (they find vt-site-lib next to the real file). On a Pi without ~/.config/viewtouch/tablets, run vt-site init and vt-site tablet add for each tablet. Printers, taxes, receipts stay in ViewTouch's own settings.
+### 2026-11-04 12:49 ET — Bob (Claude) — No mouse pointer on the guest screen
+- **What:** CustomerDisplayWindow.qml: a MouseArea over the guest window (no buttons, hover only) sets a blank cursor, so the pointer doesn't sit where a guest touched. Touches pass through; the POS window keeps its pointer.
+- **Why:** Owner 2026-11-04: the pointer showed on the guest screen when it was touched.
+- **Files:** `modern/ui/qml/CustomerDisplayWindow.qml`
 
 ### 2026-11-04 12:49 ET — Bob (Claude) — Notes: conflict markers removed
 - **What:** The learn-touch merge committed the notes file with Git conflict markers (both sides kept now, no text lost).
