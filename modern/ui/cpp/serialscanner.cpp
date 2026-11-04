@@ -1,5 +1,6 @@
 #include "serialscanner.hh"
 
+#include <QDir>
 #include <QFile>
 #include <QSocketNotifier>
 #include <QtGlobal>
@@ -39,7 +40,8 @@ SerialScanner::SerialScanner(QObject *parent)
     : QObject(parent)
 {
     const QString dev = qEnvironmentVariable("VT_SERIAL_SCANNER").trimmed();
-    device_ = dev.isEmpty() ? u"/dev/ttyUSB0"_s : dev;
+    fixedDevice_ = !dev.isEmpty();
+    device_ = fixedDevice_ ? dev : firstSerialPort();
     bool ok = false;
     const int b = qEnvironmentVariableIntValue("VT_SERIAL_SCANNER_BAUD", &ok);
     if (ok && b > 0)
@@ -66,10 +68,26 @@ void SerialScanner::start()
 #endif
 }
 
+// The adapter's first port by its stable name (/dev/serial/by-id/...-port0, e.g. the Keyspan
+// USA-49WG's): the ttyUSB number changes when the adapter is unplugged while the port is open
+// (ttyUSB0 came back as ttyUSB4, 2026-11-04). None: /dev/ttyUSB0.
+QString SerialScanner::firstSerialPort()
+{
+    const QDir byId(u"/dev/serial/by-id"_s);
+    QStringList ports = byId.entryList({u"*-port0"_s}, QDir::System | QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    if (ports.isEmpty())
+        ports = byId.entryList({u"*"_s}, QDir::System | QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    return ports.isEmpty() ? u"/dev/ttyUSB0"_s : byId.filePath(ports.first());
+}
+
 void SerialScanner::tryOpen()
 {
 #ifdef Q_OS_LINUX
-    if (fd_ >= 0 || !QFile::exists(device_))
+    if (fd_ >= 0)
+        return;
+    if (!fixedDevice_)
+        device_ = firstSerialPort();
+    if (!QFile::exists(device_))
         return;
     const int fd = ::open(device_.toLocal8Bit().constData(), O_RDONLY | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) {

@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:51 ET — Bob (Claude) — Serial scanner found by the adapter's stable name
+- **What:** SerialScanner (without VT_SERIAL_SCANNER) now opens the first /dev/serial/by-id/*-port0 (the Keyspan USA-49WG's first port), looked up again at every retry, instead of a fixed /dev/ttyUSB0; no by-id entry: /dev/ttyUSB0 as before.
+- **Why:** The Keyspan was unplugged while ViewTouch had ttyUSB0 open; plugged back in it came up as ttyUSB4-7 and ViewTouch kept waiting for ttyUSB0, so scans stopped (2026-11-04).
+- **Files:** `modern/ui/cpp/serialscanner.hh, modern/ui/cpp/serialscanner.cpp`
+- **Next person must know:** The scanner must be on the Keyspan's first port (port 1 on the case, port0 in Linux).
+
 ### 2026-11-04 12:49 ET — Bob (Claude) — Notes: conflict markers removed
 - **What:** The learn-touch merge committed the notes file with Git conflict markers (both sides kept now, no text lost).
 - **Why:** My merge commit went in before the notes conflict was resolved.
