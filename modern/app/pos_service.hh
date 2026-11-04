@@ -1314,7 +1314,7 @@ private:
     QVariantMap ageAsk_;              // an item waiting for the buyer's ID (pos_age.cpp)
     PendingScan ageAskScan_;          // the scan that rang it in, kept for when the ID passes
     bool askForAge(const core::MenuItem &item, int age, const PendingScan &scan);
-    bool agePassed(int age, const char *how, const std::string &idNumber);
+    bool agePassed(int age, const char *how, const std::string &idNumber, bool expired = false);
     bool checkAge(const core::IdDate &birth, const core::IdDate &expires, const char *how, const std::string &idNumber);
     QString labelQuery_;
     QStringList labelPath_;

@@ -573,9 +573,7 @@ TEST_CASE("ID checks: alcohol asks for the ID; a scan of the license lets it in,
     CHECK(pos.ageAsk().isEmpty());
     CHECK(pos.lines().isEmpty());
 
-    // An expired ID: refused.
     CHECK_FALSE(pos.addItem(u"draft-beer"_s));
-    CHECK_FALSE(pos.verifyAgeScan(license(mmddyyyy(30), mmddyyyy(1))));
     CHECK_FALSE(pos.verifyAgeScan(u"012345678905"_s));                    // a UPC isn't an ID
 
     // 30 years old, good until 3 years from now: the beer goes in; the check remembers.
@@ -587,8 +585,16 @@ TEST_CASE("ID checks: alcohol asks for the ID; a scan of the license lets it in,
     CHECK(c->ageVerified == 21);
     CHECK(c->ageHow == "scan");
     CHECK(c->ageId4 == "5789");                                          // only the last 4
+    CHECK_FALSE(c->ageIdExpired);
     REQUIRE(pos.addItem(u"draft-beer"_s));                               // no second ask
     CHECK(pos.lines().size() == 2);
+
+    // An expired ID still shows their photo and date of birth: accepted, noted for the receipt.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    REQUIRE(pos.verifyAgeScan(license(mmddyyyy(40), mmddyyyy(1))));
+    CHECK(pos.currentCheck()->ageIdExpired);
+    CHECK(pos.lines().size() == 1);
 
     // A new check: an ID that won't scan, the date of birth typed (the exception).
     REQUIRE(pos.startCheck(core::CheckType::Takeout));

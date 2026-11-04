@@ -299,6 +299,7 @@ struct Check {
     std::string ageBy;
     std::int64_t ageAt = 0;
     std::string ageId4;
+    bool ageIdExpired = false;   // the ID shown had expired: accepted (it still shows their photo and birth date), noted on the receipt
     std::map<std::string, std::string> giftCardFor;   // card number -> who a card sold on it is for (Purchased For)
     CardHold hold;                        // a tab's card, held
     bool kiosk = false;               // a guest ordered it on the self-order kiosk

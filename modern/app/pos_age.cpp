@@ -75,7 +75,7 @@ bool PosService::saveIdChecks(const QVariantMap &values)
 }
 
 // The ID passed: on the check, then the item waiting goes in.
-bool PosService::agePassed(int age, const char *how, const std::string &idNumber)
+bool PosService::agePassed(int age, const char *how, const std::string &idNumber, bool expired)
 {
     const QString item = ageAsk_.value(u"item"_s).toString();
     const PendingScan scan = std::exchange(ageAskScan_, {});
@@ -88,8 +88,10 @@ bool PosService::agePassed(int age, const char *how, const std::string &idNumber
         c->ageBy = user() ? user()->name : std::string();
         c->ageAt = now();
         c->ageId4 = idNumber.size() > 4 ? idNumber.substr(idNumber.size() - 4) : idNumber;
-        noteEvent(*c, std::string_view(how) == "hand" ? tr("ID checked by hand (date of birth typed): %1+").arg(age)
-                                                      : tr("ID scanned: %1+").arg(age),
+        c->ageIdExpired = c->ageIdExpired || expired;
+        noteEvent(*c, (std::string_view(how) == "hand" ? tr("ID checked by hand (date of birth typed): %1+").arg(age)
+                                                       : tr("ID scanned: %1+").arg(age))
+                          + (expired ? tr(", expired ID accepted") : QString()),
                   std::string_view(how) == "hand" ? "ageHand" : "ageScan");
         changed(*c);
     }
@@ -105,11 +107,8 @@ bool PosService::checkAge(const IdDate &birth, const IdDate &expires, const char
     const QDate today = QDateTime::fromMSecsSinceEpoch(now()).date();
     if (!birth.valid())
         return fail(tr("That date of birth isn't a real date."));
-    if (expiredOn(expires, today.year(), today.month(), today.day())) {
-        if (Check *c = current())
-            noteEvent(*c, tr("ID refused: expired"), "ageRefused");
-        return fail(tr("This ID has expired: not accepted."));
-    }
+    // An expired ID still shows their photo and date of birth: accepted, noted on the check and receipt.
+    const bool expired = expiredOn(expires, today.year(), today.month(), today.day());
     // The item waiting's age; an ID shown before anything is rung in: checked for both.
     const int need = ageAsk_.isEmpty() ? std::max({1, s_->settings.ageTobacco, s_->settings.ageAlcohol})
                                        : std::max(1, ageAsk_.value(u"age"_s).toInt());
@@ -123,7 +122,11 @@ bool PosService::checkAge(const IdDate &birth, const IdDate &expires, const char
         emit checkChanged();
         return fail(tr("Under %1: %2 can't be sold.").arg(need).arg(name));
     }
-    return agePassed(need, how, idNumber);
+    if (!agePassed(need, how, idNumber, expired))
+        return false;
+    if (expired)
+        emit notice(tr("Expired ID accepted: noted on the receipt."));
+    return true;
 }
 
 bool PosService::verifyAgeScan(const QString &raw)

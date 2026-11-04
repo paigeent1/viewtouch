@@ -220,6 +220,10 @@ Document receipt(const Check &check, const TicketContext &ctx)
         d.center(ctx.tr("Thank you!"));
     for (const std::string &l : footer)
         d.center(l);
+    if (check.ageVerified > 0 && check.ageIdExpired) {
+        d.blank();
+        d.center(ctx.tr("ID checked: expired ID accepted"));
+    }
     if (receiptNeedsPrivacy(check, ctx.settings)) {
         d.blank();
         for (const std::string &l : splitLines(privacyText(ctx.settings, false)))
