@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:10 ET — Bob (Claude) — Guest touch: works with touchscreens on a USB hub
+- **What:** vt-touch-map and vt-guest-display now strip only the interface part of a touchscreen's ID_PATH (':1.0' after the port), so a hub port like usb-0:1.2 is kept whole. Before, the saved guest port usb-0:1.2 was cut again to usb-0 when read, never matched, and both touchscreens went to the POS monitor.
+- **Why:** Owner moved both touchscreens onto an (unpowered) USB hub 2026-11-04; after learning, guest touches still worked the cashier screen.
+- **Files:** `scripts/bin/vt-touch-map, scripts/bin/vt-guest-display`
+- **Next person must know:** Direct ports (usb-0:2) and older saved files with the interface part still work.
+
 ### 2026-11-04 10:47 ET — Bob (Claude) — Merged bob/privacy-notice into main
 - **What:** Privacy notice (receipts, guest-screen Accept, Print Privacy Notice on Customers, Desktop/Privacy Notice.txt, Store Settings > Privacy notice) and Store Settings > Age-restricted sales (minimum ages, not used yet).
 - **Why:** CI: no new failures against main (29 known; line numbers shifted by the added test lines).
