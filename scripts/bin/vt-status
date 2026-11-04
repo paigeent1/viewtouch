@@ -2,8 +2,8 @@
 /usr/local/bin/vt-adb-ensure >/dev/null 2>&1 || true
 REPO="/home/pi/viewtouch-main"
 GIT_HASH=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-LATEST=$(grep VTM_BUILD_VERSION "$REPO/modern/build/vtm_build_number.hh" 2>/dev/null | awk "{print \$3}" | tr -d "\"")
-SERVER_VER="${LATEST:-0.9.19}"
+LATEST=$(cat "$REPO/modern/build/generated/vtm_build_number.hh" "$REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk "{print \$3}" | tr -d "\"")
+SERVER_VER="${LATEST:-unknown (not built?)}"
 SUBNET=$(hostname -I | awk "{print \$1}" | cut -d. -f1-3)
 SUBNET=${SUBNET:-192.168.1}
 adb connect "${SUBNET}.220:5555" >/dev/null 2>&1 || true

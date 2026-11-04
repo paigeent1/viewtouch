@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:34 ET — Bob (Claude) — vt-status / vt-check-tablets read the real server build
+- **What:** Both read VTM_BUILD_VERSION from modern/build/generated/vtm_build_number.hh (where CMake writes it), falling back to the old path; no more silent '0.9.19' when the file isn't found (now 'unknown').
+- **Why:** vt-status showed Server: 0.9.19 after the build number fix: the scripts looked in modern/build/, the header is in modern/build/generated/, and the 0.9.19 fallback hid that.
+- **Files:** `scripts/bin/vt-status, scripts/bin/vt-check-tablets`
+
 ### 2026-11-04 12:32 ET — Bob (Claude) — vt-status and vt-check-tablets show Bar 3
 - **What:** Both scripts now also connect to and report Bar 3 (192.168.1.210), like vt-tablets and vt-adb-ensure already did; vt-check-tablets counts Bar 3 for 'up to date'.
 - **Why:** Owner asked why Bar 3 wasn't showing in the ADB status: the two report scripts only listed Bar 1 and Bar 2.
