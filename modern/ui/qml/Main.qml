@@ -31,6 +31,17 @@ ApplicationWindow {
                                : Qt.platform.os !== "android"
     // What a barcode scanner is typing (see the page's Keys).
     property string scanBuffer: ""
+    // A license barcode typed by a keyboard-mode scanner (a Bluetooth one on a tablet): done when it stops.
+    Timer {
+        id: idScanEnd
+        interval: 200
+        onTriggered: {
+            if (!root.scanBuffer.startsWith("@")) return
+            const code = root.scanBuffer
+            root.scanBuffer = ""
+            root.controller.scanned(code)
+        }
+    }
     property double scanLast: 0
     // The text field being typed in, if any.
     readonly property Item typingIn: {
@@ -195,9 +206,20 @@ ApplicationWindow {
                     // then Enter.
                     const now = Date.now()
                     const burst = now - root.scanLast < 60
+                    // Shift (capital letters in a license barcode) is part of the burst, not its end.
+                    if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control || event.key === Qt.Key_Alt)
+                        return
                     root.scanLast = now
                     if (event.text.length === 1 && event.text > " ") {
                         root.scanBuffer = burst ? root.scanBuffer + event.text : event.text
+                        if (root.scanBuffer.startsWith("@")) idScanEnd.restart()
+                    } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && burst
+                               && root.scanBuffer.startsWith("@")) {
+                        // The back of a license: many lines; it's sent whole when the scanner stops.
+                        root.scanBuffer += "\n"
+                        idScanEnd.restart()
+                        event.accepted = true
+                        return
                     } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && burst
                                && root.scanBuffer.length >= 4) {
                         const code = root.scanBuffer
@@ -1523,6 +1545,12 @@ ApplicationWindow {
     }
 
     ScanAddOverlay { id: scanAddOverlay; controller: root.controller }
+    // The small 1D barcode on a license may have come first: the license scan closes its "not on file".
+    Connections {
+        target: root.controller
+        function onIdCardScanned() { scanAddOverlay.closeOverlay() }
+    }
+    AgeCheckOverlay { controller: root.controller }
     Connections {
         target: root.controller
         function onStatusChanged() { root.toast(root.controller.statusText) }

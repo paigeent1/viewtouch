@@ -127,7 +127,9 @@ void SerialScanner::readReady()
         if (n > 0) {
             for (ssize_t i = 0; i < n; ++i) {
                 const char ch = chunk[i];
-                if (ch == '\r' || ch == '\n') {
+                if ((ch == '\r' || ch == '\n' || ch == 0x1e) && buffer_.startsWith('@')) {
+                    buffer_.append('\n');   // a license barcode: many lines, sent whole when the scanner stops
+                } else if (ch == '\r' || ch == '\n') {
                     flush();
                 } else if (static_cast<unsigned char>(ch) >= 0x20 && ch != 0x7f) {
                     buffer_.append(ch);

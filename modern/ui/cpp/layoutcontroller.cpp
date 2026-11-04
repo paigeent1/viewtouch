@@ -28,6 +28,7 @@
 
 #include "core/employee.hh"
 #include "core/settings.hh"
+#include "core/id_card.hh"
 #include "app/menu_import.hh"
 #include "layout/menu_screens.hh"
 #include "layout/reflow.hh"
@@ -1624,7 +1625,7 @@ void LayoutController::scanned(const QString &code)
 {
     const QString c = code.trimmed();
     if (!c.isEmpty()) {   // for Site Setup's scanner test (the start of it only)
-        lastScan_ = c.left(48);
+        lastScan_ = vt::core::looksLikeIdCard(c.toStdString()) ? tr("A driver's license / ID (read OK)") : c.left(48);
         lastScanAt_ = QDateTime::currentMSecsSinceEpoch();
         ++siteRevision_;
         emit siteChanged();
@@ -1632,6 +1633,23 @@ void LayoutController::scanned(const QString &code)
     if (editing() || !pos_ || !pos_->loggedIn() || c.isEmpty())
         return;
     typedNumber_.clear();
+    // The back of a driver's license: the ID check, never an item. Many licenses also carry a small
+    // 1D barcode (Code 128/39) beside the big square one, and a scanner reading every kind (cigar
+    // labels need them) sends both: a 1D code while an ID check waits, or within 3 seconds of a
+    // license, is that one, and is dropped.
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    if (vt::core::looksLikeIdCard(c.toStdString())) {
+        lastIdScanAt_ = nowMs;
+        emit idCardScanned();   // closes an "Item not on file" the small barcode may have opened
+        call(u"verifyAgeScan"_s, {c}, [](const QVariant &) {});
+        return;
+    }
+    if (!pos_->ageAsk().isEmpty()) {
+        setStatus(tr("That's the small barcode: scan the big square barcode on the back of the ID."));
+        return;
+    }
+    if (nowMs - lastIdScanAt_ < 3000)
+        return;
     // PRICE CHECK on: the code shows its item (and its box or singles); nothing is rung in.
     if (pos_->priceCheck().value(u"on"_s).toBool()) {
         call(u"priceCheckCode"_s, {c}, [](const QVariant &) {});
@@ -1699,7 +1717,9 @@ void LayoutController::scanned(const QString &code)
             const bool giftCards = here && (here->id == u"gift-card"
                                             || std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) {
                                                    return pz.zone->kind == u"giftCard"; }));
-            if (giftCards) {
+            if (QDateTime::currentMSecsSinceEpoch() - lastIdScanAt_ < 3000) {
+                // A license's small barcode, answered after the license itself: nothing to add.
+            } else if (giftCards) {
                 setStatus(tr("%1 isn't a valid gift card.").arg(c));   // a gift card screen: no "add an item"
             } else if (adds) {
                 setStatus(QString());

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "core/check.hh"
+#include "core/id_card.hh"
 #include "core/customer.hh"
 #include "core/day.hh"
 #include "core/employee.hh"
@@ -587,6 +588,18 @@ public:
     void releaseCheck();
 
     bool addItem(const QString &idOrName);
+    // --- ID checks for age-restricted items (pos_age.cpp) ---
+    // The item waiting for an ID: {item, name, age, handNeedsManager}; {} when none.
+    QVariantMap ageAsk() const override { return ageAsk_; }
+    // The barcode on the back of a license (AAMVA): old enough and not expired -> the item goes in.
+    bool verifyAgeScan(const QString &raw);
+    // An ID that won't scan: its date of birth typed (MMDDYYYY); logged as the exception.
+    bool verifyAgeHand(const QString &mmddyyyy);
+    void cancelAgeCheck();
+    // Site Setup > ID checks: {tobacco, alcohol, ageTobacco, ageAlcohol, tobaccoCategories, handNeedsManager}.
+    QVariantMap idChecks() const override;
+    bool saveIdChecks(const QVariantMap &values);
+    int requiredAge(const core::MenuItem &item) const;
     void setQualifier(const QString &qualifier);   // same one again clears it
     void selectLine(qint64 lineId) override;
     void selectPayment(qint64 paymentId) override;
@@ -1294,6 +1307,11 @@ private:
     QString customerQuery_;
     std::string selectedCustomer_;
     QString giftCardNumber_;
+    QVariantMap ageAsk_;              // an item waiting for the buyer's ID
+    std::string ageAskScan_;
+    bool askForAge(const core::MenuItem &item, int age, const std::string &scan);
+    bool agePassed(int age, const char *how, const std::string &idNumber);
+    bool checkAge(const core::IdDate &birth, const core::IdDate &expires, const char *how, const std::string &idNumber);
     QVariantMap pendingCustomer_;     // waiting on the duplicate window
     QVariantList customerMatches_;
     struct PendingScan { QString itemId, code; bool retail = false; };
