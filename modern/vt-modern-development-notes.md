@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:05 ET — Bob (Claude) — Upstream sync: fc15f44f impossible prices refused
+- **What:** Upstream fc15f44f by hand: priceCents (a card's typed price) and the CSV import's price() refuse inf, nan, 1e300 and 14-digit amounts (std::isfinite, under 10,000,000). Our menu_import.cpp is older than upstream's (no Toast/xlsx readers), so only the price check and kMaxPrice went in; its test kept for typed and CSV prices, the fuzz test of importers we don't have left out.
+- **Why:** A typed 'inf' rounded to cents is undefined; huge prices overflow totals.
+- **Files:** `app/menu_import.cpp, app/pos_menu_builder.cpp, tests/test_menu_builder.cpp`
+
 ### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync: 44e5c6f4 lists trimmed at End of Day
 - **What:** Upstream 44e5c6f4 (a register on for months: done waitlist parties, deliveries over 60 days, past days over 60, and bumped/served tickets over 50 are trimmed at End of Day) plus its soak test (tests/test_soak.cpp). Conflict only in tests/CMakeLists.txt: kept our test list and added test_soak.cpp (upstream's other new test files aren't in this fork).
 - **Why:** The Pi runs for months; memory grew every day.
