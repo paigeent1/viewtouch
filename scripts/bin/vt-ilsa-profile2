@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""ILSA export profile, round 2 (for Bob): dates read in any format, and what each line code /
+mode flag / Z mode means, by counts and dollar sums. Counts, codes, departments and dates only:
+no customers, employees, cards or birth dates.
+  vt-ilsa-profile2 ~/ilsa-export/"copy bhdan 10-29-2026"
+"""
+import csv, os, re, sys
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+if not os.path.isdir(D):
+    sys.exit("Usage: vt-ilsa-profile2 ~/ilsa-export/<database name>")
+
+def rows(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(D, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?)?")
+def iso(s):
+    """Any of 2024-01-02 10:00:00, 01/02/24 10:00:00, 1/2/2024 10:00 AM -> '2024-01-02 10:00:00'."""
+    s = (s or "").strip()
+    if len(s) >= 10 and s[:4].isdigit() and s[4] == "-":
+        return s[:19]
+    m = US.match(s)
+    if not m:
+        return ""
+    mo, d, y, hh, mi, ss, ap = m.groups()
+    y = int(y); y += 2000 if y < 70 else (1900 if y < 100 else 0)
+    h = int(hh or 0)
+    if ap: h = h % 12 + (12 if ap.lower() == "pm" else 0)
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d} {h:02d}:{int(mi or 0):02d}:{int(ss or 0):02d}"
+
+def num(s):
+    try: return float(s)
+    except (TypeError, ValueError): return 0.0
+
+class Tally:
+    def __init__(self): self.n, self.amt, self.qty, self.first, self.last, self.dept = 0, 0.0, 0.0, "9999", "", Counter()
+    def add(self, when, amt=0.0, qty=0.0, dept=None):
+        self.n += 1; self.amt += amt; self.qty += qty
+        if when: self.first, self.last = min(self.first, when), max(self.last, when)
+        if dept is not None: self.dept[dept] += 1
+    def __str__(self):
+        d = ", ".join(f"{k}x{v}" for k, v in self.dept.most_common(4))
+        return f"{self.n} rows, amt ${self.amt:,.2f}, qty {self.qty:,.0f}, {self.first[:10]}..{self.last[:10]}" + (f", depts {d}" if d else "")
+
+def show(title, items):
+    print(f"\n== {title}")
+    for k, v in items:
+        print(f"  {k}: {v}")
+
+dept_name = {r.get("DEPT_NUM"): r.get("DEPT_NAME") for r in rows("Dept")}
+samples = []
+
+# --- receipts
+rs_year, rs_z, rs_regs = defaultdict(Tally), defaultdict(Tally), Counter()
+keys = {}
+for r in rows("RegSale"):
+    raw = r.get("START_TIME") or r.get("END_TIME") or ""
+    if len(samples) < 3: samples.append(raw)
+    t = iso(raw)
+    amt = num(r.get("SALE_TOTAL"))
+    rs_year[t[:4] or "?"].add(t, amt); rs_z[r.get("Z_MODE")].add(t, amt); rs_regs[r.get("REG_NUM")] += 1
+    keys[(r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM"))] = r.get("Z_MODE")
+print("Raw START_TIME examples (format check):", samples)
+show("Receipts by year", sorted(rs_year.items()))
+show("Receipts by Z_MODE", sorted(rs_z.items()))
+show("Receipts by register", sorted(rs_regs.items()))
+
+# --- lines
+def cls_key(r):
+    c, t = r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE")
+    return (c, "*" if c == "15" else t)
+by_cls, by_mode, by_cls_match, ly = defaultdict(Tally), defaultdict(Tally), Counter(), defaultdict(Tally)
+c15_in = Counter()
+prc_ids = {r.get("ID") for r in rows("PRC_ADJ")} | {r.get("ID") for r in rows("PRC_ADJ_ARCHIVE")}
+sys_ids = {r.get("ID") for r in rows("SYSDISCOUNT")} | {r.get("ID") for r in rows("SYSDISCOUNT_ARCHIVE")}
+plus = {(r.get("PLU_NUM") or "").strip() for r in rows("PLU")}
+last_sold = {}
+for r in rows("PDetail"):
+    t = iso(r.get("TIME_STAMP"))
+    amt, qty, dept = num(r.get("DETAIL_LINE_AMT")), num(r.get("DETAIL_AT_QTY")), r.get("DEPT")
+    k = cls_key(r)
+    in_rcpt = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM")) in keys
+    by_cls[k].add(t, amt, qty, dept); by_cls_match[(k, in_rcpt)] += 1
+    by_mode[r.get("MODE_FLAGS")].add(t, amt, qty)
+    if in_rcpt: ly[t[:4] or "?"].add(t, amt, qty)
+    if k[0] == "15":
+        ty = r.get("DETAIL_TYPE")
+        c15_in["in PRC_ADJ ids" if ty in prc_ids else "in SYSDISCOUNT ids" if ty in sys_ids else "is a PLU" if ty in plus else "other"] += 1
+    p = (r.get("PLU") or "").strip()
+    if in_rcpt and k == ("1", "1") and p and t > last_sold.get(p, ""): last_sold[p] = t
+show("Lines by (DETAIL_CLASS, DETAIL_TYPE) (class 15 grouped)", sorted(by_cls.items()))
+show("Lines: code and whether it belongs to a receipt", sorted(by_cls_match.items()))
+show("Class 15 DETAIL_TYPE is...", c15_in.most_common())
+show("Lines by MODE_FLAGS", sorted(by_mode.items(), key=lambda kv: -kv[1].n))
+show("Receipt lines by year", sorted(ly.items()))
+show("Departments (num: name)", sorted(dept_name.items(), key=lambda kv: int(kv[0]) if (kv[0] or "").isdigit() else 0))
+
+# --- tenders
+tt = defaultdict(Tally)
+for r in rows("TENDSALE"):
+    t = iso(r.get("DATE_TIME"))
+    tt[(t[:4] or "?", r.get("TENDER_TYPE"))].add(t, num(r.get("SALE_AMT")))
+show("Tenders by (year, type)", sorted(tt.items()))
+
+# --- inventory movements
+ia = defaultdict(Tally)
+for r in rows("InvAdj"):
+    t = iso(r.get("TIME_STAMP"))
+    ia[(r.get("REC_TYPE"), t[:4] or "?")].add(t, num(r.get("TOTAL_COST")), num(r.get("QTY")))
+show("InvAdj by (REC_TYPE, year)", sorted(ia.items()))
+
+# --- Z reports
+zt = defaultdict(Tally)
+for r in rows("RegZCnt"):
+    t = iso(r.get("REG_Z_DATETIME")); zt[t[:4] or "?"].add(t)
+show("Register Z reports by year", sorted(zt.items()))
+
+# --- items by last sale (only sale lines on receipts)
+b = Counter()
+for p in plus:
+    s = last_sold.get(p, "")
+    b["never sold" if not s else s[:4]] += 1
+show("Items by year of last sale (trim estimate)", sorted(b.items()))
+print("\nDone. Paste everything above to Bob.")

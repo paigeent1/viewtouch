@@ -108,6 +108,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:29 ET — Bob (Claude) — vt-ilsa-profile2: dates in any format, line codes explained by sums
+- **What:** New scripts/bin/vt-ilsa-profile2: reads MM/DD/YY dates (mdb-export wrote datetimes in that form, so round 1 showed every year as '?'); receipts by year / Z_MODE / register; PDetail by class/type with dollar and qty sums, top departments, and whether each code belongs to a receipt; class 15 types checked against PRC_ADJ / SYSDISCOUNT ids and PLUs; MODE_FLAGS sums; tenders and InvAdj by year; register Z's by year; items by year of last sale.
+- **Why:** Round 1 (2026-11-04): 415,506 receipts link cleanly; dates unreadable; 168,408 class 9/15 lines belong to no receipt (match InvAdj type 15); need void/refund/promo codes before writing the importer.
+- **Files:** `scripts/bin/vt-ilsa-profile2`
+
 ### 2026-11-04 18:27 ET — Bob (Claude) — vt-ilsa-profile: ILSA sales/movement facts for the importer
 - **What:** New scripts/bin/vt-ilsa-profile <export folder>: from vt-ilsa-export's CSVs prints counts only: receipts and sales by year, date range, receipt key uniqueness and how PDetail/TendSale lines match RegSale, line DETAIL_CLASS/TYPE, SOURCE_CLASS and MODE_FLAGS codes (voids/refunds), tender setup, MDetail classes, InvAdj types by year, departments/groups/target GM, tax types, POS flags, item ACTIVE/LINK/ALT counts, box links (Inv_Info), and items by last sale (trim estimate). No customer, employee, card or receipt contents.
 - **Why:** Owner 2026-11-04: the BH Danbury ILSA database (415,506 receipts, 1,024,275 lines) to import; owner: no receiving was done in ILSA, only sales and movement data matter.
