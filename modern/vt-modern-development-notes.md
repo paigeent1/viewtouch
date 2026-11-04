@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:12 ET — Bob (Claude) — ID checks: build fix (helpers include)
+- **What:** pos_age.cpp includes app/pos_json.hh for the qs/ss string helpers.
+- **Why:** CI build error on bob/id-checks.
+- **Files:** `modern/app/pos_age.cpp`
+
 ### 2026-11-04 14:09 ET — Bob (Claude) — ID checks: expired IDs accepted, noted on the receipt
 - **What:** An expired license is no longer refused: old enough passes; the check keeps ageIdExpired (in its ageCheck JSON), its history says 'expired ID accepted', a notice says so, and the receipt prints 'ID checked: expired ID accepted'. Under age is still refused.
 - **Why:** Owner 2026-11-04: don't refuse expired IDs; it's still the person's photo and birth date; note it on the receipt.

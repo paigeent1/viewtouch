@@ -2,6 +2,7 @@
 // Scanning the back of the license checks the date of birth and expiration; a date of birth typed by
 // hand is the exception (logged; a manager's PIN when the store asks). Once checked, the check
 // remembers it: more restricted items on it go straight in. Settings: Site Setup > ID checks.
+#include "app/pos_json.hh"
 #include "app/pos_service.hh"
 #include "core/id_card.hh"
 
