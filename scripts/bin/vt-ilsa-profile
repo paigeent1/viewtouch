@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""ILSA export profile for Bob: counts, date ranges, codes and setup names only (no customers,
+employees, cards or receipts' contents). Reads the CSVs vt-ilsa-export wrote.
+  vt-ilsa-profile ~/ilsa-export/"copy bhdan 10-29-2026"
+"""
+import csv, os, sys
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+if not os.path.isdir(D):
+    sys.exit("Usage: vt-ilsa-profile ~/ilsa-export/<database name>")
+
+def rows(t):
+    p = os.path.join(D, t + ".csv")
+    if not os.path.exists(p):
+        for f in os.listdir(D):
+            if f.lower() == (t + ".csv").lower():
+                p = os.path.join(D, f); break
+        else:
+            return
+    with open(p, newline="", errors="replace") as fh:
+        yield from csv.DictReader(fh)
+
+def year(s):
+    s = (s or "").strip()
+    return s[:4] if len(s) >= 4 and s[:4].isdigit() else "?"
+
+def num(s):
+    try: return float(s)
+    except (TypeError, ValueError): return 0.0
+
+def show(title, counter, top=25):
+    print(f"\n== {title}")
+    for k, v in (counter.most_common(top) if isinstance(counter, Counter) else counter):
+        print(f"  {k}: {v}")
+
+# --- receipts
+by_year, total_by_year, zmode, susp, agev, wh = Counter(), defaultdict(float), Counter(), Counter(), Counter(), Counter()
+keys2, keys3 = Counter(), Counter()
+first, last = "9999", "0000"
+for r in rows("RegSale"):
+    t = r.get("START_TIME") or r.get("END_TIME") or ""
+    y = year(t); by_year[y] += 1; total_by_year[y] += num(r.get("SALE_TOTAL"))
+    if t[:4].isdigit(): first, last = min(first, t), max(last, t)
+    zmode[r.get("Z_MODE")] += 1; susp[r.get("SUSPENDED")] += 1; agev[r.get("AGE_VERIFIED")] += 1; wh[r.get("Warehoused")] += 1
+    keys2[(r.get("REG_NUM"), r.get("RECEIPT_NUM"))] += 1
+    keys3[(r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM"))] += 1
+print(f"RegSale receipts: {sum(by_year.values())}, first {first}, last {last}")
+show("Receipts and sales total by year", sorted((y, f"{by_year[y]} receipts, ${total_by_year[y]:,.2f}") for y in by_year), 99)
+show("RegSale Z_MODE", zmode); show("RegSale SUSPENDED", susp); show("RegSale AGE_VERIFIED", agev); show("RegSale Warehoused", wh)
+print(f"\nReceipt key (REG_NUM, RECEIPT_NUM): {len(keys2)} distinct, {sum(1 for v in keys2.values() if v > 1)} repeated")
+print(f"Receipt key (REG_NUM, REG_Z_COUNTER, RECEIPT_NUM): {len(keys3)} distinct, {sum(1 for v in keys3.values() if v > 1)} repeated")
+
+# --- lines
+ly, lamt, cls, src, mode = Counter(), defaultdict(float), Counter(), Counter(), Counter()
+m2 = m3 = n = 0
+last_sold = {}
+for r in rows("PDetail"):
+    n += 1
+    t = r.get("TIME_STAMP") or ""
+    y = year(t); ly[y] += 1; lamt[y] += num(r.get("DETAIL_LINE_AMT"))
+    cls[(r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE"))] += 1; src[r.get("SOURCE_CLASS")] += 1; mode[r.get("MODE_FLAGS")] += 1
+    if (r.get("REG_NUM"), r.get("RECEIPT_NUM")) in keys2: m2 += 1
+    if (r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM")) in keys3: m3 += 1
+    p = (r.get("PLU") or "").strip()
+    if p and t > last_sold.get(p, ""): last_sold[p] = t
+print(f"\nPDetail lines: {n}; matching a receipt by (REG, RECEIPT): {m2}; by (REG, Z, RECEIPT): {m3}")
+show("Lines and line amounts by year", sorted((y, f"{ly[y]} lines, ${lamt[y]:,.2f}") for y in ly), 99)
+show("PDetail (DETAIL_CLASS, DETAIL_TYPE)", cls, 40); show("PDetail SOURCE_CLASS", src); show("PDetail MODE_FLAGS", mode)
+
+# --- tenders
+tt, tm3 = Counter(), 0
+for r in rows("TENDSALE"):
+    tt[r.get("TENDER_TYPE")] += 1
+    if (r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM")) in keys3: tm3 += 1
+print(f"\nTendSale rows: {sum(tt.values())}; matching a receipt by (REG, Z, RECEIPT): {tm3}")
+show("TendSale TENDER_TYPE", tt)
+show("TENDER setup (type: description)", [(r.get("TENDER_TYPE"), r.get("TEND_DESC")) for r in rows("TENDER")], 99)
+
+# --- misc lines, inventory movements
+show("MDetail DETAIL_CLASS", Counter(r.get("DETAIL_CLASS") for r in rows("MDetail")))
+ia, iay = Counter(), Counter()
+for r in rows("InvAdj"):
+    ia[r.get("REC_TYPE")] += 1; iay[(year(r.get("TIME_STAMP")), r.get("REC_TYPE"))] += 1
+show("InvAdj REC_TYPE", ia); show("InvAdj (year, REC_TYPE)", sorted(iay.items()), 200)
+
+# --- setup
+show("Dept (num: name | group | target GM)", [(r.get("DEPT_NUM"), f"{r.get('DEPT_NAME')} | {r.get('DEPT_GROUP')} | {r.get('TARGET_GM')}") for r in rows("Dept")], 99)
+show("Dept_Grp", [(r.get("DEPT_GROUP"), r.get("DEPT_GRP_NAME")) for r in rows("Dept_Grp")], 99)
+for r in rows("TaxType"):
+    show("Tax types (name | rate | active)", [(i, f"{r.get(f'TAX_NAME{i}')} | {r.get(f'TAX_RATE{i}')} | {r.get(f'TAX_ACTIVE{i}')}") for i in range(1, 9)], 9)
+show("Pos_Flag (name | tax group | age req)", [(r.get("POS_FLAG_NAME"), f"{r.get('TAX_GROUP')} | {r.get('AGE_REQ')}") for r in rows("Pos_Flag")], 99)
+
+# --- items
+act, link, alt, manuf = Counter(), 0, 0, Counter()
+plus = []
+for r in rows("PLU"):
+    act[r.get("ACTIVE")] += 1; plus.append((r.get("PLU_NUM") or "").strip())
+    link += bool((r.get("LINK_PLU") or "").strip()); alt += bool((r.get("Alt_PLUNum") or "").strip()); manuf[r.get("MANUF")] += 1
+print(f"\nPLU items: {len(plus)}; with LINK_PLU: {link}; with Alt_PLUNum: {alt}")
+show("PLU ACTIVE", act); show("PLU top manufacturers", manuf, 30)
+purch = sub = tgm = 0; units = Counter()
+for r in rows("Inv_Info"):
+    purch += bool((r.get("PURCH_PLU") or "").strip()); sub += bool((r.get("SUBUNIT_PLU") or "").strip())
+    tgm += num(r.get("TARGET_GM")) != 0; units[r.get("UNITS_IN_PUR_UNIT")] += 1
+print(f"\nInv_Info: with PURCH_PLU {purch}, with SUBUNIT_PLU {sub}, with a target GM {tgm}")
+show("Inv_Info UNITS_IN_PUR_UNIT", units, 20)
+buckets = Counter()
+for p in plus:
+    s = last_sold.get(p, "")
+    buckets["never sold" if not s else "last sold " + ("2025-2026" if s >= "2025" else "2023-2024" if s >= "2023" else "2020-2022" if s >= "2020" else "before 2020")] += 1
+show("Items by last sale (trim estimate)", buckets)
+print("\nDone. Paste everything above to Bob.")

@@ -108,6 +108,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:27 ET — Bob (Claude) — vt-ilsa-profile: ILSA sales/movement facts for the importer
+- **What:** New scripts/bin/vt-ilsa-profile <export folder>: from vt-ilsa-export's CSVs prints counts only: receipts and sales by year, date range, receipt key uniqueness and how PDetail/TendSale lines match RegSale, line DETAIL_CLASS/TYPE, SOURCE_CLASS and MODE_FLAGS codes (voids/refunds), tender setup, MDetail classes, InvAdj types by year, departments/groups/target GM, tax types, POS flags, item ACTIVE/LINK/ALT counts, box links (Inv_Info), and items by last sale (trim estimate). No customer, employee, card or receipt contents.
+- **Why:** Owner 2026-11-04: the BH Danbury ILSA database (415,506 receipts, 1,024,275 lines) to import; owner: no receiving was done in ILSA, only sales and movement data matter.
+- **Files:** `scripts/bin/vt-ilsa-profile`
+
 ### 2026-11-04 18:13 ET — Bob (Claude) — Manual: label templates file name (no 'claude' name left)
 - **What:** manual.html named the old modern/seed/templates/claude_label_templates.json; now label_templates.json. The only other 'claude_label' mentions are code that reads the old file name once to carry old templates over (pos_inventory.cpp, vt_label_utility.py) and history in these notes. The GitHub branch claude-label-utility was deleted 2026-11-02 (no such branch now).
 - **Why:** Owner 2026-11-04 asked why Claude is still referenced for the label utility.
