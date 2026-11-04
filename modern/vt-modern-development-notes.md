@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 10:31 ET — Bob (Claude) — Customer display test: Accept the privacy notice before the phone keypad
+- **What:** test_pos_flow 'The customer display shows the order...' taps Accept on the new privacy step (guestPrivacy / guestPrivacyAccept) before the keypad, and checks the acceptance is kept on the customer.
+- **Why:** The privacy notice now comes before a guest adds their phone; CI caught the test still expecting the keypad first.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-04 10:11 ET — Bob (Claude) — Privacy branch caught up with main
 - **What:** Merged main (upstream reliability + audit fixes) into bob/privacy-notice; notes conflict only.
 - **Why:** So the privacy branch is tested against what's on main before it merges.
