@@ -87,6 +87,7 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
   *Already working (not this item):* the basic customer display (`ui/qml/CustomerDisplay.qml`, `CustomerDisplayWindow.qml`: order, total, tips, thank-you, price checks), turned on in Manager -> Terminals -> Customer display (runs `vt-guest-display on`: HDMI-2 beside HDMI-1, not mirrored). Don't launch vtmodern with `--customer-display` while the monitors are mirrored.
 * **Tablet customer displays with video (future idea)**: The Bar 1/2/3 tablets have no customer display today. If they get one later: add `-m qtmultimedia` to the Android workflow's `aqt install-qt` so `VideoPanel.qml` builds into the APK, and serve the Store Settings > Customer display video (an MP4 on the Pi) to the tablets over the network (a file on the Pi isn't reachable from a tablet). Until then tablets fall back to the picture/GIF.
 * **Guest-screen raffles & contact entry (owner idea, 2026-11-03)**: With a second Wimaxit as a touch guest screen: guests type phone and email (needs an on-screen keyboard on the guest page, not just the phone keypad), and enter raffles; each entry prints legibly on a raffle-ticket printer (name, phone/email, drawing, number), and the entries are kept for the drawing.
+* **Test suite health (found 2026-11-03)**: GitHub "Modern checks" hasn't passed in 100+ runs. Fixed tonight: screens now load in tests (qml_load.hh) and a crash cut the run short. Still failing on main: the Menu Builder screen tests can't find item buttons (builderItem-<id>) in its grid (about 15 tests), and the gift-card page logs a Qt Quick Layouts "recursive rearrange" (WidgetGiftCard.qml; wrapped Labels already given Layout.preferredWidth). Plus a few unrelated (versions, forecast, self-order slip).
 * **4-Node Multi-Store Hub & Web Portal**: `store_config.json` and `corp_sync.py` across `CORP_HUB`, `HCAH_DANBURY`, `BHT_DANBURY`, and `BHT_GAYLORDSVILLE`, plus InMotion PHP/MySQL online ordering with Pi background polling and ESC/POS kitchen auto-printing (`192.168.1.77:9100`).
 * **Corporate ViewTouch & shared gift cards (planned, to be implemented later)**: The owner will build a Corporate ViewTouch
   instance on a separate Pi before the Buttheads stores launch. Then: one shared card list so balances work at all three
@@ -96,6 +97,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-03 20:23 ET — Bob (Claude) — Customer Display page merged to main
+- **What:** bob/customer-display-page merged (fast-forward): editable Customer Display page, guest email entry, guest screen shows the check only while the cashier works a sale, unknown-scan rules for Find Item and gift cards, test loader fix, wrapped-text layout fixes. Its own tests pass on GitHub (Debian 13, Qt 6.8); remaining failures are older ones (roadmap note 'Test suite health').
+- **Why:** Owner's requests tonight.
+- **Files:** (none)
+- **Next person must know:** Pi: git pull && vt-server. The page is a starter page (Edit Pages -> Customer Display); if the store's layout doesn't pick it up, the guest screen keeps the built-in layout.
 
 ### 2026-11-03 20:06 ET — Bob (Claude) — Wrapped texts in layouts: no recursive rearrange
 - **What:** Layout.preferredWidth: 1 on every wrapping Text/Label with Layout.fillWidth in WidgetGiftCard (the gift-card page's 'recursive rearrange' warning), CustomerDisplay's and WidgetGuestOrder's item names, and WidgetGuestMessages. In the customer display the aborted layout had left the rewards box 0x0 (a guest's tap could miss it). Test waits for the layout before tapping.
