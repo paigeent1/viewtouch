@@ -1,0 +1,317 @@
+// Site Setup: this Pi's hardware settings (the Hardware Setup page, WidgetSiteSetup.qml), kept in the
+// same files the vt-site / vt-directv scripts read, so the screen and the terminal always agree:
+//   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD
+//   ~/.config/viewtouch/tablets     Name|IP per line
+//   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
+// Per Pi, never in Git and not in the database: the store-wide settings (printers, receipts, taxes)
+// stay in Store Settings.
+#include "layoutcontroller.hh"
+
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkInterface>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QSaveFile>
+#include <QTimer>
+
+#include <algorithm>
+
+using namespace Qt::StringLiterals;
+
+namespace {
+
+QString siteDir() { return QDir::home().filePath(u".config/viewtouch"_s); }
+
+const QStringList kSiteKeys{u"SITE_NAME"_s, u"SERVER_ADDR"_s, u"SERVER_PORT"_s, u"SERIAL_SCANNER"_s,
+                            u"SERIAL_SCANNER_BAUD"_s};
+
+// KEY="value" lines (comments and anything else skipped).
+QMap<QString, QString> readSiteConf()
+{
+    QMap<QString, QString> out;
+    QFile f(QDir(siteDir()).filePath(u"site.conf"_s));
+    if (!f.open(QIODevice::ReadOnly))
+        return out;
+    static const QRegularExpression line(uR"(^\s*([A-Z_]+)=(.*)$)"_s);
+    for (const QByteArray &raw : f.readAll().split('\n')) {
+        const auto m = line.match(QString::fromUtf8(raw));
+        if (!m.hasMatch())
+            continue;
+        QString v = m.captured(2).trimmed();
+        if (v.size() >= 2 && (v.startsWith(u'"') || v.startsWith(u'\'')) && v.endsWith(v.front()))
+            v = v.mid(1, v.size() - 2);
+        out.insert(m.captured(1), v);
+    }
+    return out;
+}
+
+// What a shell file can hold safely between double quotes.
+QString clean(QString v)
+{
+    v.remove(QRegularExpression(uR"(["\\$`|\r\n])"_s));
+    return v.trimmed().left(120);
+}
+
+bool writeFile(const QString &path, const QByteArray &data)
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QSaveFile f(path);
+    return f.open(QIODevice::WriteOnly) && f.write(data) == data.size() && f.commit();
+}
+
+QVariantList readTablets()
+{
+    QVariantList out;
+    const QString dir = siteDir();
+    QFile f(QDir(dir).filePath(u"tablets"_s));
+    if (f.open(QIODevice::ReadOnly)) {
+        for (const QByteArray &raw : f.readAll().split('\n')) {
+            const QString l = QString::fromUtf8(raw).trimmed();
+            if (l.isEmpty() || l.startsWith(u'#') || !l.contains(u'|'))
+                continue;
+            out.append(QVariantMap{{u"name"_s, l.section(u'|', 0, 0).trimmed()}, {u"ip"_s, l.section(u'|', 1).trimmed()}});
+        }
+        return out;
+    }
+    QFile old(QDir::home().filePath(u".config/viewtouch_tablets.list"_s));   // before vt-site
+    if (old.open(QIODevice::ReadOnly)) {
+        int n = 0;
+        for (const QByteArray &raw : old.readAll().split('\n'))
+            if (const QString ip = QString::fromUtf8(raw).trimmed(); !ip.isEmpty())
+                out.append(QVariantMap{{u"name"_s, u"Tablet %1"_s.arg(++n)}, {u"ip"_s, ip}});
+    }
+    return out;
+}
+
+QString firstLine(const QString &path)
+{
+    QFile f(path);
+    return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readLine()).trimmed() : QString();
+}
+
+QString thisAddress()
+{
+    for (const QHostAddress &a : QNetworkInterface::allAddresses())
+        if (a.protocol() == QAbstractSocket::IPv4Protocol && !a.isLoopback() && !a.isLinkLocal())
+            return a.toString();
+    return {};
+}
+
+} // namespace
+
+QVariantMap LayoutController::siteSettings() const
+{
+#ifdef Q_OS_ANDROID
+    return {{u"android"_s, true}};
+#else
+    const QMap<QString, QString> conf = readSiteConf();
+    QVariantMap out{{u"android"_s, false},
+                    {u"siteName"_s, conf.value(u"SITE_NAME"_s)},
+                    {u"serverAddr"_s, conf.value(u"SERVER_ADDR"_s)},
+                    {u"serverPort"_s, conf.value(u"SERVER_PORT"_s, u"7719"_s).toInt()},
+                    {u"thisAddress"_s, thisAddress()},
+                    {u"scanner"_s, conf.value(u"SERIAL_SCANNER"_s)},
+                    {u"scannerBaud"_s, conf.value(u"SERIAL_SCANNER_BAUD"_s, u"9600"_s).toInt()},
+                    {u"configured"_s, QFile::exists(QDir(siteDir()).filePath(u"site.conf"_s))},
+                    {u"lastScan"_s, lastScan_}, {u"lastScanAt"_s, lastScanAt_}};
+    // The serial ports this Pi has now: by their stable names first, then any ttyUSB/ttyACM
+    // without one.
+    QVariantList ports;
+    QStringList seen;
+    const QDir byId(u"/dev/serial/by-id"_s);
+    for (const QFileInfo &fi : byId.entryInfoList(QDir::System | QDir::Files | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QString target = fi.symLinkTarget();
+        seen << target;
+        QString label = fi.fileName();
+        label.remove(QRegularExpression(u"^usb-"_s)).replace(u'_', u' ');
+        ports.append(QVariantMap{{u"path"_s, fi.absoluteFilePath()},
+                                 {u"label"_s, u"%1 (%2)"_s.arg(label.left(60), QFileInfo(target).fileName())}});
+    }
+    for (const QFileInfo &fi : QDir(u"/dev"_s).entryInfoList({u"ttyUSB*"_s, u"ttyACM*"_s}, QDir::System, QDir::Name))
+        if (!seen.contains(fi.absoluteFilePath()))
+            ports.append(QVariantMap{{u"path"_s, fi.absoluteFilePath()}, {u"label"_s, fi.fileName()}});
+    out.insert(u"scannerPorts"_s, ports);
+    out.insert(u"tablets"_s, readTablets());
+    QVariantList tvs;
+    QFile tf(QDir(siteDir()).filePath(u"tvs.json"_s));
+    if (tf.open(QIODevice::ReadOnly)) {
+        const QJsonObject o = QJsonDocument::fromJson(tf.readAll()).object();
+        for (auto it = o.begin(); it != o.end(); ++it) {
+            const QJsonObject tv = it.value().toObject();
+            tvs.append(QVariantMap{{u"key"_s, it.key()}, {u"name"_s, tv.value(u"name").toString()},
+                                   {u"kind"_s, tv.value(u"kind").toString(u"directv"_s)}, {u"ip"_s, tv.value(u"ip").toString()}});
+        }
+    }
+    out.insert(u"tvs"_s, tvs);
+    const QString guest = firstLine(QDir::home().filePath(u".vt-customer-display"_s));
+    out.insert(u"guestDisplay"_s, !guest.isEmpty() && guest != u"off");
+    out.insert(u"guestTouchPort"_s, firstLine(QDir::home().filePath(u".vt-guest-touch"_s)));
+    return out;
+#endif
+}
+
+bool LayoutController::saveSiteSettings(const QVariantMap &values)
+{
+#ifdef Q_OS_ANDROID
+    Q_UNUSED(values)
+    return false;
+#else
+    if (pos_ && !pos_->can(u"admin"_s)) {
+        setStatus(tr("Admin required."));
+        return false;
+    }
+    // site.conf: the keys given replaced in place (comments and other lines kept), new ones added.
+    QMap<QString, QString> set;
+    const auto take = [&](const QString &field, const QString &key) {
+        if (values.contains(field))
+            set.insert(key, clean(values.value(field).toString()));
+    };
+    take(u"siteName"_s, u"SITE_NAME"_s);
+    take(u"serverAddr"_s, u"SERVER_ADDR"_s);
+    take(u"scanner"_s, u"SERIAL_SCANNER"_s);
+    if (values.contains(u"serverPort"_s)) {
+        const int port = values.value(u"serverPort"_s).toInt();
+        if (port < 1 || port > 65535) {
+            setStatus(tr("The server port is a number from 1 to 65535."));
+            return false;
+        }
+        set.insert(u"SERVER_PORT"_s, QString::number(port));
+    }
+    if (values.contains(u"scannerBaud"_s)) {
+        static const QList<int> bauds{1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
+        const int baud = values.value(u"scannerBaud"_s).toInt();
+        if (!bauds.contains(baud)) {
+            setStatus(tr("The scanner speed is one of 1200 to 115200 baud."));
+            return false;
+        }
+        set.insert(u"SERIAL_SCANNER_BAUD"_s, QString::number(baud));
+    }
+    const QString dir = siteDir();
+    const QString confPath = QDir(dir).filePath(u"site.conf"_s);
+    QStringList lines;
+    QFile in(confPath);
+    if (in.open(QIODevice::ReadOnly))
+        lines = QString::fromUtf8(in.readAll()).split(u'\n');
+    else
+        lines = {u"# This site's hardware for the ViewTouch scripts (vt-site, Site Setup). Not in Git."_s};
+    while (!lines.isEmpty() && lines.last().trimmed().isEmpty())
+        lines.removeLast();
+    for (auto it = set.begin(); it != set.end(); ++it) {
+        const QString line = u"%1=\"%2\""_s.arg(it.key(), it.value());
+        bool replaced = false;
+        for (QString &l : lines)
+            if (l.trimmed().startsWith(it.key() + u'=')) {
+                l = line;
+                replaced = true;
+            }
+        if (!replaced)
+            lines << line;
+    }
+    if (!set.isEmpty() && !writeFile(confPath, (lines.join(u'\n') + u'\n').toUtf8())) {
+        setStatus(tr("Couldn't save %1.").arg(confPath));
+        return false;
+    }
+    // Tablets: the whole list as given.
+    if (values.contains(u"tablets"_s)) {
+        static const QRegularExpression ipv4(uR"(^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$)"_s);
+        QString text = u"# This site's tablets, one per line: Name|IP (vt-site tablet add / remove, Site Setup)\n"_s;
+        for (const QVariant &v : values.value(u"tablets"_s).toList()) {
+            const QVariantMap t = v.toMap();
+            const QString name = clean(t.value(u"name"_s).toString());
+            const QString ip = t.value(u"ip"_s).toString().trimmed();
+            if (name.isEmpty() && ip.isEmpty())
+                continue;
+            const auto m = ipv4.match(ip);
+            bool ok = m.hasMatch();
+            for (int i = 1; ok && i <= 4; ++i)
+                ok = m.captured(i).toInt() <= 255;
+            if (name.isEmpty() || !ok) {
+                setStatus(tr("Each tablet needs a name and an address like 192.168.1.220."));
+                return false;
+            }
+            text += name + u'|' + ip + u'\n';
+        }
+        if (!writeFile(QDir(dir).filePath(u"tablets"_s), text.toUtf8())) {
+            setStatus(tr("Couldn't save the tablets."));
+            return false;
+        }
+    }
+    ++siteRevision_;
+    emit siteChanged();
+    setStatus(set.contains(u"SERIAL_SCANNER"_s) || set.contains(u"SERIAL_SCANNER_BAUD"_s)
+                  ? tr("Site settings saved. Restart ViewTouch for a new scanner port or speed.")
+                  : tr("Site settings saved."));
+    return true;
+#endif
+}
+
+void LayoutController::siteAction(const QString &action)
+{
+#ifdef Q_OS_ANDROID
+    Q_UNUSED(action)
+    setStatus(tr("Site Setup works on the Pi."));
+#else
+    if (pos_ && !pos_->can(u"admin"_s)) {
+        setStatus(tr("Admin required."));
+        return;
+    }
+    struct Tool { const char16_t *action; const char16_t *program; QStringList args; const char *busy; bool restarts; };
+    const Tool tools[] = {
+        {u"check-tablets", u"/usr/local/bin/vt-status", {}, QT_TR_NOOP("Checking the tablets..."), false},
+        {u"push-tablets", u"/usr/local/bin/vt-tablets", {}, QT_TR_NOOP("Sending the app to the tablets..."), false},
+        {u"scan-tvs", u"/usr/local/bin/vt-directv", {u"scan"_s, u"--save"_s},
+         QT_TR_NOOP("Looking for DIRECTV receivers and smart TVs on this network (about 30 seconds)..."), false},
+        {u"learn-touch", u"/usr/local/bin/vt-guest-display", {u"touch"_s, u"--or-map"_s},
+         QT_TR_NOOP("Touch the GUEST screen now (20 seconds)... tap a blank spot."), false},
+        {u"guest-on", u"/usr/local/bin/vt-guest-display", {u"on"_s}, QT_TR_NOOP("Turning the guest display on: ViewTouch restarts..."), true},
+        {u"guest-off", u"/usr/local/bin/vt-guest-display", {u"off"_s}, QT_TR_NOOP("Turning the guest display off: ViewTouch restarts..."), true},
+        {u"restart", u"/usr/local/bin/vt-server", {}, QT_TR_NOOP("Restarting ViewTouch..."), true},
+    };
+    const Tool *tool = nullptr;
+    for (const Tool &t : tools)
+        if (action == QStringView(t.action))
+            tool = &t;
+    if (!tool) {
+        setStatus(tr("Unknown site tool: %1").arg(action));
+        return;
+    }
+    const QString program = QString::fromUtf16(tool->program);
+    if (!QFile::exists(program)) {
+        setStatus(tr("%1 isn't installed on this computer.").arg(QFileInfo(program).fileName()));
+        return;
+    }
+    setStatus(tr(tool->busy));
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (!env.contains(u"DISPLAY"_s))
+        env.insert(u"DISPLAY"_s, u":0"_s);
+    if (tool->restarts) {
+        // It stops this ViewTouch: run on its own, outliving it.
+        QProcess p;
+        p.setProcessEnvironment(env);
+        p.setProgram(u"setsid"_s);
+        p.setArguments(QStringList{program} + tool->args);
+        p.startDetached();
+        return;
+    }
+    auto *proc = new QProcess(this);
+    proc->setProcessEnvironment(env);
+    connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+        QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+        const QStringList rows = out.split(u'\n', Qt::SkipEmptyParts);
+        // The outcome: the last line or two, not the whole log.
+        out = rows.mid(std::max<qsizetype>(0, rows.size() - 2)).join(u" | "_s);
+        setStatus(out.isEmpty() ? tr("Done.") : out);
+        ++siteRevision_;
+        emit siteChanged();
+        proc->deleteLater();
+    });
+    QTimer::singleShot(10 * 60 * 1000, proc, [proc] { proc->kill(); });
+    proc->start(program, tool->args);
+#endif
+}

@@ -1623,6 +1623,12 @@ bool LayoutController::numberKey(const QString &key)
 void LayoutController::scanned(const QString &code)
 {
     const QString c = code.trimmed();
+    if (!c.isEmpty()) {   // for Site Setup's scanner test (the start of it only)
+        lastScan_ = c.left(48);
+        lastScanAt_ = QDateTime::currentMSecsSinceEpoch();
+        ++siteRevision_;
+        emit siteChanged();
+    }
     if (editing() || !pos_ || !pos_->loggedIn() || c.isEmpty())
         return;
     typedNumber_.clear();

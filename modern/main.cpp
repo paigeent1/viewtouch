@@ -874,6 +874,7 @@ int runStore(const Args &cli, const Options &o)
             // deletes one later, it stays deleted). "page#zone" in the starter state marks it done.
             static const std::pair<const char16_t *, const char16_t *> givenZones[] = {
                 {u"hardware-config", u"vt-touch-map"},   // Learn guest touchscreen
+                {u"hardware-config", u"site-setup"},     // Site Setup
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {

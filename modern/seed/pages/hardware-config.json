@@ -241,6 +241,31 @@
       }
     },
     {
+      "id": "site-setup",
+      "kind": "button",
+      "label": "Site Setup",
+      "rect": {
+        "x": 1000,
+        "y": 770,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "site-setup"
+        }
+      ]
+    },
+    {
       "id": "back",
       "kind": "button",
       "rect": {

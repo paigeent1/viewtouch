@@ -90,8 +90,22 @@ class LayoutController : public QObject {
     Q_PROPERTY(QStringList fontFamilies READ fontFamilies NOTIFY fontsChanged)
     // The setup guide is showing (opens for managers until it's finished).
     Q_PROPERTY(bool setupOpen READ setupOpen NOTIFY setupOpenChanged)
+    // Site Setup (sitesetup.cpp): goes up when this Pi's hardware settings or the last scan change.
+    Q_PROPERTY(int siteRevision READ siteRevision NOTIFY siteChanged)
 
 public:
+    // --- Site Setup (sitesetup.cpp): this Pi's hardware, in ~/.config/viewtouch (vt-site) ---
+    // {android, siteName, serverAddr, serverPort, thisAddress, scanner, scannerBaud,
+    //  scannerPorts: [{path, label}], tablets: [{name, ip}], tvs: [{key, name, kind, ip}],
+    //  guestDisplay, guestTouchPort, lastScan, lastScanAt}
+    Q_INVOKABLE QVariantMap siteSettings() const;
+    // Saves what's given (siteName, serverAddr, serverPort, scanner, scannerBaud, tablets). Admins.
+    Q_INVOKABLE bool saveSiteSettings(const QVariantMap &values);
+    // A site tool, in the background (the status line says how it went). Admins.
+    //   check-tablets, push-tablets, scan-tvs, learn-touch, guest-on, guest-off, restart
+    Q_INVOKABLE void siteAction(const QString &action);
+    int siteRevision() const { return siteRevision_; }
+
     // Persists a layout; false (with a message) when it could not.
     using Saver = std::function<bool(const vt::layout::Layout &, QString *error)>;
 
@@ -323,6 +337,7 @@ signals:
     void menuScreensChanged();
     void fontsChanged();
     void setupOpenChanged();
+    void siteChanged();
     // A command for the widgets on the page (kitchenStation, kitchenAllDay...).
     void widgetCommand(const QString &name, const QVariantMap &args);
     void editorChanged();
@@ -374,6 +389,9 @@ private:
     QVariantMap guestBackground_;
     void refreshGuest();
     QString status_;
+    int siteRevision_ = 0;
+    QString lastScan_;
+    qint64 lastScanAt_ = 0;
     // The pages in this terminal's own look (Manager -> Terminals), when it has one.
     std::optional<vt::layout::Layout> lookedLayout_;
     QString lookedId_;

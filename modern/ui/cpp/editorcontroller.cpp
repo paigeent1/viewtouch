@@ -266,6 +266,7 @@ QString EditorController::kindName(const QString &kind) const
         {u"orderSummary"_s, QT_TR_NOOP("Order summary (items and totals, no seat/course)")},
         {u"guestOrder"_s, QT_TR_NOOP("Customer display: the guest's order and totals")},
         {u"guestMessages"_s, QT_TR_NOOP("Customer display: messages and pictures in turn")},
+        {u"siteSetup"_s, QT_TR_NOOP("Site Setup: this Pi's scanner, guest display, tablets and TVs")},
         {u"guestMedia"_s, QT_TR_NOOP("Customer display: picture, GIF or video")},
         {u"guestHeader"_s, QT_TR_NOOP("Customer display: logo and check bar")},
         {u"loginPad"_s, QT_TR_NOOP("Login keypad")},
