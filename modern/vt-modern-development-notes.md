@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:54 ET — Bob (Claude) — vt-ilsa-tieout3: ILSA tender formula per day
+- **What:** Round 2 finding: ILSA's Z tender totals equal TendSale AMT_TEND exactly for checks ($29,903.43), gift cards ($21,511.08) and cards ($12,266,604.49); SALE_AMT is the whole sale repeated on each tender row (split tenders), so it must not be summed as the tender. Cash: Z $5,366,241.10 vs AMT_TEND - CHANGE_DUE $5,130,589.71; 9,663 negative cash rows (-$288k). New scripts/bin/vt-ilsa-tieout3 tries cash formulas day by day. Z_Totals counters (sale/no-sale/cancel/refund/void counts) are all 0 in this database, so receipt modes 1/2 can't be confirmed from them.
+- **Why:** Owner's vt-ilsa-tieout2 run 2026-11-04.
+- **Files:** `scripts/bin/vt-ilsa-tieout3`
+
 ### 2026-11-04 18:51 ET — Bob (Claude) — Backlog: BH coupon and MFG coupon tenders with redemption slips
 - **What:** Section 5: BH Coupon tender ($2.50, cashier decides, one audit slip per coupon, no UPC scan) and MFG Coupon tender; DataBar coupon scanning at the register.
 - **Why:** Owner 2026-11-04.
