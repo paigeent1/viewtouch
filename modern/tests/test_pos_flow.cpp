@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include "qml_load.hh"
 
 #include "net/build_info.hh"
 #include "net/stress.hh"
@@ -213,21 +214,7 @@ TEST_CASE("Flow: quick order from the floor, open checks list", "[flow]")
 
 namespace {
 
-// Loads a ViewTouch screen the way the app's main.cpp does (vtmLoadModuleQml): this build puts the QML
-// module under qrc:/ViewTouch (no QTP0001 policy), where loadFromModule("ViewTouch", "Main") can't find it.
-void loadViewTouchQml(QQmlApplicationEngine &engine, const char *name)
-{
-    engine.addImportPath(u"qrc:/"_s);
-    engine.addImportPath(u"qrc:/qt/qml"_s);
-    const QString file = QString::fromLatin1(name) + u".qml"_s;
-    for (const QString &dir : {u":/qt/qml/ViewTouch/ui/qml/"_s, u":/ViewTouch/ui/qml/"_s}) {
-        if (QFile::exists(dir + file)) {
-            engine.load(QUrl(u"qrc"_s + dir + file));
-            return;
-        }
-    }
-    engine.loadFromModule("ViewTouch", name);
-}
+using vt::test::loadViewTouchQml;   // qml_load.hh
 
 struct Screen : Session {
     QQmlApplicationEngine engine;
@@ -529,7 +516,7 @@ TEST_CASE("UI: the customer display shows the order, asks for a tip, says thank 
     Session s;
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"pos"_s, QVariant::fromValue(static_cast<app::PosSession *>(&s.pos))}});
-    engine.loadFromModule("ViewTouch", "CustomerDisplayWindow");
+    loadViewTouchQml(engine, "CustomerDisplayWindow");
     REQUIRE_FALSE(engine.rootObjects().isEmpty());
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     REQUIRE(window);
@@ -5047,7 +5034,7 @@ TEST_CASE("On-screen keyboard: on by default, over the screen, lifts a covered f
     QQmlApplicationEngine engine;
     // No --touch-keyboard: the terminal's setting decides (on when not set).
     engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&s.c)}, {u"width"_s, 1600}, {u"height"_s, 900}});
-    engine.loadFromModule("ViewTouch", "Main");
+    loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));

@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 19:13 ET — Bob (Claude) — Tests load the QML screens the way the app does
+- **What:** New tests/qml_load.hh (vt::test::loadViewTouchQml: import paths qrc:/ and qrc:/qt/qml, then the screen's qrc file, as main.cpp's vtmLoadModuleQml). test_editor_ui, test_pages_ui and test_pos_flow use it instead of loadFromModule("ViewTouch", ...), which in this build finds 'no type named Main' (module under qrc:/ViewTouch): every screen test had been failing on GitHub since at least 2026-11-02, and one could crash the run.
+- **Why:** Modern checks never green; screen tests weren't testing screens.
+- **Files:** `tests/qml_load.hh, tests/test_editor_ui.cpp, tests/test_pages_ui.cpp, tests/test_pos_flow.cpp`
+
 ### 2026-11-03 18:58 ET — Bob (Claude) — Merge main into bob/customer-display-page
 - **What:** Brought tonight's main (vt-guest-display touch learning fix) into the Customer Display page branch; vt-guest-display keeps both the progressive-mode and the stdbuf/source-id changes.
 - **Why:** Test the branch with current main before merging it.

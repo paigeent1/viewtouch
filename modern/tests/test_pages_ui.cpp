@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include "qml_load.hh"
 
 #include "layout_fixture.hh"
 #include "layoutcontroller.hh"
@@ -48,7 +49,7 @@ TEST_CASE("Every seed page renders cleanly, running and editing", "[ui][pages]")
                                  {u"width"_s, 1600}, {u"height"_s, 900}});
     g_warnings.clear();
     const QtMessageHandler previous = qInstallMessageHandler(collect);
-    engine.loadFromModule("ViewTouch", "Main");
+    vt::test::loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));
@@ -101,7 +102,7 @@ TEST_CASE("Admin screen: touching a record opens its form", "[ui][pages]")
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&c)},
                                  {u"width"_s, 1600}, {u"height"_s, 900}});
-    engine.loadFromModule("ViewTouch", "Main");
+    vt::test::loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));
@@ -148,7 +149,7 @@ TEST_CASE("Kitchen display shows sent orders; touching one bumps it", "[ui][page
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&c)},
                                  {u"width"_s, 1600}, {u"height"_s, 900}});
-    engine.loadFromModule("ViewTouch", "Main");
+    vt::test::loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));
@@ -188,7 +189,7 @@ TEST_CASE("Customer details typed then Continue are kept", "[ui][pages]")
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&c)},
                                  {u"width"_s, 1600}, {u"height"_s, 900}});
-    engine.loadFromModule("ViewTouch", "Main");
+    vt::test::loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));
@@ -230,7 +231,7 @@ TEST_CASE("F1 opens the editor only for someone allowed to edit pages", "[ui][pa
     QQmlApplicationEngine engine;
     engine.setInitialProperties({{u"controller"_s, QVariant::fromValue(&c)},
                                  {u"width"_s, 1600}, {u"height"_s, 900}});
-    engine.loadFromModule("ViewTouch", "Main");
+    vt::test::loadViewTouchQml(engine, "Main");
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));

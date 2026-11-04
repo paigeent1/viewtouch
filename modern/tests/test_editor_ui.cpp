@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include "qml_load.hh"
 
 #include "layout_fixture.hh"
 #include "layoutcontroller.hh"
@@ -30,7 +31,7 @@ public:
             {u"width"_s, 1600},
             {u"height"_s, 900},
         });
-        engine.loadFromModule("ViewTouch", "Main");
+        vt::test::loadViewTouchQml(engine, "Main");
         REQUIRE_FALSE(engine.rootObjects().isEmpty());
         window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         REQUIRE(window);
