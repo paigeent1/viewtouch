@@ -214,6 +214,33 @@
       }
     },
     {
+      "id": "vt-touch-map",
+      "kind": "button",
+      "label": "Guest touch monitor sync (2x Tap)",
+      "rect": {
+        "x": 380,
+        "y": 770,
+        "w": 540,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "double",
+      "actions": [
+        {
+          "type": "command",
+          "name": "vtSync",
+          "args": {
+            "mode": "touch-map"
+          }
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#6b3fa0"
+        }
+      }
+    },
+    {
       "id": "back",
       "kind": "button",
       "rect": {

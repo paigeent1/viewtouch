@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 08:39 ET — Bob (Claude) — Guest touch monitor sync button
+- **What:** Hardware Configuration: 'Guest touch monitor sync (2x Tap)' (behavior double: touch, then tap again) runs vtSync mode touch-map (/usr/local/bin/vt-touch-map); vtSync passes VT_TOUCH_VERBOSE=1 and DISPLAY=:0 so the status line shows each touch device and its monitor.
+- **Why:** Owner: a button to reset the touch mapping if the monitors get out of whack.
+- **Files:** `seed/pages/hardware-config.json, ui/cpp/layoutcontroller.cpp`
+- **Next person must know:** If the store has edited Hardware Configuration, the starter page doesn't update: add the button in the editor (command vtSync, mode touch-map, behavior double).
+
 ### 2026-11-04 07:52 ET — Bob (Claude) — Customer Display picture: smaller is always whole
 - **What:** guestMedia crops only at Size 100% with Fit 'fill'; any Size under 100 shows the whole picture.
 - **Why:** Owner: adjusting size still clipped the logo (Fit was still fill).

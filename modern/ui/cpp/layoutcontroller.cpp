@@ -2094,6 +2094,12 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
             if (!out.isEmpty()) setStatus(out);
             proc->deleteLater();
         });
+        // vt-touch-map (Guest touch monitor sync) says which touchscreen went to which monitor.
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert(u"VT_TOUCH_VERBOSE"_s, u"1"_s);
+        if (!env.contains(u"DISPLAY"_s))
+            env.insert(u"DISPLAY"_s, u":0"_s);
+        proc->setProcessEnvironment(env);
         proc->start(u"/usr/local/bin/vt-"_s + m, {});
         return done(true);
     }
