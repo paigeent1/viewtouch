@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""ILSA self-check (dry run, writes nothing): rebuild each day's totals from ILSA's receipts and compare
+with the Z report numbers ILSA saved (Z_Tender, Z_Taxes), per register Z. Answers which receipts
+ILSA counted (Z_MODE 0/1/2) before the importer is written. Counts and dollars only.
+  vt-ilsa-tieout ~/ilsa-export/"copy bhdan 10-29-2026"
+"""
+import csv, os, re, sys
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+if not os.path.isdir(D):
+    sys.exit("Usage: vt-ilsa-tieout ~/ilsa-export/<database name>")
+
+def rows(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(D, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+def num(s):
+    try: return float(s)
+    except (TypeError, ValueError): return 0.0
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def day(s):
+    s = (s or "").strip()
+    if len(s) >= 10 and s[4] == "-": return s[:10]
+    m = US.match(s)
+    if not m: return "?"
+    mo, d, y = m.groups(); y = int(y); y += 2000 if y < 70 else (1900 if y < 100 else 0)
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d}"
+
+zday = {(r.get("REG_NUM"), r.get("REG_Z_COUNTER")): day(r.get("REG_Z_DATETIME")) for r in rows("RegZCnt")}
+mode = {}
+rcpt = defaultdict(lambda: defaultdict(float))       # (reg, z) -> {"sale m0": .., "tax m1": ..}
+for r in rows("RegSale"):
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER")); m = r.get("Z_MODE")
+    mode[(z, r.get("RECEIPT_NUM"))] = m
+    rcpt[z][f"sale m{m}"] += num(r.get("SALE_TOTAL"))
+    rcpt[z][f"tax m{m}"] += sum(num(r.get(f"TAX{i}_AMT")) - num(r.get(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+tend = defaultdict(lambda: defaultdict(float))       # (reg, z) -> {(type, mode): amt}
+for r in rows("TENDSALE"):
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER")); m = mode.get((z, r.get("RECEIPT_NUM")), "?")
+    tend[z][(r.get("TENDER_TYPE"), m)] += num(r.get("SALE_AMT"))
+def reg_level(table):
+    """The register's own Z rows (cashier 0); if ILSA kept only cashier rows, all of them."""
+    all_rows = list(rows(table))
+    reg = [r for r in all_rows if (r.get("CSHR_NUM") or "0").strip() in ("", "0")]
+    print(f"{table}: {len(all_rows)} rows, {len(reg)} register-level" + ("" if reg else " (using all rows)"))
+    return reg or all_rows
+ztend = defaultdict(lambda: defaultdict(float))
+zmodes = Counter()
+for r in reg_level("Z_Tender"):
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER")); zmodes[r.get("Z_MODE")] += 1
+    ztend[z][(r.get("TENDER_TYPE"), r.get("Z_MODE"))] += num(r.get("TENDER_AMT")) - num(r.get("REFUND_AMT"))
+ztax = defaultdict(lambda: defaultdict(float))
+for r in reg_level("Z_Taxes"):
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+    ztax[z][r.get("Z_MODE")] += sum(num(r.get(f"TAX{i}_AMT")) - num(r.get(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+
+print("Z_Tender register-level rows by Z_MODE:", dict(zmodes))
+
+# Which receipt modes does ILSA's Z count? Try each combination, count the days that match to the cent.
+combos = {"mode 0 only": {"0"}, "modes 0+1": {"0", "1"}, "modes 0+1+2": {"0", "1", "2"}}
+for zm in sorted({k[1] for v in ztend.values() for k in v}):
+    print(f"\n== ILSA Z_Tender rows with Z_MODE {zm}: which receipts add up to them?")
+    for name, ms in combos.items():
+        ok = bad = 0
+        for z, zt in ztend.items():
+            ztot = sum(a for (t, m), a in zt.items() if m == zm)
+            rtot = sum(a for (t, m), a in tend.get(z, {}).items() if m in ms)
+            if abs(ztot) < 0.005 and abs(rtot) < 0.005: continue
+            if abs(ztot - rtot) < 0.015: ok += 1
+            else: bad += 1
+        print(f"  receipts {name}: {ok} Z's match, {bad} don't")
+
+print("\n== Tax: ILSA Z_Taxes (mode 0) vs tax on mode-0 receipts")
+ok = bad = 0; worst = []
+for z, zt in ztax.items():
+    a, b = zt.get("0", 0.0), rcpt.get(z, {}).get("tax m0", 0.0)
+    if abs(a - b) < 0.015: ok += 1
+    else: bad += 1; worst.append((abs(a - b), zday.get(z, "?"), round(a, 2), round(b, 2)))
+print(f"  {ok} Z's match, {bad} don't")
+for w in sorted(worst, reverse=True)[:10]:
+    print(f"  {w[1]}: Z tax {w[2]} vs receipts {w[3]}")
+
+print("\n== Tenders by type, mode 0, whole history: ILSA Z vs receipts")
+zt_all, rt_all = defaultdict(float), defaultdict(float)
+for zt in ztend.values():
+    for (t, m), a in zt.items():
+        if m == "0": zt_all[t] += a
+for tt in tend.values():
+    for (t, m), a in tt.items():
+        if m == "0": rt_all[t] += a
+for t in sorted(set(zt_all) | set(rt_all), key=lambda x: int(x) if (x or "").isdigit() else 0):
+    print(f"  type {t}: Z ${zt_all[t]:,.2f} vs receipts ${rt_all[t]:,.2f} (diff ${zt_all[t] - rt_all[t]:,.2f})")
+
+print("\n== Receipts by Z_MODE: what's in them (tender types)")
+by = defaultdict(lambda: defaultdict(float))
+for tt in tend.values():
+    for (t, m), a in tt.items(): by[m][t] += a
+for m in sorted(by):
+    print(f"  mode {m}: " + ", ".join(f"type {t} ${a:,.2f}" for t, a in sorted(by[m].items())))
+print("\nDone. Paste everything above to Bob.")
