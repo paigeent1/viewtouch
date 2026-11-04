@@ -1562,8 +1562,8 @@ void LayoutController::scanned(const QString &code)
     const auto *page = currentPage();
     // Scans count only where they mean something: Retail and the order screens (ring it in), Pay
     // (a coupon, a gift card), and screens with a search or a scan field (Gift Card, Find, the Item /
-    // UPC Builder, labels, counts). Elsewhere (the floor plan, Manager...) they're ignored: no
-    // "not on file, add it?" over the tables.
+    // UPC Builder, labels, counts). Elsewhere (the floor plan, Manager...) they're ignored without a
+    // word: no "not on file, add it?" over the tables.
     const bool sells = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier"
                                 || page->kind == u"order" || page->kind == u"settle" || page->id == u"retail-entry");
     bool searches = false;
@@ -1576,10 +1576,8 @@ void LayoutController::scanned(const QString &code)
         for (const Layout::PlacedZone &pz : shown().zones)
             searches = searches || scanZones.contains(pz.zone->kind);
     }
-    if (!sells && !searches) {
-        setStatus(tr("Scan ignored here: scan on Retail, an order or a search screen."));
-        return;
-    }
+    if (!sells && !searches)
+        return;   // silently: nothing on the screen, nothing said
     const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier" || page->kind == u"order" || page->id == u"retail-entry");
     QString c12 = c;
     if (c.size() == 11 && std::all_of(c.cbegin(), c.cend(), [](QChar ch) { return ch.isDigit(); })) {

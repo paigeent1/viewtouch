@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 19:23 ET — Bob (Claude) — Ignored scans say nothing
+- **What:** A scan on a screen that doesn't take scans (tables, Manager...) is now ignored silently, without the 'Scan ignored here' status line.
+- **Why:** Owner: suppress the message on those pages.
+- **Files:** `ui/cpp/layoutcontroller.cpp`
+
 ### 2026-11-03 19:18 ET — Bob (Claude) — Scans only where they mean something
 - **What:** LayoutController::scanned: scans count on Retail and order pages (index/items/modifier/order), Pay (settle), and screens with a search or scan field (gift-card, find-item, menu-builder, admin-menu, find-check, reprint-receipt, labels, or a page holding giftCard/checkSearch/customerLookup/menuBuilder/retailLabels/stockCount/receiveDelivery/menuGrid zones). Elsewhere (tables, Manager...) a scan is ignored with a status line. 'Not on file: add it?' only on ordering pages, Retail, menu-builder and admin-menu; on other scan screens just 'X isn't on file'. Price check still works anywhere; a focused text field still receives keyboard-scanner input as typing.
 - **Why:** Owner: scanner shouldn't prompt 'not on file' on the tables page; only Retail or a search field.
