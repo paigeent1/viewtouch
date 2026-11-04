@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:59 ET — Bob (Claude) — vt-ilsa-tieout4: test paid outs (RegReconcile) against the cash gap
+- **What:** vt-ilsa-tieout4 also tests ILSA's drawer counts per Z (RegReconcile Z_PAYOUTS, Z_PAYINS, Z_SAFEDROPS, CSHR_PAYOUTS/PAYINS) and the negative cash rows split by receipt mode against the 722-day cash gap.
+- **Why:** Owner 2026-11-04: probably paid outs; also a few crash days where one ILSA journal didn't write to the other.
+- **Files:** `scripts/bin/vt-ilsa-tieout4`
+
 ### 2026-11-04 18:55 ET — Bob (Claude) — vt-ilsa-tieout4: what's behind ILSA's cash on the days that don't match
 - **What:** Round 3 result: cards (4,583/4,583 days), checks (338/338) and gift cards (386/386) match ILSA's Z to the cent using TendSale AMT_TEND; cash with AMT_TEND - CHANGE_DUE matches 3,861/4,583 days (Z higher by $235,651 in total). New scripts/bin/vt-ilsa-tieout4: on the 722 other days, tests whether the gap equals cash refunds, change given on non-cash tenders, MDetail entries, 30/30 lines, negative dept entries, 4/1 lines, or mode-1 receipts (alone or in pairs).
 - **Why:** Owner's vt-ilsa-tieout3 run 2026-11-04.

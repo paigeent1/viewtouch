@@ -49,6 +49,15 @@ for r in rows("TENDSALE"):
         if a < 0: cand[k]["cash refund rows (AMT_TEND)"] += t
     else:
         cand[k]["change given on non-cash tenders"] += c
+for r in rows("RegReconcile"):   # ILSA's drawer counts per register Z: paid outs, paid ins, drops
+    k = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+    for c in ("Z_PAYOUTS", "Z_PAYINS", "Z_SAFEDROPS", "CSHR_PAYOUTS", "CSHR_PAYINS"):
+        cand[k]["RegReconcile " + c] += num(r.get(c))
+for r in rows("TENDSALE"):        # negative cash rows split by what ILSA's receipt says they were
+    k = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+    if r.get("TENDER_TYPE") == "1" and num(r.get("SALE_AMT")) < 0:
+        m = mode.get((k, r.get("RECEIPT_NUM")), "?")
+        cand[k][f"cash refund rows on mode-{m} receipts"] += num(r.get("AMT_TEND"))
 for r in rows("MDetail"):
     k = (r.get("REG_NUM"), r.get("REG_Z_COUNTER")); cand[k]["MDetail (dept 0 entries)"] += num(r.get("DETAIL_AMT"))
 for r in rows("PDetail"):
