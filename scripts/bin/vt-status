@@ -8,6 +8,8 @@ SUBNET=$(hostname -I | awk "{print \$1}" | cut -d. -f1-3)
 SUBNET=${SUBNET:-192.168.1}
 adb connect "${SUBNET}.220:5555" >/dev/null 2>&1 || true
 adb connect "${SUBNET}.215:5555" >/dev/null 2>&1 || true
+adb connect "${SUBNET}.210:5555" >/dev/null 2>&1 || true
 B1=$(adb -s "${SUBNET}.220:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
 B2=$(adb -s "${SUBNET}.215:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
-echo "Server: ${SERVER_VER} (Git: ${GIT_HASH}) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline}"
+B3=$(adb -s "${SUBNET}.210:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= "/versionName/{print \$2; exit}" | tr -d "\r ")
+echo "Server: ${SERVER_VER} (Git: ${GIT_HASH}) | Bar1: ${B1:-Offline} | Bar2: ${B2:-Offline} | Bar3: ${B3:-Offline}"
