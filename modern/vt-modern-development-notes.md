@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:33 ET — Bob (Claude) — Retired vt-tmp
+- **What:** Removed scripts/bin/vt-tmp (it pulled apply_changes.py from Google Drive and ran it, then pushed output and vt_label_utility.py back). AGENTS.md now says not to bring back run-a-script-from-Drive tools; LABEL_UTILITY_NOTES points at Git history instead of the Drive backup.
+- **Why:** Owner's decision 2026-11-04 (audit): it ran whatever file landed in a Drive folder with the owner's rights, and it is how Pi-side patches kept undoing Git fixes.
+- **Files:** `scripts/bin/vt-tmp (deleted), AGENTS.md, modern/tools/LABEL_UTILITY_NOTES.md`
+- **Next person must know:** Pi: sudo rm -f /usr/local/bin/vt-tmp (git pull doesn't remove the installed copy).
+
 ### 2026-11-04 09:33 ET — Bob (Claude) — Gift card PINs: managers only
 - **What:** giftCardInfo() shows a card's PIN only to someone with the manager permission; everyone else gets ••••, and the gift card search no longer matches on PINs for them. The gift card reports (Activated, Active Balances, Inactive) print the PIN column the same way: managers see it, others see ••••. New test in test_customers.
 - **Why:** Owner's decision 2026-11-04 (audit): any server could look up or print every card's PIN, which is all someone needs to spend a card.

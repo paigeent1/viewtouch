@@ -38,6 +38,8 @@ entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (
   everyone else's commits on top.
 - Never patch repo files in the Pi's working tree (scripts, `apply_changes.py`, `sed`/regex edits): change them in a
   commit on `main`. A Pi-side edit blocks the owner's `git pull` and silently undoes fixes (2026-11-02 and -03).
+- No run-a-script-from-Google-Drive tools on the Pi. `vt-tmp` (ran `apply_changes.py` from Drive with the
+  owner's rights) was retired 2026-11-04 by the owner's decision; don't bring it back. Changes come as Git commits.
 - `/usr/local/bin/vt-label-utility` must stay the 5-line launcher from `scripts/bin/vt-label-utility`. Never copy
   `vt_label_utility.py` (or anything else) over it: ViewTouch would run that stale copy and no fix would show.
 
