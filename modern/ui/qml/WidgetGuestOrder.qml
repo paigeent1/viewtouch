@@ -9,7 +9,8 @@ Item {
     id: w
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
-    readonly property bool hasCheck: !!pos && pos.hasCheck
+    // The check, while the cashier works it (zone.checkShown on the guest's screen).
+    readonly property bool hasCheck: zone && zone.checkShown !== undefined ? zone.checkShown : !!pos && pos.hasCheck
     readonly property var lines: hasCheck ? pos.lines : []
     readonly property var totals: hasCheck ? pos.totals : ({})
     readonly property var prompt: pos ? pos.customerPrompt : ({})
@@ -97,6 +98,7 @@ Item {
             TapHandler {
                 enabled: w.hasCheck
                 onTapped: {
+                    if (TouchGuard.covered(point.scenePressPosition)) return
                     const h = w.host()
                     if (!h || h.overlayOpen) return
                     if ((w.loyalty.member ?? "") === "")

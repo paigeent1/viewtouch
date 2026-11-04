@@ -39,7 +39,7 @@ Item {
     }
     Text {
         anchors { right: parent.right; rightMargin: w.unit; verticalCenter: parent.verticalCenter }
-        visible: !!w.pos && w.pos.hasCheck
+        visible: w.zone && w.zone.checkShown !== undefined ? w.zone.checkShown : !!w.pos && w.pos.hasCheck
         text: (w.prompt.label ?? "") + (w.prompt.checkId ? "  ·  #" + w.prompt.checkId : "")
         color: w.ink
         font.family: w.face

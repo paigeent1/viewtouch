@@ -19,7 +19,8 @@ Rectangle {
     readonly property bool guestHost: true
     function askPhone(title, done) { keypad.ask(title, false, done) }
     function askEmail(title, done) { emailPad.ask(title, done) }
-    readonly property bool hasCheck: pos !== null && pos.hasCheck
+    // The check, while the cashier works it: not over the tables or Manager with one still open.
+    readonly property bool hasCheck: pos !== null && pos.hasCheck && (controller === null || controller.selling)
     readonly property var lines: hasCheck ? pos.lines : []
     readonly property var totals: hasCheck ? pos.totals : ({})
     readonly property var prompt: pos ? pos.customerPrompt : ({})

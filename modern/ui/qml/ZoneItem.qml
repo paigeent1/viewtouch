@@ -50,6 +50,9 @@ Item {
     function touch(px) { return px / Math.max(0.1, screenScale) }
     property LayoutController controller
     property PosService pos
+    // The guest's screen: whether it shows the check (the cashier is working a sale); undefined
+    // elsewhere: the session's own hasCheck.
+    property var checkShown: undefined
     // The logged-in person's text size (Employees: Text size); never while editing.
     readonly property real textScale: pos && !editing && pos.userPrefs.textSize ? pos.userPrefs.textSize / 100 : 1
 
@@ -176,7 +179,7 @@ Item {
         if (r.login === "loggedIn" && !loggedIn) return false
         if (r.login === "loggedOut" && loggedIn) return false
         if (r.login === "manager" && !(p && p.permissions.includes("manager"))) return false
-        const open = !!p && p.hasCheck
+        const open = zone.checkShown !== undefined ? zone.checkShown : !!p && p.hasCheck
         if (r.check === "open" && !open) return false
         if (r.check === "none" && open) return false
         if (r.checkType && (!open || p.check.type !== r.checkType)) return false

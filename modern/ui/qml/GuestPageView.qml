@@ -53,6 +53,7 @@ Item {
                 dragDY: 0
                 previewRect: null
                 previewRotation: null
+                checkShown: !!view.controller.pos && view.controller.pos.hasCheck && view.controller.selling
             }
         }
     }

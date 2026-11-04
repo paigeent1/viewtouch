@@ -54,6 +54,9 @@ class LayoutController : public QObject {
     Q_PROPERTY(bool hasGuestPage READ hasGuestPage NOTIFY guestPageChanged)
     Q_PROPERTY(QSize guestCanvas READ guestCanvas NOTIFY guestPageChanged)
     Q_PROPERTY(QVariantMap guestBackground READ guestBackground NOTIFY guestPageChanged)
+    // The cashier is working a sale here (Retail, an order page, Pay): only then does the guest's
+    // screen show the check (not over the tables, Manager or Reports with a check still open).
+    Q_PROPERTY(bool selling READ selling NOTIFY pageChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
     // What a held button does: {title, text}; empty when nothing is explained.
     Q_PROPERTY(QVariantMap explanation READ explanation NOTIFY explanationChanged)
@@ -124,6 +127,7 @@ public:
     bool hasGuestPage() const { return guestCanvas_.isValid(); }
     QSize guestCanvas() const { return guestCanvas_; }
     QVariantMap guestBackground() const { return guestBackground_; }
+    bool selling() const;
     QString statusText() const { return status_; }
     bool editing() const { return editing_; }
     bool asleep() const { return asleep_; }

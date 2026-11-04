@@ -1603,6 +1603,7 @@ TEST_CASE("UI: Menu Builder: a color theme for every category", "[flow][ui][them
         QTest::qWait(60);
     };
     tap(u"builderThemes"_s);
+    REQUIRE(by(u"builderThemeUse"_s));                         // (missing: a failure, not a crash)
     CHECK_FALSE(by(u"builderThemeUse"_s)->isEnabled());       // a theme first
     tap(u"builderTheme-bright"_s);
     s.shot("85-builder-themes");

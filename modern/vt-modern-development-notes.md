@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 19:26 ET — Bob (Claude) — Guest screen shows the check only while the cashier works it
+- **What:** LayoutController::selling (Retail, retail-discount*, order pages, Pay, split, gift-card). CustomerDisplay.hasCheck and the guest page (ZoneItem.checkShown, set by GuestPageView; showWhen 'check open/none' and WidgetGuestOrder/Header use it) follow it, so the order blanks when the cashier goes to the tables, Manager or Reports with a check still open. WidgetGuestOrder's tap respects TouchGuard (UI lint). Menu Builder theme test REQUIREs its button before using it (it crashed the whole run on main too).
+- **Why:** Owner: guest display kept the last open check while on the tables; GitHub run findings.
+- **Files:** `ui/cpp/layoutcontroller.hh/.cpp, ui/qml/ZoneItem.qml, ui/qml/GuestPageView.qml, ui/qml/WidgetGuestOrder.qml, ui/qml/WidgetGuestHeader.qml, ui/qml/CustomerDisplay.qml, tests/test_pos_flow.cpp`
+
 ### 2026-11-03 19:13 ET — Bob (Claude) — Tests load the QML screens the way the app does
 - **What:** New tests/qml_load.hh (vt::test::loadViewTouchQml: import paths qrc:/ and qrc:/qt/qml, then the screen's qrc file, as main.cpp's vtmLoadModuleQml). test_editor_ui, test_pages_ui and test_pos_flow use it instead of loadFromModule("ViewTouch", ...), which in this build finds 'no type named Main' (module under qrc:/ViewTouch): every screen test had been failing on GitHub since at least 2026-11-02, and one could crash the run.
 - **Why:** Modern checks never green; screen tests weren't testing screens.

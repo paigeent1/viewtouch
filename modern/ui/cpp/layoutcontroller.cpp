@@ -1262,6 +1262,14 @@ bool LayoutController::showPage(const QString &pageId)
     return navigate(Navigator::Mode::Replace, pageId) || nav_.current() == pageId;
 }
 
+bool LayoutController::selling() const
+{
+    const auto *page = currentPage();
+    return page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier"
+                    || page->kind == u"order" || page->kind == u"settle" || page->id == u"retail-entry"
+                    || page->id.startsWith(u"retail-discount"_s) || page->id == u"split" || page->id == u"gift-card");
+}
+
 void LayoutController::refreshGuest()
 {
     // The Customer Display page as designed (the editor's draft while editing): no phone layout,
