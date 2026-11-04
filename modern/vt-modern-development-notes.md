@@ -99,6 +99,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:14 ET — Bob (Claude) — Upstream sync: build on Qt 6.8
+- **What:** main.cpp: QString + u": " (allowed by Qt 6.12, not 6.8) from upstream 7424bf42 written u": "_s.
+- **Why:** The upstream group didn't compile on the Pi's Qt 6.8.
+- **Files:** `main.cpp`
+
 ### 2026-11-04 09:09 ET — Bob (Claude) — Ledger: 2e37ab3a was already ported
 - **What:** Upstream 2e37ab3a (tablet connection kept on wake) was ported by Neil on 2026-10-24 (94be1399); the ledger now says so.
 - **Why:** Owner: Neil's earlier changes may be undocumented.
