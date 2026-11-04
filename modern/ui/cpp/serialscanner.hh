@@ -28,12 +28,14 @@ signals:
     void scanned(const QString &code);
 
 private:
+    static QString firstSerialPort();
     void tryOpen();
     void readReady();
     void flush();
     void closePort();
 
     QString device_;
+    bool fixedDevice_ = false;   // VT_SERIAL_SCANNER named it; else found again at each try
     int baud_ = 9600;
     int fd_ = -1;
     QSocketNotifier *notifier_ = nullptr;

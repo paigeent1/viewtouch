@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 13:09 ET — Bob (Claude) — Merged bob/scanner-port into main
+- **What:** Serial scanner opens the adapter's first port by its /dev/serial/by-id name.
+- **Why:** CI: no new failures (29 known).
+- **Files:** `modern/ui/cpp/serialscanner.cpp`, `modern/ui/cpp/serialscanner.hh`
+
 ### 2026-11-04 13:03 ET — Bob (Claude) — Merged bob/guest-no-pointer into main
 - **What:** No mouse pointer over the guest screen.
 - **Why:** CI: no new failures (29 known).
@@ -114,6 +119,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** CustomerDisplayWindow.qml: a MouseArea over the guest window (no buttons, hover only) sets a blank cursor, so the pointer doesn't sit where a guest touched. Touches pass through; the POS window keeps its pointer.
 - **Why:** Owner 2026-11-04: the pointer showed on the guest screen when it was touched.
 - **Files:** `modern/ui/qml/CustomerDisplayWindow.qml`
+### 2026-11-04 12:51 ET — Bob (Claude) — Serial scanner found by the adapter's stable name
+- **What:** SerialScanner (without VT_SERIAL_SCANNER) now opens the first /dev/serial/by-id/*-port0 (the Keyspan USA-49WG's first port), looked up again at every retry, instead of a fixed /dev/ttyUSB0; no by-id entry: /dev/ttyUSB0 as before.
+- **Why:** The Keyspan was unplugged while ViewTouch had ttyUSB0 open; plugged back in it came up as ttyUSB4-7 and ViewTouch kept waiting for ttyUSB0, so scans stopped (2026-11-04).
+- **Files:** `modern/ui/cpp/serialscanner.hh, modern/ui/cpp/serialscanner.cpp`
+- **Next person must know:** The scanner must be on the Keyspan's first port (port 1 on the case, port0 in Linux).
 
 ### 2026-11-04 12:49 ET — Bob (Claude) — Notes: conflict markers removed
 - **What:** The learn-touch merge committed the notes file with Git conflict markers (both sides kept now, no text lost).
