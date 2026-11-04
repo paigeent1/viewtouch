@@ -1,0 +1,58 @@
+#!/bin/bash
+# A fresh Raspberry Pi to a running ViewTouch store server, from Git (the deployment checklist's
+# Phases 1-2). Run once on the new Pi, as its desktop user:
+#   git clone https://github.com/paigeent1/viewtouch.git ~/viewtouch-main
+#   bash ~/viewtouch-main/scripts/bin/vt-install "Store name"
+# Safe to run again: it skips what's done. It does not start ViewTouch (vt-server does, after).
+set -e
+REPO="$HOME/viewtouch-main"
+SITE="${1:-}"
+step() { echo; echo "=== $* ==="; }
+
+step "1. Build tools, Qt and the helpers (several minutes)"
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    git python3 g++ cmake ninja-build ccache \
+    qt6-base-dev qt6-declarative-dev qt6-declarative-dev-tools libgl-dev libssl-dev \
+    qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates \
+    qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-dialogs \
+    qml6-module-qtquick-window qml6-module-qtqml-workerscript \
+    libqt6sql6-sqlite qt6-qpa-plugins fonts-dejavu-core fonts-noto-color-emoji \
+    adb xinput gh
+
+step "2. The code (paigeent1/viewtouch) in $REPO"
+if [ ! -d "$REPO/.git" ]; then
+    git clone https://github.com/paigeent1/viewtouch.git "$REPO"
+fi
+cd "$REPO"
+git remote get-url myfork >/dev/null 2>&1 || git remote rename origin myfork
+git pull --ff-only myfork main
+
+step "3. The vt-* commands, linked to the repo (git pull keeps them current)"
+for f in "$REPO"/scripts/bin/vt-*; do sudo ln -sf "$f" /usr/local/bin/; done
+
+step "4. Serial scanner access, and the beep3 command"
+sudo usermod -aG dialout "$USER"
+if ! grep -q '^beep3()' "$HOME/.bashrc"; then
+    cat >> "$HOME/.bashrc" <<'EOF'
+
+# Three long beeps when a pasted command finishes (vt-install).
+beep3() { for i in 1 2 3; do printf '\a'; command -v speaker-test >/dev/null && timeout 0.6 speaker-test -t sine -f 880 -l 1 >/dev/null 2>&1; sleep 0.3; done; }
+EOF
+fi
+
+step "5. Configure the build"
+if [ ! -f modern/build/build.ninja ]; then
+    cmake -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+fi
+
+step "6. This site's settings (vt-site)"
+if [ -n "$SITE" ]; then vt-site init "$SITE" >/dev/null; else vt-site init >/dev/null; fi
+vt-site
+
+echo
+echo "Done. Next:"
+echo "  1. Log out and back in (or reboot) so the scanner permission and beep3 take effect."
+echo "  2. Build and start ViewTouch (first build: 20-40 minutes):  vt-server; beep3"
+echo "  3. GitHub login for tablet app downloads:                   gh auth login"
+echo "  4. Then the deployment checklist: Store Settings, Site Setup, devices."

@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 15:24 ET — Bob (Claude) — vt-install: a fresh Pi to a ViewTouch store server in one command
+- **What:** New scripts/bin/vt-install "Store name": installs the build tools, Qt 6 and helpers (adb, xinput, gh, ccache), clones/pulls paigeent1/viewtouch into ~/viewtouch-main (remote myfork), links every vt-* command, adds dialout and a beep3 function, configures the build (Ninja, Release, ccache), starts this site's settings (vt-site init). Rerunnable. Then vt-server builds and starts.
+- **Why:** Owner 2026-11-04 has a second Pi to bring up (BH Danbury); the checklist's open item was a one-step installer.
+- **Files:** `scripts/bin/vt-install`
+- **Next person must know:** beep3 here is a simple version (terminal bell + speaker-test); the HCA Pi has the owner's own.
+
 ### 2026-11-04 14:51 ET — Bob (Claude) — Merged bob/id-checks into main
 - **What:** ID checks for tobacco and alcohol (license scan; tablet camera ID mode; Bluetooth/USB keyboard scanners; hand-typed date the exception; expired IDs accepted and noted on the receipt; a license's small 1D barcode ignored), Site Setup ID checks box and USB scanner note.
 - **Why:** CI: no new failures (29 known; the ID check tests pass); tablet APK build succeeded on the branch.
