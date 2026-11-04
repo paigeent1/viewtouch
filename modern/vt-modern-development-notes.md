@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:53 ET — Bob (Claude) — Version computed again (server and Android)
+- **What:** BuildInfo.cmake sets version to MAJOR.MINOR.<commit count> again (my earlier fix removed the hardcoded 0.9.19 but the original version line had been replaced, so the version came out empty; test_net 'Versions' caught it). CMakeLists Android QT_ANDROID_VERSION_NAME back to MAJOR.MINOR.<build> (it was hardcoded 0.9.19 in 704954c2); the version code already used the commit count.
+- **Why:** Audit fix follow-up: every build must carry its own version for the update check and the tablets' upgrade.
+- **Files:** `modern/cmake/BuildInfo.cmake, modern/CMakeLists.txt`
+- **Next person must know:** Checked 261aab66 (Neil, 2026-10-24): it removed the sendKit/offline lines and 11 offline/tax test cases from test_net that 94be1399 had pasted from upstream; our fork never had upstream's Work Offline feature, so nothing that worked was lost. Upstream's offline mode (c4b87db0) is a candidate for the later overhaul.
+
 ### 2026-11-04 09:46 ET — Bob (Claude) — vt-directv scan: only this Pi's own network
 - **What:** vt-directv scan no longer takes a subnet and no longer sweeps the known TVs' networks. It scans only the network of the Pi's default-route adapter (a network bigger than a /24 is swept as the Pi's /24), and SSDP answers from anywhere else are ignored. With no default route it scans nothing.
 - **Why:** Owner 2026-11-04: each deployment should only look on the local subnet the Pi is on (no reaching into another network, a VPN or a second adapter's network).

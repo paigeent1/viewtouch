@@ -25,6 +25,7 @@ if(changes STREQUAL "")
 else()
     set(modified 1)
 endif()
+set(version "${MAJOR}.${MINOR}.${number}")
 
 function(write_if_changed path content)
     if(EXISTS "${path}")
