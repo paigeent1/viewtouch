@@ -263,6 +263,33 @@ TEST_CASE("Gift cards: a manager moves a balance to a new card; the old one clos
     CHECK(rowAmount(report, u"Sold and reloaded"_s) == u"$50.00"_s);
 }
 
+TEST_CASE("Gift cards: only managers see a card's PIN or find it by PIN", "[customers][giftcards]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);                                           // Morgan, a manager
+    REQUIRE(pos.sellGiftCard(u"6000 1111 2221"_s, 5000));
+    REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
+    for (auto &card : pos.shared()->giftCards)
+        if (card.number == "600011112221")
+            card.pin = "4821";
+
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"pin"_s] == u"4821"_s);
+    REQUIRE(pos.lookupGiftCard(u"4821"_s));                    // a manager may search by PIN
+    CHECK(pos.giftCardInfo()[u"found"_s].toBool());
+
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1111"_s));                     // a server
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"found"_s].toBool());
+    CHECK(pos.giftCardInfo()[u"pin"_s] == u"••••"_s);
+    for (const QVariant &v : pos.giftCardInfo()[u"matches"_s].toList())
+        CHECK(v.toMap()[u"pin"_s] == u"••••"_s);
+    pos.lookupGiftCard(u"4821"_s);
+    CHECK_FALSE(pos.giftCardInfo()[u"found"_s].toBool());     // not by its PIN
+}
+
 TEST_CASE("Subscription cards: subscription-only promotions come off once the card is shown", "[customers][giftcards]")
 {
     PosService pos(test::seedPosData(), nullptr);

@@ -379,8 +379,14 @@ void PosService::rememberCustomer(Check &c)
 QVariantMap PosService::giftCardInfo() const
 {
     if (!user() || giftCardNumber_.isEmpty()) return {};
-    auto cardMap = [this](const GiftCard &c) -> QVariantMap {
-        return {{u"number"_s, qs(c.number)}, {u"pin"_s, qs(c.pin)}, {u"issuedTo"_s, qs(c.issuedTo)},
+    // A card's PIN is for managers only (owner's decision, 2026-11-04): others
+    // see "••••" and can't find a card by its PIN.
+    const bool showPin = can(u"manager"_s);
+    const auto pinText = [showPin](const GiftCard &c) {
+        return c.pin.empty() ? QString() : showPin ? qs(c.pin) : u"••••"_s;
+    };
+    auto cardMap = [this, &pinText](const GiftCard &c) -> QVariantMap {
+        return {{u"number"_s, qs(c.number)}, {u"pin"_s, pinText(c)}, {u"issuedTo"_s, qs(c.issuedTo)},
                 {u"purchasedBy"_s, qs(c.purchasedBy)}, {u"balance"_s, format(c.balance)},
                 {u"balanceCents"_s, qint64(c.balance.cents())}, {u"issued"_s, whenText(c.issuedAt)},
                 {u"location"_s, qs(c.issuedLocation)}, {u"closed"_s, c.closed}};
@@ -391,7 +397,7 @@ QVariantMap PosService::giftCardInfo() const
         QString qClean = giftCardNumber_.toLower(); qClean.replace(u',' , u' '); const QStringList toks = qClean.simplified().split(u' ', Qt::SkipEmptyParts);
         std::vector<const GiftCard *> hits;
         for (const GiftCard &c : s_->giftCards) {
-            const QString hay = (qs(c.number) + u" "_s + qs(c.pin) + u" "_s + qs(c.issuedTo) + u" "_s + qs(c.purchasedBy)).toLower();
+            const QString hay = (qs(c.number) + u" "_s + (showPin ? qs(c.pin) : QString()) + u" "_s + qs(c.issuedTo) + u" "_s + qs(c.purchasedBy)).toLower();
             bool ok = !toks.isEmpty();
             for (const QString &tk : toks) if (!hay.contains(tk)) { ok = false; break; }
             if (ok) hits.push_back(&c);
@@ -405,7 +411,7 @@ QVariantMap PosService::giftCardInfo() const
     QVariantMap m{{u"number"_s, g ? qs(g->number) : giftCardNumber_}, {u"found"_s, g != nullptr},
                   {u"display"_s, lastFour(g ? g->number : ss(giftCardNumber_))}, {u"matches"_s, matches}};
     if (!g) return m;
-    m.insert(u"pin"_s, qs(g->pin)); m.insert(u"issuedTo"_s, qs(g->issuedTo)); m.insert(u"purchasedBy"_s, qs(g->purchasedBy));
+    m.insert(u"pin"_s, pinText(*g)); m.insert(u"issuedTo"_s, qs(g->issuedTo)); m.insert(u"purchasedBy"_s, qs(g->purchasedBy));
     m.insert(u"balance"_s, format(g->balance)); m.insert(u"balanceCents"_s, qint64(g->balance.cents())); m.insert(u"issued"_s, whenText(g->issuedAt));
     m.insert(u"location"_s, qs(g->issuedLocation)); m.insert(u"closed"_s, g->closed);
     m.insert(u"replacedBy"_s, g->replacedBy.empty() ? QString() : lastFour(g->replacedBy));

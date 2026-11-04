@@ -1318,7 +1318,7 @@ Report accountsReport(const std::vector<GiftCard> &cards, const std::vector<Cust
 
 
 Report giftCardsSubReport(const std::string &mode, const std::vector<GiftCard> &cards, const std::vector<Check> &checks,
-                          std::int64_t fromMs, std::int64_t toMs, const ReportContext &ctx)
+                          std::int64_t fromMs, std::int64_t toMs, const ReportContext &ctx, bool showPins)
 {
     Report r; r.id = mode; r.subtitle = ctx.period;
     std::map<std::int64_t, std::string> staff;
@@ -1367,7 +1367,7 @@ Report giftCardsSubReport(const std::string &mode, const std::vector<GiftCard> &
         if (g.issuedAt > 0 && g.issuedAt != 1767225600000LL) { std::time_t tm = g.issuedAt / 1000; char b[24]; if (std::strftime(b, sizeof(b), "%m/%d/%y", std::localtime(&tm))) dt = b; }
         std::string st = std::string(g.balance.cents() > 0 ? "ACTIVE" : (isAct ? "USED($0)" : "AVAIL")) + (dt.empty() ? "" : " · " + dt);
         auto [fnm, lnm] = splitFL(g.issuedTo);
-        r.line({g.number, g.pin.empty() ? "----" : g.pin, fnm, lnm, fmtCust(g.purchasedBy, g.issuedTo), emp, st, ctx.money(g.balance)});
+        r.line({g.number, g.pin.empty() ? "----" : (showPins ? g.pin : "••••"), fnm, lnm, fmtCust(g.purchasedBy, g.issuedTo), emp, st, ctx.money(g.balance)});
         tot += g.balance; ++cnt;
     }
     r.total({"Total Matching Cards", count(cnt), "", "", "", "", "", ctx.money(tot)});

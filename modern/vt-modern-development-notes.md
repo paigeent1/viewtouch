@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:33 ET — Bob (Claude) — Gift card PINs: managers only
+- **What:** giftCardInfo() shows a card's PIN only to someone with the manager permission; everyone else gets ••••, and the gift card search no longer matches on PINs for them. The gift card reports (Activated, Active Balances, Inactive) print the PIN column the same way: managers see it, others see ••••. New test in test_customers.
+- **Why:** Owner's decision 2026-11-04 (audit): any server could look up or print every card's PIN, which is all someone needs to spend a card.
+- **Files:** `modern/app/pos_customers.cpp, modern/core/report.hh, modern/core/report.cpp, modern/app/pos_day.cpp, modern/tests/test_customers.cpp`
+- **Next person must know:** The PIN is still synced to tablets in the store data (pos_json); only what's shown changed.
+
 ### 2026-11-04 09:30 ET — Bob (Claude) — Audit fixes: real build numbers, graceful restart, barcodes save
 - **What:** Removed the hardcoded build 19 / 0.9.19 lines from modern/cmake/BuildInfo.cmake so each build gets its real git count again. vt-server and vt-fast now stop vtmodern with SIGTERM, wait up to 10 s, and only then force it. Menu item barcodes are no longer refused for an 11-digit code or a GS1 check digit that doesn't add up (shape and duplicate checks stay).
 - **Why:** Audit of earlier changes: the fixed build number made every Pi and tablet look the same version to the update check and to the server's behind/ahead compare; killall -9 could cut a database write in half; the check-digit block meant store and vendor codes that don't follow GS1 could never be saved, and the 11-digit message promised a fill-in that never happened.
