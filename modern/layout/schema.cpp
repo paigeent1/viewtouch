@@ -132,7 +132,7 @@ QJsonArray widgetSettings(const QString &kind)
                              options({{"", "Fill the box (edges may be cut off)"}, {"fit", "The whole picture"}})),
                         u"The whole picture: all of a logo shows, with space around it"_s));
         out.append(hint(with(intField(u"props.scale"_s, u"Size %"_s, g, 10, 100), u"default"_s, 100),
-                        u"The picture this much of the box (100: as big as fits)"_s));
+                        u"The picture this much of the box, centered; under 100 the whole picture always shows"_s));
         out.append(hint(field(u"props.image"_s, u"Picture (here only)"_s, u"image"_s, g),
                         u"Empty: Store Settings > Customer display (left side between guests), else the logo"_s));
         out.append(hint(field(u"props.video"_s, u"Video (an MP4 on the Pi)"_s, u"string"_s, g),

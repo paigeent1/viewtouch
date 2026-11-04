@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 07:52 ET — Bob (Claude) — Customer Display picture: smaller is always whole
+- **What:** guestMedia crops only at Size 100% with Fit 'fill'; any Size under 100 shows the whole picture.
+- **Why:** Owner: adjusting size still clipped the logo (Fit was still fill).
+- **Files:** `ui/qml/WidgetGuestMedia.qml, layout/schema.cpp`
+
 ### 2026-11-04 07:42 ET — Bob (Claude) — Leaving the editor on Customer Display goes back to the POS
 - **What:** LayoutController::leaveEditMode: if the cashier's screen is on customer-display, back (else home). showPage refuses customer-display outside editing. Seed page test skips it outside editing; controller test covers both.
 - **Why:** Owner: after editing the Customer Display page, both screens showed it and the POS had no way back (no buttons there).

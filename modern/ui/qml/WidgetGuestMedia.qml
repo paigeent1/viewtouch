@@ -14,9 +14,10 @@ Item {
     property bool videoFailed: false
     onVideoChanged: videoFailed = false
     function img(ref) { return pos ? (pos.imageRevision < 0 ? undefined : pos.imageUrl(ref)) : ref }
-    readonly property bool crop: props.fit !== "fit"   // props.fit "fit": whole picture, bars around it
-    // props.scale: the picture this percent of the box (whole picture, smaller), centered.
+    // props.scale: the picture this percent of the box, centered, always whole (made smaller: not cut).
     readonly property real scale: Math.max(0.1, Math.min(1, (props.scale ?? 100) / 100))
+    // Fill the box (edges cut off) unless props.fit is "fit" or it's made smaller.
+    readonly property bool crop: props.fit !== "fit" && scale >= 1
     clip: true
 
     Loader {
