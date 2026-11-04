@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:08 ET — Bob (Claude) — ID checks: build fix
+- **What:** The scan waiting for an ID check is a PendingScan (item, code, retail), not a string.
+- **Why:** CI build error on bob/id-checks.
+- **Files:** `modern/app/pos_service.hh, modern/app/pos_service.cpp, modern/app/pos_age.cpp, modern/tests/test_customers.cpp`
+
 ### 2026-11-04 14:05 ET — Bob (Claude) — ID checks for tobacco and alcohol (license scan)
 - **What:** Items in the tobacco categories ticked in Site Setup > ID checks (idCheckTobacco, tobaccoCategories, ageTobacco) and, when on, items taxed as alcohol (idCheckAlcohol, ageAlcohol) wait for the buyer's ID: AgeCheckOverlay (POS and tablets) says scan the back of the ID; core/id_card.hh reads the AAMVA PDF417 (DBB birth, DBA expiry, DAQ number; US MMDDCCYY or Canadian CCYYMMDD); under age or expired: refused (logged on the check), else the check keeps ageVerified/ageHow/ageBy/ageAt/ageId4 (last 4 only, CT CGS 53-344(e)) and the item goes in; later restricted items on that check go straight in. 'Won't scan: type date' = verifyAgeHand (MMDDYYYY), logged as the exception ('ageHand' event), optionally manager PIN (idHandNeedsManager). Scans: SerialScanner keeps a license's line breaks (buffer starting '@'); keyboard-mode scanners (Bluetooth on a tablet) the same via Main.qml (Shift no longer ends a burst; idScanEnd timer). A license's small 1D barcode (Code 128/39) is ignored while an ID check waits and within 3 s of a license scan, and a license scan closes an 'Item not on file' the small one opened, so the scanner can keep reading all barcode kinds (cigar labels). Site Setup's scan test shows 'A driver's license / ID (read OK)', never the license data. Tests in test_customers.
 - **Why:** Owner 2026-11-04: tablets at HCA scan the back of the ID, ID options on the Site Setup page, hand-keyed DOB the exception; the 1D barcode on licenses had forced turning that symbology off in ILSA, which broke cigar labels.

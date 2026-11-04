@@ -28,7 +28,7 @@ int PosService::requiredAge(const MenuItem &item) const
     return age;
 }
 
-bool PosService::askForAge(const MenuItem &item, int age, const std::string &scan)
+bool PosService::askForAge(const MenuItem &item, int age, const PendingScan &scan)
 {
     ageAsk_ = {{u"item"_s, qs(item.id)}, {u"name"_s, qs(item.name)}, {u"age"_s, age},
                {u"handNeedsManager"_s, s_->settings.idHandNeedsManager}};
@@ -78,7 +78,7 @@ bool PosService::saveIdChecks(const QVariantMap &values)
 bool PosService::agePassed(int age, const char *how, const std::string &idNumber)
 {
     const QString item = ageAsk_.value(u"item"_s).toString();
-    const std::string scan = std::exchange(ageAskScan_, {});
+    const PendingScan scan = std::exchange(ageAskScan_, {});
     ageAsk_.clear();
     if (!current())   // the ID shown before anything was rung in
         startCheck(CheckType::Quick);
@@ -119,7 +119,7 @@ bool PosService::checkAge(const IdDate &birth, const IdDate &expires, const char
         if (Check *c = current())
             noteEvent(*c, tr("ID refused: under %1 (%2)").arg(need).arg(name), "ageRefused");
         ageAsk_.clear();
-        ageAskScan_.clear();
+        ageAskScan_ = {};
         emit checkChanged();
         return fail(tr("Under %1: %2 can't be sold.").arg(need).arg(name));
     }
@@ -155,7 +155,7 @@ void PosService::cancelAgeCheck()
     if (ageAsk_.isEmpty())
         return;
     ageAsk_.clear();
-    ageAskScan_.clear();
+    ageAskScan_ = {};
     emit checkChanged();
 }
 

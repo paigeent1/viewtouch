@@ -1284,7 +1284,7 @@ bool PosService::addItem(const QString &idOrName)
     if (const int need = requiredAge(*item); need > 0) {
         const Check *open = current();
         if (!open || open->ageVerified < need) {
-            const std::string scan = std::exchange(pendingScan_, {});
+            const PendingScan scan = std::exchange(pendingScan_, {});
             return askForAge(*item, need, scan);
         }
     }

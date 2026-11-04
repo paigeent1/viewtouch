@@ -1307,15 +1307,15 @@ private:
     QString customerQuery_;
     std::string selectedCustomer_;
     QString giftCardNumber_;
-    QVariantMap ageAsk_;              // an item waiting for the buyer's ID
-    std::string ageAskScan_;
-    bool askForAge(const core::MenuItem &item, int age, const std::string &scan);
-    bool agePassed(int age, const char *how, const std::string &idNumber);
-    bool checkAge(const core::IdDate &birth, const core::IdDate &expires, const char *how, const std::string &idNumber);
     QVariantMap pendingCustomer_;     // waiting on the duplicate window
     QVariantList customerMatches_;
     struct PendingScan { QString itemId, code; bool retail = false; };
     PendingScan pendingScan_;   // for the next addItem
+    QVariantMap ageAsk_;              // an item waiting for the buyer's ID (pos_age.cpp)
+    PendingScan ageAskScan_;          // the scan that rang it in, kept for when the ID passes
+    bool askForAge(const core::MenuItem &item, int age, const PendingScan &scan);
+    bool agePassed(int age, const char *how, const std::string &idNumber);
+    bool checkAge(const core::IdDate &birth, const core::IdDate &expires, const char *how, const std::string &idNumber);
     QString labelQuery_;
     QStringList labelPath_;
     bool labelBrowsing_ = false;   // the Labels screen is showing the tree (worked out only then)

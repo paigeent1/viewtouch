@@ -8,6 +8,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDate>
 #include <QDir>
 #include <QFile>
 #include <QSqlDatabase>
