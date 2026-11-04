@@ -15,11 +15,47 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        Label {
-            text: qsTr("Pages")
-            font.bold: true
-            font.pixelSize: 15
-            Layout.margins: 12
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 8
+            Layout.topMargin: 10
+            Label {
+                text: qsTr("Pages")
+                font.bold: true
+                font.pixelSize: 15
+                Layout.fillWidth: true
+            }
+            // A-Z, or grouped by type (each group folds).
+            Button {
+                objectName: "pageSort"
+                flat: true
+                text: list.byType ? qsTr("By type") : qsTr("A–Z")
+                onClicked: list.byType = !list.byType
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("List the pages A–Z, or grouped by type")
+            }
+        }
+
+        // Find a page: by its name, its id or its type.
+        TextField {
+            id: findPage
+            objectName: "pageFind"
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            Layout.rightMargin: 8
+            Layout.bottomMargin: 6
+            placeholderText: qsTr("Find a page…")
+            rightPadding: clearFind.visible ? clearFind.width + 6 : padding
+            Keys.onEscapePressed: text = ""
+            ToolButton {
+                id: clearFind
+                visible: findPage.text !== ""
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "✕"
+                onClicked: findPage.text = ""
+            }
         }
 
         ListView {
@@ -27,40 +63,101 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            property bool byType: false
+            property var opened: ({})          // By type: the groups opened (they start shut)
             // A page's phone version is reached by the Standard | Phone switch.
             readonly property var listed: panel.editor.pages.filter(p => !p.variantOf)
             readonly property string shownPage: panel.editor.revision >= 0 ? (panel.editor.screens.page ?? panel.editor.pageId) : ""
-            model: listed
-            currentIndex: listed.findIndex(p => p.id === shownPage)
+            function title(p) { return p.name ? qsTranslate("Page", p.name) : p.id }
+            // The rows: pages (sorted, filtered by the search), with a header for each type when grouped.
+            readonly property var rows: {
+                const q = findPage.text.trim().toLowerCase()
+                const kindName = k => panel.editor.pageKindName(k)
+                let pages = listed.filter(p => q === "" || title(p).toLowerCase().includes(q)
+                                                || p.id.toLowerCase().includes(q) || kindName(p.kind).toLowerCase().includes(q))
+                pages = pages.slice().sort((a, b) => title(a).localeCompare(title(b)))
+                if (!byType)
+                    return pages.map(p => ({ page: p }))
+                pages.sort((a, b) => kindName(a.kind).localeCompare(kindName(b.kind)) || title(a).localeCompare(title(b)))
+                const out = []
+                let last = null
+                for (const p of pages) {
+                    if (p.kind !== last) {
+                        last = p.kind
+                        out.push({ header: p.kind, count: pages.filter(x => x.kind === p.kind).length })
+                    }
+                    // Searching, or the page on screen: its group stays open.
+                    if (q !== "" || opened[p.kind] || p.id === shownPage)
+                        out.push({ page: p })
+                }
+                return out
+            }
+            model: rows
+            currentIndex: rows.findIndex(r => r.page && r.page.id === shownPage)
+            onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
             ScrollBar.vertical: ScrollBar {}
 
             delegate: ItemDelegate {
                 id: row
                 required property var modelData
                 required property int index
+                readonly property bool isHeader: modelData.header !== undefined
                 width: ListView.view.width
                 highlighted: ListView.isCurrentItem
-                onClicked: panel.controller.showPage(modelData.id)
+                onClicked: {
+                    if (isHeader) {
+                        const o = Object.assign({}, list.opened)
+                        o[modelData.header] = !o[modelData.header]
+                        list.opened = o
+                    } else {
+                        panel.controller.showPage(modelData.page.id)
+                    }
+                }
+                background: Rectangle {
+                    color: row.isHeader ? Qt.rgba(0.5, 0.5, 0.5, 0.15)
+                         : row.highlighted ? palette.highlight
+                         : row.hovered ? Qt.rgba(0.5, 0.5, 0.5, 0.1) : "transparent"
+                }
 
                 contentItem: ColumnLayout {
                     spacing: 1
                     Label {
-                        text: row.modelData.name ? qsTranslate("Page", row.modelData.name) : row.modelData.id
+                        visible: row.isHeader
+                        text: row.isHeader ? (list.opened[row.modelData.header] || findPage.text !== "" ? "▾ " : "▸ ")
+                                             + panel.editor.pageKindName(row.modelData.header)
+                                             + "  (" + row.modelData.count + ")" : ""
+                        font.bold: true
+                        font.pixelSize: 12
+                        color: EditorStyle.muted
+                        Layout.fillWidth: true
+                    }
+                    Label {
+                        visible: !row.isHeader
+                        text: row.isHeader ? "" : list.title(row.modelData.page)
                         font.bold: row.highlighted
+                        color: row.highlighted ? "white" : palette.text
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                     Label {
-                        text: panel.editor.pageKindName(row.modelData.kind)
-                              + (row.modelData.role ? "  ·  " + qsTr("role: %1").arg(panel.editor.pageRoleName(row.modelData.role)) : "")
-                              + (row.modelData.templateId ? "  ·  ⧉ " + row.modelData.templateId : "")
-                              + (row.modelData.hasPhone ? "  ·  " + qsTr("+ phone") : "")
+                        visible: !row.isHeader
+                        readonly property var p: row.modelData.page ?? ({})
+                        text: row.isHeader ? "" : (list.byType ? "" : panel.editor.pageKindName(p.kind))
+                              + (p.role ? (list.byType ? "" : "  ·  ") + qsTr("role: %1").arg(panel.editor.pageRoleName(p.role)) : "")
+                              + (p.templateId ? "  ·  ⧉ " + p.templateId : "")
+                              + (p.hasPhone ? "  ·  " + qsTr("+ phone") : "")
                         color: row.highlighted ? Qt.rgba(1, 1, 1, 0.8) : EditorStyle.muted
                         font.pixelSize: 11
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                 }
+            }
+            Label {
+                anchors.centerIn: parent
+                visible: list.count === 0
+                text: qsTr("No page matches.")
+                color: EditorStyle.muted
             }
         }
 

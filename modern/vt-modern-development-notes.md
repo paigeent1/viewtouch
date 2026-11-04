@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 16:13 ET — Bob (Claude) — Screen editor: find a page, A-Z or grouped by type
+- **What:** PagePanel (the editor's left Pages list): a 'Find a page…' box (name, id or type; ✕ or Esc clears), the list sorted A–Z, and an A–Z / By type switch: By type shows a header per type with its count; groups start shut and open with a touch (the page on screen and search matches always show). The page on screen is scrolled into view.
+- **Why:** Owner 2026-11-04: the editor's page list is getting long.
+- **Files:** `modern/ui/qml/PagePanel.qml`
+
 ### 2026-11-04 16:10 ET — Bob (Claude) — Labels screen: yellow camera Scan button beside the search
 - **What:** WidgetRetailLabels: a yellow '📷 Scan' button next to the Find or scan field. On a tablet it opens the camera (new command scanCameraField); the code read fills the search and, like a scanner's Enter, puts the one matching item on the list (LayoutController::cameraCode signal; cameraToField_ routes that one camera scan to the field instead of ringing it in). On the Pi it says 'No camera on this terminal: use the barcode scanner' (or, with a USB camera in /dev/v4l/by-id, that camera scanning is on the tablets).
 - **Why:** Owner 2026-11-04: scan labels from the tablet camera; the Pi has no camera.
