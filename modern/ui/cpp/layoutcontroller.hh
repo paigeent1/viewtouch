@@ -338,6 +338,8 @@ signals:
     void fontsChanged();
     void setupOpenChanged();
     void siteChanged();
+    // The back of a license was scanned (the ID check has it).
+    void idCardScanned();
     // A command for the widgets on the page (kitchenStation, kitchenAllDay...).
     void widgetCommand(const QString &name, const QVariantMap &args);
     void editorChanged();
@@ -392,6 +394,7 @@ private:
     int siteRevision_ = 0;
     QString lastScan_;
     qint64 lastScanAt_ = 0;
+    qint64 lastIdScanAt_ = 0;
     // The pages in this terminal's own look (Manager -> Terminals), when it has one.
     std::optional<vt::layout::Layout> lookedLayout_;
     QString lookedId_;

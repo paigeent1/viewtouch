@@ -1280,6 +1280,14 @@ bool PosService::addItem(const QString &idOrName)
         return fail(tr("'%1' is not on the menu.").arg(idOrName));
     if (!item->available)
         return fail(tr("%1 is sold out.").arg(qs(item->name)));
+    // Tobacco and alcohol: the buyer's ID first (once per check; pos_age.cpp).
+    if (const int need = requiredAge(*item); need > 0) {
+        const Check *open = current();
+        if (!open || open->ageVerified < need) {
+            const PendingScan scan = std::exchange(pendingScan_, {});
+            return askForAge(*item, need, scan);
+        }
+    }
     if (item->ticketCapacity > 0) {   // tickets to an event: only as many as there are seats
         if (item->eventAt > 0 && now() > item->eventAt)
             return fail(tr("%1 has already taken place.").arg(qs(item->name)));

@@ -126,7 +126,8 @@ Item {
                     title: qsTr("Scanner")
                     ColumnLayout {
                         anchors.fill: parent
-                        Caption { text: qsTr("Scanner port") }
+                        Caption { text: qsTr("USB scanners need no setup: they type into the POS screen (a second one just for IDs too). These settings are for a serial scanner on the adapter.") }
+                        Caption { text: qsTr("Serial scanner port") }
                         ComboBox {
                             id: portBox
                             objectName: "scannerPort"
@@ -271,12 +272,67 @@ Item {
                     }
                 }
 
+                // --- ID checks (store-wide, kept with Store Settings) ---
+                Box {
+                    id: idBox
+                    title: qsTr("ID checks (tobacco and alcohol)")
+                    Layout.columnSpan: grid.columns > 1 ? 2 : 1
+                    readonly property var saved: w.pos ? w.pos.idChecks : ({})
+                    property var ids: ({})
+                    property bool idDirty: false
+                    function load() { ids = Object.assign({}, saved); ids.tobaccoCategories = (saved.tobaccoCategories ?? []).slice(); idDirty = false }
+                    function put(key, value) { const d = Object.assign({}, ids); d[key] = value; ids = d; idDirty = true }
+                    onSavedChanged: if (!idDirty) load()
+                    Component.onCompleted: load()
+                    ColumnLayout {
+                        anchors.fill: parent
+                        Caption { text: qsTr("Ringing in one of these asks for the buyer's ID: scan the back of the license (POS scanner, or a 2D scanner paired to a tablet). A date of birth typed by hand is the logged exception.") }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            CheckBox { objectName: "idTobacco"; text: qsTr("Tobacco, age"); font.pixelSize: 16; font.bold: false; checked: idBox.ids.tobacco ?? true; onToggled: idBox.put("tobacco", checked) }
+                            SpinBox { from: 18; to: 99; value: idBox.ids.ageTobacco ?? 21; font.bold: false; onValueModified: idBox.put("ageTobacco", value) }
+                            Item { Layout.preferredWidth: 24 }
+                            CheckBox { objectName: "idAlcohol"; text: qsTr("Alcohol, age"); font.pixelSize: 16; font.bold: false; checked: idBox.ids.alcohol ?? false; onToggled: idBox.put("alcohol", checked) }
+                            SpinBox { from: 18; to: 99; value: idBox.ids.ageAlcohol ?? 21; font.bold: false; onValueModified: idBox.put("ageAlcohol", value) }
+                            Item { Layout.fillWidth: true }
+                        }
+                        Caption { text: qsTr("Alcohol: items taxed as alcohol. Tobacco: items in the categories ticked here:") }
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: w.pos ? w.pos.menuCategories : []
+                                delegate: CheckBox {
+                                    required property var modelData
+                                    text: modelData.name
+                                    font.pixelSize: 15; font.bold: false
+                                    checked: (idBox.ids.tobaccoCategories ?? []).includes(modelData.id)
+                                    onToggled: {
+                                        const list = (idBox.ids.tobaccoCategories ?? []).filter(c => c !== modelData.id)
+                                        if (checked) list.push(modelData.id)
+                                        idBox.put("tobaccoCategories", list)
+                                    }
+                                }
+                            }
+                        }
+                        CheckBox { text: qsTr("A date of birth typed by hand needs a manager's PIN"); font.pixelSize: 15; font.bold: false
+                                   checked: idBox.ids.handNeedsManager ?? false; onToggled: idBox.put("handNeedsManager", checked) }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Caption { text: idBox.idDirty ? qsTr("ID check changes not saved yet.") : qsTr("For the whole store (Store Settings).") }
+                            Button { text: qsTr("Cancel"); implicitHeight: 46; font.bold: false; enabled: idBox.idDirty; onClicked: idBox.load() }
+                            Button { objectName: "saveIdChecks"; text: qsTr("Save ID checks"); implicitHeight: 46; highlighted: true; enabled: idBox.idDirty && w.admin
+                                     onClicked: { w.pos.saveIdChecks(idBox.ids); idBox.idDirty = false } }
+                        }
+                    }
+                }
+
                 // --- coming ---
                 Box {
                     title: qsTr("Coming later")
                     ColumnLayout {
                         anchors.fill: parent
-                        Caption { text: qsTr("Driver's license reader (ID checks): uses the scanner above.") }
+                        Caption { text: qsTr("Tablets scanning IDs with their own camera (for now: a 2D scanner paired by Bluetooth).") }
                         Caption { text: qsTr("Scale and scale scanner: not built yet.") }
                         Caption { text: qsTr("Card terminal (Global Payments): not built yet.") }
                     }

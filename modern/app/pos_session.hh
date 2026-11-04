@@ -101,6 +101,8 @@ class PosSession : public QObject {
     // What the customer display asks the guest: {askingTip, tipChosen, tip, choices}.
     Q_PROPERTY(QVariantMap customerPrompt READ customerPrompt NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap customerDuplicate READ customerDuplicate NOTIFY checkChanged)
+    Q_PROPERTY(QVariantMap ageAsk READ ageAsk NOTIFY checkChanged)
+    Q_PROPERTY(QVariantMap idChecks READ idChecks NOTIFY adminChanged)
     // The week's schedule ({title, days, totals, staff}) and your next shift.
     Q_PROPERTY(QVariantMap schedule READ scheduleInfo NOTIFY sessionChanged)
     Q_PROPERTY(QString nextShift READ nextShift NOTIFY sessionChanged)
@@ -316,7 +318,9 @@ public:
     virtual QVariantMap giftCardInfo() const = 0;
     virtual QVariantMap waitlistInfo() const = 0;
     virtual QVariantMap customerPrompt() const = 0;
-    virtual QVariantMap customerDuplicate() const = 0;   // {name, phone, email, matches: [{id, name, phone, email, why}]}
+    virtual QVariantMap customerDuplicate() const = 0;
+    virtual QVariantMap ageAsk() const = 0;     // an item waiting for the buyer's ID: {item, name, age, handNeedsManager}
+    virtual QVariantMap idChecks() const = 0;   // the store's ID check settings (Site Setup)   // {name, phone, email, matches: [{id, name, phone, email, why}]}
     virtual QVariantMap scheduleInfo() const = 0;
     virtual QString nextShift() const = 0;
     virtual QVariantMap rangeReport() const = 0;
@@ -664,6 +668,10 @@ public:
     Q_INVOKABLE void removeCoupon(const QString &id) { invoke(QStringLiteral("removeCoupon"), {id}); }
     Q_INVOKABLE void customerJoin(const QString &phone, bool privacyAccepted = false) { invoke(QStringLiteral("customerJoin"), {phone, privacyAccepted}); }
     Q_INVOKABLE void printPrivacyNotice() { invoke(QStringLiteral("printPrivacyNotice")); }
+    Q_INVOKABLE void verifyAgeScan(const QString &raw) { invoke(QStringLiteral("verifyAgeScan"), {raw}); }
+    Q_INVOKABLE void verifyAgeHand(const QString &mmddyyyy) { invoke(QStringLiteral("verifyAgeHand"), {mmddyyyy}); }
+    Q_INVOKABLE void cancelAgeCheck() { invoke(QStringLiteral("cancelAgeCheck")); }
+    Q_INVOKABLE void saveIdChecks(const QVariantMap &values) { invoke(QStringLiteral("saveIdChecks"), {values}); }
     Q_INVOKABLE void customerEmail(const QString &email, bool privacyAccepted = false) { invoke(QStringLiteral("customerEmail"), {email, privacyAccepted}); }
     Q_INVOKABLE void sendReceipt(const QString &how, const QString &to = {})
     {

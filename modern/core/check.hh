@@ -291,6 +291,15 @@ struct Check {
     std::vector<std::string> allergies;   // the guest's (allergen ids): the kitchen sees them
     std::vector<std::string> coupons;     // promotions whose code was entered on it (their ids)
     std::string subscriptionCard;         // a subscription (9...) card shown on it: subscription-only promotions apply
+    // ID check for age-restricted items (tobacco, alcohol): the age shown (the buyer is at least this
+    // old), how ("scan", "hand"), who checked and when, the ID's last 4 characters. Nothing else from
+    // the ID is kept (CT CGS 53-344(e)).
+    int ageVerified = 0;
+    std::string ageHow;
+    std::string ageBy;
+    std::int64_t ageAt = 0;
+    std::string ageId4;
+    bool ageIdExpired = false;   // the ID shown had expired: accepted (it still shows their photo and birth date), noted on the receipt
     std::map<std::string, std::string> giftCardFor;   // card number -> who a card sold on it is for (Purchased For)
     CardHold hold;                        // a tab's card, held
     bool kiosk = false;               // a guest ordered it on the self-order kiosk

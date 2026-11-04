@@ -8,6 +8,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDate>
 #include <QDir>
 #include <QFile>
 #include <QSqlDatabase>
@@ -543,4 +544,82 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     REQUIRE(pos.findRetailLabels(u"zippo"_s));
     CHECK(pos.retailLabels()[u"matches"_s].toList().isEmpty());
     qputenv("HOME", oldHome);
+}
+
+namespace {
+// The barcode on the back of a license (AAMVA), with this date of birth and expiration (MMDDYYYY).
+QString license(const QString &dob, const QString &expires)
+{
+    return u"@\n\x1e\rANSI 636000090002DL00410200ZC02410012DLDAQT64235789\nDCSSAMPLE\nDACTEST\nDBB"_s + dob
+         + u"\nDBA"_s + expires + u"\nDAJCT\n"_s;
+}
+QString mmddyyyy(int yearsAgo) { return QDate::currentDate().addYears(-yearsAgo).toString(u"MMddyyyy"_s); }
+} // namespace
+
+TEST_CASE("ID checks: alcohol asks for the ID; a scan of the license lets it in, once per check", "[customers][age]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);
+    pos.shared()->settings.idCheckAlcohol = true;
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+
+    // Ringing in a beer: it waits for the ID.
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    CHECK(pos.ageAsk()[u"age"_s] == 21);
+    CHECK(pos.lines().isEmpty());
+
+    // Under 21: refused, nothing rung in.
+    CHECK_FALSE(pos.verifyAgeScan(license(mmddyyyy(19), mmddyyyy(-3))));
+    CHECK(pos.ageAsk().isEmpty());
+    CHECK(pos.lines().isEmpty());
+
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    CHECK_FALSE(pos.verifyAgeScan(u"012345678905"_s));                    // a UPC isn't an ID
+
+    // 30 years old, good until 3 years from now: the beer goes in; the check remembers.
+    REQUIRE(pos.verifyAgeScan(license(mmddyyyy(30), mmddyyyy(-3))));
+    CHECK(pos.ageAsk().isEmpty());
+    CHECK(pos.lines().size() == 1);
+    const core::Check *c = pos.currentCheck();
+    REQUIRE(c);
+    CHECK(c->ageVerified == 21);
+    CHECK(c->ageHow == "scan");
+    CHECK(c->ageId4 == "5789");                                          // only the last 4
+    CHECK_FALSE(c->ageIdExpired);
+    REQUIRE(pos.addItem(u"draft-beer"_s));                               // no second ask
+    CHECK(pos.lines().size() == 2);
+
+    // An expired ID still shows their photo and date of birth: accepted, noted for the receipt.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    REQUIRE(pos.verifyAgeScan(license(mmddyyyy(40), mmddyyyy(1))));
+    CHECK(pos.currentCheck()->ageIdExpired);
+    CHECK(pos.lines().size() == 1);
+
+    // A new check: an ID that won't scan, the date of birth typed (the exception).
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    CHECK_FALSE(pos.verifyAgeHand(u"0101"_s));                           // not a whole date
+    REQUIRE(pos.verifyAgeHand(mmddyyyy(25)));
+    CHECK(pos.currentCheck()->ageHow == "hand");
+    CHECK(pos.lines().size() == 1);
+
+    // Not an alcohol check store: no ask.
+    pos.shared()->settings.idCheckAlcohol = false;
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    REQUIRE(pos.addItem(u"draft-beer"_s));
+}
+
+TEST_CASE("ID checks: tobacco by category, settings saved from Site Setup", "[customers][age]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);                                                       // a manager
+    REQUIRE(pos.saveIdChecks({{u"tobacco"_s, true}, {u"ageTobacco"_s, 21}, {u"tobaccoCategories"_s, QStringList{u"drinks"_s}}}));
+    CHECK(pos.idChecks()[u"tobaccoCategories"_s].toStringList() == QStringList{u"drinks"_s});
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));                             // in a ticked category
+    pos.cancelAgeCheck();
+    CHECK(pos.ageAsk().isEmpty());
+    CHECK(pos.lines().isEmpty());
+    REQUIRE(pos.addItem(u"cobb"_s));                                       // not age-restricted
 }

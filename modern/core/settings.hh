@@ -185,6 +185,13 @@ struct PosSettings {
     // For the ID check at the register (coming: scan the license on each such sale).
     int ageAlcohol = 21;
     int ageTobacco = 21;   // cigarettes, cigars, rolling papers, e-cigarettes
+    // ID checks (Site Setup > ID checks): which items ask for the buyer's ID before they're rung in.
+    // Tobacco: items in these categories (MenuCategory ids); alcohol: items taxed as alcohol.
+    bool idCheckTobacco = true;
+    bool idCheckAlcohol = false;
+    std::vector<std::string> tobaccoCategories;
+    // A date of birth typed by hand (an ID that won't scan) needs a manager's PIN.
+    bool idHandNeedsManager = false;
     bool privacyOnReceipts = true;
     std::string privacyShort;
     std::string privacyFull;

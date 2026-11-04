@@ -40,12 +40,18 @@ object BarcodeScanner {
     private var bgThread: HandlerThread? = null
     private var bgHandler: Handler? = null
     private var useFrontCamera: Boolean = false
+    // ID mode: the PDF417 barcode on the back of a driver's license (age checks), not UPCs. A license
+    // also has a small 1D barcode; only the square one is read here.
+    private var idMode: Boolean = false
     private val busy = AtomicBoolean(false)
     private val finished = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var timeoutRunnable: Runnable? = null
 
-    private val scanner by lazy {
+    private val idScanner by lazy {
+        BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_PDF417).build())
+    }
+    private val upcScanner by lazy {
         val opts = BarcodeScannerOptions.Builder()
             .setBarcodeFormats(
                 Barcode.FORMAT_UPC_A,
@@ -60,7 +66,18 @@ object BarcodeScanner {
     }
 
     @JvmStatic
+    fun startId(activity: Activity) {
+        idMode = true
+        launch(activity)
+    }
+
+    @JvmStatic
     fun start(activity: Activity) {
+        idMode = false
+        launch(activity)
+    }
+
+    private fun launch(activity: Activity) {
         mainHandler.post {
             if (overlay != null) {
                 stop(activity)
@@ -99,7 +116,7 @@ object BarcodeScanner {
         }
 
         val title = TextView(activity).apply {
-            text = "Scan UPC Barcode"
+            text = if (idMode) "Scan the BACK of the ID (big square barcode)" else "Scan UPC Barcode"
             textSize = 20f
             setTextColor(Color.parseColor("#E6B800"))
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -165,7 +182,7 @@ object BarcodeScanner {
         // Auto-shutoff after 20 seconds if no barcode is scanned
         val r = Runnable { stop(activity) }
         timeoutRunnable = r
-        mainHandler.postDelayed(r, 10000)
+        mainHandler.postDelayed(r, if (idMode) 30000 else 10000)
     }
 
     @SuppressLint("MissingPermission")
@@ -186,9 +203,12 @@ object BarcodeScanner {
             }
             val camId = chosenId ?: return
 
-            surfaceTexture.setDefaultBufferSize(1280, 720)
+            // A license's PDF417 is dense: a larger picture for it.
+            val w = if (idMode) 1920 else 1280
+            val h = if (idMode) 1080 else 720
+            surfaceTexture.setDefaultBufferSize(w, h)
             val previewSurface = Surface(surfaceTexture)
-            imageReader = ImageReader.newInstance(1280, 720, ImageFormat.YUV_420_888, 2).apply {
+            imageReader = ImageReader.newInstance(w, h, ImageFormat.YUV_420_888, 2).apply {
                 setOnImageAvailableListener({ reader ->
                     val img = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     if (finished.get() || !busy.compareAndSet(false, true)) {
@@ -197,10 +217,11 @@ object BarcodeScanner {
                     }
                     val mediaImage = img
                     val input = InputImage.fromMediaImage(mediaImage, 0)
-                    scanner.process(input)
+                    (if (idMode) idScanner else upcScanner).process(input)
                         .addOnSuccessListener { barcodes ->
                             for (b in barcodes) {
-                                val raw = b.rawValue?.trim() ?: continue
+                                // A license keeps its line breaks (its fields are one per line).
+                                val raw = (if (idMode) b.rawValue else b.rawValue?.trim()) ?: continue
                                 if (raw.length >= 4 && finished.compareAndSet(false, true)) {
                                     try {
                                         ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90)

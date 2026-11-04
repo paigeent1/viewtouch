@@ -213,6 +213,10 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"applyCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.applyCoupon(a.value(0).toString())); }},
         {u"removeCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeCoupon(a.value(0).toString())); }},
         {u"customerJoin"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerJoin(a.value(0).toString(), a.value(1).toBool())); }},
+        {u"verifyAgeScan"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.verifyAgeScan(a.value(0).toString())); }},
+        {u"verifyAgeHand"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.verifyAgeHand(a.value(0).toString())); }},
+        {u"cancelAgeCheck"_s, [](PosService &p, const QVariantList &) { p.cancelAgeCheck(); return QVariant(true); }},
+        {u"saveIdChecks"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveIdChecks(a.value(0).toMap())); }},
         {u"printPrivacyNotice"_s, [](PosService &p, const QVariantList &) { return QVariant(p.printPrivacyNotice()); }},
         {u"customerEmail"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerEmail(a.value(0).toString(), a.value(1).toBool())); }},
         {u"sendReceipt"_s, [](PosService &p, const QVariantList &a) {

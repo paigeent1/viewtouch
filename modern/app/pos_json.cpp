@@ -174,7 +174,11 @@ QJsonObject toJson(const Check &c)
         {u"events"_s, events}, {u"firedCourse"_s, c.firedCourse}, {u"customerId"_s, qs(c.customerId)},
         {u"receiptEmail"_s, qs(c.receiptEmail)}, {u"receiptEmailSent"_s, c.receiptEmailSent},
         {u"cashTipCents"_s, qint64(c.cashTip.cents())},
-        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"subscriptionCard"_s, qs(c.subscriptionCard)}, {u"giftCardFor"_s, [&c] {
+        {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"subscriptionCard"_s, qs(c.subscriptionCard)},
+        {u"ageCheck"_s, c.ageVerified <= 0 ? QJsonValue() : QJsonValue(QJsonObject{{u"age"_s, c.ageVerified}, {u"how"_s, qs(c.ageHow)},
+                                                  {u"by"_s, qs(c.ageBy)}, {u"at"_s, qint64(c.ageAt)}, {u"id4"_s, qs(c.ageId4)},
+                                                  {u"expired"_s, c.ageIdExpired}})},
+        {u"giftCardFor"_s, [&c] {
             QJsonObject o;
             for (const auto &[number, who] : c.giftCardFor) o.insert(qs(number), qs(who));
             return o;
@@ -305,6 +309,14 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.allergies = strings(o.value(u"allergies").toArray());
     c.coupons = strings(o.value(u"coupons").toArray());
     c.subscriptionCard = ss(o.value(u"subscriptionCard").toString());
+    if (const QJsonObject age = o.value(u"ageCheck").toObject(); !age.isEmpty()) {
+        c.ageVerified = age.value(u"age").toInt();
+        c.ageHow = ss(age.value(u"how").toString());
+        c.ageBy = ss(age.value(u"by").toString());
+        c.ageAt = age.value(u"at").toInteger();
+        c.ageId4 = ss(age.value(u"id4").toString());
+        c.ageIdExpired = age.value(u"expired").toBool();
+    }
     const QJsonObject giftCardFor = o.value(u"giftCardFor").toObject();
     for (auto it = giftCardFor.begin(); it != giftCardFor.end(); ++it)
         c.giftCardFor[ss(it.key())] = ss(it.value().toString());
@@ -989,6 +1001,8 @@ QJsonObject toJson(const PosSettings &s)
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
         {u"minimumAge"_s, QJsonObject{{u"alcohol"_s, s.ageAlcohol}, {u"tobacco"_s, s.ageTobacco}}},
+        {u"idChecks"_s, QJsonObject{{u"tobacco"_s, s.idCheckTobacco}, {u"alcohol"_s, s.idCheckAlcohol},
+                                    {u"tobaccoCategories"_s, strings(s.tobaccoCategories)}, {u"handNeedsManager"_s, s.idHandNeedsManager}}},
         {u"privacy"_s, QJsonObject{{u"onReceipts"_s, s.privacyOnReceipts}, {u"short"_s, qs(s.privacyShort)},
                                    {u"full"_s, qs(s.privacyFull)}, {u"updatedAt"_s, qint64(s.privacyUpdatedAt)}}},
         {u"gratuity"_s, QJsonObject{{u"percent"_s, double(s.gratuityBp) / 100.0}, {u"minGuests"_s, s.gratuityMinGuests}}},
@@ -1369,6 +1383,13 @@ PosSettings settingsFromJson(const QJsonObject &o)
         const QJsonObject age = o.value(u"minimumAge").toObject();
         s.ageAlcohol = std::clamp(age.value(u"alcohol").toInt(21), 0, 99);
         s.ageTobacco = std::clamp(age.value(u"tobacco").toInt(21), 0, 99);
+        const QJsonObject id = o.value(u"idChecks").toObject();
+        s.idCheckTobacco = id.value(u"tobacco").toBool(true);
+        s.idCheckAlcohol = id.value(u"alcohol").toBool(false);
+        s.tobaccoCategories.clear();
+        for (const QJsonValue &v : id.value(u"tobaccoCategories").toArray())
+            s.tobaccoCategories.push_back(ss(v.toString()));
+        s.idHandNeedsManager = id.value(u"handNeedsManager").toBool(false);
     }
     {
         const QJsonObject privacy = o.value(u"privacy").toObject();
