@@ -33,6 +33,7 @@
 #include <QDateTime>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <functional>
 #include <QLocale>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -908,6 +909,52 @@ int runStore(const Args &cli, const Options &o)
                             zonesAdded = true;
                         }
                 state.seen << mark;
+            }
+            // A given button changed later on a page the store has edited: once, and only while the
+            // button is still as it was given (a store's own change is kept).
+            {
+                using vt::layout::Zone;
+                const auto jumpsTo = [](const Zone &z, const QString &page) {
+                    return z.actions.size() == 1 && z.actions.front().type() == u"jump" && z.actions.front().str(u"page") == page;
+                };
+                const auto setJump = [](Zone &z, const QString &page) {
+                    z.actions = {vt::layout::Action{QJsonObject{{u"type"_s, u"jump"_s}, {u"mode"_s, u"push"_s}, {u"page"_s, page}}}};
+                };
+                struct ZonePatch { QString page, zone, mark; std::function<bool(Zone &)> apply; };
+                QList<ZonePatch> patches{
+                    // Retail: CASHIER DUTY opens the Cashier Duty screen (X report...), Reprint Receipt the
+                    // open checks (mine / all), the decimal key is a blank (owner, 2026-11-04).
+                    {u"retail-entry"_s, u"rtl-duty"_s, u"cashier-duty"_s, [&](Zone &z) {
+                         if (!jumpsTo(z, u"drawer"_s)) return false;
+                         setJump(z, u"cashier-duty"_s);
+                         return true; }},
+                    {u"retail-entry"_s, u"rtl-reprint"_s, u"open-checks"_s, [&](Zone &z) {
+                         if (!jumpsTo(z, u"reprint-receipt"_s)) return false;
+                         setJump(z, u"check-list"_s);
+                         return true; }},
+                    {u"retail-entry"_s, u"rtl-key-."_s, u"blank"_s, [](Zone &z) {
+                         if (z.label != u".") return false;
+                         z.label.clear();
+                         z.actions.clear();
+                         z.behavior = u"none"_s;
+                         return true; }},
+                };
+                // The number keys' digits nearly filling the key.
+                for (const QString &k : {u"0"_s, u"00"_s, u"1"_s, u"2"_s, u"3"_s, u"4"_s, u"5"_s, u"6"_s, u"7"_s, u"8"_s, u"9"_s})
+                    patches.append({u"retail-entry"_s, u"rtl-key-"_s + k, u"font96"_s, [](Zone &z) {
+                                        if (z.style.normal.contains(u"fontSize")) return false;
+                                        z.style.normal.insert(u"fontSize"_s, 96);
+                                        return true; }});
+                for (const ZonePatch &p : patches) {
+                    const QString mark = p.page + u'#' + p.zone + u'@' + p.mark;
+                    if (state.seen.contains(mark))
+                        continue;
+                    if (vt::layout::Page *mine = layout->page(p.page))
+                        for (Zone &z : mine->zones)
+                            if (z.id == p.zone && p.apply(z))
+                                zonesAdded = true;
+                    state.seen << mark;
+                }
             }
             if (zonesAdded && !store.save(*layout, &error))
                 qWarning().noquote() << "Could not save the added buttons:" << error;

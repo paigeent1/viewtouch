@@ -350,7 +350,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "drawer"
+          "page": "cashier-duty"
         }
       ]
     },
@@ -376,7 +376,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "reprint-receipt"
+          "page": "check-list"
         }
       ]
     },
@@ -746,7 +746,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -771,7 +772,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -796,7 +798,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -821,7 +824,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -846,7 +850,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -871,7 +876,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -896,7 +902,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -921,7 +928,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -946,7 +954,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -971,7 +980,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -996,7 +1006,8 @@
       "style": {
         "normal": {
           "fill": "#e2e8f0",
-          "text": "#111827"
+          "text": "#111827",
+          "fontSize": 96
         }
       },
       "actions": [
@@ -1009,9 +1020,9 @@
     {
       "id": "rtl-key-.",
       "kind": "button",
-      "label": ".",
+      "label": "",
       "shape": "pill",
-      "behavior": "blink",
+      "behavior": "none",
       "rect": {
         "x": 1300,
         "y": 924,
@@ -1024,12 +1035,7 @@
           "text": "#111827"
         }
       },
-      "actions": [
-        {
-          "type": "key",
-          "key": "."
-        }
-      ]
+      "actions": []
     }
   ]
 }

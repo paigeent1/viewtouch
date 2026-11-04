@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 15:33 ET — Bob (Claude) — Cashier Duty screen; retail page: CASHIER DUTY, Reprint Receipt, number keys, decimal key
+- **What:** New starter page cashier-duty (Cashier Duty): X REPORT (command xReport, now a layout command), DRAWER (count/pay in/pay out), NO SALE, LOOK UP CHECKS (the Reprint Receipt search for now), OPEN CHECKS (mine/all), TIME CLOCK, Back. Retail POS Entry: CASHIER DUTY jumps to cashier-duty (was drawer); Reprint Receipt jumps to check-list (open checks, My/All Checks) (was reprint-receipt); number keys fontSize 96; the decimal key is blank (no label, no action). The store's edited retail page gets these once at start (main.cpp ZonePatch list, each only if the button is still as given; marks 'retail-entry#<zone>@<change>').
+- **Why:** Owner 2026-11-04: another cashier duty screen with the X report, larger digits, no decimal key, Reprint Receipt to the open checks with mine/all.
+- **Files:** `modern/seed/pages/cashier-duty.json, modern/seed/pages/retail-entry.json, modern/main.cpp, modern/ui/cpp/layoutcontroller.cpp`
+- **Next person must know:** LOOK UP CHECKS will become the ILSA-style receipt lookup (list + receipt preview + Print / Gift receipt) once the owner says whether 'legacy checks' means ViewTouch's past checks or ILSA's.
+
 ### 2026-11-04 15:24 ET — Bob (Claude) — vt-install: a fresh Pi to a ViewTouch store server in one command
 - **What:** New scripts/bin/vt-install "Store name": installs the build tools, Qt 6 and helpers (adb, xinput, gh, ccache), clones/pulls paigeent1/viewtouch into ~/viewtouch-main (remote myfork), links every vt-* command, adds dialout and a beep3 function, configures the build (Ninja, Release, ccache), starts this site's settings (vt-site init). Rerunnable. Then vt-server builds and starts.
 - **Why:** Owner 2026-11-04 has a second Pi to bring up (BH Danbury); the checklist's open item was a one-step installer.
