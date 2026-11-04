@@ -127,6 +127,26 @@ QJsonArray widgetSettings(const QString &kind)
                         u"The items sold most today, most first (the Popular page)"_s));
         out.append(hint(field(u"props.search"_s, u"Find by name"_s, u"bool"_s, g),
                         u"Shows the items whose name has what's typed on a keyboard panel (the Find page)"_s));
+    } else if (kind == u"guestMedia") {
+        out.append(hint(with(field(u"props.fit"_s, u"Fit"_s, u"enum"_s, g), u"options"_s,
+                             options({{"", "Fill the box (edges may be cut off)"}, {"fit", "The whole picture"}})),
+                        u"The whole picture: all of a logo shows, with space around it"_s));
+        out.append(hint(with(intField(u"props.scale"_s, u"Size %"_s, g, 10, 100), u"default"_s, 100),
+                        u"The picture this much of the box (100: as big as fits)"_s));
+        out.append(hint(field(u"props.image"_s, u"Picture (here only)"_s, u"image"_s, g),
+                        u"Empty: Store Settings > Customer display (left side between guests), else the logo"_s));
+        out.append(hint(field(u"props.video"_s, u"Video (an MP4 on the Pi)"_s, u"string"_s, g),
+                        u"Empty: Store Settings > Customer display. Muted, on a loop"_s));
+    } else if (kind == u"guestMessages") {
+        out.append(hint(field(u"props.title"_s, u"Line above each message"_s, u"string"_s, g),
+                        u"Default: Welcome! Clear it for none"_s));
+        out.append(hint(with(intField(u"props.seconds"_s, u"Seconds each"_s, g, 2, 60), u"default"_s, 7), u"Default 7"_s));
+    } else if (kind == u"guestOrder") {
+        out.append(hint(with(field(u"props.rewards"_s, u"Rewards box"_s, u"bool"_s, g), u"default"_s, true), u"Their points, or add their phone"_s));
+        out.append(hint(with(field(u"props.email"_s, u"Ask for their email"_s, u"bool"_s, g), u"default"_s, true), u"After they join with their phone"_s));
+    } else if (kind == u"guestHeader") {
+        out.append(hint(with(field(u"props.accent"_s, u"In the customer display color"_s, u"bool"_s, g), u"default"_s, true),
+                        u"Off: the zone's own fill (Look)"_s));
     } else if (kind == u"checkList") {
         out.append(with(field(u"props.mode"_s, u"Lists"_s, u"enum"_s, g), u"options"_s,
                         options({{"", "Open checks (touch to open)"}, {"tabs", "Bar tabs"},

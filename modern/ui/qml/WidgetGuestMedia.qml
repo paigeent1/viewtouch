@@ -15,6 +15,8 @@ Item {
     onVideoChanged: videoFailed = false
     function img(ref) { return pos ? (pos.imageRevision < 0 ? undefined : pos.imageUrl(ref)) : ref }
     readonly property bool crop: props.fit !== "fit"   // props.fit "fit": whole picture, bars around it
+    // props.scale: the picture this percent of the box (whole picture, smaller), centered.
+    readonly property real scale: Math.max(0.1, Math.min(1, (props.scale ?? 100) / 100))
     clip: true
 
     Loader {
@@ -29,7 +31,9 @@ Item {
         }
     }
     AnimatedImage {
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: parent.width * w.scale
+        height: parent.height * w.scale
         visible: player.status !== Loader.Ready && w.picture !== ""
         fillMode: w.crop ? Image.PreserveAspectCrop : Image.PreserveAspectFit
         playing: visible

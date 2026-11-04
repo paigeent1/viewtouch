@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 07:40 ET — Bob (Claude) — Customer Display parts get settings in the editor
+- **What:** Inspector Settings for the guest parts (layout/schema.cpp widgetSettings): guestMedia Fit (fill/crop or the whole picture), Size % (10-100, centered), its own Picture and Video; guestMessages line above each message and seconds each; guestOrder rewards box and ask-for-email; guestHeader in the customer display color. WidgetGuestMedia honors props.scale.
+- **Why:** Owner: the Hat City logo is cut off in the left box; wants to scale it down from the editor.
+- **Files:** `layout/schema.cpp, ui/qml/WidgetGuestMedia.qml`
+
 ### 2026-11-04 07:33 ET — Bob (Claude) — Touchscreens stay tied after a reconnect
 - **What:** vt-touch-map --watch re-ties the touchscreens whenever their device ids or the monitors change (X resets a device's mapping when it reconnects: the guest Wimaxit's touch had gone back to spanning the whole desktop, so taps landed on the POS). vt-guest-display on (and its boot script) and touch start one watcher; off stops it. The guest monitor is set to the POS monitor's resolution when it has that mode (the larger Wimaxit came up 1280x720).
 - **Why:** Owner: guest touches still recognized on the cashier screen; xinput showed devices 10/11 unmapped.
