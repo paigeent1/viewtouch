@@ -12,8 +12,11 @@ if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; t
 fi
 cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
 sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
-killall -9 vtmodern 2>/dev/null || true
-sleep 1
+# Stop ViewTouch the polite way first (it saves and closes the database on
+# SIGTERM); force it only if it is still running after 10 seconds.
+pkill -TERM -x vtmodern 2>/dev/null || true
+for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
+pkill -KILL -x vtmodern 2>/dev/null || true
 # The customer display on the second monitor (vt-guest-display on|off writes ~/.vt-customer-display).
 GUEST="${VT_CUSTOMER_DISPLAY:-$(cat "$HOME/.vt-customer-display" 2>/dev/null)}"
 EXTRA=()

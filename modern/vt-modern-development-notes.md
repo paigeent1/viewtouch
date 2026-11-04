@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:30 ET — Bob (Claude) — Audit fixes: real build numbers, graceful restart, barcodes save
+- **What:** Removed the hardcoded build 19 / 0.9.19 lines from modern/cmake/BuildInfo.cmake so each build gets its real git count again. vt-server and vt-fast now stop vtmodern with SIGTERM, wait up to 10 s, and only then force it. Menu item barcodes are no longer refused for an 11-digit code or a GS1 check digit that doesn't add up (shape and duplicate checks stay).
+- **Why:** Audit of earlier changes: the fixed build number made every Pi and tablet look the same version to the update check and to the server's behind/ahead compare; killall -9 could cut a database write in half; the check-digit block meant store and vendor codes that don't follow GS1 could never be saved, and the 11-digit message promised a fill-in that never happened.
+- **Files:** `modern/cmake/BuildInfo.cmake, scripts/bin/vt-server, scripts/bin/vt-fast, modern/app/pos_service.cpp`
+- **Next person must know:** Gift card numbers still use their own check-digit test on purpose (test_customers).
+
 ### 2026-11-04 09:13 ET — Bob (Claude) — Qt upgrade step 1: build the fork with the official Qt on GitHub
 - **What:** modern/tools/get-qt.sh from upstream (official Qt binaries from download.qt.io into /opt/qt/VERSION, alongside Debian's; plus qtmultimedia for this fork's video), modern/tools/qt-version = 6.12.0, and a dispatch-only workflow 'Modern checks (official Qt)' that builds and tests this fork with it on Debian 13. The regular checks stay on Debian's Qt 6.8 (the Pi today).
 - **Why:** Owner: Qt update important now. Plan: 1) GitHub build on 6.12 and fix what breaks (still building on 6.8); 2) Pi: Qt 6.12 in /opt/qt beside Debian's, a separate build, vt-server switch, easy rollback; 3) tablets' APK on 6.12; 4) upstream fixes merge easier.

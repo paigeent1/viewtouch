@@ -263,34 +263,12 @@ QStringList PosService::barcodeList(const QString &text)
 QString PosService::barcodeProblem(const QStringList &codes, const std::string &itemId) const
 {
     static const QRegularExpression shape(u"^[0-9A-Za-z-]{4,40}$"_s);
-    static const QRegularExpression allDigits(u"^[0-9]+$"_s);
     for (const QString &c : codes) {
         if (!shape.match(c).hasMatch())
             return tr("A barcode is 4 to 40 letters and digits: \"%1\".").arg(c);
-        // GS1 Modulo-10 check digit verification for standard 8, 12, 13, 14 digit UPC/EAN/GTIN codes
-        if (allDigits.match(c).hasMatch()) {
-            const qsizetype len = c.size();
-            if (len == 11) {
-                int sum = 0;
-                for (qsizetype i = 0; i < len; ++i) {
-                    const int d = c[len - 1 - i].digitValue();
-                    sum += d * ((i % 2 == 0) ? 3 : 1);
-                }
-                const int check = (10 - (sum % 10)) % 10;
-                return tr("UPC \"%1\" missing check digit %2 -> filled %1%2. Touch Save again to confirm.").arg(c).arg(check);
-            }
-            if (len == 8 || len == 12 || len == 13 || len == 14) {
-                int sum = 0;
-                for (qsizetype i = 0; i < len - 1; ++i) {
-                    const int d = c[len - 2 - i].digitValue();
-                    sum += d * ((i % 2 == 0) ? 3 : 1);
-                }
-                const int expected = (10 - (sum % 10)) % 10;
-                const int actual = c[len - 1].digitValue();
-                if (actual != expected)
-                    return tr("Invalid UPC check digit on \"%1\": ends in %2, but check digit must be %3.").arg(c).arg(actual).arg(expected);
-            }
-        }
+        // No check-digit test here: a scanner always sends the code printed on the
+        // package, and some real store and vendor codes do not follow GS1. Blocking
+        // them meant those items could never be saved (audit 2026-11-04).
         for (const MenuItem &m : s_->menu)
             if (m.id != itemId && std::ranges::find(m.barcodes, ss(c)) != m.barcodes.end())
                 return tr("%1 already has the barcode %2.").arg(qs(m.name), c);
