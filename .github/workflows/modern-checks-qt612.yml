@@ -1,0 +1,61 @@
+# This fork on the official Qt (modern/tools/qt-version, from download.qt.io via
+# tools/get-qt.sh), as the official ViewTouch builds: the step before moving the
+# store's Pi and tablets from Debian's Qt 6.8. Run by hand (Actions -> Run workflow).
+name: Modern checks (official Qt)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: modern-checks-qt-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test (Debian 13, official Qt)
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    timeout-minutes: 75
+    steps:
+      - name: Git
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ca-certificates git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build tools and libraries
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            g++ cmake ninja-build file curl ca-certificates python3 7zip libgl-dev libegl-dev \
+            libxkbcommon-dev libxkbcommon-x11-0 libfontconfig1 libfreetype6 libdbus-1-3 libglib2.0-0t64 libwayland-client0 \
+            libwayland-cursor0 libwayland-egl1 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-xkb1 \
+            libdrm2 libgbm1 libgssapi-krb5-2 libbrotli1 libzstd1 libopengl0 libsm6 libice6 libssl-dev \
+            fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji
+
+      - name: Qt (cached)
+        uses: actions/cache@v4
+        with:
+          path: /opt/qt
+          key: qt-${{ hashFiles('modern/tools/qt-version', 'modern/tools/get-qt.sh') }}-debian13-x64
+
+      - name: Qt
+        run: sh modern/tools/get-qt.sh
+
+      - name: Build
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          cmake -S modern -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/opt/qt/$(cat modern/tools/qt-version)"
+          cmake --build build 2>&1 | tee build.log
+          grep -E "warning:.*deprecated" build.log | sort | uniq -c | sort -rn | head -40 || true
+
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: timeout 2400 ./build/tests/vtm_tests

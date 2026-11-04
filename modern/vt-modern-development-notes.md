@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:13 ET — Bob (Claude) — Qt upgrade step 1: build the fork with the official Qt on GitHub
+- **What:** modern/tools/get-qt.sh from upstream (official Qt binaries from download.qt.io into /opt/qt/VERSION, alongside Debian's; plus qtmultimedia for this fork's video), modern/tools/qt-version = 6.12.0, and a dispatch-only workflow 'Modern checks (official Qt)' that builds and tests this fork with it on Debian 13. The regular checks stay on Debian's Qt 6.8 (the Pi today).
+- **Why:** Owner: Qt update important now. Plan: 1) GitHub build on 6.12 and fix what breaks (still building on 6.8); 2) Pi: Qt 6.12 in /opt/qt beside Debian's, a separate build, vt-server switch, easy rollback; 3) tablets' APK on 6.12; 4) upstream fixes merge easier.
+- **Files:** `.github/workflows/modern-checks-qt612.yml, modern/tools/get-qt.sh, modern/tools/qt-version`
+
 ### 2026-11-04 08:46 ET — Bob (Claude) — New buttons reach edited pages once
 - **What:** main.cpp: after the starter-page update, a short list of given zones (page#zone) is added to the store's page when missing, even if the store edited that page; once only (marked in the starter state, so a button the store deletes stays deleted). First: hardware-config#vt-touch-map (Guest touch monitor sync).
 - **Why:** Owner: why can't Bob edit the Hardware Configuration page? The store's edited page never takes starter changes.
