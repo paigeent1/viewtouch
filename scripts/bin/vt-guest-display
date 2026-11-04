@@ -4,6 +4,8 @@
 #   vt-guest-display off   back to mirroring the first monitor on the second
 #   vt-guest-display touch the guest monitor is a touchscreen too: touch it once so the Pi learns which
 #                          touchscreen is which (both report the same name); remembered by USB port
+#   vt-guest-display touch --or-map   the same, and if nobody touches it, tie them as last learned
+#                          (Hardware Configuration's "Learn guest touchscreen" button)
 # Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
 MODE="${1:-on}"
 STATE="$HOME/.vt-customer-display"
@@ -23,15 +25,22 @@ if [ "$MODE" = touch ]; then
             if (ev !~ /Touch|ButtonPress|Motion/) next
             for (i = 2; i <= 3; i++) { d = $i; gsub(/[()]/, "", d); if (index(want, " " d " ")) { print d; fflush(); exit } }
         }')
-    [ -z "$hit" ] && { echo "No touch seen. Run it again and touch the guest screen."; exit 1; }
+    if [ -z "$hit" ]; then
+        if [ "$2" = --or-map ]; then
+            vt-touch-map
+            (setsid vt-touch-map --watch >/dev/null 2>&1 &)
+            echo "No touch on the guest screen: touchscreens tied as last learned. Double-tap again and touch the guest screen to re-learn."
+            exit 0
+        fi
+        echo "No touch seen. Run it again and touch the guest screen."; exit 1
+    fi
     node=$(xinput list-props "$hit" | awk -F'"' '/Device Node/{print $2; exit}')
     port=$(udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p' | sed 's/\(usb-[0-9]*:[0-9.]*\):[0-9]*\.[0-9]*$/\1/')
     [ -z "$port" ] && { echo "Couldn't tell which USB port that touchscreen is on."; exit 1; }
     echo "$port" > "$HOME/.vt-guest-touch"
     VT_TOUCH_VERBOSE=1 vt-touch-map
     (setsid vt-touch-map --watch >/dev/null 2>&1 &)   # and again whenever a touchscreen reconnects
-    echo "Guest touchscreen learned (USB port $port): it now touches the second monitor; the other one the POS."
-    echo "Keep it plugged into the same USB port (or run vt-guest-display touch again)."
+    echo "Guest touchscreen learned (USB port $port): it touches the guest monitor, the other one the POS. Keep it in the same USB port (or learn it again)."
     exit 0
 fi
 

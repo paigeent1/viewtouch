@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:18 ET — Bob (Claude) — Hardware Configuration: Learn guest touchscreen button (learn, then map)
+- **What:** The Guest touch monitor sync button (zone vt-touch-map, vtSync mode touch-map) is now 'Learn guest touchscreen (2x Tap)': the POS status line says to touch the GUEST screen; the touch is learned (USB port saved) and both touchscreens are tied to their monitors; with no touch in 20 s they're tied as last learned (vt-guest-display touch --or-map). The status line shows only the outcome. Stores that kept the old button name get the new name once at start (main.cpp renamedZones).
+- **Why:** Owner 2026-11-04: the sync button should go through the learn routine and then map the ports, so moving a touch cable never needs the terminal.
+- **Files:** `scripts/bin/vt-guest-display, modern/ui/cpp/layoutcontroller.cpp, modern/main.cpp, modern/seed/pages/hardware-config.json`
+- **Next person must know:** Needs /usr/local/bin/vt-guest-display linked to the repo copy (sudo ln -sf ~/viewtouch-main/scripts/bin/vt-guest-display /usr/local/bin/vt-guest-display).
+
 ### 2026-11-04 12:10 ET — Bob (Claude) — Guest touch: works with touchscreens on a USB hub
 - **What:** vt-touch-map and vt-guest-display now strip only the interface part of a touchscreen's ID_PATH (':1.0' after the port), so a hub port like usb-0:1.2 is kept whole. Before, the saved guest port usb-0:1.2 was cut again to usb-0 when read, never matched, and both touchscreens went to the POS monitor.
 - **Why:** Owner moved both touchscreens onto an (unpowered) USB hub 2026-11-04; after learning, guest touches still worked the cashier screen.

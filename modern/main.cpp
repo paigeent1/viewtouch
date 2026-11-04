@@ -873,7 +873,7 @@ int runStore(const Args &cli, const Options &o)
             // New buttons a store should get even on a page it has edited (added once: if the store
             // deletes one later, it stays deleted). "page#zone" in the starter state marks it done.
             static const std::pair<const char16_t *, const char16_t *> givenZones[] = {
-                {u"hardware-config", u"vt-touch-map"},   // Guest touch monitor sync
+                {u"hardware-config", u"vt-touch-map"},   // Learn guest touchscreen
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {
@@ -890,6 +890,22 @@ int runStore(const Args &cli, const Options &o)
                             qInfo().noquote() << "Button added to" << QString::fromUtf16(pageId) << ":" << z.label;
                         }
                 }
+                state.seen << mark;
+            }
+            // A given button renamed later: once, and only if the store kept the old name.
+            static const struct { const char16_t *pageId, *zoneId, *was, *renamed; } renamedZones[] = {
+                {u"hardware-config", u"vt-touch-map", u"Guest touch monitor sync (2x Tap)", u"Learn guest touchscreen (2x Tap)"},
+            };
+            for (const auto &[pageId, zoneId, was, renamed] : renamedZones) {
+                const QString mark = QString::fromUtf16(pageId) + u'#' + QString::fromUtf16(zoneId) + u"@label"_s;
+                if (state.seen.contains(mark))
+                    continue;
+                if (vt::layout::Page *mine = layout->page(QString::fromUtf16(pageId)))
+                    for (vt::layout::Zone &z : mine->zones)
+                        if (z.id == QString::fromUtf16(zoneId) && z.label == QString::fromUtf16(was)) {
+                            z.label = QString::fromUtf16(renamed);
+                            zonesAdded = true;
+                        }
                 state.seen << mark;
             }
             if (zonesAdded && !store.save(*layout, &error))
