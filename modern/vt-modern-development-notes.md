@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:13 ET — Bob (Claude) — vt-id-test: test the scanner on a license
+- **What:** New scripts/bin/vt-id-test: stops ViewTouch 20 s, reads the scanner's first port, prints whether the PDF417 and a 1D barcode were read and every AAMVA field (--short: only found/missing), erases the scan, restarts ViewTouch.
+- **Why:** Owner wanted to test his license on the BH Danbury scanner with all data shown; pasted heredoc scripts didn't come through in his terminal.
+- **Files:** `scripts/bin/vt-id-test`
+
 ### 2026-11-04 14:00 ET — Bob (Claude) — Merged bob/site-name; vt-tablets shows the version code cleanly
 - **What:** Site Setup's store name from Store Settings merged. vt-tablets prints versionCode=90000260 (it printed 90000260minSdk: the rest of dumpsys's line ran into it).
 - **Why:** CI: no new failures. Owner saw the odd versionCode text when pushing 0.9.260 to Bar 1-3 (all installed fine).
