@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:46 ET — Bob (Claude) — Site Setup: USB scanners need no setup
+- **What:** The Scanner box says USB scanners (keyboard type, including a second one just for IDs) need no setup, and labels the port as the serial scanner's.
+- **Why:** Owner 2026-11-04: plans a separate USB ID scanner at retail registers; no 'second scanner' setting is needed, so say so where people will look.
+- **Files:** `modern/ui/qml/WidgetSiteSetup.qml`
+
 ### 2026-11-04 14:36 ET — Bob (Claude) — ID checks: tablets scan the license with their camera
 - **What:** The ID check popup on a tablet has '📷 Scan ID with camera' (command scanCameraId): the tablet app's camera scanner (BarcodeScanner.kt, ML Kit on the device) in ID mode reads only PDF417 (not the license's small 1D barcode), at 1920x1080, keeps the license's line breaks, 30 s timeout, and hands it to the ID check. A Bluetooth 2D scanner paired to the tablet works too (keyboard mode, Main.qml). Also merged main into the branch.
 - **Why:** Owner 2026-11-04: HCA tablets scan the back of the ID with their camera for now; include the Bluetooth scanner option.

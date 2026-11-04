@@ -126,7 +126,8 @@ Item {
                     title: qsTr("Scanner")
                     ColumnLayout {
                         anchors.fill: parent
-                        Caption { text: qsTr("Scanner port") }
+                        Caption { text: qsTr("USB scanners need no setup: they type into the POS screen (a second one just for IDs too). These settings are for a serial scanner on the adapter.") }
+                        Caption { text: qsTr("Serial scanner port") }
                         ComboBox {
                             id: portBox
                             objectName: "scannerPort"
