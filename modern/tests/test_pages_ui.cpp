@@ -54,16 +54,25 @@ TEST_CASE("Every seed page renders cleanly, running and editing", "[ui][pages]")
     REQUIRE(window);
     REQUIRE(QTest::qWaitForWindowExposed(window));
 
+    // Each warning says which page it came from.
+    const auto tagNew = [](qsizetype from, const QString &where) {
+        for (qsizetype i = from; i < g_warnings.size(); ++i)
+            g_warnings[i] = where + u": "_s + g_warnings[i];
+    };
     for (const QString &id : pageIds) {
         INFO(id.toStdString());
+        const qsizetype before = g_warnings.size();
         CHECK(c.showPage(id));
         QTest::qWait(20);
+        tagNew(before, id);
     }
     c.enterEditMode();
     for (const QString &id : pageIds) {
         INFO("edit " << id.toStdString());
+        const qsizetype before = g_warnings.size();
         CHECK(c.showPage(id));
         QTest::qWait(20);
+        tagNew(before, u"edit "_s + id);
     }
     c.leaveEditMode(false);
     QTest::qWait(20);

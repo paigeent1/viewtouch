@@ -261,6 +261,7 @@ Rectangle {
 
                 // Rewards: their points, or join.
                 Rectangle {
+                    objectName: "guestRewards"
                     visible: d.loyalty.enabled ?? false
                     Layout.fillWidth: true
                     Layout.preferredHeight: d.unit * 4.4
@@ -484,6 +485,7 @@ Rectangle {
     // --- a keypad for the guest: a phone number, or an amount ---
     Rectangle {
         id: keypad
+        objectName: "guestKeypad"
         anchors.fill: parent
         visible: false
         // Touches stop here: nothing under the keypad (the page's widgets) takes them too.

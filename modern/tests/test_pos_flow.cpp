@@ -574,7 +574,16 @@ TEST_CASE("UI: the customer display shows the order, asks for a tip, says thank 
     REQUIRE(s.pos.finishChoosing());
     s.pos.addItem(u"water"_s);
     // The guest joins rewards with their phone number.
-    tap(u"Earn rewards: touch to add your phone"_s);
+    {
+        QQuickItem *box = named(window->contentItem(), u"guestRewards"_s);
+        REQUIRE(box);
+        const QPointF at = box->mapToScene(QPointF(box->width() / 2, box->height() / 2));
+        INFO("rewards box " << box->width() << "x" << box->height() << " at " << at.x() << "," << at.y()
+                            << " in " << window->width() << "x" << window->height());
+        QTest::mouseClick(window, Qt::LeftButton, {}, at.toPoint());
+        QTest::qWait(60);
+        REQUIRE(named(window->contentItem(), u"guestKeypad"_s));   // the phone keypad came up
+    }
     for (const char *k : {"5", "5", "5", "0", "1", "0", "1", "2", "3", "4"})
         tap(QString::fromLatin1(k));
     tap(u"OK"_s);
