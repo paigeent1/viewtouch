@@ -153,6 +153,25 @@ void TicketPrinter::printOrderSlip(const PosSettings &settings, const Check &che
     }
 }
 
+QString TicketPrinter::receiptText(const PosSettings &settings, const Check &check, bool gift)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    const PrinterConfig *p = receiptPrinter(settings, {});
+    const TicketContext ctx = context(settings);
+    return QString::fromStdString(renderText(gift ? giftReceipt(check, ctx) : receipt(check, ctx), p ? p->width : 42));
+}
+
+void TicketPrinter::printGiftReceipt(const PosSettings &settings, const Check &check, const std::string &printerId)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    if (const PrinterConfig *p = receiptPrinter(settings, printerId)) {
+        TicketContext ctx = context(settings);
+        if (settings.receiptLogo && p->effectiveFormat() == "escpos")
+            ctx.logo = logoFor(settings, p->width);
+        send(settings, *p, giftReceipt(check, ctx), u"Gift receipt #%1"_s.arg(check.id));
+    }
+}
+
 void TicketPrinter::printPrivacyNotice(const PosSettings &settings, const std::string &printerId)
 {
     const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));

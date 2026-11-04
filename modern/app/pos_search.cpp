@@ -147,7 +147,7 @@ void PosService::selectFoundCheck(qint64 id)
     emit sessionChanged();
 }
 
-bool PosService::reprintCheck(qint64 id)
+bool PosService::reprintCheck(qint64 id, bool gift)
 {
     if (!require(perm::Settle, tr("Printing receipts")))
         return false;
@@ -156,6 +156,11 @@ bool PosService::reprintCheck(qint64 id)
         return fail(tr("Find the check first."));
     if (!s_->printer)
         return fail(tr("No printer is set up."));
+    if (gift) {
+        s_->printer->printGiftReceipt(s_->settings, *it, receiptPrinter());
+        emit notice(tr("Printing a gift receipt for check #%1").arg(id));
+        return true;
+    }
     if (askReceiptPrinter()) {   // a handheld: where?
         offerReceipt(*it, true);
         return true;
@@ -238,7 +243,9 @@ QVariantMap PosService::checkSearch() const
             {u"customer"_s, qs(c.customer.name)}, {u"guests"_s, c.guests},
             {u"lines"_s, lines}, {u"payments"_s, payments}, {u"events"_s, events}, {u"refunds"_s, refunds},
             {u"subtotal"_s, format(t.subtotal)}, {u"tax"_s, format(t.tax)}, {u"total"_s, format(t.total)},
-            {u"tips"_s, t.tips.cents() ? format(t.tips) : QString()}});
+            {u"tips"_s, t.tips.cents() ? format(t.tips) : QString()},
+            // The receipt as printed (Look Up Checks shows it beside the list).
+            {u"receiptText"_s, s_->printer ? s_->printer->receiptText(s_->settings, c, false) : QString()}});
     }
     return out;
 }

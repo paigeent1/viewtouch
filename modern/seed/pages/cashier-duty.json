@@ -124,7 +124,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "reprint-receipt"
+          "page": "receipt-lookup"
         }
       ]
     },

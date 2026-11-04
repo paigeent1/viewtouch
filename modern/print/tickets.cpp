@@ -232,6 +232,34 @@ Document receipt(const Check &check, const TicketContext &ctx)
     return d;
 }
 
+Document giftReceipt(const Check &check, const TicketContext &ctx)
+{
+    Document d;
+    if (ctx.logo)
+        d.image(ctx.logo);
+    d.center(ctx.settings.storeName, true, true);
+    for (const std::string &l : splitLines(ctx.settings.receiptHeader))
+        d.center(l);
+    d.blank();
+    d.center(upper(ctx.tr("Gift receipt")), true, true);
+    d.columns(ctx.tr("Check #%1", {std::to_string(check.id)}), ctx.dateTime(check.closedAt ? check.closedAt : ctx.now));
+    d.rule();
+    for (const OrderLine &l : check.lines) {
+        if (l.voided || l.corrected || l.isComment())
+            continue;
+        d.text((l.quantity > 1 ? std::to_string(l.quantity) + " x " : std::string()) + l.displayName());
+        for (const Modifier &m : l.modifiers)
+            d.text("  " + m.displayName());
+    }
+    d.rule();
+    const std::vector<std::string> footer = splitLines(ctx.settings.receiptFooter);
+    if (footer.empty())
+        d.center(ctx.tr("Thank you!"));
+    for (const std::string &l : footer)
+        d.center(l);
+    return d;
+}
+
 bool receiptNeedsPrivacy(const Check &check, const PosSettings &settings)
 {
     return settings.privacyOnReceipts && !check.training

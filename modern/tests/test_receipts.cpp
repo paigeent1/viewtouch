@@ -286,3 +286,26 @@ TEST_CASE("Receipts: emailed with the internet down: it waits and goes by itself
     CHECK(calls.contains(u"POST /v1/charges/ch_7 ?receipt_email=guest%40example.com"_s));
     CHECK(sent());
 }
+
+TEST_CASE("Receipts: a gift receipt lists the items with no prices", "[receipts]")
+{
+    core::PosSettings settings;
+    settings.storeName = "Test Store";
+    core::Check c;
+    c.id = 41;
+    core::OrderLine a;
+    a.itemId = "lighter"; a.name = "Lighter"; a.unitPrice = Money::fromCents(299); a.quantity = 2;
+    core::OrderLine gone;
+    gone.itemId = "cigar"; gone.name = "Cigar"; gone.unitPrice = Money::fromCents(1250); gone.corrected = true; gone.voided = true;
+    c.lines = {a, gone};
+    const print::TicketContext ctx{settings, [](std::int64_t) { return std::string("Oct 8"); },
+                                   [](std::int64_t) { return std::string("10:31 AM"); }, 0};
+    const std::string gift = print::renderText(print::giftReceipt(c, ctx), 42);
+    CHECK(gift.find("GIFT RECEIPT") != std::string::npos);
+    CHECK(gift.find("2 x Lighter") != std::string::npos);
+    CHECK(gift.find("Cigar") == std::string::npos);
+    CHECK(gift.find("2.99") == std::string::npos);
+    CHECK(gift.find("5.98") == std::string::npos);
+    const std::string full = print::renderText(print::receipt(c, ctx), 42);
+    CHECK(full.find("5.98") != std::string::npos);
+}

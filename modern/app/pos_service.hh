@@ -133,6 +133,9 @@ public:
         (void)summary;
         return saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
     }
+    // A copy of a receipt as text (on screen: Look Up Checks), or the gift receipt's.
+    virtual QString receiptText(const core::PosSettings &, const core::Check &, bool gift) { (void)gift; return {}; }
+    virtual void printGiftReceipt(const core::PosSettings &, const core::Check &, const std::string &) {}
     // The full privacy notice, for a customer who asks (Customers screen).
     virtual void printPrivacyNotice(const core::PosSettings &, const std::string &) {}
     // The full privacy notice as a text file on the server (Desktop/Privacy Notice.txt): where it went.
@@ -507,7 +510,7 @@ public:
     // last `days` (0: ever), a page from `offset` (checkSearch: nextOffset).
     bool searchChecks(const QString &query, int days = 365, int offset = 0);
     void selectFoundCheck(qint64 id);
-    bool reprintCheck(qint64 id);   // a copy of a found check's receipt
+    bool reprintCheck(qint64 id, bool gift = false);   // a copy of a found check's receipt (or a gift receipt)
     QVariantMap checkSearch() const override;
     QVariantMap receiving() const override;
     QVariantMap stockCounting() const override;

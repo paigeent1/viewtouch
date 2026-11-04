@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 15:41 ET — Bob (Claude) — Look Up Checks screen (ILSA-style receipt lookup) on Cashier Duty
+- **What:** New receiptLookup widget and receipt-lookup page: receipts on the right (today/week/month/year/all, newer/older pages, up/down), the receipt as printed on the left, Print Receipt, Print Gift Receipt (no prices), Cancel. Cashier Duty's LOOK UP CHECKS opens it. Backend: print::giftReceipt, PosPrinter::receiptText/printGiftReceipt, reprintCheck(id, gift), receiptText in the selected search result. Test for the gift receipt.
+- **Why:** Owner asked for the ILSA receipt lookup layout for ViewTouch data (no ILSA import for now).
+- **Files:** `modern/ui/qml/WidgetReceiptLookup.qml, modern/seed/pages/receipt-lookup.json, modern/seed/pages/cashier-duty.json, modern/print/tickets.*, modern/print/ticket_printer.*, modern/app/pos_service.hh, modern/app/pos_search.cpp, modern/app/pos_session.hh, modern/app/pos_commands.cpp, schema/ZoneItem/editorcontroller/CMake, modern/tests/test_receipts.cpp`
+- **Next person must know:** Searches older than 60 days read from SQLite (indexed), so lookups stay quick as data grows.
+
 ### 2026-11-04 15:33 ET — Bob (Claude) — Cashier Duty screen; retail page: CASHIER DUTY, Reprint Receipt, number keys, decimal key
 - **What:** New starter page cashier-duty (Cashier Duty): X REPORT (command xReport, now a layout command), DRAWER (count/pay in/pay out), NO SALE, LOOK UP CHECKS (the Reprint Receipt search for now), OPEN CHECKS (mine/all), TIME CLOCK, Back. Retail POS Entry: CASHIER DUTY jumps to cashier-duty (was drawer); Reprint Receipt jumps to check-list (open checks, My/All Checks) (was reprint-receipt); number keys fontSize 96; the decimal key is blank (no label, no action). The store's edited retail page gets these once at start (main.cpp ZonePatch list, each only if the button is still as given; marks 'retail-entry#<zone>@<change>').
 - **Why:** Owner 2026-11-04: another cashier duty screen with the X report, larger digits, no decimal key, Reprint Receipt to the open checks with mine/all.

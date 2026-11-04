@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "receipt-lookup",
+  "name": "Look Up Checks",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "rl-title",
+      "kind": "label",
+      "rect": {
+        "x": 16,
+        "y": 8,
+        "w": 1888,
+        "h": 64
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Look Up Checks: touch a receipt, then Print Receipt or Print Gift Receipt"
+    },
+    {
+      "id": "rl-lookup",
+      "kind": "receiptLookup",
+      "rect": {
+        "x": 16,
+        "y": 80,
+        "w": 1888,
+        "h": 984
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "props": {
+        "days": 1
+      }
+    }
+  ]
+}
