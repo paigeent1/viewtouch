@@ -254,6 +254,26 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             s_->settings.receiptFreeChoices = record.value(u"receiptFreeChoices"_s).toBool();
         if (record.contains(u"receiptShowVoids"_s))
             s_->settings.receiptShowVoids = record.value(u"receiptShowVoids"_s).toBool();
+        if (record.contains(u"ageAlcohol"_s))
+            s_->settings.ageAlcohol = std::clamp(record.value(u"ageAlcohol"_s).toInt(), 0, 99);
+        if (record.contains(u"ageTobacco"_s))
+            s_->settings.ageTobacco = std::clamp(record.value(u"ageTobacco"_s).toInt(), 0, 99);
+        if (record.contains(u"privacyOnReceipts"_s))
+            s_->settings.privacyOnReceipts = record.value(u"privacyOnReceipts"_s).toBool();
+        // The built-in wording is kept as "" (so a better built-in reaches the store).
+        const auto notice = [&](const QString &key, const char *builtIn, std::string &into) {
+            if (!record.contains(key))
+                return;
+            std::string text = ss(record.value(key).toString().trimmed());
+            if (text == QString::fromUtf8(builtIn).trimmed().toStdString())
+                text.clear();
+            if (text != into) {
+                into = text;
+                s_->settings.privacyUpdatedAt = now();
+            }
+        };
+        notice(u"privacyShort"_s, privacyShortDefault(), s_->settings.privacyShort);
+        notice(u"privacyFull"_s, privacyFullDefault(), s_->settings.privacyFull);
         if (record.contains(u"soldOutBackNextDay"_s))
             s_->settings.soldOutBackNextDay = record.value(u"soldOutBackNextDay"_s).toBool();
         const double gratuity = number(record, u"gratuityPercent");
@@ -629,6 +649,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             }
         }
         settingsChanged();
+        if (s_->printer)
+            s_->printer->savePrivacyNotice(s_->settings);   // Desktop/Privacy Notice.txt, kept current
         ok = true;
     }
     if (ok) {

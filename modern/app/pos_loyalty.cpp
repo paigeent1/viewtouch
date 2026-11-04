@@ -339,7 +339,7 @@ bool PosService::redeemReward(int index)
     return true;
 }
 
-bool PosService::customerJoin(const QString &phone)
+bool PosService::customerJoin(const QString &phone, bool privacyAccepted)
 {
     if (!require(perm::Order, tr("Rewards sign-up")))
         return false;
@@ -352,12 +352,29 @@ bool PosService::customerJoin(const QString &phone)
     const auto it = std::ranges::find_if(s_->customers, [&](const CustomerRecord &r) {
         return CustomerRecord::digits(r.phone) == digits;
     });
-    if (it != s_->customers.end())
-        return useCustomer(qs(it->id));
-    return saveCustomer({{u"phone"_s, phone.trimmed()}, {u"name"_s, QString()}});
+    const bool ok = it != s_->customers.end() ? useCustomer(qs(it->id))
+                                              : saveCustomer({{u"phone"_s, phone.trimmed()}, {u"name"_s, QString()}});
+    // When they accepted the privacy notice (on the customer display), kept with them.
+    if (ok && privacyAccepted && !c->training)
+        if (CustomerRecord *r = s_->customer(c->customerId)) {
+            r->privacyAcceptedAt = now();
+            saveCustomerRecord(*r);
+        }
+    return ok;
 }
 
-bool PosService::customerEmail(const QString &email)
+bool PosService::printPrivacyNotice()
+{
+    if (!require(perm::Order, tr("Printing the privacy notice")))
+        return false;
+    if (!s_->printer)
+        return fail(tr("No printer here."));
+    s_->printer->printPrivacyNotice(s_->settings, receiptPrinter());
+    emit notice(tr("Privacy notice printed"));
+    return true;
+}
+
+bool PosService::customerEmail(const QString &email, bool privacyAccepted)
 {
     if (!require(perm::Order, tr("Rewards sign-up")))
         return false;
@@ -374,6 +391,8 @@ bool PosService::customerEmail(const QString &email)
     if (!valid.match(e).hasMatch())
         return fail(tr("That email address doesn't look right."));
     r->email = ss(e.left(120));
+    if (privacyAccepted)
+        r->privacyAcceptedAt = now();
     saveCustomerRecord(*r);
     emit notice(tr("Email saved"));
     emit sessionChanged();

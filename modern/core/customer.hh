@@ -43,6 +43,7 @@ struct CustomerRecord {
     // What they had last time (for "Same as Last Time"), and when.
     std::vector<OrderLine> lastOrder;
     std::int64_t lastOrderAt = 0;
+    std::int64_t privacyAcceptedAt = 0;   // accepted the privacy notice on the customer display (latest)
     Money spent;               // their totals, before tips
     std::int64_t lastVisit = 0;
 

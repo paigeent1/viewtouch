@@ -10,6 +10,7 @@
 #include "core/inventory.hh"
 #include "core/tax.hh"
 
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -175,6 +176,19 @@ struct PosSettings {
     // Items 86'd during service are back on the menu after End of Day.
     bool soldOutBackNextDay = true;
     std::string receiptFooter;
+    // Privacy notice (Store Settings -> Privacy notice). Short: on the receipt of a
+    // check with a customer's details on it, and on the customer display before a
+    // guest adds their phone or email. Full: printed on request and saved on the
+    // Pi as "Privacy Notice.txt". Empty: the built-in text (privacyShortDefault /
+    // privacyFullDefault). {store} and {contact} are filled in (privacyFill).
+    // Age-restricted sales: the youngest a buyer may be (Store Settings -> Age-restricted sales).
+    // For the ID check at the register (coming: scan the license on each such sale).
+    int ageAlcohol = 21;
+    int ageTobacco = 21;   // cigarettes, cigars, rolling papers, e-cigarettes
+    bool privacyOnReceipts = true;
+    std::string privacyShort;
+    std::string privacyFull;
+    std::int64_t privacyUpdatedAt = 0;   // epoch ms the notice last changed ({date})
     // Auto-gratuity: added to dine-in checks with at least this many guests.
     std::int64_t gratuityBp = 0;   // 0 = off; 1800 = 18%
     int gratuityMinGuests = 6;
@@ -598,5 +612,93 @@ const std::vector<StateRules> &stateRules();
 const StateRules *stateRulesFor(const std::string &code);
 // The store's state chosen: its rules into the settings.
 void applyStateRules(PosSettings &s, const std::string &code);
+
+
+// --- privacy notice -------------------------------------------------------------------
+inline const char *privacyShortDefault()
+{
+    return "PRIVACY: {store} keeps your name, phone and email only to look up your rewards, gift cards and "
+           "past orders, and to send the receipts and offers you ask for. We don't sell it or share it "
+           "except to process your payment. Ask us for the full privacy notice, or to see, fix or delete "
+           "your information.";
+}
+inline const char *privacyFullDefault()
+{
+    return "PRIVACY NOTICE\n"
+           "{store}\n"
+           "{contact}\n"
+           "Effective {date}\n"
+           "\n"
+           "WHAT WE COLLECT\n"
+           "When you give it to us: your name, phone number, email address and, for delivery, your "
+           "address. With it we keep what you bought from us, your rewards points, your gift card and "
+           "subscription balances, and any notes you ask us to keep (an allergy, a delivery gate code).\n"
+           "We do not keep your card number. Card payments are handled by our payment processor; we see "
+           "only the card brand, the last four digits and the approval.\n"
+           "\n"
+           "WHY\n"
+           "- To find your rewards, gift cards, subscription and past orders when you visit.\n"
+           "- To send the receipts, order updates and offers you ask for.\n"
+           "- To run the store: sales records, taxes, preventing fraud, and what the law requires.\n"
+           "\n"
+           "WHO SEES IT\n"
+           "Our staff, as their job needs it. Service providers who work for us (payment processing, "
+           "email and text delivery, secure backups), only to do that work. Government authorities "
+           "when the law requires it.\n"
+           "We do not sell your personal information, share it for targeted advertising, or use it to "
+           "train artificial intelligence models.\n"
+           "\n"
+           "HOW LONG\n"
+           "Your customer details until you ask us to delete them. "
+           "Sales records as long as tax and business laws require (they stay, without your name, after "
+           "your details are deleted).\n"
+           "\n"
+           "YOUR CHOICES AND RIGHTS\n"
+           "You never have to give us your details to buy from us. You can ask us to show you what we "
+           "have about you, correct it, delete it, or stop sending offers. Ask any manager, or contact us "
+           "as above. We will answer within 45 days and won't treat you differently for asking.\n"
+           "If you are not satisfied with our answer, you may appeal by contacting us again; you can also "
+           "contact your state attorney general.\n"
+           "\n"
+           "SECURITY\n"
+           "Your information stays on our own store computers on a private network that guests can't "
+           "reach, and only staff with a login can look it up.\n"
+           "\n"
+           "CHANGES\n"
+           "We will update this notice when our practices change and show the new effective date.\n";
+}
+// {store} -> the store's name, {contact} -> the receipt header (address, phone),
+// {date} -> `date`.
+inline std::string privacyFill(std::string text, const std::string &store, const std::string &contact,
+                               const std::string &date = {})
+{
+    const auto put = [&](const std::string &key, const std::string &value) {
+        for (std::size_t at = text.find(key); at != std::string::npos; at = text.find(key, at + value.size()))
+            text.replace(at, key.size(), value);
+    };
+    put("{store}", store.empty() ? std::string("this store") : store);
+    put("{contact}", contact);
+    put("{date}", date);
+    return text;
+}
+
+// The store's privacy notice, {store}/{contact}/{date} filled in: the short one
+// (receipts, the customer display) or the full one.
+inline std::string privacyText(const PosSettings &settings, bool full)
+{
+    const std::string &mine = full ? settings.privacyFull : settings.privacyShort;
+    const std::string text = mine.empty() ? std::string(full ? privacyFullDefault() : privacyShortDefault()) : mine;
+    // {date}: when the store last changed it; the built-in wording's own date otherwise.
+    std::string date = "November 4, 2026";
+    if (settings.privacyUpdatedAt > 0) {
+        const std::time_t t = std::time_t(settings.privacyUpdatedAt / 1000);
+        char buf[40];
+        if (const std::tm *tm = std::localtime(&t); tm && std::strftime(buf, sizeof buf, "%B %e, %Y", tm))
+            date = buf;
+        if (const auto two = date.find("  "); two != std::string::npos)
+            date.erase(two, 1);   // "%e" pads one-digit days
+    }
+    return privacyFill(text, settings.storeName, settings.receiptHeader, date);
+}
 
 } // namespace vt::core

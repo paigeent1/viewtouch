@@ -1126,6 +1126,7 @@ QVariantMap PosService::customerPrompt() const
         {u"tip"_s, mine && tipChoice_.chosen ? format(tipFor(*c)) : QString()},
         {u"choices"_s, choices}, {u"loyalty"_s, loyalty}, {u"slides"_s, slides},
         {u"logo"_s, qs(s_->settings.displayLogo)}, {u"accent"_s, qs(s_->settings.displayAccent)},
+        {u"privacy"_s, qs(privacyText(s_->settings, false))},
         {u"panel"_s, qs(s_->settings.displayPanel)}, {u"video"_s, qs(s_->settings.displayVideo)},
         {u"canText"_s, bool(s_->sendText) && !s_->settings.textWebhook.empty()},
         {u"label"_s, c ? qs(c->label) : QString()}, {u"checkId"_s, c ? qint64(c->id) : 0},

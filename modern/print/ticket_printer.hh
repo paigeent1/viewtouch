@@ -35,6 +35,9 @@ public:
     bool printTestPage(const core::PosSettings &settings, const std::string &printerId, bool kickDrawer) override;
     void printOrderSlip(const core::PosSettings &settings, const core::Check &check, const std::string &printerId,
                         bool sent) override;
+    void printPrivacyNotice(const core::PosSettings &settings, const std::string &printerId) override;
+    // Next to the Daily Reports folder: Desktop/Privacy Notice.txt (rewritten only when it changes).
+    QString savePrivacyNotice(const core::PosSettings &settings) override;
     QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
                                  const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
                                  std::int64_t dayOpenedAt) override;

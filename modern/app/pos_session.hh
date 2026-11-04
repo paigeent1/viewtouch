@@ -662,8 +662,9 @@ public:
     Q_INVOKABLE void releaseHold() { invoke(QStringLiteral("releaseHold"), {}); }
     Q_INVOKABLE void applyCoupon(const QString &code) { invoke(QStringLiteral("applyCoupon"), {code}); }
     Q_INVOKABLE void removeCoupon(const QString &id) { invoke(QStringLiteral("removeCoupon"), {id}); }
-    Q_INVOKABLE void customerJoin(const QString &phone) { invoke(QStringLiteral("customerJoin"), {phone}); }
-    Q_INVOKABLE void customerEmail(const QString &email) { invoke(QStringLiteral("customerEmail"), {email}); }
+    Q_INVOKABLE void customerJoin(const QString &phone, bool privacyAccepted = false) { invoke(QStringLiteral("customerJoin"), {phone, privacyAccepted}); }
+    Q_INVOKABLE void printPrivacyNotice() { invoke(QStringLiteral("printPrivacyNotice")); }
+    Q_INVOKABLE void customerEmail(const QString &email, bool privacyAccepted = false) { invoke(QStringLiteral("customerEmail"), {email, privacyAccepted}); }
     Q_INVOKABLE void sendReceipt(const QString &how, const QString &to = {})
     {
         invoke(QStringLiteral("sendReceipt"), {how, to});
