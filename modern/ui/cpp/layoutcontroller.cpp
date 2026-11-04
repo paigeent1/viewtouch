@@ -2104,12 +2104,25 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         return done(true);
     }
     if (name == u"directv") {
-        QProcess proc;
-        QStringList a{args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(), args.value(u"val"_s, u"206"_s).toString()};
-        proc.start(u"/usr/local/bin/vt-directv"_s, a);
-        proc.waitForFinished(4000);
-        const QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-        setStatus(out.isEmpty() ? u"DIRECTV command sent."_s : out);
+        // In the background: a receiver that doesn't answer mustn't freeze the
+        // screen (it used to wait up to 4 s). The answer shows in the status line.
+        const QStringList a{args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(),
+                            args.value(u"val"_s, u"206"_s).toString()};
+        auto *proc = new QProcess(this);
+        connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+            const QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+            setStatus(out.isEmpty() ? tr("DIRECTV command sent.") : out);
+            proc->deleteLater();
+        });
+        connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError e) {
+            if (e == QProcess::FailedToStart) {
+                setStatus(tr("TV control isn't set up on this device (vt-directv)."));
+                proc->deleteLater();
+            }
+        });
+        QTimer::singleShot(10000, proc, [proc] { proc->kill(); });
+        setStatus(tr("Sending to the TV..."));
+        proc->start(u"/usr/local/bin/vt-directv"_s, a);
         return done(true);
     }
     if (name == u"openAdmin") {
