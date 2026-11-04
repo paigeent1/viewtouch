@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 19:27 ET — Bob (Claude) — Unknown scans: Find Item offers to add; gift card screen says not valid
+- **What:** An unknown code on Find Item now offers 'not on file: add it?' (as on Retail, orders and the Item/UPC Builder); on the gift card screen (page gift-card or one with a giftCard zone) it says '<code> isn't a valid gift card'.
+- **Why:** Owner's rule for unknown codes on GC and Find Item.
+- **Files:** `ui/cpp/layoutcontroller.cpp`
+
 ### 2026-11-03 19:26 ET — Bob (Claude) — Merge main into bob/customer-display-page (scan rules)
 - **What:** Brought main's scan restrictions into the branch.
 - **Why:** Test together before merging.

@@ -1674,12 +1674,19 @@ void LayoutController::scanned(const QString &code)
         if (k == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))
             navigate(Navigator::Mode::Push, u"gift-card"_s);
         else if (k == u"unrecognized" || k.isEmpty()) {
-            // "Not on file: add it?" only where it would be rung in, or in the Item / UPC Builder.
+            // "Not on file: add it?" where it would be rung in, in the Item / UPC Builder and Find Item;
+            // on a gift card screen it's a card that isn't valid.
             const auto *here = currentPage();
             const bool adds = here && (here->kind == u"index" || here->kind == u"items" || here->kind == u"modifier"
                                        || here->kind == u"order" || here->id == u"retail-entry"
-                                       || here->id == u"menu-builder" || here->id == u"admin-menu");
-            if (adds) {
+                                       || here->id == u"menu-builder" || here->id == u"admin-menu"
+                                       || here->id == u"find-item");
+            const bool giftCards = here && (here->id == u"gift-card"
+                                            || std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) {
+                                                   return pz.zone->kind == u"giftCard"; }));
+            if (giftCards) {
+                setStatus(tr("%1 isn't a valid gift card.").arg(c));   // a gift card screen: no "add an item"
+            } else if (adds) {
                 setStatus(QString());
                 emit unrecognizedBarcode(c);
             } else {
