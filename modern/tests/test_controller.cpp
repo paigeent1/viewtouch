@@ -6,7 +6,9 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QFile>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 
 using namespace Qt::StringLiterals;
 
@@ -207,4 +209,47 @@ TEST_CASE("The Customer Display page is only for editing on the cashier's screen
     CHECK(c.pageId() == u"customer-display"_s);
     REQUIRE(c.leaveEditMode(false));
     CHECK(c.pageId() != u"customer-display"_s);       // leaving the editor: back to the POS
+}
+
+TEST_CASE("Site Setup: this Pi's hardware saved in the files vt-site reads", "[controller][site]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    {
+        LayoutController c = seedController();
+        QVariantMap site = c.siteSettings();
+        CHECK_FALSE(site[u"configured"_s].toBool());
+        CHECK(site[u"serverPort"_s].toInt() == 7719);
+        CHECK(site[u"tablets"_s].toList().isEmpty());
+
+        const int before = c.siteRevision();
+        REQUIRE(c.saveSiteSettings({{u"siteName"_s, u"BH Danbury"_s}, {u"scannerBaud"_s, 9600}, {u"scanner"_s, u"off\"$`"_s},
+                                    {u"tablets"_s, QVariantList{QVariantMap{{u"name"_s, u"Bar 1"_s}, {u"ip"_s, u"192.168.1.220"_s}},
+                                                                QVariantMap{{u"name"_s, u"Bar 3"_s}, {u"ip"_s, u"192.168.1.210"_s}}}}}));
+        CHECK(c.siteRevision() > before);
+        site = c.siteSettings();
+        CHECK(site[u"configured"_s].toBool());
+        CHECK(site[u"siteName"_s] == u"BH Danbury"_s);
+        CHECK(site[u"scanner"_s] == u"off"_s);                        // no quotes or $ reach the shell file
+        REQUIRE(site[u"tablets"_s].toList().size() == 2);
+        CHECK(site[u"tablets"_s].toList()[1].toMap()[u"ip"_s] == u"192.168.1.210"_s);
+
+        QFile conf(home.filePath(u".config/viewtouch/site.conf"_s));
+        REQUIRE(conf.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(conf.readAll());
+        CHECK(text.contains(u"SITE_NAME=\"BH Danbury\""_s));
+        CHECK(text.contains(u"SERIAL_SCANNER_BAUD=\"9600\""_s));
+
+        // Refused: a bad address, a bad speed; nothing changes.
+        CHECK_FALSE(c.saveSiteSettings({{u"tablets"_s, QVariantList{QVariantMap{{u"name"_s, u"Bar 2"_s}, {u"ip"_s, u"192.168.1.999"_s}}}}}));
+        CHECK_FALSE(c.saveSiteSettings({{u"scannerBaud"_s, 1234}}));
+        CHECK(c.siteSettings()[u"tablets"_s].toList().size() == 2);
+
+        // A scan shows up for the scanner test.
+        c.scanned(u" 012345678905 "_s);
+        CHECK(c.siteSettings()[u"lastScan"_s] == u"012345678905"_s);
+    }
+    qputenv("HOME", oldHome);
 }

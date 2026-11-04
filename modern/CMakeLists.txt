@@ -173,6 +173,7 @@ if(Qt6_FOUND)
             ui/qml/PriceCheckOverlay.qml
             ui/qml/WidgetGuestOrder.qml
             ui/qml/WidgetGuestMessages.qml
+            ui/qml/WidgetSiteSetup.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml
             ui/qml/GuestPageView.qml
@@ -243,7 +244,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetCustomerInfo.qml
         SOURCES
             ui/cpp/zonemodel.hh ui/cpp/zonemodel.cpp
-            ui/cpp/layoutcontroller.hh ui/cpp/layoutcontroller.cpp
+            ui/cpp/layoutcontroller.hh ui/cpp/layoutcontroller.cpp ui/cpp/sitesetup.cpp
             ui/cpp/language.hh ui/cpp/language.cpp
             ui/cpp/editorcontroller.hh ui/cpp/editorcontroller.cpp
             ui/cpp/joincontroller.hh ui/cpp/joincontroller.cpp

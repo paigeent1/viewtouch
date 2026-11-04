@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 13:12 ET — Bob (Claude) — Site Setup screen (ILSA-style hardware settings per Pi)
+- **What:** New page site-setup (Hardware Configuration > Site Setup, green button, given once to edited Hardware pages) with widget siteSetup (WidgetSiteSetup.qml): framed boxes on one screen like ILSA's System Settings: This site (name, this Pi's address, server address/port for pairing), Scanner (port dropdown: Auto / Off / the ports the Pi sees now by /dev/serial/by-id name; speed; live scan test; restart), Guest display (on/off, Learn guest touchscreen, learned port, link to its messages), Printers and receipts (links to Printers, Store Settings, Terminals), Tablets (name + fixed address list, Check tablets, Send app update), TVs and DIRECTV (list, Scan the network), Coming later. Save/Cancel. LayoutController::siteSettings/saveSiteSettings/siteAction (ui/cpp/sitesetup.cpp) read and write ~/.config/viewtouch/site.conf, tablets, tvs.json: the files vt-site/vt-directv use. Admins only; on a tablet it says to use the Pi. Test in test_controller.
+- **Why:** Owner 2026-11-04: an intuitive one-screen setup like ILSA's POS System Settings for initial setup and hardware changes at each deployment, without code changes.
+- **Files:** `modern/ui/cpp/sitesetup.cpp, modern/ui/cpp/layoutcontroller.hh, modern/ui/cpp/layoutcontroller.cpp, modern/ui/qml/WidgetSiteSetup.qml, modern/seed/pages/site-setup.json, modern/seed/pages/hardware-config.json, modern/main.cpp, modern/layout/schema.cpp, modern/ui/qml/ZoneItem.qml, modern/ui/cpp/editorcontroller.cpp, modern/CMakeLists.txt, modern/tests/test_controller.cpp`
+- **Next person must know:** Owner said to skip ILSA's safe drops, large-item lookup, paper checks and report group 4. Store-wide settings (printers, receipts, taxes) stay in Store Settings; Site Setup only links to them.
+
 ### 2026-11-04 13:09 ET — Bob (Claude) — Merged bob/scanner-port into main
 - **What:** Serial scanner opens the adapter's first port by its /dev/serial/by-id name.
 - **Why:** CI: no new failures (29 known).
