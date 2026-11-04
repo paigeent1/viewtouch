@@ -126,6 +126,7 @@ Item {
                     width: parent.width
                     Text {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                         text: (row.modelData.quantity > 1 ? row.modelData.quantity + " × " : "") + row.modelData.name
                         color: row.modelData.voided ? "#e06c75" : w.ink
                         font.strikeout: row.modelData.voided ?? false

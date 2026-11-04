@@ -575,6 +575,7 @@ TEST_CASE("UI: the customer display shows the order, asks for a tip, says thank 
     s.pos.addItem(u"water"_s);
     // The guest joins rewards with their phone number.
     {
+        QTest::qWait(150);   // the order on the screen, laid out
         QQuickItem *box = named(window->contentItem(), u"guestRewards"_s);
         REQUIRE(box);
         const QPointF at = box->mapToScene(QPointF(box->width() / 2, box->height() / 2));

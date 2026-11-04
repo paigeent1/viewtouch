@@ -122,6 +122,7 @@ Item {
                 }
                 Label {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                     wrapMode: Text.WordWrap
                     opacity: 0.6
                     text: w.checkHasCustomer ? qsTr("Purchased By: %1").arg((w.pos.check.customer ?? {}).name || qsTr("the customer on the check"))
@@ -156,6 +157,7 @@ Item {
                 }
                 Label {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                     wrapMode: Text.WordWrap
                     opacity: 0.6
                     text: qsTr("No number? A new one is made and printed on the receipt. A card works once its check is paid.")
@@ -166,6 +168,7 @@ Item {
                     spacing: 6
                     Label {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                         wrapMode: Text.WordWrap
                         text: qsTr("Move all %1 from card %2 to:").arg(w.card.balance ?? "").arg(w.card.display ?? "")
                     }
@@ -199,6 +202,7 @@ Item {
                     }
                     Label {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                         wrapMode: Text.WordWrap
                         opacity: 0.6
                         text: qsTr("The old card is closed for good and both cards' history shows the move.")
@@ -221,6 +225,7 @@ Item {
                     font.bold: true
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                 }
                 Label {
                     visible: w.found

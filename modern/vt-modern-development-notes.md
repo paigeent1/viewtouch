@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 20:06 ET — Bob (Claude) — Wrapped texts in layouts: no recursive rearrange
+- **What:** Layout.preferredWidth: 1 on every wrapping Text/Label with Layout.fillWidth in WidgetGiftCard (the gift-card page's 'recursive rearrange' warning), CustomerDisplay's and WidgetGuestOrder's item names, and WidgetGuestMessages. In the customer display the aborted layout had left the rewards box 0x0 (a guest's tap could miss it). Test waits for the layout before tapping.
+- **Why:** Branch run diagnostics.
+- **Files:** `ui/qml/WidgetGiftCard.qml, ui/qml/CustomerDisplay.qml, ui/qml/WidgetGuestOrder.qml, ui/qml/WidgetGuestMessages.qml, tests/test_pos_flow.cpp`
+
 ### 2026-11-03 19:47 ET — Bob (Claude) — Tests: page warnings name their page; customer display test taps the rewards box
 - **What:** test_pages_ui tags each QML warning with the page it came from; the customer display test taps the rewards box by objectName (guestRewards) and checks the keypad (guestKeypad) opens, with sizes in the message.
 - **Why:** Branch run: an unattributed 'recursive rearrange' warning and the rewards tap not opening the keypad.

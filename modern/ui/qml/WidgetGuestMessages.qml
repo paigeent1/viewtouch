@@ -59,6 +59,7 @@ Item {
             }
             Text {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 1   // wrapped text: its width from the layout, not its own (no recursive rearrange)
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
                 text: slide.current !== "" ? slide.current : (w.pos ? w.pos.storeName : "")
