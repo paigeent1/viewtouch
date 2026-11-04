@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 07:33 ET — Bob (Claude) — Touchscreens stay tied after a reconnect
+- **What:** vt-touch-map --watch re-ties the touchscreens whenever their device ids or the monitors change (X resets a device's mapping when it reconnects: the guest Wimaxit's touch had gone back to spanning the whole desktop, so taps landed on the POS). vt-guest-display on (and its boot script) and touch start one watcher; off stops it. The guest monitor is set to the POS monitor's resolution when it has that mode (the larger Wimaxit came up 1280x720).
+- **Why:** Owner: guest touches still recognized on the cashier screen; xinput showed devices 10/11 unmapped.
+- **Files:** `scripts/bin/vt-touch-map, scripts/bin/vt-guest-display`
+- **Next person must know:** Pi: install both scripts, then vt-guest-display on.
+
 ### 2026-11-04 07:27 ET — Bob (Claude) — Touchscreens matched by USB port, not interface
 - **What:** vt-touch-map and vt-guest-display touch now compare the USB port only (ID_PATH without the trailing :1.0/:1.1 interface): each Wimaxit touchscreen is two pointer devices on two interfaces, and the one not learned was mapped to the POS monitor. VT_TOUCH_VERBOSE=1 vt-touch-map prints each device's port and monitor (the learn step shows it).
 - **Why:** Owner: a touch on the guest screen worked the cashier's screen (selected an item on the open check).
