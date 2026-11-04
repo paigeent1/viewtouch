@@ -17,6 +17,8 @@
 #include <QPointer>
 #include <QSize>
 #include <QTime>
+
+#include <utility>
 #include <QSet>
 #include <QElapsedTimer>
 #include <QTimer>
@@ -294,6 +296,7 @@ public:
     // What a barcode scanner read (keys too fast for a person, then Enter):
     // an item's barcode or number rings it in on the order screens; else a
     // coupon or a gift card (PosService::scanCode).
+    bool takeCameraToField() { return std::exchange(cameraToField_, false); }
     Q_INVOKABLE void scanned(const QString &code);
     Q_INVOKABLE void openNewItemWithBarcode(const QString &code, const QString &itemType = QStringLiteral("retail"));
     Q_INVOKABLE void submitScanAddPin(const QString &pin, const QString &code, const QString &itemType = QStringLiteral("retail"));
@@ -340,6 +343,8 @@ signals:
     void siteChanged();
     // The back of a license was scanned (the ID check has it).
     void idCardScanned();
+    // A camera scan asked for by a search field (scanCameraField): the code goes to that field.
+    void cameraCode(const QString &code);
     // A command for the widgets on the page (kitchenStation, kitchenAllDay...).
     void widgetCommand(const QString &name, const QVariantMap &args);
     void editorChanged();
@@ -395,6 +400,7 @@ private:
     QString lastScan_;
     qint64 lastScanAt_ = 0;
     qint64 lastIdScanAt_ = 0;
+    bool cameraToField_ = false;   // the next camera scan fills a search field (cameraCode)
     // The pages in this terminal's own look (Manager -> Terminals), when it has one.
     std::optional<vt::layout::Layout> lookedLayout_;
     QString lookedId_;
