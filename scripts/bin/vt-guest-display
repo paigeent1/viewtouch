@@ -25,10 +25,10 @@ if [ "$MODE" = touch ]; then
         }')
     [ -z "$hit" ] && { echo "No touch seen. Run it again and touch the guest screen."; exit 1; }
     node=$(xinput list-props "$hit" | awk -F'"' '/Device Node/{print $2; exit}')
-    port=$(udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p')
+    port=$(udevadm info -q property -n "$node" 2>/dev/null | sed -n 's/^ID_PATH=//p' | sed 's/:[0-9]*\.[0-9]*$//')
     [ -z "$port" ] && { echo "Couldn't tell which USB port that touchscreen is on."; exit 1; }
     echo "$port" > "$HOME/.vt-guest-touch"
-    vt-touch-map
+    VT_TOUCH_VERBOSE=1 vt-touch-map
     echo "Guest touchscreen learned (USB port $port): it now touches the second monitor; the other one the POS."
     echo "Keep it plugged into the same USB port (or run vt-guest-display touch again)."
     exit 0

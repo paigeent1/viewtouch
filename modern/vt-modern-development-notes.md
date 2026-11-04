@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 07:27 ET — Bob (Claude) — Touchscreens matched by USB port, not interface
+- **What:** vt-touch-map and vt-guest-display touch now compare the USB port only (ID_PATH without the trailing :1.0/:1.1 interface): each Wimaxit touchscreen is two pointer devices on two interfaces, and the one not learned was mapped to the POS monitor. VT_TOUCH_VERBOSE=1 vt-touch-map prints each device's port and monitor (the learn step shows it).
+- **Why:** Owner: a touch on the guest screen worked the cashier's screen (selected an item on the open check).
+- **Files:** `scripts/bin/vt-touch-map, scripts/bin/vt-guest-display`
+- **Next person must know:** Pi: install both scripts, then vt-guest-display touch again.
+
 ### 2026-11-03 20:23 ET — Bob (Claude) — Customer Display page merged to main
 - **What:** bob/customer-display-page merged (fast-forward): editable Customer Display page, guest email entry, guest screen shows the check only while the cashier works a sale, unknown-scan rules for Find Item and gift cards, test loader fix, wrapped-text layout fixes. Its own tests pass on GitHub (Debian 13, Qt 6.8); remaining failures are older ones (roadmap note 'Test suite health').
 - **Why:** Owner's requests tonight.
