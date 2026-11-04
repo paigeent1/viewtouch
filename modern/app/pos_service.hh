@@ -1069,8 +1069,18 @@ public:
     bool selectCustomer(const QString &id);
     // Put a customer (default: the selected one) on the open check.
     bool useCustomer(const QString &id = {});
-    // Add or update (by id, else the same phone number); goes on the open check.
+    // Add or update (by id); goes on the open check. A new customer with the
+    // same phone, email or full name as one on file (or an edit that takes
+    // someone else's phone or email) isn't saved: customerDuplicate() lists
+    // the matches and resolveCustomerDuplicate() says what to do. The record's
+    // "onDuplicate": "new" saves a new customer anyway, "skip" saves without
+    // checking, "match" (typed on a takeout) reuses the one with that phone.
     bool saveCustomer(const QVariantMap &record);
+    QVariantMap customerDuplicate() const override;
+    // choice: "use" (put that customer on the check, change nothing), "update"
+    // (that customer gets the details typed), "new" (save a new customer
+    // anyway) or "cancel".
+    bool resolveCustomerDuplicate(const QString &choice, const QString &id = {});
     // A customer asked to be forgotten (privacy laws): their record goes, and
     // their name, phone, address, email and note come off every check and
     // waitlist entry (the sales stay, with no one's name on them).
@@ -1277,6 +1287,8 @@ private:
     QString customerQuery_;
     std::string selectedCustomer_;
     QString giftCardNumber_;
+    QVariantMap pendingCustomer_;     // waiting on the duplicate window
+    QVariantList customerMatches_;
     struct PendingScan { QString itemId, code; bool retail = false; };
     PendingScan pendingScan_;   // for the next addItem
     QString labelQuery_;

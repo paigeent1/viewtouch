@@ -300,21 +300,50 @@ bool PosService::saveCustomer(const QVariantMap &record)
     if (name.empty() && phone.empty())
         return fail(tr("A customer needs a first/last name or a phone number."));
 
-    // The same person: by id, else by phone number, else by exact full name.
+    // The same person: by id. Anyone else with this phone, email or (for a new
+    // customer) full name is asked about first, never merged silently.
     CustomerRecord *c = s_->customer(text(u"id"));
     const std::string digits = CustomerRecord::digits(phone);
-    if (!c && digits.size() >= 7) {
+    const std::string email = text(u"email");
+    const QString how = record.value(u"onDuplicate"_s).toString();
+    if (how.isEmpty()) {
+        QVariantList matches;
+        for (const CustomerRecord &r : s_->customers) {
+            if (c && r.id == c->id)
+                continue;
+            QStringList why;
+            if (digits.size() >= 7 && CustomerRecord::digits(r.phone) == digits)
+                why << tr("same phone");
+            if (!email.empty() && qs(r.email).compare(qs(email), Qt::CaseInsensitive) == 0)
+                why << tr("same email");
+            if (!c && !name.empty() && qs(r.name).compare(qs(name), Qt::CaseInsensitive) == 0)
+                why << tr("same name");
+            if (!why.isEmpty())
+                matches.append(QVariantMap{{u"id"_s, qs(r.id)}, {u"name"_s, qs(r.name)}, {u"phone"_s, qs(r.phone)},
+                                           {u"email"_s, qs(r.email)}, {u"visits"_s, r.visits}, {u"why"_s, why.join(u", "_s)}});
+        }
+        if (!matches.isEmpty()) {
+            pendingCustomer_ = record;
+            customerMatches_ = matches;
+            emit checkChanged();
+            return false;
+        }
+    }
+    if (!c && how == u"match") {
+        // A customer typed on a takeout or delivery: the one with this phone,
+        // else the one with this name and no other phone.
         auto it = std::ranges::find_if(s_->customers, [&](const CustomerRecord &r) {
-            return CustomerRecord::digits(r.phone) == digits;
+            return digits.size() >= 7 && CustomerRecord::digits(r.phone) == digits;
         });
+        if (it == s_->customers.end() && !name.empty())
+            it = std::ranges::find_if(s_->customers, [&](const CustomerRecord &r) {
+                return qs(r.name).compare(qs(name), Qt::CaseInsensitive) == 0
+                    && (r.phone.empty() || digits.empty() || CustomerRecord::digits(r.phone) == digits);
+            });
         c = it == s_->customers.end() ? nullptr : &*it;
     }
-    if (!c && !name.empty()) {
-        auto it = std::ranges::find_if(s_->customers, [&](const CustomerRecord &r) {
-            return qs(r.name).compare(qs(name), Qt::CaseInsensitive) == 0;
-        });
-        c = it == s_->customers.end() ? nullptr : &*it;
-    }
+    pendingCustomer_.clear();
+    customerMatches_.clear();
     if (!c) {
         CustomerRecord fresh;
         fresh.id = "c" + std::to_string(now()) + "-" + std::to_string(QRandomGenerator::global()->bounded(1000, 9999));
@@ -324,9 +353,13 @@ bool PosService::saveCustomer(const QVariantMap &record)
     }
     c->name = name;
     c->phone = phone;
-    c->email = text(u"email");
-    c->address = text(u"address");
-    c->note = text(u"note");
+    // Only the details given: a takeout's name and phone don't wipe an email.
+    if (record.contains(u"email"_s))
+        c->email = email;
+    if (record.contains(u"address"_s))
+        c->address = text(u"address");
+    if (record.contains(u"note"_s))
+        c->note = text(u"note");
     // House accounts are a manager's decision.
     if (record.contains(u"houseAccount"_s) || record.contains(u"accountLimit"_s)) {
         const bool wants = record.value(u"houseAccount"_s, c->houseAccount).toBool();
@@ -370,8 +403,54 @@ void PosService::rememberCustomer(Check &c)
         }
     }
     const QVariantMap record{{u"name"_s, qs(c.customer.name)}, {u"phone"_s, qs(c.customer.phone)},
-                             {u"address"_s, qs(c.customer.address)}, {u"note"_s, qs(c.customer.note)}};
+                             {u"address"_s, qs(c.customer.address)}, {u"note"_s, qs(c.customer.note)},
+                             {u"onDuplicate"_s, u"match"_s}};
     saveCustomer(record);
+}
+
+QVariantMap PosService::customerDuplicate() const
+{
+    if (!user() || customerMatches_.isEmpty())
+        return {};
+    return {{u"name"_s, pendingCustomer_.value(u"name"_s).toString().trimmed().isEmpty()
+                 ? (pendingCustomer_.value(u"firstName"_s).toString() + u" "_s + pendingCustomer_.value(u"lastName"_s).toString()).trimmed()
+                 : pendingCustomer_.value(u"name"_s).toString().trimmed()},
+            {u"phone"_s, pendingCustomer_.value(u"phone"_s)}, {u"email"_s, pendingCustomer_.value(u"email"_s)},
+            {u"editing"_s, !pendingCustomer_.value(u"id"_s).toString().isEmpty()}, {u"matches"_s, customerMatches_}};
+}
+
+bool PosService::resolveCustomerDuplicate(const QString &choice, const QString &id)
+{
+    if (customerMatches_.isEmpty())
+        return false;
+    const bool listed = std::ranges::any_of(customerMatches_, [&](const QVariant &m) { return m.toMap().value(u"id"_s).toString() == id; });
+    QVariantMap record = pendingCustomer_;
+    if (choice == u"cancel") {
+        pendingCustomer_.clear();
+        customerMatches_.clear();
+        emit checkChanged();
+        return true;
+    }
+    if ((choice == u"use" || choice == u"update") && !listed)
+        return fail(tr("Choose one of the customers on file."));
+    if (choice == u"use") {
+        pendingCustomer_.clear();
+        customerMatches_.clear();
+        const Check *open = current();
+        const bool ok = open && open->status == CheckStatus::Open && open->customerId.empty() ? useCustomer(id) : selectCustomer(id);
+        emit checkChanged();
+        return ok;
+    }
+    if (choice == u"update") {
+        record.insert(u"id"_s, id);
+        record.insert(u"onDuplicate"_s, u"skip"_s);
+        return saveCustomer(record);
+    }
+    if (choice == u"new") {
+        record.insert(u"onDuplicate"_s, u"skip"_s);   // a new one, or the edit as typed
+        return saveCustomer(record);
+    }
+    return fail(tr("Use, update, new or cancel."));
 }
 
 // --- gift cards ---------------------------------------------------------------------------

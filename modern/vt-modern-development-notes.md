@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:36 ET — Bob (Claude) — Duplicate customers: a floating window asks
+- **What:** Saving a new customer whose phone, email or full name matches one on file (or editing a customer to someone else's phone or email) no longer merges into that record. The save stops and a floating window on the Customers screen lists the matches and why (same phone / email / name) with Use This One, Update It, Save as New Customer and Cancel. New session property customerDuplicate and command resolveCustomerDuplicate (also on tablets). Takeout/delivery names typed on a check still reuse the record with that phone (onDuplicate: match) and no longer wipe the customer's email. Tests in test_customers.
+- **Why:** Owner asked 2026-11-04: duplicate checks should look at phone and email too and ask what to do. The old code silently overwrote whichever customer had the same phone or exact full name (audit finding).
+- **Files:** `modern/app/pos_customers.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_session.cpp, modern/app/pos_commands.cpp, modern/net/remote_session.hh, modern/net/remote_session.cpp, modern/ui/qml/WidgetCustomerLookup.qml, modern/tests/test_customers.cpp`
+
 ### 2026-11-04 09:33 ET — Bob (Claude) — Retired vt-tmp
 - **What:** Removed scripts/bin/vt-tmp (it pulled apply_changes.py from Google Drive and ran it, then pushed output and vt_label_utility.py back). AGENTS.md now says not to bring back run-a-script-from-Drive tools; LABEL_UTILITY_NOTES points at Git history instead of the Drive backup.
 - **Why:** Owner's decision 2026-11-04 (audit): it ran whatever file landed in a Drive folder with the owner's rights, and it is how Pi-side patches kept undoing Git fixes.
