@@ -606,7 +606,7 @@ public:
     Q_INVOKABLE void setupRetireSamples() { invoke(QStringLiteral("setupRetireSamples")); }
     Q_INVOKABLE void setupFinish(bool done) { invoke(QStringLiteral("setupFinish"), {done}); }
     Q_INVOKABLE void selectFoundCheck(qint64 id) { invoke(QStringLiteral("selectFoundCheck"), {id}); }
-    Q_INVOKABLE void reprintCheck(qint64 id) { invoke(QStringLiteral("reprintCheck"), {id}); }
+    Q_INVOKABLE void reprintCheck(qint64 id, bool gift = false) { invoke(QStringLiteral("reprintCheck"), {id, gift}); }
     Q_INVOKABLE void cancelClockIn() { invoke(QStringLiteral("cancelClockIn")); }
     Q_INVOKABLE void declareCashTips(const QString &amount) { invoke(QStringLiteral("declareCashTips"), {amount}); }
     Q_INVOKABLE void kioskStart(bool toGo) { invoke(QStringLiteral("kioskStart"), {toGo}); }

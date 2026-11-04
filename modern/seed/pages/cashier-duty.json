@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "id": "cashier-duty",
+  "name": "Cashier Duty",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "cd-title",
+      "kind": "label",
+      "rect": {
+        "x": 160,
+        "y": 32,
+        "w": 1600,
+        "h": 96
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Cashier Duty"
+    },
+    {
+      "id": "cd-xreport",
+      "kind": "button",
+      "label": "X REPORT\n(print, nothing reset)",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 160,
+        "y": 180,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#2563eb",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "xReport"
+        }
+      ]
+    },
+    {
+      "id": "cd-drawer",
+      "kind": "button",
+      "label": "DRAWER\ncount \u00b7 pay in \u00b7 pay out",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 180,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#16a34a",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "drawer"
+        }
+      ]
+    },
+    {
+      "id": "cd-nosale",
+      "kind": "button",
+      "label": "NO SALE",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1200,
+        "y": 180,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#0ea5e9",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "noSale"
+        }
+      ]
+    },
+    {
+      "id": "cd-lookup",
+      "kind": "button",
+      "label": "LOOK UP CHECKS\n(past receipts, reprint)",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 160,
+        "y": 420,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#a855f7",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "receipt-lookup"
+        }
+      ]
+    },
+    {
+      "id": "cd-open",
+      "kind": "button",
+      "label": "OPEN CHECKS\nmine \u00b7 all",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 680,
+        "y": 420,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#d97706",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "check-list"
+        }
+      ]
+    },
+    {
+      "id": "cd-clock",
+      "kind": "button",
+      "label": "TIME CLOCK",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1200,
+        "y": 420,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#14b8a6",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "time-clock"
+        }
+      ]
+    },
+    {
+      "id": "cd-back",
+      "kind": "button",
+      "label": "\u2039 Back",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 160,
+        "y": 920,
+        "w": 432,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569",
+          "text": "#ffffff",
+          "fontSize": 36
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

@@ -57,6 +57,8 @@ Document noSaleTicket(const core::CashMovement &noSale, int number, const std::s
 
 // The full privacy notice on the receipt printer, for a customer who asks.
 Document privacyNoticeTicket(const TicketContext &ctx);
+// A gift receipt: what was bought (names and quantities), no prices or payments.
+Document giftReceipt(const core::Check &check, const TicketContext &ctx);
 // A receipt carries the short notice when the check has a customer's details.
 bool receiptNeedsPrivacy(const core::Check &check, const core::PosSettings &settings);
 

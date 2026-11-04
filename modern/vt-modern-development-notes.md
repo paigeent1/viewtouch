@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 15:57 ET — Bob (Claude) — Merged bob/cashier-duty (Cashier Duty screen, X report, Look Up Checks)
+- **What:** Merged the Cashier Duty page (X report, drawer, no sale, Look Up Checks, open checks, time clock), retail page changes (Cashier Duty and Reprint buttons, big number keys, blank decimal key) and the ILSA-style Look Up Checks screen with gift receipts.
+- **Why:** Tests matched main (same 32 known failures). Owner's 1-7 list from 2026-11-04.
+- **Files:** `modern/CMakeLists.txt`, `modern/app/pos_commands.cpp`, `modern/app/pos_search.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.hh`, `modern/layout/schema.cpp`, `modern/main.cpp`, `modern/print/ticket_printer.cpp`, `modern/print/ticket_printer.hh`, `modern/print/tickets.cpp`, `modern/print/tickets.hh`, `modern/seed/pages/cashier-duty.json`, `modern/seed/pages/receipt-lookup.json`, `modern/seed/pages/retail-entry.json`, `modern/tests/test_receipts.cpp`, `modern/ui/cpp/editorcontroller.cpp`, `modern/ui/cpp/layoutcontroller.cpp`, `modern/ui/qml/WidgetReceiptLookup.qml`, `modern/ui/qml/ZoneItem.qml`
+- **Next person must know:** Edited retail pages get the button/key changes once at start (ZonePatch, only if still as given).
+
 ### 2026-11-04 15:47 ET — Bob (Claude) — Merged upstream/tax-at-close (tax kept at time of sale)
 - **What:** Merged the port of upstream 55d9fa5a: a closed check keeps the tax rates it was rung at, so reprints and reports show the tax actually charged.
 - **Why:** Tests matched main (same known failures); owner asked that reprints hold the tax charged at the time of sale.
@@ -109,6 +115,17 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** Ported upstream 55d9fa5a: Check::closedRates (saved with the check as 'rates'), set at closeCheck, cleared on reopen; Check::totals uses it when set. Reprints, refunds, check search and range reports of a past check show the tax charged when it was sold, whatever the rates are now. Checks closed before this have none and use today's rates. Left out: the offline-check part (pos_offline.cpp is not in the fork) and the taxExempt/taxGratuity fields the fork lacks. Upstream test added to test_reports.
 - **Why:** Owner 2026-11-04 asked whether the upstream update keeping the tax charged at the time of sale (for reprints) was in; it wasn't.
 - **Files:** `modern/core/check.hh, modern/core/core.cpp, modern/app/pos_json.cpp, modern/app/pos_service.cpp, modern/app/pos_checks.cpp, modern/tests/test_reports.cpp, modern/vt-modern-development-notes.md (ledger)`
+### 2026-11-04 15:41 ET — Bob (Claude) — Look Up Checks screen (ILSA-style receipt lookup) on Cashier Duty
+- **What:** New receiptLookup widget and receipt-lookup page: receipts on the right (today/week/month/year/all, newer/older pages, up/down), the receipt as printed on the left, Print Receipt, Print Gift Receipt (no prices), Cancel. Cashier Duty's LOOK UP CHECKS opens it. Backend: print::giftReceipt, PosPrinter::receiptText/printGiftReceipt, reprintCheck(id, gift), receiptText in the selected search result. Test for the gift receipt.
+- **Why:** Owner asked for the ILSA receipt lookup layout for ViewTouch data (no ILSA import for now).
+- **Files:** `modern/ui/qml/WidgetReceiptLookup.qml, modern/seed/pages/receipt-lookup.json, modern/seed/pages/cashier-duty.json, modern/print/tickets.*, modern/print/ticket_printer.*, modern/app/pos_service.hh, modern/app/pos_search.cpp, modern/app/pos_session.hh, modern/app/pos_commands.cpp, schema/ZoneItem/editorcontroller/CMake, modern/tests/test_receipts.cpp`
+- **Next person must know:** Searches older than 60 days read from SQLite (indexed), so lookups stay quick as data grows.
+
+### 2026-11-04 15:33 ET — Bob (Claude) — Cashier Duty screen; retail page: CASHIER DUTY, Reprint Receipt, number keys, decimal key
+- **What:** New starter page cashier-duty (Cashier Duty): X REPORT (command xReport, now a layout command), DRAWER (count/pay in/pay out), NO SALE, LOOK UP CHECKS (the Reprint Receipt search for now), OPEN CHECKS (mine/all), TIME CLOCK, Back. Retail POS Entry: CASHIER DUTY jumps to cashier-duty (was drawer); Reprint Receipt jumps to check-list (open checks, My/All Checks) (was reprint-receipt); number keys fontSize 96; the decimal key is blank (no label, no action). The store's edited retail page gets these once at start (main.cpp ZonePatch list, each only if the button is still as given; marks 'retail-entry#<zone>@<change>').
+- **Why:** Owner 2026-11-04: another cashier duty screen with the X report, larger digits, no decimal key, Reprint Receipt to the open checks with mine/all.
+- **Files:** `modern/seed/pages/cashier-duty.json, modern/seed/pages/retail-entry.json, modern/main.cpp, modern/ui/cpp/layoutcontroller.cpp`
+- **Next person must know:** LOOK UP CHECKS will become the ILSA-style receipt lookup (list + receipt preview + Print / Gift receipt) once the owner says whether 'legacy checks' means ViewTouch's past checks or ILSA's.
 
 ### 2026-11-04 15:24 ET — Bob (Claude) — vt-install: a fresh Pi to a ViewTouch store server in one command
 - **What:** New scripts/bin/vt-install "Store name": installs the build tools, Qt 6 and helpers (adb, xinput, gh, ccache), clones/pulls paigeent1/viewtouch into ~/viewtouch-main (remote myfork), links every vt-* command, adds dialout and a beep3 function, configures the build (Ninja, Release, ccache), starts this site's settings (vt-site init). Rerunnable. Then vt-server builds and starts.
