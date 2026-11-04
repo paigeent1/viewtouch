@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:55 ET — Bob (Claude) — vt-ilsa-tieout4: what's behind ILSA's cash on the days that don't match
+- **What:** Round 3 result: cards (4,583/4,583 days), checks (338/338) and gift cards (386/386) match ILSA's Z to the cent using TendSale AMT_TEND; cash with AMT_TEND - CHANGE_DUE matches 3,861/4,583 days (Z higher by $235,651 in total). New scripts/bin/vt-ilsa-tieout4: on the 722 other days, tests whether the gap equals cash refunds, change given on non-cash tenders, MDetail entries, 30/30 lines, negative dept entries, 4/1 lines, or mode-1 receipts (alone or in pairs).
+- **Why:** Owner's vt-ilsa-tieout3 run 2026-11-04.
+- **Files:** `scripts/bin/vt-ilsa-tieout4`
+
 ### 2026-11-04 18:54 ET — Bob (Claude) — vt-ilsa-tieout3: ILSA tender formula per day
 - **What:** Round 2 finding: ILSA's Z tender totals equal TendSale AMT_TEND exactly for checks ($29,903.43), gift cards ($21,511.08) and cards ($12,266,604.49); SALE_AMT is the whole sale repeated on each tender row (split tenders), so it must not be summed as the tender. Cash: Z $5,366,241.10 vs AMT_TEND - CHANGE_DUE $5,130,589.71; 9,663 negative cash rows (-$288k). New scripts/bin/vt-ilsa-tieout3 tries cash formulas day by day. Z_Totals counters (sale/no-sale/cancel/refund/void counts) are all 0 in this database, so receipt modes 1/2 can't be confirmed from them.
 - **Why:** Owner's vt-ilsa-tieout2 run 2026-11-04.
