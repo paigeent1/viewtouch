@@ -98,6 +98,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync, group 1: database and network reliability
+- **What:** From the official ViewTouch (github.com/ViewTouch/viewtouch main), applied with git apply --3way, no conflicts: 7424bf42 a row that can never be written no longer stops every save; 209ec272 database indexes for what's looked up by time; 348bb5ae only plain table and column names go into SQL; ec643be2 the cash tips column added in one transaction; 2e9b9ddc a network message arriving in pieces isn't searched again from its start; 7f1695c0 terminals wait a little longer between tries, no endless wait; bd4291d0 standby takeover limited to five wrong PINs, then waits. Not yet (need hand merges): 44e5c6f4 lists trimmed at End of Day, 2e37ab3a phone waking from sleep, 5f415087 handheld taxes wiped, fc15f44f impossible prices refused.
+- **Why:** Owner left the upstream catch-up to Bob: bring in fixes in small tested groups, recorded by upstream commit id; no Qt 6.12 work (the Pi runs Qt 6.8).
+- **Files:** `storage/*, net/*, app/* (see the upstream commits)`
+- **Next person must know:** Policy: downstream fork; upstream fixes in small groups with their commit ids in these notes; the store's own features stay here.
+
 ### 2026-11-04 08:46 ET — Bob (Claude) — New buttons reach edited pages once
 - **What:** main.cpp: after the starter-page update, a short list of given zones (page#zone) is added to the store's page when missing, even if the store edited that page; once only (marked in the starter state, so a button the store deletes stays deleted). First: hardware-config#vt-touch-map (Guest touch monitor sync).
 - **Why:** Owner: why can't Bob edit the Hardware Configuration page? The store's edited page never takes starter changes.
