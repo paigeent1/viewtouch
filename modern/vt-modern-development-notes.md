@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:48 ET — Bob (Claude) — Merged bob/learn-touch-button into main
+- **What:** Learn guest touchscreen (2x Tap) on Hardware Configuration: learn then map.
+- **Why:** CI: no new failures (29 known).
+- **Files:** `modern/main.cpp`, `modern/seed/pages/hardware-config.json`, `modern/ui/cpp/layoutcontroller.cpp`, `scripts/bin/vt-guest-display`
+
+<<<<<<< HEAD
 ### 2026-11-04 12:34 ET — Bob (Claude) — vt-status / vt-check-tablets read the real server build
 - **What:** Both read VTM_BUILD_VERSION from modern/build/generated/vtm_build_number.hh (where CMake writes it), falling back to the old path; no more silent '0.9.19' when the file isn't found (now 'unknown').
 - **Why:** vt-status showed Server: 0.9.19 after the build number fix: the scripts looked in modern/build/, the header is in modern/build/generated/, and the 0.9.19 fallback hid that.
@@ -109,6 +115,13 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** Both scripts now also connect to and report Bar 3 (192.168.1.210), like vt-tablets and vt-adb-ensure already did; vt-check-tablets counts Bar 3 for 'up to date'.
 - **Why:** Owner asked why Bar 3 wasn't showing in the ADB status: the two report scripts only listed Bar 1 and Bar 2.
 - **Files:** `scripts/bin/vt-status, scripts/bin/vt-check-tablets`
+=======
+### 2026-11-04 12:18 ET — Bob (Claude) — Hardware Configuration: Learn guest touchscreen button (learn, then map)
+- **What:** The Guest touch monitor sync button (zone vt-touch-map, vtSync mode touch-map) is now 'Learn guest touchscreen (2x Tap)': the POS status line says to touch the GUEST screen; the touch is learned (USB port saved) and both touchscreens are tied to their monitors; with no touch in 20 s they're tied as last learned (vt-guest-display touch --or-map). The status line shows only the outcome. Stores that kept the old button name get the new name once at start (main.cpp renamedZones).
+- **Why:** Owner 2026-11-04: the sync button should go through the learn routine and then map the ports, so moving a touch cable never needs the terminal.
+- **Files:** `scripts/bin/vt-guest-display, modern/ui/cpp/layoutcontroller.cpp, modern/main.cpp, modern/seed/pages/hardware-config.json`
+- **Next person must know:** Needs /usr/local/bin/vt-guest-display linked to the repo copy (sudo ln -sf ~/viewtouch-main/scripts/bin/vt-guest-display /usr/local/bin/vt-guest-display).
+>>>>>>> bob/learn-touch-button
 
 ### 2026-11-04 12:10 ET — Bob (Claude) — Guest touch: works with touchscreens on a USB hub
 - **What:** vt-touch-map and vt-guest-display now strip only the interface part of a touchscreen's ID_PATH (':1.0' after the port), so a hub port like usb-0:1.2 is kept whole. Before, the saved guest port usb-0:1.2 was cut again to usb-0 when read, never matched, and both touchscreens went to the POS monitor.

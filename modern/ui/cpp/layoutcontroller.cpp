@@ -2086,21 +2086,30 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
             return done(false);
         }
         const QString m = args.value(u"mode"_s, u"status"_s).toString();
-        setStatus(u"Running vt-"_s + m + u"..."_s);
+        // Learn guest touchscreen (mode touch-map): touch the guest screen to learn it, then both are
+        // tied to their monitors; no touch in 20 s: tied as last learned.
+        const bool learnTouch = m == u"touch-map";
+        setStatus(learnTouch ? tr("Touch the GUEST screen now (20 seconds)... tap a blank spot.")
+                             : u"Running vt-"_s + m + u"..."_s);
         auto *proc = new QProcess(this);
-        connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+        connect(proc, &QProcess::finished, this, [this, proc, learnTouch](int, QProcess::ExitStatus) {
             QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+            if (learnTouch)   // the outcome only (not the device list)
+                out = out.section(u'\n', -1);
             out.replace(u'\n', u" | "_s);
             if (!out.isEmpty()) setStatus(out);
             proc->deleteLater();
         });
-        // vt-touch-map (Guest touch monitor sync) says which touchscreen went to which monitor.
+        // The touch scripts say which touchscreen went to which monitor.
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert(u"VT_TOUCH_VERBOSE"_s, u"1"_s);
         if (!env.contains(u"DISPLAY"_s))
             env.insert(u"DISPLAY"_s, u":0"_s);
         proc->setProcessEnvironment(env);
-        proc->start(u"/usr/local/bin/vt-"_s + m, {});
+        if (learnTouch)
+            proc->start(u"/usr/local/bin/vt-guest-display"_s, {u"touch"_s, u"--or-map"_s});
+        else
+            proc->start(u"/usr/local/bin/vt-"_s + m, {});
         return done(true);
     }
     if (name == u"directv") {

@@ -216,7 +216,7 @@
     {
       "id": "vt-touch-map",
       "kind": "button",
-      "label": "Guest touch monitor sync (2x Tap)",
+      "label": "Learn guest touchscreen (2x Tap)",
       "rect": {
         "x": 380,
         "y": 770,
