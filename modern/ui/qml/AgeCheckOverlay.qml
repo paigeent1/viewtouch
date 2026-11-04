@@ -119,7 +119,7 @@ Rectangle {
                 implicitHeight: 72; radius: 12
                 color: camTap.pressed ? "#15803d" : "#1f8a4c"
                 Text { anchors.centerIn: parent; text: qsTr("📷 Scan ID with camera"); color: "white"; font.pixelSize: 24; font.bold: true }
-                TapHandler { id: camTap; onTapped: ov.controller.command("scanCameraId") }
+                TapHandler { id: camTap; onTapped: { Qt.inputMethod.hide(); ov.controller.command("scanCameraId") } }
             }
             RowLayout {
                 Layout.fillWidth: true

@@ -355,7 +355,12 @@ Item {
                     }
                     TapHandler {
                         id: camTap
-                        onTapped: if (w.zone && w.zone.controller) w.zone.controller.command("scanCameraField")
+                        onTapped: {
+                            // The search box lets go first, so the tablet's keyboard doesn't cover the camera.
+                            findField.focus = false
+                            Qt.inputMethod.hide()
+                            if (w.zone && w.zone.controller) w.zone.controller.command("scanCameraField")
+                        }
                     }
                 }
                 Connections {

@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 16:57 ET — Bob (Claude) — Camera Scan: hide the tablet keyboard first
+- **What:** Labels screen yellow Scan: the search box gives up focus and the on-screen keyboard is hidden before the camera opens; the ID check's camera button hides the keyboard too.
+- **Why:** Owner's video 2026-11-04: touching Scan on a tablet brought up the Android keyboard over the camera window.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml, modern/ui/qml/AgeCheckOverlay.qml`
+- **Next person must know:** Fast-forwarded into main so the tablet APK and the Pi carry the same build number.
+
 ### 2026-11-04 16:32 ET — Bob (Claude) — Merged bob/labels-camera (Labels camera Scan, editor page finder)
 - **What:** Merged the yellow camera Scan button on the Labels screen and the editor's Find a page / A-Z / By type page list. Tablet APK built from the branch (run 41915215181).
 - **Why:** Tests matched main (same 32 known failures).
