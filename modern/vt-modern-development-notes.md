@@ -99,6 +99,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 10:30 ET — Bob (Claude) — Demo data tests: closed days counted as saved (upstream e883d871)
+- **What:** Ported upstream e883d871 to tests/test_safety.cpp: the demo tests count the closed days through a sink (126) and expect 60 in memory.
+- **Why:** The upstream reliability merge (44e5c6f4) keeps only the newest 60 closed days in memory at End of Day, as a restart already did (pos_store loads LIMIT 60); the demo tests still expected all 126 in memory and failed on main after the merge. Older days stay in the database and reports.
+- **Files:** `modern/tests/test_safety.cpp`
+
 ### 2026-11-04 10:11 ET — Bob (Claude) — Merged bob/audit-fixes into main
 - **What:** Audit fixes: real build numbers and versions (server and Android), graceful vtmodern restart, barcodes without GS1 check digits save, gift card PINs for managers only, vt-tmp retired, duplicate-customer window (phone/email/name), vt-directv rebuilt (no DB/page writes, background, scan of the Pi's own subnet).
 - **Why:** Owner's audit decisions 2026-11-04. CI on the branch: no new failures against main (29 known, now also fixing test_net Versions).
