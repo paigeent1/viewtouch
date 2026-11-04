@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 10:31 ET — Bob (Claude) — Privacy branch: main merged again
+- **What:** Merged main (demo test fix) into bob/privacy-notice.
+- **Why:** Test the privacy branch on top of current main.
+- **Files:** `modern/tests/test_safety.cpp`
+
 ### 2026-11-04 10:31 ET — Bob (Claude) — Customer display test: Accept the privacy notice before the phone keypad
 - **What:** test_pos_flow 'The customer display shows the order...' taps Accept on the new privacy step (guestPrivacy / guestPrivacyAccept) before the keypad, and checks the acceptance is kept on the customer.
 - **Why:** The privacy notice now comes before a guest adds their phone; CI caught the test still expecting the keypad first.
@@ -115,6 +120,10 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** Owner asked 2026-11-04 for a privacy notice routine on receipts when customer info is collected, the notice on the Pi, an admin place to update it, the notice to accept on the guest screen (retail only: HCA has no guest screen), and alcohol/tobacco ages as Store Settings options.
 - **Files:** `modern/core/settings.hh, modern/core/customer.hh, modern/print/tickets.hh, modern/print/tickets.cpp, modern/print/ticket_printer.hh, modern/print/ticket_printer.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_commands.cpp, modern/app/pos_loyalty.cpp, modern/app/pos_day.cpp, modern/app/pos_json.cpp, modern/app/pos_admin_fields.cpp, modern/app/pos_admin_shared.hh, modern/app/pos_admin_records.cpp, modern/app/pos_admin_save.cpp, modern/main.cpp, modern/ui/qml/CustomerDisplay.qml, modern/ui/qml/WidgetGuestOrder.qml, modern/ui/qml/WidgetCustomerLookup.qml, modern/tests/test_print.cpp, modern/tests/test_loyalty.cpp, modern/vt-modern-development-notes.md (roadmap: ID scan)`
 - **Next person must know:** The built-in wording is a starting point, not legal advice (CT Data Privacy Act thresholds dropped to 35,000 consumers on 2026-07-01). Saving the built-in text unchanged keeps the setting empty, so later wording fixes still reach the store.
+### 2026-11-04 10:30 ET — Bob (Claude) — Demo data tests: closed days counted as saved (upstream e883d871)
+- **What:** Ported upstream e883d871 to tests/test_safety.cpp: the demo tests count the closed days through a sink (126) and expect 60 in memory.
+- **Why:** The upstream reliability merge (44e5c6f4) keeps only the newest 60 closed days in memory at End of Day, as a restart already did (pos_store loads LIMIT 60); the demo tests still expected all 126 in memory and failed on main after the merge. Older days stay in the database and reports.
+- **Files:** `modern/tests/test_safety.cpp`
 
 ### 2026-11-04 10:11 ET — Bob (Claude) — Merged bob/audit-fixes into main
 - **What:** Audit fixes: real build numbers and versions (server and Android), graceful vtmodern restart, barcodes without GS1 check digits save, gift card PINs for managers only, vt-tmp retired, duplicate-customer window (phone/email/name), vt-directv rebuilt (no DB/page writes, background, scan of the Pi's own subnet).
