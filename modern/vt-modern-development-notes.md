@@ -97,6 +97,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-03 19:26 ET — Bob (Claude) — Merge main into bob/customer-display-page (scan rules)
+- **What:** Brought main's scan restrictions into the branch.
+- **Why:** Test together before merging.
+- **Files:** `modern/ui/cpp/layoutcontroller.cpp`
+
 ### 2026-11-03 19:26 ET — Bob (Claude) — Guest screen shows the check only while the cashier works it
 - **What:** LayoutController::selling (Retail, retail-discount*, order pages, Pay, split, gift-card). CustomerDisplay.hasCheck and the guest page (ZoneItem.checkShown, set by GuestPageView; showWhen 'check open/none' and WidgetGuestOrder/Header use it) follow it, so the order blanks when the cashier goes to the tables, Manager or Reports with a check still open. WidgetGuestOrder's tap respects TouchGuard (UI lint). Menu Builder theme test REQUIREs its button before using it (it crashed the whole run on main too).
 - **Why:** Owner: guest display kept the last open check while on the tables; GitHub run findings.
@@ -127,6 +132,15 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** Owner: make the customer display a page for the editor; second Wimaxit as a touch guest screen for phone and email entry.
 - **Files:** `seed/pages/customer-display.json, ui/qml/WidgetGuest*.qml, ui/qml/GuestPageView.qml, ui/qml/CustomerDisplay.qml, ui/qml/CustomerDisplayWindow.qml, ui/qml/Main.qml, ui/qml/ZoneItem.qml, ui/cpp/layoutcontroller.hh/.cpp, ui/cpp/editorcontroller.cpp, layout/schema.cpp, main.cpp, app/pos_service.hh, app/pos_session.hh, app/pos_commands.cpp, app/pos_loyalty.cpp, app/pos_day.cpp, CMakeLists.txt, tests/test_controller.cpp, tests/test_loyalty.cpp`
 - **Next person must know:** Built and tested on branch bob/customer-display-page first (GitHub Modern checks), merged to main after.
+### 2026-11-03 19:23 ET — Bob (Claude) — Ignored scans say nothing
+- **What:** A scan on a screen that doesn't take scans (tables, Manager...) is now ignored silently, without the 'Scan ignored here' status line.
+- **Why:** Owner: suppress the message on those pages.
+- **Files:** `ui/cpp/layoutcontroller.cpp`
+
+### 2026-11-03 19:18 ET — Bob (Claude) — Scans only where they mean something
+- **What:** LayoutController::scanned: scans count on Retail and order pages (index/items/modifier/order), Pay (settle), and screens with a search or scan field (gift-card, find-item, menu-builder, admin-menu, find-check, reprint-receipt, labels, or a page holding giftCard/checkSearch/customerLookup/menuBuilder/retailLabels/stockCount/receiveDelivery/menuGrid zones). Elsewhere (tables, Manager...) a scan is ignored with a status line. 'Not on file: add it?' only on ordering pages, Retail, menu-builder and admin-menu; on other scan screens just 'X isn't on file'. Price check still works anywhere; a focused text field still receives keyboard-scanner input as typing.
+- **Why:** Owner: scanner shouldn't prompt 'not on file' on the tables page; only Retail or a search field.
+- **Files:** `ui/cpp/layoutcontroller.cpp`
 
 ### 2026-11-03 18:51 ET — Bob (Claude) — vt-guest-display touch: sees the touch
 - **What:** The learn step ran xinput test-xi2 through a pipe (output held back until it exited) and read the master device number; now stdbuf -oL, and it takes the touchscreen's number from the brackets ('device: 2 (7)'); 20 seconds, Touch/ButtonPress/Motion events.

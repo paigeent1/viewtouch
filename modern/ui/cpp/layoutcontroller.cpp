@@ -1623,6 +1623,24 @@ void LayoutController::scanned(const QString &code)
         return;
     }
     const auto *page = currentPage();
+    // Scans count only where they mean something: Retail and the order screens (ring it in), Pay
+    // (a coupon, a gift card), and screens with a search or a scan field (Gift Card, Find, the Item /
+    // UPC Builder, labels, counts). Elsewhere (the floor plan, Manager...) they're ignored without a
+    // word: no "not on file, add it?" over the tables.
+    const bool sells = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier"
+                                || page->kind == u"order" || page->kind == u"settle" || page->id == u"retail-entry");
+    bool searches = false;
+    if (page && !sells) {
+        static const QStringList scanZones{u"giftCard"_s, u"checkSearch"_s, u"customerLookup"_s, u"menuBuilder"_s,
+                                           u"retailLabels"_s, u"stockCount"_s, u"receiveDelivery"_s, u"menuGrid"_s};
+        static const QStringList scanPages{u"gift-card"_s, u"find-item"_s, u"menu-builder"_s, u"admin-menu"_s,
+                                           u"find-check"_s, u"reprint-receipt"_s, u"labels"_s};
+        searches = scanPages.contains(page->id);
+        for (const Layout::PlacedZone &pz : shown().zones)
+            searches = searches || scanZones.contains(pz.zone->kind);
+    }
+    if (!sells && !searches)
+        return;   // silently: nothing on the screen, nothing said
     const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier" || page->kind == u"order" || page->id == u"retail-entry");
     QString c12 = c;
     if (c.size() == 11 && std::all_of(c.cbegin(), c.cend(), [](QChar ch) { return ch.isDigit(); })) {
@@ -1656,8 +1674,17 @@ void LayoutController::scanned(const QString &code)
         if (k == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))
             navigate(Navigator::Mode::Push, u"gift-card"_s);
         else if (k == u"unrecognized" || k.isEmpty()) {
-            setStatus(QString());
-            emit unrecognizedBarcode(c);
+            // "Not on file: add it?" only where it would be rung in, or in the Item / UPC Builder.
+            const auto *here = currentPage();
+            const bool adds = here && (here->kind == u"index" || here->kind == u"items" || here->kind == u"modifier"
+                                       || here->kind == u"order" || here->id == u"retail-entry"
+                                       || here->id == u"menu-builder" || here->id == u"admin-menu");
+            if (adds) {
+                setStatus(QString());
+                emit unrecognizedBarcode(c);
+            } else {
+                setStatus(tr("%1 isn't on file.").arg(c));
+            }
         }
     });
 }
