@@ -98,6 +98,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 08:46 ET — Bob (Claude) — New buttons reach edited pages once
+- **What:** main.cpp: after the starter-page update, a short list of given zones (page#zone) is added to the store's page when missing, even if the store edited that page; once only (marked in the starter state, so a button the store deletes stays deleted). First: hardware-config#vt-touch-map (Guest touch monitor sync).
+- **Why:** Owner: why can't Bob edit the Hardware Configuration page? The store's edited page never takes starter changes.
+- **Files:** `main.cpp`
+
 ### 2026-11-04 08:39 ET — Bob (Claude) — Guest touch monitor sync button
 - **What:** Hardware Configuration: 'Guest touch monitor sync (2x Tap)' (behavior double: touch, then tap again) runs vtSync mode touch-map (/usr/local/bin/vt-touch-map); vtSync passes VT_TOUCH_VERBOSE=1 and DISPLAY=:0 so the status line shows each touch device and its monitor.
 - **Why:** Owner: a button to reset the touch mapping if the monitors get out of whack.

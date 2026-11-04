@@ -870,6 +870,30 @@ int runStore(const Args &cli, const Options &o)
                 qInfo().noquote() << "New starter pages added:" << update.added.join(u", ");
             if (!update.updated.isEmpty())
                 qInfo().noquote() << "Starter pages updated (they were never edited):" << update.updated.join(u", ");
+            // New buttons a store should get even on a page it has edited (added once: if the store
+            // deletes one later, it stays deleted). "page#zone" in the starter state marks it done.
+            static const std::pair<const char16_t *, const char16_t *> givenZones[] = {
+                {u"hardware-config", u"vt-touch-map"},   // Guest touch monitor sync
+            };
+            bool zonesAdded = false;
+            for (const auto &[pageId, zoneId] : givenZones) {
+                const QString mark = QString::fromUtf16(pageId) + u'#' + QString::fromUtf16(zoneId);
+                if (state.seen.contains(mark))
+                    continue;
+                vt::layout::Page *mine = layout->page(QString::fromUtf16(pageId));
+                const vt::layout::Page *given = starter->page(QString::fromUtf16(pageId));
+                if (mine && given && std::ranges::none_of(mine->zones, [&](const vt::layout::Zone &z) { return z.id == QString::fromUtf16(zoneId); })) {
+                    for (const vt::layout::Zone &z : given->zones)
+                        if (z.id == QString::fromUtf16(zoneId)) {
+                            mine->zones.append(z);
+                            zonesAdded = true;
+                            qInfo().noquote() << "Button added to" << QString::fromUtf16(pageId) << ":" << z.label;
+                        }
+                }
+                state.seen << mark;
+            }
+            if (zonesAdded && !store.save(*layout, &error))
+                qWarning().noquote() << "Could not save the added buttons:" << error;
             for (const vt::layout::Page &p : starter->pages) {
                 if (!state.seen.contains(p.id))
                     state.seen << p.id;
