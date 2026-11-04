@@ -89,6 +89,7 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 * **Guest-screen raffles & contact entry (owner idea, 2026-11-03)**: With a second Wimaxit as a touch guest screen: guests type phone and email (needs an on-screen keyboard on the guest page, not just the phone keypad), and enter raffles; each entry prints legibly on a raffle-ticket printer (name, phone/email, drawing, number), and the entries are kept for the drawing.
 * **Test suite health (found 2026-11-03)**: GitHub "Modern checks" hasn't passed in 100+ runs. Fixed tonight: screens now load in tests (qml_load.hh) and a crash cut the run short. Still failing on main: the Menu Builder screen tests can't find item buttons (builderItem-<id>) in its grid (about 15 tests), and the gift-card page logs a Qt Quick Layouts "recursive rearrange" (WidgetGiftCard.qml; wrapped Labels already given Layout.preferredWidth). Plus a few unrelated (versions, forecast, self-order slip).
 * **ID scan for age-restricted sales (owner: paused 2026-11-04, remind him)**: Scan the license barcode (PDF417/AAMVA) on each tobacco, cigarette, rolling-paper, e-cig and alcohol sale; block under the Store Settings > Age-restricted sales minimums (ageTobacco / ageAlcohol, already there) or an expired ID; log only "ID checked, 21+, who, when" on the check (CT CGS 53-344 limits what scan data may be kept). CT requires an ID from every tobacco buyer regardless of apparent age (since 2022-07-01), so a guest-screen PIN can't replace the ID. The owner has more requirements for this, including IDs whose barcode won't read or that have none: ask him before starting. Needs a 2D scanner.
+* **Upstream sync ledger (official ViewTouch: github.com/ViewTouch/viewtouch)**: the fork's base is d9ad3d0a (2026-10-15). Policy (owner left it to Bob, 2026-11-04): stay a downstream fork; bring upstream fixes in small groups, each tested on GitHub (Debian 13, Qt 6.8) before the Pi; record each upstream id in the Log; no Qt 6.12 work while the Pi runs Qt 6.8; offer good general fixes of ours back upstream. Done: group 1 (7424bf42 209ec272 348bb5ae ec643be2 2e9b9ddc 7f1695c0 bd4291d0), 44e5c6f4, fc15f44f. Already in the fork: 2e37ab3a (phone waking from sleep) was ported by Neil on 2026-10-24 (94be1399), hence its conflict. Deferred (network code rewritten upstream after our base; tablets stable): 5f415087 handheld taxes wiped. Next: money and tax (c60aa58c, ff5ab8d9, f8db6b99 vs our discount totals, 942f25b1, 7d3ee617, 55d9fa5a, 580eb34d, ebb48823, bfb4348d), then 073726ad/3cecfcb6/59169169/96b336f8, then security 0ac3c24c (94 files). 8a0727be (starter buttons on edited pages) would replace our givenZones list in main.cpp.
 * **4-Node Multi-Store Hub & Web Portal**: `store_config.json` and `corp_sync.py` across `CORP_HUB`, `HCAH_DANBURY`, `BHT_DANBURY`, and `BHT_GAYLORDSVILLE`, plus InMotion PHP/MySQL online ordering with Pi background polling and ESC/POS kitchen auto-printing (`192.168.1.77:9100`).
 * **Corporate ViewTouch & shared gift cards (planned, to be implemented later)**: The owner will build a Corporate ViewTouch
   instance on a separate Pi before the Buttheads stores launch. Then: one shared card list so balances work at all three
@@ -99,12 +100,27 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 10:11 ET — Bob (Claude) — Privacy branch caught up with main
+- **What:** Merged main (upstream reliability + audit fixes) into bob/privacy-notice; notes conflict only.
+- **Why:** So the privacy branch is tested against what's on main before it merges.
+- **Files:** `modern/app/menu_import.cpp`, `modern/app/pos_day.cpp`, `modern/app/pos_menu_builder.cpp`, `modern/i18n/es.json`, `modern/i18n/fr.json`, `modern/i18n/pt.json`, `modern/i18n/zh.json`, `modern/main.cpp`, `modern/net/discovery.cpp`, `modern/net/protocol.cpp`, `modern/net/protocol.hh`, `modern/net/remote_session.cpp`, `modern/net/remote_session.hh`, `modern/net/standby.cpp`, `modern/net/standby.hh`, `modern/storage/async_writer.cpp`, `modern/storage/async_writer.hh`, `modern/storage/pos_store.cpp`, `modern/tests/CMakeLists.txt`, `modern/tests/test_menu_builder.cpp`, `modern/tests/test_pos_store.cpp`, `modern/tests/test_soak.cpp`, `modern/tests/test_standby.cpp`
+
 ### 2026-11-04 10:04 ET — Bob (Claude) — Privacy notice: receipts, guest screen accept, full notice on the Pi; minimum ages in Store Settings
 - **What:** Store Settings > Privacy notice (admin): on/off for receipts, a short notice and a full notice (built-in wording when empty; {store}, {contact} = receipt header, {date} = when it last changed). The short notice prints at the bottom of the receipt when the check has a customer's name, phone or email (not on practice checks). On the customer display (retail stores with one) the short notice comes up with Accept / No Thanks before a guest adds their phone or email, once per check; acceptance is kept on the customer (privacyAcceptedAt) via customerJoin/customerEmail(..., privacyAccepted). The full notice prints from the Customers screen (Print Privacy Notice, any staff) and is written on the server as Desktop/Privacy Notice.txt at start and whenever Store Settings are saved. Also Store Settings > Age-restricted sales: minimum age for alcohol and for tobacco (default 21), not used yet (for the ID scan, paused). Tests in test_print and test_loyalty.
 - **Why:** Owner asked 2026-11-04 for a privacy notice routine on receipts when customer info is collected, the notice on the Pi, an admin place to update it, the notice to accept on the guest screen (retail only: HCA has no guest screen), and alcohol/tobacco ages as Store Settings options.
 - **Files:** `modern/core/settings.hh, modern/core/customer.hh, modern/print/tickets.hh, modern/print/tickets.cpp, modern/print/ticket_printer.hh, modern/print/ticket_printer.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_commands.cpp, modern/app/pos_loyalty.cpp, modern/app/pos_day.cpp, modern/app/pos_json.cpp, modern/app/pos_admin_fields.cpp, modern/app/pos_admin_shared.hh, modern/app/pos_admin_records.cpp, modern/app/pos_admin_save.cpp, modern/main.cpp, modern/ui/qml/CustomerDisplay.qml, modern/ui/qml/WidgetGuestOrder.qml, modern/ui/qml/WidgetCustomerLookup.qml, modern/tests/test_print.cpp, modern/tests/test_loyalty.cpp, modern/vt-modern-development-notes.md (roadmap: ID scan)`
 - **Next person must know:** The built-in wording is a starting point, not legal advice (CT Data Privacy Act thresholds dropped to 35,000 consumers on 2026-07-01). Saving the built-in text unchanged keeps the setting empty, so later wording fixes still reach the store.
 
+### 2026-11-04 10:11 ET — Bob (Claude) — Merged bob/audit-fixes into main
+- **What:** Audit fixes: real build numbers and versions (server and Android), graceful vtmodern restart, barcodes without GS1 check digits save, gift card PINs for managers only, vt-tmp retired, duplicate-customer window (phone/email/name), vt-directv rebuilt (no DB/page writes, background, scan of the Pi's own subnet).
+- **Why:** Owner's audit decisions 2026-11-04. CI on the branch: no new failures against main (29 known, now also fixing test_net Versions).
+- **Files:** `see the merge (bob/audit-fixes)`
+- **Next person must know:** Pi after pulling: sudo rm -f /usr/local/bin/vt-tmp; sudo ln -sf ~/viewtouch-main/scripts/bin/vt-directv /usr/local/bin/vt-directv. Tablets: the next APK numbers itself by commit count (well above 19), so it installs as an upgrade.
+
+### 2026-11-04 10:11 ET — Bob (Claude) — Merged upstream/reliability into main
+- **What:** Merged branch upstream/reliability (upstream ViewTouch reliability fixes group 1, 44e5c6f4 soak test, fc15f44f price import guard hand-merged, Qt 6.8 compile fix). CI: no new test failures against main (the extra test_safety/test_pos_service failures in its run were date/salt flakes in files it doesn't change; they passed on the next run).
+- **Why:** Owner approved bringing in the upstream reliability fixes; the Upstream sync ledger in this file lists what came and what was deferred.
+- **Files:** `see the merge (upstream/reliability)`
 ### 2026-11-04 09:53 ET — Bob (Claude) — Version computed again (server and Android)
 - **What:** BuildInfo.cmake sets version to MAJOR.MINOR.<commit count> again (my earlier fix removed the hardcoded 0.9.19 but the original version line had been replaced, so the version came out empty; test_net 'Versions' caught it). CMakeLists Android QT_ANDROID_VERSION_NAME back to MAJOR.MINOR.<build> (it was hardcoded 0.9.19 in 704954c2); the version code already used the commit count.
 - **Why:** Audit fix follow-up: every build must carry its own version for the update check and the tablets' upgrade.
@@ -150,6 +166,36 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** modern/tools/get-qt.sh from upstream (official Qt binaries from download.qt.io into /opt/qt/VERSION, alongside Debian's; plus qtmultimedia for this fork's video), modern/tools/qt-version = 6.12.0, and a dispatch-only workflow 'Modern checks (official Qt)' that builds and tests this fork with it on Debian 13. The regular checks stay on Debian's Qt 6.8 (the Pi today).
 - **Why:** Owner: Qt update important now. Plan: 1) GitHub build on 6.12 and fix what breaks (still building on 6.8); 2) Pi: Qt 6.12 in /opt/qt beside Debian's, a separate build, vt-server switch, easy rollback; 3) tablets' APK on 6.12; 4) upstream fixes merge easier.
 - **Files:** `.github/workflows/modern-checks-qt612.yml, modern/tools/get-qt.sh, modern/tools/qt-version`
+### 2026-11-04 09:14 ET — Bob (Claude) — Upstream sync: build on Qt 6.8
+- **What:** main.cpp: QString + u": " (allowed by Qt 6.12, not 6.8) from upstream 7424bf42 written u": "_s.
+- **Why:** The upstream group didn't compile on the Pi's Qt 6.8.
+- **Files:** `main.cpp`
+
+### 2026-11-04 09:09 ET — Bob (Claude) — Ledger: 2e37ab3a was already ported
+- **What:** Upstream 2e37ab3a (tablet connection kept on wake) was ported by Neil on 2026-10-24 (94be1399); the ledger now says so.
+- **Why:** Owner: Neil's earlier changes may be undocumented.
+- **Files:** (none)
+
+### 2026-11-04 09:05 ET — Bob (Claude) — Upstream sync ledger in the roadmap
+- **What:** Section 5 now keeps the upstream sync ledger: base commit, policy, what's in, what's deferred and why, and the next groups in order.
+- **Why:** Owner asked what to do as the fork diverges; a written record makes each catch-up a checklist.
+- **Files:** `modern/vt-modern-development-notes.md`
+
+### 2026-11-04 09:05 ET — Bob (Claude) — Upstream sync: fc15f44f impossible prices refused
+- **What:** Upstream fc15f44f by hand: priceCents (a card's typed price) and the CSV import's price() refuse inf, nan, 1e300 and 14-digit amounts (std::isfinite, under 10,000,000). Our menu_import.cpp is older than upstream's (no Toast/xlsx readers), so only the price check and kMaxPrice went in; its test kept for typed and CSV prices, the fuzz test of importers we don't have left out.
+- **Why:** A typed 'inf' rounded to cents is undefined; huge prices overflow totals.
+- **Files:** `app/menu_import.cpp, app/pos_menu_builder.cpp, tests/test_menu_builder.cpp`
+
+### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync: 44e5c6f4 lists trimmed at End of Day
+- **What:** Upstream 44e5c6f4 (a register on for months: done waitlist parties, deliveries over 60 days, past days over 60, and bumped/served tickets over 50 are trimmed at End of Day) plus its soak test (tests/test_soak.cpp). Conflict only in tests/CMakeLists.txt: kept our test list and added test_soak.cpp (upstream's other new test files aren't in this fork).
+- **Why:** The Pi runs for months; memory grew every day.
+- **Files:** `app/pos_day.cpp, tests/test_soak.cpp, tests/CMakeLists.txt`
+
+### 2026-11-04 09:04 ET — Bob (Claude) — Upstream sync, group 1: database and network reliability
+- **What:** From the official ViewTouch (github.com/ViewTouch/viewtouch main), applied with git apply --3way, no conflicts: 7424bf42 a row that can never be written no longer stops every save; 209ec272 database indexes for what's looked up by time; 348bb5ae only plain table and column names go into SQL; ec643be2 the cash tips column added in one transaction; 2e9b9ddc a network message arriving in pieces isn't searched again from its start; 7f1695c0 terminals wait a little longer between tries, no endless wait; bd4291d0 standby takeover limited to five wrong PINs, then waits. Not yet (need hand merges): 44e5c6f4 lists trimmed at End of Day, 2e37ab3a phone waking from sleep, 5f415087 handheld taxes wiped, fc15f44f impossible prices refused.
+- **Why:** Owner left the upstream catch-up to Bob: bring in fixes in small tested groups, recorded by upstream commit id; no Qt 6.12 work (the Pi runs Qt 6.8).
+- **Files:** `storage/*, net/*, app/* (see the upstream commits)`
+- **Next person must know:** Policy: downstream fork; upstream fixes in small groups with their commit ids in these notes; the store's own features stay here.
 
 ### 2026-11-04 08:46 ET — Bob (Claude) — New buttons reach edited pages once
 - **What:** main.cpp: after the starter-page update, a short list of given zones (page#zone) is added to the store's page when missing, even if the store edited that page; once only (marked in the starter state, so a button the store deletes stays deleted). First: hardware-config#vt-touch-map (Guest touch monitor sync).

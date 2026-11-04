@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QRegularExpression>
+#include <cmath>
 
 using namespace Qt::StringLiterals;
 
@@ -70,6 +71,10 @@ QString what(const QString &header)
     return {};
 }
 
+// Above this, not a price (in cents near the limit of whole numbers, a
+// few of it would overflow the totals). (Upstream fc15f44f.)
+constexpr double kMaxPrice = 10'000'000;
+
 bool price(QString text, double *out)
 {
     text = text.trimmed();
@@ -83,7 +88,7 @@ bool price(QString text, double *out)
         text.remove(u',');
     bool ok = false;
     *out = text.toDouble(&ok);
-    return ok && *out >= 0;
+    return ok && std::isfinite(*out) && *out >= 0 && *out < kMaxPrice;   // 99999999999999 isn't a price
 }
 
 } // namespace

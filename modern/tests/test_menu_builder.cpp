@@ -4,6 +4,9 @@
 #include "app/pos_json.hh"
 #include "storage/pos_store.hh"
 #include "qt_catch.hh"
+#include <QJsonArray>
+#include <cmath>
+#include <random>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -944,4 +947,21 @@ TEST_CASE("Barcodes: on an item's card, one item's each; scanned: an item, a cou
     CHECK(imported == 1);
     REQUIRE(pos.findItem(u"028400090858"_s));
     CHECK(pos.findItem(u"028400090858"_s)->name == "Chips");
+}
+
+TEST_CASE("Menu import: prices that aren't amounts (NaN, infinity, 1e999) aren't read as prices", "[menubuilder][import][fuzz]")
+{
+    // Typed on a card: the same ("inf" was read as infinity, and rounded to cents: undefined).
+    for (const char *typed : {"inf", "-inf", "nan", "1e300", "1e999", "99999999999999"})
+        CHECK(app::priceCents(QString::fromLatin1(typed), u"$"_s) == -1);
+    CHECK(app::priceCents(u"$11.50"_s, u"$"_s) == 1150);
+    CHECK(app::priceCents(u"3,50"_s, u"$"_s) == 350);
+    for (const char *price : {"NaN", "nan", "inf", "-inf", "Infinity", "1e999", "-1e999", "99999999999999", "1e308", "0x10"}) {
+        INFO(price);
+        const app::MenuImport csv = app::readMenuCsv(u"Item,Price\nCobb,%1\n"_s.arg(QString::fromLatin1(price)));
+        for (const app::ImportedItem &i : csv.items) {
+            CHECK(std::isfinite(i.price));
+            CHECK(std::abs(i.price) < 1e9);
+        }
+    }
 }
