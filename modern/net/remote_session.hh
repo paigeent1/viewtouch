@@ -145,6 +145,7 @@ public:
     QString storeLogo() const override { return v(u"storeLogo").toString(); }
     QVariantMap kioskMenu() const override { return v(u"kioskMenu").toMap(); }
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
+    QVariantMap customerDuplicate() const override { return v(u"customerDuplicate").toMap(); }
     int imageRevision() const override { return adminRevision() + imageRevision_; }
     int screenSaverMinutes() const override { return v(u"screenSaverMinutes").toInt(); }
     QString scanAddPermission() const override { const QString s = v(u"scanAddPermission").toString(); return s.isEmpty() ? QStringLiteral("manager") : s; }

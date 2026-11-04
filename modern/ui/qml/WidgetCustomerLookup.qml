@@ -13,6 +13,9 @@ Item {
     readonly property bool manager: pos !== null && pos.permissions.indexOf("manager") >= 0
     property var draft: ({})
     property bool creating: false
+    // Someone on file has this phone, email or name: the floating window asks.
+    readonly property var duplicate: pos ? pos.customerDuplicate : ({})
+    readonly property var dupMatches: duplicate.matches ?? []
 
     function reload() {
         const full = (chosen.name ?? "").trim()
@@ -52,8 +55,7 @@ Item {
             r.houseAccount = draft.houseAccount
             r.accountLimit = cents(draft.limit)
         }
-        pos.saveCustomer(r)
-        creating = false
+        pos.saveCustomer(r)     // the form closes once it's saved (chosen changes)
     }
 
     Timer { id: searchTimer; interval: 250; onTriggered: w.pos.findCustomers(search.text) }
@@ -317,6 +319,71 @@ Item {
                     text: qsTr("Find a customer on the left, or add a new one.")
                     opacity: 0.6
                 }
+            }
+        }
+    }
+
+    // --- possible duplicate ---------------------------------------------------
+    Popup {
+        id: dupWindow
+        objectName: "customerDuplicate"
+        parent: Overlay.overlay
+        visible: w.visible && w.dupMatches.length > 0
+        modal: true
+        closePolicy: Popup.NoAutoClose
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 32 : 640, 640)
+        padding: 18
+        background: Rectangle { color: "#1d232d"; radius: 10; border.color: "#f0b429"; border.width: 2 }
+
+        contentItem: ColumnLayout {
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Already on file?")
+                font.pixelSize: 24; font.bold: true; color: "#f0b429"
+            }
+            Label {
+                Layout.fillWidth: true; Layout.preferredWidth: 1
+                wrapMode: Text.WordWrap; color: "white"
+                text: (w.duplicate.editing ?? false)
+                      ? qsTr("Another customer already has this phone number or email. What would you like to do?")
+                      : qsTr("%1 looks like a customer you already have. What would you like to do?")
+                            .arg([w.duplicate.name, w.duplicate.phone, w.duplicate.email].filter(x => (x ?? "") !== "").join(" · "))
+            }
+            Repeater {
+                model: w.dupMatches
+                delegate: Rectangle {
+                    id: match
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: row.implicitHeight + 16
+                    radius: 6; color: "#2b3340"
+                    RowLayout {
+                        id: row
+                        anchors.fill: parent; anchors.margins: 8; spacing: 8
+                        ColumnLayout {
+                            Layout.fillWidth: true; Layout.preferredWidth: 1; spacing: 2
+                            Label { Layout.fillWidth: true; elide: Text.ElideRight; color: "white"; font.bold: true
+                                    text: (match.modelData.name || qsTr("(no name)")) + "  ·  " + qsTr("%n visit(s)", "", match.modelData.visits ?? 0) }
+                            Label { Layout.fillWidth: true; elide: Text.ElideRight; color: "#c3cad6"
+                                    text: [match.modelData.phone, match.modelData.email].filter(x => (x ?? "") !== "").join("  ·  ") }
+                            Label { text: match.modelData.why; color: "#f0b429"; font.pixelSize: 13 }
+                        }
+                        Button { text: qsTr("Use This One"); implicitHeight: 44; visible: !(w.duplicate.editing ?? false)
+                                 onClicked: { w.creating = false; w.pos.resolveCustomerDuplicate("use", match.modelData.id) } }
+                        Button { text: qsTr("Update It"); implicitHeight: 44; visible: !(w.duplicate.editing ?? false)
+                                 onClicked: w.pos.resolveCustomerDuplicate("update", match.modelData.id) }
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 8
+                Button { text: (w.duplicate.editing ?? false) ? qsTr("Save Anyway") : qsTr("Save as New Customer")
+                         Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 48
+                         onClicked: w.pos.resolveCustomerDuplicate("new") }
+                Button { text: qsTr("Cancel"); Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 48
+                         onClicked: w.pos.resolveCustomerDuplicate("cancel") }
             }
         }
     }

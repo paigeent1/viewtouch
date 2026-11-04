@@ -100,6 +100,7 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap waitlist READ waitlistInfo NOTIFY dayChanged)
     // What the customer display asks the guest: {askingTip, tipChosen, tip, choices}.
     Q_PROPERTY(QVariantMap customerPrompt READ customerPrompt NOTIFY checkChanged)
+    Q_PROPERTY(QVariantMap customerDuplicate READ customerDuplicate NOTIFY checkChanged)
     // The week's schedule ({title, days, totals, staff}) and your next shift.
     Q_PROPERTY(QVariantMap schedule READ scheduleInfo NOTIFY sessionChanged)
     Q_PROPERTY(QString nextShift READ nextShift NOTIFY sessionChanged)
@@ -315,6 +316,7 @@ public:
     virtual QVariantMap giftCardInfo() const = 0;
     virtual QVariantMap waitlistInfo() const = 0;
     virtual QVariantMap customerPrompt() const = 0;
+    virtual QVariantMap customerDuplicate() const = 0;   // {name, phone, email, matches: [{id, name, phone, email, why}]}
     virtual QVariantMap scheduleInfo() const = 0;
     virtual QString nextShift() const = 0;
     virtual QVariantMap rangeReport() const = 0;
@@ -614,6 +616,7 @@ public:
     Q_INVOKABLE void useCustomer(const QString &id = {}) { invoke(QStringLiteral("useCustomer"), {id}); }
     Q_INVOKABLE void forgetCustomer(const QString &id) { invoke(QStringLiteral("forgetCustomer"), {id}); }
     Q_INVOKABLE void saveCustomer(const QVariantMap &record) { invoke(QStringLiteral("saveCustomer"), {record}); }
+    Q_INVOKABLE void resolveCustomerDuplicate(const QString &choice, const QString &id = {}) { invoke(QStringLiteral("resolveCustomerDuplicate"), {choice, id}); }
     Q_INVOKABLE void sellGiftCard(const QString &number, qint64 amountCents = 0, const QString &purchasedBy = {}, const QString &issuedTo = {})
     {
         invoke(QStringLiteral("sellGiftCard"), {number, amountCents, purchasedBy, issuedTo});

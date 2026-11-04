@@ -99,10 +99,56 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 10:11 ET — Bob (Claude) — Merged bob/audit-fixes into main
+- **What:** Audit fixes: real build numbers and versions (server and Android), graceful vtmodern restart, barcodes without GS1 check digits save, gift card PINs for managers only, vt-tmp retired, duplicate-customer window (phone/email/name), vt-directv rebuilt (no DB/page writes, background, scan of the Pi's own subnet).
+- **Why:** Owner's audit decisions 2026-11-04. CI on the branch: no new failures against main (29 known, now also fixing test_net Versions).
+- **Files:** `see the merge (bob/audit-fixes)`
+- **Next person must know:** Pi after pulling: sudo rm -f /usr/local/bin/vt-tmp; sudo ln -sf ~/viewtouch-main/scripts/bin/vt-directv /usr/local/bin/vt-directv. Tablets: the next APK numbers itself by commit count (well above 19), so it installs as an upgrade.
+
 ### 2026-11-04 10:11 ET — Bob (Claude) — Merged upstream/reliability into main
 - **What:** Merged branch upstream/reliability (upstream ViewTouch reliability fixes group 1, 44e5c6f4 soak test, fc15f44f price import guard hand-merged, Qt 6.8 compile fix). CI: no new test failures against main (the extra test_safety/test_pos_service failures in its run were date/salt flakes in files it doesn't change; they passed on the next run).
 - **Why:** Owner approved bringing in the upstream reliability fixes; the Upstream sync ledger in this file lists what came and what was deferred.
 - **Files:** `see the merge (upstream/reliability)`
+### 2026-11-04 09:53 ET — Bob (Claude) — Version computed again (server and Android)
+- **What:** BuildInfo.cmake sets version to MAJOR.MINOR.<commit count> again (my earlier fix removed the hardcoded 0.9.19 but the original version line had been replaced, so the version came out empty; test_net 'Versions' caught it). CMakeLists Android QT_ANDROID_VERSION_NAME back to MAJOR.MINOR.<build> (it was hardcoded 0.9.19 in 704954c2); the version code already used the commit count.
+- **Why:** Audit fix follow-up: every build must carry its own version for the update check and the tablets' upgrade.
+- **Files:** `modern/cmake/BuildInfo.cmake, modern/CMakeLists.txt`
+- **Next person must know:** Checked 261aab66 (Neil, 2026-10-24): it removed the sendKit/offline lines and 11 offline/tax test cases from test_net that 94be1399 had pasted from upstream; our fork never had upstream's Work Offline feature, so nothing that worked was lost. Upstream's offline mode (c4b87db0) is a candidate for the later overhaul.
+
+### 2026-11-04 09:46 ET — Bob (Claude) — vt-directv scan: only this Pi's own network
+- **What:** vt-directv scan no longer takes a subnet and no longer sweeps the known TVs' networks. It scans only the network of the Pi's default-route adapter (a network bigger than a /24 is swept as the Pi's /24), and SSDP answers from anywhere else are ignored. With no default route it scans nothing.
+- **Why:** Owner 2026-11-04: each deployment should only look on the local subnet the Pi is on (no reaching into another network, a VPN or a second adapter's network).
+- **Files:** `scripts/bin/vt-directv`
+- **Next person must know:** At Hat City the receivers (192.168.6.x) will be found once the Pi is on that network; until then scan finds nothing there, which is expected.
+
+### 2026-11-04 09:39 ET — Bob (Claude) — vt-directv rebuilt: no database writes, no frozen screen, TV scan
+- **What:** scripts/bin/vt-directv rewritten. Same command line for the DIRECTV pages (box|all tune <ch> / key <key>), but it no longer rebuilds pages into viewtouch.db and seed/pages after every tune (--init-pages now just says so). TV list moved to ~/.config/viewtouch/tvs.json (built-in five bar receivers if missing). New: 'vt-directv scan [--save] [subnet]' finds DIRECTV receivers and smart TVs by SSDP plus a sweep of this computer's subnets and the known TVs' subnets (DIRECTV 8080, Roku 8060, Samsung 8001, LG webOS 3000, Android/Google 8008); 'list'. Roku TVs can be worked now (ECP keypress); Samsung/LG/Sony/Android TV are found and listed but need a one-time pairing (not built yet). 'all' sends to every receiver at once. LayoutController runs it in the background with a 10 s limit instead of waiting on the UI thread.
+- **Why:** Owner's decision 2026-11-04: rebuild it, and have the Pi find DIRECTV boxes (if they're swapped) and other smart TVs to work them over the network instead of HDMI. Audit: writing viewtouch.db while ViewTouch runs breaks the one-writer rule, overwrote layout edits, rewrote repo files on the Pi (blocking git pull), and the 4 s wait froze the POS when a box was off.
+- **Files:** `scripts/bin/vt-directv, modern/ui/cpp/layoutcontroller.cpp`
+- **Next person must know:** Pi: sudo ln -sf ~/viewtouch-main/scripts/bin/vt-directv /usr/local/bin/vt-directv so git pull keeps it current. The Pi is on 192.168.1.x and the receivers on 192.168.6.x: SSDP won't cross that, the port sweep does if the router routes between them. The Frequently Used column on the tune pages is now fixed (edit it in the editor); counts still go to directv_freq.json.
+
+### 2026-11-04 09:36 ET — Bob (Claude) — Duplicate customers: a floating window asks
+- **What:** Saving a new customer whose phone, email or full name matches one on file (or editing a customer to someone else's phone or email) no longer merges into that record. The save stops and a floating window on the Customers screen lists the matches and why (same phone / email / name) with Use This One, Update It, Save as New Customer and Cancel. New session property customerDuplicate and command resolveCustomerDuplicate (also on tablets). Takeout/delivery names typed on a check still reuse the record with that phone (onDuplicate: match) and no longer wipe the customer's email. Tests in test_customers.
+- **Why:** Owner asked 2026-11-04: duplicate checks should look at phone and email too and ask what to do. The old code silently overwrote whichever customer had the same phone or exact full name (audit finding).
+- **Files:** `modern/app/pos_customers.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_session.cpp, modern/app/pos_commands.cpp, modern/net/remote_session.hh, modern/net/remote_session.cpp, modern/ui/qml/WidgetCustomerLookup.qml, modern/tests/test_customers.cpp`
+
+### 2026-11-04 09:33 ET — Bob (Claude) — Retired vt-tmp
+- **What:** Removed scripts/bin/vt-tmp (it pulled apply_changes.py from Google Drive and ran it, then pushed output and vt_label_utility.py back). AGENTS.md now says not to bring back run-a-script-from-Drive tools; LABEL_UTILITY_NOTES points at Git history instead of the Drive backup.
+- **Why:** Owner's decision 2026-11-04 (audit): it ran whatever file landed in a Drive folder with the owner's rights, and it is how Pi-side patches kept undoing Git fixes.
+- **Files:** `scripts/bin/vt-tmp (deleted), AGENTS.md, modern/tools/LABEL_UTILITY_NOTES.md`
+- **Next person must know:** Pi: sudo rm -f /usr/local/bin/vt-tmp (git pull doesn't remove the installed copy).
+
+### 2026-11-04 09:33 ET — Bob (Claude) — Gift card PINs: managers only
+- **What:** giftCardInfo() shows a card's PIN only to someone with the manager permission; everyone else gets ••••, and the gift card search no longer matches on PINs for them. The gift card reports (Activated, Active Balances, Inactive) print the PIN column the same way: managers see it, others see ••••. New test in test_customers.
+- **Why:** Owner's decision 2026-11-04 (audit): any server could look up or print every card's PIN, which is all someone needs to spend a card.
+- **Files:** `modern/app/pos_customers.cpp, modern/core/report.hh, modern/core/report.cpp, modern/app/pos_day.cpp, modern/tests/test_customers.cpp`
+- **Next person must know:** The PIN is still synced to tablets in the store data (pos_json); only what's shown changed.
+
+### 2026-11-04 09:30 ET — Bob (Claude) — Audit fixes: real build numbers, graceful restart, barcodes save
+- **What:** Removed the hardcoded build 19 / 0.9.19 lines from modern/cmake/BuildInfo.cmake so each build gets its real git count again. vt-server and vt-fast now stop vtmodern with SIGTERM, wait up to 10 s, and only then force it. Menu item barcodes are no longer refused for an 11-digit code or a GS1 check digit that doesn't add up (shape and duplicate checks stay).
+- **Why:** Audit of earlier changes: the fixed build number made every Pi and tablet look the same version to the update check and to the server's behind/ahead compare; killall -9 could cut a database write in half; the check-digit block meant store and vendor codes that don't follow GS1 could never be saved, and the 11-digit message promised a fill-in that never happened.
+- **Files:** `modern/cmake/BuildInfo.cmake, scripts/bin/vt-server, scripts/bin/vt-fast, modern/app/pos_service.cpp`
+- **Next person must know:** Gift card numbers still use their own check-digit test on purpose (test_customers).
 
 ### 2026-11-04 09:13 ET — Bob (Claude) — Qt upgrade step 1: build the fork with the official Qt on GitHub
 - **What:** modern/tools/get-qt.sh from upstream (official Qt binaries from download.qt.io into /opt/qt/VERSION, alongside Debian's; plus qtmultimedia for this fork's video), modern/tools/qt-version = 6.12.0, and a dispatch-only workflow 'Modern checks (official Qt)' that builds and tests this fork with it on Debian 13. The regular checks stay on Debian's Qt 6.8 (the Pi today).

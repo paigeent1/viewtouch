@@ -148,7 +148,8 @@ Report depositReport(const std::vector<DrawerSession> &drawers, const std::vecto
 // the store), and house account charges, payments and balances.
 Report accountsReport(const std::vector<GiftCard> &cards, const std::vector<CustomerRecord> &customers,
                       std::int64_t since, const ReportContext &ctx);
-Report giftCardsSubReport(const std::string &mode, const std::vector<GiftCard> &cards, const std::vector<Check> &checks, std::int64_t fromMs, std::int64_t toMs, const ReportContext &ctx);
+// showPins: managers see each card's PIN; everyone else sees "••••".
+Report giftCardsSubReport(const std::string &mode, const std::vector<GiftCard> &cards, const std::vector<Check> &checks, std::int64_t fromMs, std::int64_t toMs, const ReportContext &ctx, bool showPins = false);
 // Kitchen ticket times by station: from sent to made (bumped) - how many,
 // the average, the longest, how many were late - and the slowest tickets.
 Report kitchenReport(const std::vector<const Check *> &checks, int lateMinutes, const ReportContext &ctx);

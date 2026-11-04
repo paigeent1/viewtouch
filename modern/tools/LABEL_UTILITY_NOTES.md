@@ -20,7 +20,7 @@ changes what the operator sees or does, raise it, add a line here, and tag the c
   adding **`--upc <code>`** when a UPC is given. The utility opens straight to that item's label preview.
 - The idle-logout check looks for a running **`vt_label_utility.py`** or **`vt-label-utility`** (`pgrep -f 'vt[_-]label[_-]utility'`). Don't rename the file.
 - **`/usr/local/bin/vt-label-utility` must stay the 5-line launcher** from `scripts/bin/vt-label-utility` (it runs the repo copy). Never copy the whole script there: ViewTouch would run that stale copy and Git updates would never show (happened 2026-11-02).
-- `scripts/bin/vt-tmp` backs the file up to Google Drive.
+- The file's history is in Git (`git log -- modern/tools/vt_label_utility.py`); the old `vt-tmp` Drive backup was retired 2026-11-04.
 
 ## Design rules (please keep)
 1. **Every label is one 1-bit picture** rendered by `render_label_pil_image()` at the printer's DPI and sent

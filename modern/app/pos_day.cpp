@@ -1504,7 +1504,7 @@ Report PosService::buildReport(const QString &id) const
     if (id == u"accounts")
         return accountsReport(s_->giftCards, s_->customers, s_->day.openedAt, ctx);
     if (id.startsWith(u"gc_"))
-        return giftCardsSubReport(ss(id), s_->giftCards, s_->closedToday, 0, 0, ctx);
+        return giftCardsSubReport(ss(id), s_->giftCards, s_->closedToday, 0, 0, ctx, can(u"manager"_s));
     if (id == u"audit" || id == u"exceptions") {
         std::vector<const Check *> checks;
         for (const Check &c : s_->closedToday)
@@ -1572,7 +1572,7 @@ Report PosService::rangeCapableReport(const QString &id, const std::vector<Check
             if (c.closedAt > 0 && (minAt == 0 || c.closedAt < minAt)) minAt = c.closedAt;
             if (c.closedAt > maxAt) maxAt = c.closedAt;
         }
-        return giftCardsSubReport(ss(id), s_->giftCards, closed, minAt, maxAt, ctx);
+        return giftCardsSubReport(ss(id), s_->giftCards, closed, minAt, maxAt, ctx, can(u"manager"_s));
     }
     if (id == u"royalty")
         return royaltyReport(closed, ctx);

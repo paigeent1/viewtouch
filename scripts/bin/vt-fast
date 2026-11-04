@@ -3,6 +3,10 @@ set -e
 cd ~/viewtouch-main/modern
 cmake --build build --target vtmodern -j3
 sudo cp -f build/vtmodern /usr/local/bin/vtmodern
-killall -9 vtmodern 2>/dev/null || true; sleep 0.5
+# Stop ViewTouch the polite way first (it saves and closes the database on
+# SIGTERM); force it only if it is still running after 10 seconds.
+pkill -TERM -x vtmodern 2>/dev/null || true
+for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
+pkill -KILL -x vtmodern 2>/dev/null || true
 WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 ~/viewtouch-main/modern/build/vtmodern --serve >/dev/null 2>&1 &
 echo "✓ vtmodern rebuilt and restarted! ($(ccache -s | grep -E 'Hits|Hit rate' | tr '\n' ' '))"

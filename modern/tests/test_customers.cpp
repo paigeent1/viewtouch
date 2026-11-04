@@ -63,8 +63,11 @@ TEST_CASE("Customers: saved, found by phone or name, counted when their checks c
     CHECK(names(pos.customerResults()) == QStringList{u"Dana Lee"_s});
     REQUIRE(pos.findCustomers(u"kim"_s));
     CHECK(names(pos.customerResults()) == QStringList{u"Alex Kim"_s});
-    // The same phone written differently is the same person.
-    REQUIRE(pos.saveCustomer({{u"name"_s, u"Dana Lee-Park"_s}, {u"phone"_s, u"555.010.1234"_s}}));
+    // The same phone written differently: asked about, then Dana is updated.
+    CHECK_FALSE(pos.saveCustomer({{u"name"_s, u"Dana Lee-Park"_s}, {u"phone"_s, u"555.010.1234"_s}}));
+    REQUIRE(pos.customerDuplicate()[u"matches"_s].toList().size() == 1);
+    REQUIRE(pos.resolveCustomerDuplicate(u"update"_s, QString::fromStdString(pos.shared()->customers.front().id)));
+    CHECK(pos.customerDuplicate().isEmpty());
     CHECK(pos.shared()->customers.size() == 2);
 
     // A takeout for Dana: picked from the list, counted at close.
@@ -261,6 +264,74 @@ TEST_CASE("Gift cards: a manager moves a balance to a new card; the old one clos
     // Not counted as a sale or a spend in the report.
     const QVariantMap report = pos.report(u"accounts"_s);
     CHECK(rowAmount(report, u"Sold and reloaded"_s) == u"$50.00"_s);
+}
+
+TEST_CASE("Gift cards: only managers see a card's PIN or find it by PIN", "[customers][giftcards]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);                                           // Morgan, a manager
+    REQUIRE(pos.sellGiftCard(u"6000 1111 2221"_s, 5000));
+    REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
+    for (auto &card : pos.shared()->giftCards)
+        if (card.number == "600011112221")
+            card.pin = "4821";
+
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"pin"_s] == u"4821"_s);
+    REQUIRE(pos.lookupGiftCard(u"4821"_s));                    // a manager may search by PIN
+    CHECK(pos.giftCardInfo()[u"found"_s].toBool());
+
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1111"_s));                     // a server
+    REQUIRE(pos.lookupGiftCard(u"600011112221"_s));
+    CHECK(pos.giftCardInfo()[u"found"_s].toBool());
+    CHECK(pos.giftCardInfo()[u"pin"_s] == u"••••"_s);
+    for (const QVariant &v : pos.giftCardInfo()[u"matches"_s].toList())
+        CHECK(v.toMap()[u"pin"_s] == u"••••"_s);
+    pos.lookupGiftCard(u"4821"_s);
+    CHECK_FALSE(pos.giftCardInfo()[u"found"_s].toBool());     // not by its PIN
+}
+
+TEST_CASE("Customers: a new one with the same phone, email or name opens the duplicate window", "[customers]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    openDrawer(pos);
+    REQUIRE(pos.saveCustomer({{u"name"_s, u"Dana Lee"_s}, {u"phone"_s, u"555-010-1234"_s}, {u"email"_s, u"dana@example.com"_s}}));
+    REQUIRE(pos.saveCustomer({{u"name"_s, u"Alex Kim"_s}, {u"phone"_s, u"555-777-0000"_s}}));
+    const auto &list = pos.shared()->customers;
+    const QString dana = QString::fromStdString(list.front().id);
+    const auto matchWhy = [&] { return pos.customerDuplicate()[u"matches"_s].toList().value(0).toMap()[u"why"_s].toString(); };
+
+    // Same name, no phone: asked. Cancel saves nothing.
+    CHECK_FALSE(pos.saveCustomer({{u"name"_s, u"dana lee"_s}}));
+    CHECK(matchWhy() == u"same name"_s);
+    REQUIRE(pos.resolveCustomerDuplicate(u"cancel"_s));
+    CHECK(pos.customerDuplicate().isEmpty());
+    CHECK(list.size() == 2);
+
+    // Same email, another name: a different Dana gets saved as new on purpose.
+    CHECK_FALSE(pos.saveCustomer({{u"name"_s, u"Dana Smith"_s}, {u"email"_s, u"DANA@example.com"_s}}));
+    CHECK(matchWhy() == u"same email"_s);
+    CHECK_FALSE(pos.resolveCustomerDuplicate(u"update"_s, u"nobody"_s));          // only one listed
+    REQUIRE(pos.resolveCustomerDuplicate(u"new"_s));
+    CHECK(list.size() == 3);
+
+    // Same phone and name: "use" puts the one on file on the check, unchanged.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.saveCustomer({{u"name"_s, u"Dana Lee"_s}, {u"phone"_s, u"(555) 010 1234"_s}}));
+    CHECK(matchWhy().contains(u"same phone"_s));
+    REQUIRE(pos.resolveCustomerDuplicate(u"use"_s, dana));
+    CHECK(pos.checkInfo()[u"customer"_s].toMap()[u"name"_s] == u"Dana Lee"_s);
+    CHECK(list.front().email == "dana@example.com");
+    CHECK(list.size() == 3);
+
+    // Editing Alex to Dana's phone: asked too (a name alone isn't, for an edit).
+    const QString alex = QString::fromStdString(list[1].id);
+    CHECK_FALSE(pos.saveCustomer({{u"id"_s, alex}, {u"name"_s, u"Alex Kim"_s}, {u"phone"_s, u"555-010-1234"_s}}));
+    CHECK(pos.customerDuplicate()[u"editing"_s].toBool());
+    REQUIRE(pos.resolveCustomerDuplicate(u"cancel"_s));
+    REQUIRE(pos.saveCustomer({{u"id"_s, alex}, {u"name"_s, u"Alex Kim"_s}, {u"phone"_s, u"555-777-0001"_s}}));
 }
 
 TEST_CASE("Subscription cards: subscription-only promotions come off once the card is shown", "[customers][giftcards]")
