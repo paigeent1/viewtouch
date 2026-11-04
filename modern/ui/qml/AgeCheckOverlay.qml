@@ -15,6 +15,7 @@ Rectangle {
     readonly property bool asking: (ask.age ?? 0) > 0
     visible: asking
     property bool typing: false
+    readonly property bool android: Qt.platform.os === "android"
     property string dob: ""            // MMDDYYYY as typed
     onAskingChanged: { typing = false; dob = "" }
     readonly property string shown: {
@@ -55,7 +56,8 @@ Rectangle {
                 visible: !ov.typing
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: qsTr("Scan the barcode on the back of the ID.\nLook at the photo: is it them?")
+                text: ov.android ? qsTr("Scan the back of the ID: the camera, or a Bluetooth scanner.\nLook at the photo: is it them?")
+                                 : qsTr("Scan the barcode on the back of the ID.\nLook at the photo: is it them?")
                 color: "#d9dee7"; font.pixelSize: 22
             }
             // --- an ID that won't scan: the date of birth by hand ---
@@ -108,6 +110,16 @@ Rectangle {
                                                              : qsTr("Typed by hand: logged as an exception.")
                     color: "#f0b429"; font.pixelSize: 15
                 }
+            }
+            // A tablet: its camera reads the license (a paired Bluetooth 2D scanner works too).
+            Rectangle {
+                objectName: "ageCameraScan"
+                Layout.fillWidth: true
+                visible: ov.android && !ov.typing
+                implicitHeight: 72; radius: 12
+                color: camTap.pressed ? "#15803d" : "#1f8a4c"
+                Text { anchors.centerIn: parent; text: qsTr("📷 Scan ID with camera"); color: "white"; font.pixelSize: 24; font.bold: true }
+                TapHandler { id: camTap; onTapped: ov.controller.command("scanCameraId") }
             }
             RowLayout {
                 Layout.fillWidth: true

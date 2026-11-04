@@ -2028,14 +2028,14 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Close ViewTouch: a manager's way off a kiosk screen (it then stays
     // closed until the next boot; see vtmodern-kiosk.service).
-    if (name == u"scanCamera") {
+    if (name == u"scanCamera" || name == u"scanCameraId") {
 #ifdef Q_OS_ANDROID
         s_activeScannerController = this;
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
         if (activity.isValid()) {
             QJniObject::callStaticMethod<void>(
                 "org/viewtouch/pos/BarcodeScanner",
-                "start",
+                name == u"scanCameraId" ? "startId" : "start",
                 "(Landroid/app/Activity;)V",
                 activity.object<jobject>());
             return done(true);

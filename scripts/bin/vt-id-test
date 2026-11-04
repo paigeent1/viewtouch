@@ -1,0 +1,35 @@
+#!/bin/bash
+# Test the scanner on the back of a driver's license: stops ViewTouch for 20 seconds, prints every
+# field the scanner reads (on this screen only: nothing is saved, the scan is erased), restarts it.
+#   vt-id-test          all fields
+#   vt-id-test --short  only which fields were found (nothing personal shown)
+PORT=$(ls /dev/serial/by-id/*-port0 2>/dev/null | head -1); PORT=${PORT:-/dev/ttyUSB0}
+echo "Scanner port: $PORT"
+echo "Stopping ViewTouch..."; pkill -TERM -x vtmodern; sleep 4
+stty -F "$PORT" 9600 raw -echo || { echo "Can't open $PORT"; vt-server >/dev/null 2>&1 & exit 1; }
+echo ">>> SCAN NOW: the back of the license (20 seconds)"
+timeout 20 cat "$PORT" > /tmp/vt-lic.bin
+python3 - "$1" <<'PY'
+import re, sys
+short = len(sys.argv) > 1 and sys.argv[1] == '--short'
+d = open('/tmp/vt-lic.bin', 'rb').read(); t = d.decode('latin-1')
+print('bytes read:', len(d))
+lic = 'ANSI ' in t or 'AAMVA' in t
+print('license barcode (PDF417) read:', lic)
+before = t.split('@', 1)[0].strip() if lic else ''
+print('a small 1D barcode read too:', ('yes: ' + (before if not short else str(len(before)) + ' characters')) if before else 'no')
+if not short:
+    print('--- raw (control characters as <xx>) ---')
+    print(''.join(c if 32 <= ord(c) < 127 or c == '\n' else '<%02x>' % ord(c) for c in t))
+names = {'DAQ':'ID number','DCS':'Last name','DAC':'First name','DAD':'Middle name','DBB':'Date of birth',
+ 'DBA':'Expires','DBD':'Issued','DBC':'Sex (1=M 2=F)','DAY':'Eye color','DAU':'Height','DAG':'Street',
+ 'DAI':'City','DAJ':'State','DAK':'ZIP','DCF':'Document discriminator','DCG':'Country','DCA':'Class',
+ 'DCB':'Restrictions','DCD':'Endorsements','DDA':'Compliance','DDB':'Card revision date','DDK':'Organ donor'}
+print('--- fields ---')
+for m in re.finditer(r'(?:^|[\n\r\x1e]|DL|ID)(D[A-Z]{2})([^\n\r\x1e]*)', t):
+    code, val = m.group(1), m.group(2).strip()
+    print(f'{code}  {names.get(code, ""):24} {"found" if short else val}')
+PY
+shred -u /tmp/vt-lic.bin 2>/dev/null
+echo "Starting ViewTouch again..."; vt-server >/dev/null 2>&1
+echo "Done."

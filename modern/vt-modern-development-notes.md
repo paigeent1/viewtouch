@@ -100,6 +100,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 14:36 ET — Bob (Claude) — ID checks: tablets scan the license with their camera
+- **What:** The ID check popup on a tablet has '📷 Scan ID with camera' (command scanCameraId): the tablet app's camera scanner (BarcodeScanner.kt, ML Kit on the device) in ID mode reads only PDF417 (not the license's small 1D barcode), at 1920x1080, keeps the license's line breaks, 30 s timeout, and hands it to the ID check. A Bluetooth 2D scanner paired to the tablet works too (keyboard mode, Main.qml). Also merged main into the branch.
+- **Why:** Owner 2026-11-04: HCA tablets scan the back of the ID with their camera for now; include the Bluetooth scanner option.
+- **Files:** `modern/android/src/org/viewtouch/pos/BarcodeScanner.kt, modern/ui/cpp/layoutcontroller.cpp, modern/ui/qml/AgeCheckOverlay.qml`
+- **Next person must know:** Camera mode needs the tablet app rebuilt (Modern Android) and pushed (vt-tablets).
+
 ### 2026-11-04 14:12 ET — Bob (Claude) — ID checks: build fix (helpers include)
 - **What:** pos_age.cpp includes app/pos_json.hh for the qs/ss string helpers.
 - **Why:** CI build error on bob/id-checks.
@@ -120,6 +126,10 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** Owner 2026-11-04: tablets at HCA scan the back of the ID, ID options on the Site Setup page, hand-keyed DOB the exception; the 1D barcode on licenses had forced turning that symbology off in ILSA, which broke cigar labels.
 - **Files:** `modern/core/id_card.hh, modern/app/pos_age.cpp, modern/app/pos_service.cpp, modern/app/pos_service.hh, modern/app/pos_session.hh, modern/app/pos_session.cpp, modern/app/pos_commands.cpp, modern/app/pos_json.cpp, modern/core/check.hh, modern/core/settings.hh, modern/net/remote_session.hh, modern/net/remote_session.cpp, modern/ui/qml/AgeCheckOverlay.qml, modern/ui/qml/Main.qml, modern/ui/qml/WidgetSiteSetup.qml, modern/ui/cpp/layoutcontroller.cpp, modern/ui/cpp/layoutcontroller.hh, modern/ui/cpp/serialscanner.cpp, modern/CMakeLists.txt, modern/tests/test_customers.cpp`
 - **Next person must know:** Tablet camera scanning (no Bluetooth scanner) is not built: needs a PDF417 decoder (ZXing-C++) and Qt Multimedia in the APK. Phone + PIN lookup, 'add this customer?' after a new ID, the Exceptions report rows and the 'Age Not Verified' slip are for the refinement with the owner.
+### 2026-11-04 14:13 ET — Bob (Claude) — vt-id-test: test the scanner on a license
+- **What:** New scripts/bin/vt-id-test: stops ViewTouch 20 s, reads the scanner's first port, prints whether the PDF417 and a 1D barcode were read and every AAMVA field (--short: only found/missing), erases the scan, restarts ViewTouch.
+- **Why:** Owner wanted to test his license on the BH Danbury scanner with all data shown; pasted heredoc scripts didn't come through in his terminal.
+- **Files:** `scripts/bin/vt-id-test`
 
 ### 2026-11-04 14:00 ET — Bob (Claude) — Merged bob/site-name; vt-tablets shows the version code cleanly
 - **What:** Site Setup's store name from Store Settings merged. vt-tablets prints versionCode=90000260 (it printed 90000260minSdk: the rest of dumpsys's line ran into it).
