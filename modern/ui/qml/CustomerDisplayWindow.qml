@@ -12,4 +12,12 @@ Window {
     color: "#0f1318"
     title: qsTr("ViewTouch — Customer Display")
     CustomerDisplay { anchors.fill: parent; pos: win.pos; controller: win.controller }
+    // Guests only touch this screen: no mouse pointer left where they touched. Touches and
+    // clicks pass through (it takes no buttons); the POS screen keeps its pointer.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        hoverEnabled: true
+        cursorShape: Qt.BlankCursor
+    }
 }

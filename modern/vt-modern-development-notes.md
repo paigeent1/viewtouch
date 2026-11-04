@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 12:49 ET — Bob (Claude) — No mouse pointer on the guest screen
+- **What:** CustomerDisplayWindow.qml: a MouseArea over the guest window (no buttons, hover only) sets a blank cursor, so the pointer doesn't sit where a guest touched. Touches pass through; the POS window keeps its pointer.
+- **Why:** Owner 2026-11-04: the pointer showed on the guest screen when it was touched.
+- **Files:** `modern/ui/qml/CustomerDisplayWindow.qml`
+
 ### 2026-11-04 12:49 ET — Bob (Claude) — Notes: conflict markers removed
 - **What:** The learn-touch merge committed the notes file with Git conflict markers (both sides kept now, no text lost).
 - **Why:** My merge commit went in before the notes conflict was resolved.
