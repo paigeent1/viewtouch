@@ -107,6 +107,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 17:28 ET — Bob (Claude) — HOLD: Pi and tablet update waiting (owner's call)
+- **What:** Owner put the Pi/tablet update on hold. Deployed now (per his 16:56 video): Pi 0.9.279 (merge of bob/labels-camera), tablets 0.9.278 (APK from that branch). Waiting to go out: camera Scan hides the tablet keyboard first (Labels + ID check); tablet camera window much bigger and centered, guide line in the middle (Android); scripts/bin/vt-ilsa-export; backlog notes. Before the next push: build the APK from main's head so Pi and tablets carry the same build number.
+- **Why:** Owner 2026-11-04 17:28: hold the update, keep track of the code changes.
+- **Files:** (none)
+- **Next person must know:** Pi command when released: git pull myfork main && vt-server, then the APK from a Modern Android run on main's head (gh run download <run> -n ViewTouch-android-arm64-v8a) and vt-tablets. Also: make the tablet 'older ViewTouch' banner ignore notes-only commits.
+
 ### 2026-11-04 17:28 ET — Bob (Claude) — Merged bob/ilsa-export
 - **What:** Merged bob/ilsa-export into main (notes/backlog and scripts only, no app code).
 - **Why:** Owner 2026-11-04: hold the Pi/tablet update for now; keep the record of changes in Git.
