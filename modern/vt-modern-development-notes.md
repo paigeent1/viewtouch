@@ -100,6 +100,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 17:00 ET — Bob (Claude) — Tablet camera scan window: much bigger, centered
+- **What:** BarcodeScanner.kt overlay: the camera card is now 62% of the screen wide and 88% tall, centered (was 400x520 px in the top-right corner); the red guide line is across the middle of the picture (it sat at the top); bigger title and buttons.
+- **Why:** Owner 2026-11-04: the camera window was too small to aim with.
+- **Files:** `modern/android/src/org/viewtouch/pos/BarcodeScanner.kt`
+
 ### 2026-11-04 16:57 ET — Bob (Claude) — Camera Scan: hide the tablet keyboard first
 - **What:** Labels screen yellow Scan: the search box gives up focus and the on-screen keyboard is hidden before the camera opens; the ID check's camera button hides the keyboard too.
 - **Why:** Owner's video 2026-11-04: touching Scan on a tablet brought up the Android keyboard over the camera window.

@@ -106,7 +106,9 @@ object BarcodeScanner {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#181C24"))
             setPadding(24, 20, 24, 20)
-            val lp = FrameLayout.LayoutParams(400, 520, Gravity.TOP or Gravity.END)
+            // Big enough to aim with: most of the screen, centered.
+            val dm = activity.resources.displayMetrics
+            val lp = FrameLayout.LayoutParams((dm.widthPixels * 0.62).toInt(), (dm.heightPixels * 0.88).toInt(), Gravity.CENTER)
             layoutParams = lp
         }
 
@@ -117,13 +119,14 @@ object BarcodeScanner {
 
         val title = TextView(activity).apply {
             text = if (idMode) "Scan the BACK of the ID (big square barcode)" else "Scan UPC Barcode"
-            textSize = 20f
+            textSize = 22f
             setTextColor(Color.parseColor("#E6B800"))
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val flipBtn = Button(activity).apply {
             text = "Flip Camera"
+            textSize = 18f
             setBackgroundColor(Color.parseColor("#2B3340"))
             setTextColor(Color.WHITE)
             setOnClickListener {
@@ -135,6 +138,7 @@ object BarcodeScanner {
 
         val closeBtn = Button(activity).apply {
             text = "Cancel"
+            textSize = 18f
             setBackgroundColor(Color.parseColor("#8A2C2C"))
             setTextColor(Color.WHITE)
             val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -159,7 +163,7 @@ object BarcodeScanner {
         // Red laser guide line across the center
         val guideLine = FrameLayout(activity).apply {
             setBackgroundColor(Color.parseColor("#AAFF3333"))
-            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 4, Gravity.TOP or Gravity.END)
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 6, Gravity.CENTER_VERTICAL)
         }
         previewBox.addView(guideLine)
 
