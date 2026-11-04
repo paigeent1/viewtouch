@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""ILSA self-check round 2 (dry run): why tenders differ from ILSA's Z, and whether receipt modes
+1/2 are cancelled sales / no sales. Counts and dollars only.
+  vt-ilsa-tieout2 ~/ilsa-export/"copy bhdan 10-29-2026"
+"""
+import csv, os, re, sys
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+if not os.path.isdir(D):
+    sys.exit("Usage: vt-ilsa-tieout2 ~/ilsa-export/<database name>")
+
+def rows(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(D, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+def num(s):
+    try: return float(s)
+    except (TypeError, ValueError): return 0.0
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def year(s):
+    s = (s or "").strip()
+    if len(s) >= 4 and s[:4].isdigit(): return s[:4]
+    m = US.match(s)
+    if not m: return "?"
+    y = int(m.group(3))
+    if y < 100: y += 2000 if y < 70 else 1900
+    return str(y)
+
+zyear = {(r.get("REG_NUM"), r.get("REG_Z_COUNTER")): year(r.get("REG_Z_DATETIME")) for r in rows("RegZCnt")}
+
+# --- Z_Tender: what the columns hold
+print("== Z_Tender: rows per (register Z, cashier Z) and cashier values")
+zt_keys, cash = Counter(), Counter()
+zsum = defaultdict(lambda: defaultdict(float))     # type -> column -> $
+zsum_y = defaultdict(float)   # (year, type) -> Z TENDER_AMT
+zt_by_z = defaultdict(lambda: defaultdict(float))  # (reg, z) -> type -> TENDER_AMT
+for r in rows("Z_Tender"):
+    zt_keys[(r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("CSHR_NUM"), r.get("CSHR_Z_COUNTER"), r.get("TENDER_TYPE"))] += 1
+    cash[r.get("CSHR_NUM") == "0" or r.get("CSHR_NUM") == ""] += 1
+    t = r.get("TENDER_TYPE")
+    for c in ("TENDER_AMT", "CHANGE_OUT", "IN_DRW_AMT", "REFUND_AMT", "DEBIT_CASH_BACK_AMT"):
+        zsum[t][c] += num(r.get(c))
+    for c in ("TENDER_QTY", "REFUND_QTY", "IN_DRW_QTY"):
+        zsum[t][c] += num(r.get(c))
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+    zsum_y[(zyear.get(z, "?"), t)] += num(r.get("TENDER_AMT"))
+    zt_by_z[z][t] += num(r.get("TENDER_AMT"))
+print(f"  rows: {sum(zt_keys.values())}, duplicate keys: {sum(1 for v in zt_keys.values() if v > 1)}, cashier 0/blank rows: {cash[True]}")
+for t, cols in sorted(zsum.items()):
+    print(f"  type {t}: " + ", ".join(f"{c} {v:,.2f}" for c, v in cols.items()))
+
+# --- TendSale: what the columns hold
+print("\n== TendSale by type: SALE_AMT, AMT_TEND, CHANGE_DUE, negatives, rows per receipt")
+ts = defaultdict(lambda: defaultdict(float))
+ts_y = defaultdict(float)
+per_rcpt = Counter()
+ts_by_z = defaultdict(lambda: defaultdict(float))
+for r in rows("TENDSALE"):
+    t = r.get("TENDER_TYPE"); a = num(r.get("SALE_AMT"))
+    ts[t]["rows"] += 1; ts[t]["SALE_AMT"] += a; ts[t]["AMT_TEND"] += num(r.get("AMT_TEND")); ts[t]["CHANGE_DUE"] += num(r.get("CHANGE_DUE"))
+    if a < 0: ts[t]["negative rows"] += 1; ts[t]["negative $"] += a
+    if r.get("Z_Mode") not in (None, "", "0"): ts[t][f"Z_Mode {r.get('Z_Mode')} rows"] += 1
+    per_rcpt[(r.get("REG_NUM"), r.get("REG_Z_COUNTER"), r.get("RECEIPT_NUM"), t)] += 1
+    z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+    ts_y[(zyear.get(z, "?"), t)] += a
+    ts_by_z[z][t] += a
+for t, cols in sorted(ts.items()):
+    print(f"  type {t}: " + ", ".join(f"{c} {v:,.2f}" for c, v in cols.items()))
+print(f"  receipts with the same tender type twice or more: {sum(1 for v in per_rcpt.values() if v > 1)}")
+
+print("\n== Tenders by year: receipts (TendSale SALE_AMT) - ILSA Z (TENDER_AMT)")
+for y in sorted({k[0] for k in ts_y} | {k[0] for k in zsum_y}):
+    parts = []
+    for t in ("1", "10", "15", "70"):
+        d = ts_y.get((y, t), 0.0) - zsum_y.get((y, t), 0.0)
+        parts.append(f"type {t} {d:+,.2f}")
+    print(f"  {y}: " + ", ".join(parts))
+
+print("\n== Days: does receipts - Z for cash equal the cash change given that day?")
+chg_z = defaultdict(float)
+for r in rows("TENDSALE"):
+    chg_z[(r.get("REG_NUM"), r.get("REG_Z_COUNTER"))] += num(r.get("CHANGE_DUE"))
+m = n = 0
+for z in zt_by_z:
+    d = ts_by_z[z].get("1", 0.0) - zt_by_z[z].get("1", 0.0)
+    n += 1; m += abs(d - chg_z[z]) < 0.015 or abs(d + chg_z[z]) < 0.015
+print(f"  {m} of {n} days")
+
+# --- modes 1 and 2 against ILSA's own cancelled / no-sale counts
+mode_cnt = Counter(); mode_amt = defaultdict(float)
+for r in rows("RegSale"):
+    mode_cnt[r.get("Z_MODE")] += 1; mode_amt[r.get("Z_MODE")] += num(r.get("SALE_TOTAL"))
+zt = defaultdict(float)
+for r in rows("Z_Totals"):
+    for c in ("Z_SALE_COUNT", "Z_NO_SALE_COUNT", "Z_CANCEL_SALE_QTY", "Z_CANCEL_SALE_AMT", "Z_REFUND_QTY", "Z_REFUND_AMT",
+              "Z_PREV_ITEM_VOID_QTY", "Z_LAST_ITEM_VOID_QTY", "Z_PLU_AMT", "Z_ENTRY_AMT", "Z_MISC_AMT"):
+        zt[c] += num(r.get(c))
+print("\n== Receipt modes vs ILSA Z_Totals counters (whole history)")
+for k in sorted(mode_cnt):
+    print(f"  receipts Z_MODE {k}: {mode_cnt[k]} receipts, ${mode_amt[k]:,.2f}")
+for c, v in zt.items():
+    print(f"  Z_Totals {c}: {v:,.2f}")
+print("\nDone. Paste everything above to Bob.")

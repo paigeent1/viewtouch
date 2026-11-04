@@ -109,6 +109,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-04 18:45 ET — Bob (Claude) — vt-ilsa-tieout2: why ILSA tenders differ from its Z; modes 1/2
+- **What:** New scripts/bin/vt-ilsa-tieout2 (dry run): Z_Tender and TendSale column sums by tender type (amount, tendered, change, refunds, negatives, duplicates), receipts minus Z by year, a check whether the daily cash gap equals change given, and receipt modes vs ILSA's Z_Totals counters (sales, no sales, cancelled sales, refunds, voids). Round 1 result: tax matches on 4,575 of 4,583 Z's; tenders on 2,057; receipts higher than Z by cash \11k, credit \83k, gift \4k; receipt modes 1 and 2 have no tenders (likely cancelled sales and no sales).
+- **Why:** Owner's vt-ilsa-tieout run 2026-11-04.
+- **Files:** `scripts/bin/vt-ilsa-tieout2`
+
 ### 2026-11-04 18:39 ET — Bob (Claude) — Backlog: lottery history only; parallel run during beta
 - **What:** ILSA import notes: lottery departments history-only (BH stopped lottery 3+ years ago); parallel ILSA + ViewTouch ringing during the beta.
 - **Why:** Owner 2026-11-04.
