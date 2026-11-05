@@ -11,7 +11,7 @@ if not exist "%DEST%" mkdir "%DEST%"
 copy /Y "%SRC%ViewTouch_ILSA_Sync.ps1" "%DEST%\" >nul || goto :fail
 copy /Y "%SRC%ViewTouch_ILSA_Sync_hidden.vbs" "%DEST%\" >nul || goto :fail
 if not exist "%DEST%\settings.txt" (
-  echo # MDB=C:\ilsa\ilsa.mdb>"%DEST%\settings.txt"
+  echo MDB=C:\ilsa\data\ilsacorp.mdb>"%DEST%\settings.txt"
   echo # DROPBOX=C:\Users\YOU\Dropbox\POS project>>"%DEST%\settings.txt"
 )
 if not "%~1"=="" echo MDB=%~1>>"%DEST%\settings.txt"

@@ -8,6 +8,6 @@ ViewTouch ILSA price book sync (for the ILSA Windows 7 computer)
      Each run sends only when prices/items changed. No window pops up.
 3. If it says the database or Dropbox folder wasn't found: open C:\ViewTouchSync\settings.txt,
    put the right paths on lines like these (no # in front), save, and run the installer again:
-     MDB=C:\ilsa\ilsa.mdb
+     MDB=C:\ilsa\data\ilsacorp.mdb
      DROPBOX=C:\Users\Owner\Dropbox\POS project
 Log: C:\ViewTouchSync\sync.log      Remove: schtasks /Delete /TN "ViewTouch ILSA Sync" /F

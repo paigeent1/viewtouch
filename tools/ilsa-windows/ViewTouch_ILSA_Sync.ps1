@@ -27,7 +27,7 @@ if (Test-Path $sf) { foreach ($l in Get-Content $sf) { if ($l -match '^\s*(\w+)\
 $mdb = $settings["MDB"]
 if (-not $mdb -or -not (Test-Path $mdb)) {
     $desk = [Environment]::GetFolderPath("Desktop")
-    $cands = @("C:\ilsa\ilsa.mdb", "C:\ILSA\ilsa.mdb", "C:\ilsa_\ilsa.mdb", "D:\ilsa\ilsa.mdb", (Join-Path $desk "ilsa.mdb"))
+    $cands = @("C:\ilsa\data\ilsacorp.mdb", "C:\ilsa\ilsa.mdb", "C:\ILSA\ilsa.mdb", "C:\ilsa_\ilsa.mdb", "D:\ilsa\ilsa.mdb", (Join-Path $desk "ilsa.mdb"))
     $mdb = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 if (-not $mdb) { Log "ERROR: ILSA database not found. Put MDB=C:\path\to\ilsa.mdb in $sf"; exit 2 }
