@@ -111,6 +111,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 16:24 ET — Bob (Claude) — vt-ilsa-items: ILSA price book to a ViewTouch menu file
+- **What:** New scripts/bin/vt-ilsa-items [--history <ILSA export>]: from ~/ilsa-pricebook/latest builds ~/ilsa-items/viewtouch-menu.json (format viewtouch-menu, for Menu Builder > Import a menu): every item except lottery (ACTIVE ignored), one category per ILSA department (ilsa-<dept>), tax from the POS flag's tax group (1 merchandise, else none), barcodes = PLU_NUM + Alt_PLUNum + UPC_E; same name in the same department = one item with every UPC, price from the UPC sold most recently (else the highest); merges.csv lists each merge (PRICES DIFFER flagged); summary.txt counts and the departments holding ID-check items. No on-hand. Not imported yet: ViewTouch was built around restaurant-size menus, so 33,000 items gets a speed test first (menu sync to tablets, scans, saves).
+- **Why:** Owner 2026-11-05: import all ILSA items into ViewTouch and run alongside ILSA.
+- **Files:** `scripts/bin/vt-ilsa-items`
+
 ### 2026-11-05 16:21 ET — Bob (Claude) — ILSA history: price, quantity and cost per sale line confirmed
 - **What:** Backlog (ILSA import): the fields that carry price, quantity and cost at the time, and the GP by year they give (26.9% in 2014 to 32% now); dept 260 lines without cost and lottery handled separately.
 - **Why:** Owner 2026-11-05: wants what sold at what price and GP on cost at the time.
