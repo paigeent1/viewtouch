@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""ILSA price book -> a ViewTouch menu file (Menu Builder > Import a menu), plus a merge report.
+"""ILSA price book -> a ViewTouch menu file (Menu Builder > Import a menu), plus review reports.
   vt-ilsa-items [--history ~/ilsa-export/"copy bhdan 10-29-2026"]
-Reads ~/ilsa-pricebook/latest (what the ILSA computer sends). Every item (ILSA's ACTIVE flag is
-ignored), except lottery. One category per ILSA department. Tax: ILSA's POS flag (tax group 1 =
-merchandise, otherwise none). Items with the same name in the same department are ONE item: every
-UPC becomes one of its barcodes; its price is the price of the UPC that sold most recently (with
---history; else the highest), and each merge is listed for review. No quantities on hand.
-Writes ~/ilsa-items/viewtouch-menu.json, merges.csv and summary.txt.
+Reads ~/ilsa-pricebook/latest (what the ILSA computer sends). One ViewTouch item per ILSA item:
+NOTHING is merged (the owner decides merges himself). ILSA's ACTIVE flag is ignored; lottery is left
+out. One category per ILSA department. Tax: ILSA's POS flag (tax group 1 = merchandise, otherwise
+none). Barcodes: PLU_NUM + Alt_PLUNum + UPC_E. No quantities on hand.
+Writes ~/ilsa-items/viewtouch-menu.json, and for review:
+  possible-duplicates.csv  same name in the same department, each with its UPC, price, last sale
+  inhouse-upcs.csv         the store's own UPCs (708694...): item, last sold, and any same-name item
+                           with a maker's UPC (a candidate to free the in-house code)
+  summary.txt
 """
 import csv, json, os, re, sys
 from collections import Counter, defaultdict
@@ -14,6 +17,7 @@ from collections import Counter, defaultdict
 csv.field_size_limit(1 << 30)
 BOOK = os.path.expanduser("~/ilsa-pricebook/latest")
 OUT = os.path.expanduser("~/ilsa-items")
+INHOUSE = "708694"
 LOTTERY = {"270", "275", "280", "300", "320", "340", "345", "360", "365", "370", "375", "377", "378", "379",
            "380", "400", "405", "420"}
 
@@ -32,11 +36,11 @@ def clean(s): return re.sub(r"\s+", " ", (s or "").strip())
 def code(s):
     s = (s or "").strip()
     return s[:-2] if s.endswith(".0") and s[:-2].isdigit() else s
+def slug(s): return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "x"
 
 if not os.path.isdir(BOOK):
     sys.exit("No price book yet: run vt-ilsa-pricebook first.")
 
-# --- last sale per UPC (optional, from the ILSA history export) --------------------------------
 last_sold = {}
 if "--history" in sys.argv:
     h = sys.argv[sys.argv.index("--history") + 1]
@@ -52,15 +56,11 @@ if "--history" in sys.argv:
         if u and t > last_sold.get(u, ""):
             last_sold[u] = t
 
-# --- departments, tax --------------------------------------------------------------------------
 dept = {code(r.get("DEPT_NUM")): clean(r.get("DEPT_NAME") or r.get("POS_DESC")) for r in rows(BOOK, "Dept")}
 taxgroup = {clean(r.get("POS_FLAG_NAME")).upper(): code(r.get("TAX_GROUP")) for r in rows(BOOK, "Pos_Flag")}
 agereq = {clean(r.get("POS_FLAG_NAME")).upper(): code(r.get("AGE_REQ")) for r in rows(BOOK, "Pos_Flag")}
 
-def slug(s): return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "x"
-
-# --- items -------------------------------------------------------------------------------------
-groups = defaultdict(list)   # (dept, NAME) -> ILSA items
+groups = defaultdict(list)   # (dept, NAME) -> ILSA items (only to report look-alikes)
 skipped = Counter()
 for r in rows(BOOK, "PLU"):
     upc = code(r.get("PLU_NUM"))
@@ -73,49 +73,53 @@ for r in rows(BOOK, "PLU"):
     flag = clean(r.get("POS_FLAG_NAME")).upper()
     codes = [upc] + [c for c in (code(r.get("Alt_PLUNum")), code(r.get("UPC_E"))) if c and c != upc]
     groups[(d, name.upper())].append({"upc": upc, "codes": codes, "name": name, "price": num(r.get("LAST_PRICE")),
-                                      "tax": taxgroup.get(flag, "1"), "age": agereq.get(flag, "0"), "flag": flag})
+                                      "tax": taxgroup.get(flag, "1"), "age": agereq.get(flag, "0")})
 
-cats, items, merges, tobacco_cats = {}, [], [], set()
-used_codes = set()
+cats, items, dups, inhouse, tobacco_cats = {}, [], [], [], set()
+used, clashes = set(), 0
 for (d, _), g in sorted(groups.items()):
     cname = dept.get(d) or f"DEPT {d or '?'}"
     cid = "ilsa-" + slug(cname)
     cats[cid] = {"id": cid, "name": cname, "taxClass": "merchandise"}
-    g.sort(key=lambda x: (last_sold.get(x["upc"], ""), x["price"]), reverse=True)
-    keep = g[0]
-    barcodes = []
     for x in g:
-        for c in x["codes"]:
-            if c not in used_codes:
-                used_codes.add(c); barcodes.append(c)
-    if not barcodes:
-        continue   # every code already on another item
-    items.append({"id": "ilsa-" + keep["upc"], "name": keep["name"], "price": keep["price"],
-                  "taxClass": "merchandise" if keep["tax"] == "1" else "none", "family": cid, "barcodes": barcodes})
-    if keep["age"] not in ("", "0"):
-        tobacco_cats.add(cname)
+        barcodes = [c for c in x["codes"] if c not in used]
+        clashes += len(x["codes"]) - len(barcodes)
+        used.update(barcodes)
+        items.append({"id": "ilsa-" + x["upc"], "name": x["name"], "price": x["price"],
+                      "taxClass": "merchandise" if x["tax"] == "1" else "none", "family": cid, "barcodes": barcodes})
+        if x["age"] not in ("", "0"):
+            tobacco_cats.add(cname)
+        if x["upc"].startswith(INHOUSE):
+            makers = [y["upc"] for y in g if not y["upc"].startswith(INHOUSE)]
+            inhouse.append([x["upc"], cname, x["name"], f"{x['price']:.2f}", last_sold.get(x["upc"], "never"),
+                            " ".join(makers), "candidate to free" if makers else ""])
     if len(g) > 1:
-        prices = sorted({x["price"] for x in g})
-        merges.append([cname, keep["name"], len(g), " ".join(x["upc"] for x in g), keep["upc"],
-                       f"{keep['price']:.2f}", " / ".join(f"{p:.2f}" for p in prices),
-                       "PRICES DIFFER" if len(prices) > 1 else "", last_sold.get(keep["upc"], "")])
+        g = sorted(g, key=lambda x: last_sold.get(x["upc"], ""), reverse=True)
+        dups.append([cname, g[0]["name"], len(g)] + [f"{x['upc']} ${x['price']:.2f} last sold {last_sold.get(x['upc'], 'never')}" for x in g])
 
 os.makedirs(OUT, exist_ok=True)
+man = os.path.join(BOOK, "manifest.txt")
 book = {"format": "viewtouch-menu", "version": 1, "store": "ILSA price book",
-        "exported": open(os.path.join(BOOK, "manifest.txt")).read().split("\n")[0].replace("exported=", "") if os.path.exists(os.path.join(BOOK, "manifest.txt")) else "",
+        "exported": open(man).readline().strip().replace("exported=", "") if os.path.exists(man) else "",
         "categories": sorted(cats.values(), key=lambda c: c["name"]), "choiceGroups": [], "items": items, "pictures": {}}
 with open(os.path.join(OUT, "viewtouch-menu.json"), "w") as f:
     json.dump(book, f)
-with open(os.path.join(OUT, "merges.csv"), "w", newline="") as f:
+with open(os.path.join(OUT, "possible-duplicates.csv"), "w", newline="") as f:
     w = csv.writer(f)
-    w.writerow(["Department", "Name kept", "ILSA items", "UPCs", "Price from UPC", "Price", "All prices", "Check", "Last sold"])
-    w.writerows(sorted(merges))
+    w.writerow(["Department", "Name", "ILSA items", "Item 1 (most recent sale)", "Item 2", "Item 3", "More..."])
+    w.writerows(sorted(dups))
+with open(os.path.join(OUT, "inhouse-upcs.csv"), "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["In-house UPC", "Department", "Name", "Price", "Last sold", "Same-name items with a maker's UPC", "Note"])
+    w.writerows(sorted(inhouse, key=lambda r: (r[6] == "", r[4])))
 by_cat = Counter(i["family"] for i in items)
 lines = [f"ILSA items read: {sum(len(g) for g in groups.values()) + sum(skipped.values())}; left out: {dict(skipped)}",
-         f"ViewTouch items: {len(items)} in {len(cats)} categories; barcodes {sum(len(i['barcodes']) for i in items)}",
-         f"Same-name items merged: {len(merges)} groups ({sum(m[2] for m in merges)} ILSA items); with different prices: {sum(1 for m in merges if m[7])}",
+         f"ViewTouch items: {len(items)} in {len(cats)} categories (nothing merged); barcodes {sum(len(i['barcodes']) for i in items)}"
+         + (f"; {clashes} codes were on two ILSA items and kept on the first only" if clashes else ""),
+         f"Same name in the same department (for your review): {len(dups)} groups, {sum(r[2] for r in dups)} items",
+         f"In-house UPCs ({INHOUSE}...): {len(inhouse)} items; {sum(1 for r in inhouse if r[6])} have a same-name item with a maker's UPC (candidates to free); {sum(1 for r in inhouse if r[4] == 'never')} never sold",
          f"Departments with ID-check (age) items: {', '.join(sorted(tobacco_cats)) or 'none'}",
          "Items per category:"] + [f"  {cats[c]['name']}: {n}" for c, n in sorted(by_cat.items(), key=lambda kv: -kv[1])]
 open(os.path.join(OUT, "summary.txt"), "w").write("\n".join(lines) + "\n")
 print("\n".join(lines))
-print(f"\nWrote {OUT}/viewtouch-menu.json (Menu Builder > Import a menu) and {OUT}/merges.csv")
+print(f"\nWrote {OUT}/viewtouch-menu.json (not imported yet), possible-duplicates.csv, inhouse-upcs.csv")
