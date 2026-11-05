@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 13:23 ET — Bob (Claude) — vt-start: start ViewTouch with the guest screen, no rebuild
+- **What:** New scripts/bin/vt-start: stops ViewTouch politely if running, puts the monitors side by side again (~/.config/vt-guest-display.sh), and starts the existing build with --serve and --customer-display (from ~/.vt-customer-display) and the site's scanner, like vt-server but without building. For the Pi's desktop shortcut and after reboots.
+- **Why:** Owner 2026-11-05: guest screen not coming up after a reboot; the packaging .desktop (Exec=vtmodern) starts ViewTouch without the customer display; the update is on hold, so restarting must not rebuild from the newer code.
+- **Files:** `scripts/bin/vt-start`
+
 ### 2026-11-05 12:28 ET — Bob (Claude) — ILSA: files not used (PosReceipts is the 7-day reprint store)
 - **What:** Backlog (ILSA import): ilsa.mdb empty, Copy of ILSA.mdb a subset, PosReceipts.mdb is ILSA's last-7-days reprint store (card PAN column, never imported).
 - **Why:** Owner 2026-11-05.

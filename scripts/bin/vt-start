@@ -1,0 +1,21 @@
+#!/bin/bash
+# Starts ViewTouch the way vt-server does (the store server, the customer display on the second
+# monitor when it's on, this site's scanner) but WITHOUT rebuilding: it runs the build already
+# there. For the desktop shortcut and after a reboot. vt-server = rebuild from the code + restart.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+BIN="$VT_REPO/modern/build/vtmodern"
+[ -x "$BIN" ] || BIN=/usr/local/bin/vtmodern
+if pgrep -x vtmodern >/dev/null; then
+    pkill -TERM -x vtmodern 2>/dev/null || true
+    for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
+    pkill -KILL -x vtmodern 2>/dev/null || true
+fi
+GUEST="${VT_CUSTOMER_DISPLAY:-$(cat "$HOME/.vt-customer-display" 2>/dev/null)}"
+EXTRA=()
+[ -n "$GUEST" ] && [ "$GUEST" != off ] && EXTRA=(--customer-display "$GUEST")
+[ -n "$SERIAL_SCANNER" ] && export VT_SERIAL_SCANNER="$SERIAL_SCANNER"
+export VT_SERIAL_SCANNER_BAUD="$SERIAL_SCANNER_BAUD"
+# The monitors side by side again (vt-guest-display saved how), in case the desktop came up mirrored.
+[ -n "$GUEST" ] && [ "$GUEST" != off ] && [ -x "$HOME/.config/vt-guest-display.sh" ] && "$HOME/.config/vt-guest-display.sh" >/dev/null 2>&1
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$BIN" --serve "${EXTRA[@]}" >/dev/null 2>&1 &
+echo "ViewTouch started (no rebuild).${GUEST:+ Customer display: $GUEST.}"
