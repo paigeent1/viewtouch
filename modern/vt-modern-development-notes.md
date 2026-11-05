@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 18:54 ET — Bob (Claude) — vt-ilsa-items: UPCs as scanners send them (leading 0 restored)
+- **What:** ILSA stores codes as numbers, so a UPC-A's leading 0 is dropped (016165009116 -> 16165009116) and a scanned code wouldn't match. Each 11-digit code also gets its 12-digit form ('0' + code); a 13-digit code starting with 0 also gets its 12-digit form. The code as ILSA has it stays first.
+- **Why:** Owner 2026-11-05: Zen tubes (UPC 0 16165 00911 6) found by lookup but a Bluetooth scan said not on file.
+- **Files:** `scripts/bin/vt-ilsa-items`
+
 ### 2026-11-05 18:42 ET — Bob (Claude) — Hardware Configuration: Bluetooth scanner button; reboot after Close ViewTouch returns to ViewTouch
 - **What:** New button 'Bluetooth scanner' on Hardware Configuration (given once to edited pages via givenZones) -> command openBluetooth: on a tablet, Kiosk.openBluetooth lets com.android.settings / com.android.bluetooth run in the pinned task and opens Android's Bluetooth settings (Back returns; Kiosk.apply pins ViewTouch alone again when it comes to the front); on the Pi a note to use the Bluetooth icon. Kiosk.boot now makes ViewTouch the home screen again before starting it, so a reboot after Manager > Close ViewTouch comes back to ViewTouch.
 - **Why:** Owner 2026-11-05: pairing an MS912+ on Bar 3 hit error 101 (lock task) and, after Close ViewTouch, the reboot stayed on Android's home screen; he asked for a Bluetooth button on the Hardware Configuration page.

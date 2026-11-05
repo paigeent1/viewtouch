@@ -74,7 +74,14 @@ for r in rows(BOOK, "PLU"):
         skipped[RETIRED[d]] += 1; continue
     name = clean(r.get("PLU_DESC")) or clean(r.get("POS_DESC")) or f"ITEM {upc}"
     flag = clean(r.get("POS_FLAG_NAME")).upper()
-    codes = [upc] + [c for c in (code(r.get("Alt_PLUNum")), code(r.get("UPC_E"))) if c and c != upc]
+    codes = []
+    for c in [upc, code(r.get("Alt_PLUNum")), code(r.get("UPC_E"))]:
+        # ILSA keeps codes as numbers, so a UPC's leading 0 is lost (016165009116 -> 16165009116):
+        # the item also gets the code as scanners send it (12-digit UPC-A, and 13-digit EAN for those).
+        for v in ([c, "0" + c] if c.isdigit() and len(c) == 11 else
+                  [c, c[1:]] if c.isdigit() and len(c) == 13 and c.startswith("0") else [c]):
+            if v and v not in codes:
+                codes.append(v)
     groups[(d, name.upper())].append({"upc": upc, "codes": codes, "name": name, "price": num(r.get("LAST_PRICE")),
                                       "tax": taxgroup.get(flag, "1"), "age": agereq.get(flag, "0")})
 
