@@ -111,6 +111,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 16:25 ET — Bob (Claude) — Test: 33,000-item catalog speed
+- **What:** tests/test_stress.cpp 'Big catalog' [catalog]: imports 33,000 retail items with two barcodes each through importMenuFile (the ILSA path), then times the item list (and its JSON size, what the tablets receive), a barcode scan the way LayoutController::scanned looks it up, saving the whole store and loading it back; prints [catalog] timings.
+- **Why:** Before importing the ILSA price book (33,552 items) into the live beta: ViewTouch was built around restaurant-size menus.
+- **Files:** `modern/tests/test_stress.cpp`
+
 ### 2026-11-05 16:24 ET — Bob (Claude) — vt-ilsa-items: ILSA price book to a ViewTouch menu file
 - **What:** New scripts/bin/vt-ilsa-items [--history <ILSA export>]: from ~/ilsa-pricebook/latest builds ~/ilsa-items/viewtouch-menu.json (format viewtouch-menu, for Menu Builder > Import a menu): every item except lottery (ACTIVE ignored), one category per ILSA department (ilsa-<dept>), tax from the POS flag's tax group (1 merchandise, else none), barcodes = PLU_NUM + Alt_PLUNum + UPC_E; same name in the same department = one item with every UPC, price from the UPC sold most recently (else the highest); merges.csv lists each merge (PRICES DIFFER flagged); summary.txt counts and the departments holding ID-check items. No on-hand. Not imported yet: ViewTouch was built around restaurant-size menus, so 33,000 items gets a speed test first (menu sync to tablets, scans, saves).
 - **Why:** Owner 2026-11-05: import all ILSA items into ViewTouch and run alongside ILSA.
