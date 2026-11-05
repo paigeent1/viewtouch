@@ -2032,6 +2032,24 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 
     // Close ViewTouch: a manager's way off a kiosk screen (it then stays
     // closed until the next boot; see vtmodern-kiosk.service).
+    // Hardware Configuration -> Bluetooth: pair a Bluetooth scanner (a tablet: Android's Bluetooth screen,
+    // kept inside the kiosk; the Pi: its own Bluetooth icon).
+    if (name == u"openBluetooth") {
+#ifdef Q_OS_ANDROID
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        if (!activity.isValid())
+            return done(false);
+        QJniObject::callStaticMethod<void>("org/viewtouch/pos/Kiosk", "openBluetooth", "(Landroid/app/Activity;)V",
+                                           activity.object<jobject>());
+        setStatus(tr("Pair the scanner, then press Back to return to ViewTouch."));
+        return done(true);
+#else
+        setStatus(tr("On the Pi: the Bluetooth icon at the top right of the screen pairs a scanner. "
+                     "To pair one with a tablet, press Bluetooth on that tablet. USB scanners need no setup."));
+        return done(true);
+#endif
+    }
+
     if (name == u"scanCamera" || name == u"scanCameraId" || name == u"scanCameraField") {
         cameraToField_ = name == u"scanCameraField";
 #ifdef Q_OS_ANDROID
@@ -2474,6 +2492,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"removePayment"_s, QT_TR_NOOP("Takes off the touched payment.")},
             {u"noSale"_s, QT_TR_NOOP("Opens the cash drawer without a sale (it's recorded).")},
             {u"xReport"_s, QT_TR_NOOP("Prints an X report: today's sales and drawers so far, nothing closed or reset.")},
+            {u"openBluetooth"_s, QT_TR_NOOP("Pairs a Bluetooth scanner: on a tablet, opens Android's Bluetooth screen without leaving ViewTouch.")},
             {u"logout"_s, QT_TR_NOOP("Logs you out. Your open check opens again when you log back in.")},
             {u"clockIn"_s, QT_TR_NOOP("Starts your shift.")},
             {u"clockOut"_s, QT_TR_NOOP("Ends your shift.")},

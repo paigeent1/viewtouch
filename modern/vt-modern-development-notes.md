@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 18:42 ET — Bob (Claude) — Hardware Configuration: Bluetooth scanner button; reboot after Close ViewTouch returns to ViewTouch
+- **What:** New button 'Bluetooth scanner' on Hardware Configuration (given once to edited pages via givenZones) -> command openBluetooth: on a tablet, Kiosk.openBluetooth lets com.android.settings / com.android.bluetooth run in the pinned task and opens Android's Bluetooth settings (Back returns; Kiosk.apply pins ViewTouch alone again when it comes to the front); on the Pi a note to use the Bluetooth icon. Kiosk.boot now makes ViewTouch the home screen again before starting it, so a reboot after Manager > Close ViewTouch comes back to ViewTouch.
+- **Why:** Owner 2026-11-05: pairing an MS912+ on Bar 3 hit error 101 (lock task) and, after Close ViewTouch, the reboot stayed on Android's home screen; he asked for a Bluetooth button on the Hardware Configuration page.
+- **Files:** `modern/android/src/org/viewtouch/pos/Kiosk.kt, modern/ui/cpp/layoutcontroller.cpp, modern/seed/pages/hardware-config.json, modern/main.cpp`
+
 ### 2026-11-05 18:41 ET — Bob (Claude) — Notes: tablet Bluetooth pairing and Close ViewTouch reboot gap
 - **What:** Backlog: error 101 opening Bluetooth settings under lock task; Close ViewTouch then reboot doesn't return to ViewTouch; fixes planned for the next APK.
 - **Why:** Owner pairing an MS912+ on Bar 3, 2026-11-05.

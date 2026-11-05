@@ -15,6 +15,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.UserManager
+import android.provider.Settings
 
 // A tablet only for ViewTouch, like the store's register: ViewTouch is the
 // tablet's home screen (it starts when the tablet turns on), pinned (no
@@ -71,6 +72,24 @@ object Kiosk {
             activity.startLockTask()
         } catch (e: IllegalArgumentException) {
             // Not allowed yet (just set up): the next time it comes to the front.
+        }
+    }
+
+    // Hardware Configuration -> Bluetooth: Android's Bluetooth screen (pair a scanner) without leaving
+    // the kiosk: Settings may run in the pinned task until ViewTouch comes back to the front (apply()
+    // sets the pinned apps back to ViewTouch alone). Back returns to ViewTouch.
+    @JvmStatic
+    fun openBluetooth(activity: Activity) {
+        policy(activity)?.let { dpm ->
+            try {
+                dpm.setLockTaskPackages(admin(activity),
+                    arrayOf(activity.packageName, "com.android.settings", "com.android.bluetooth"))
+            } catch (e: Exception) {
+            }
+        }
+        try {
+            activity.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+        } catch (e: Exception) {
         }
     }
 
@@ -171,8 +190,17 @@ object Kiosk {
     // The tablet started: ViewTouch again.
     fun boot(context: Context) {
         ensureWirelessAdb(context)
-        if (policy(context) == null)
-            return
+        val dpm = policy(context) ?: return
+        // ViewTouch as the home screen again (Close ViewTouch turned that off): Android may not let a
+        // starting tablet open an app from here, but it always opens the home screen.
+        try {
+            setHome(context, true)
+            dpm.addPersistentPreferredActivity(admin(context), IntentFilter(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }, home(context))
+        } catch (e: Exception) {
+        }
         context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
             context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }

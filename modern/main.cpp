@@ -876,6 +876,7 @@ int runStore(const Args &cli, const Options &o)
             static const std::pair<const char16_t *, const char16_t *> givenZones[] = {
                 {u"hardware-config", u"vt-touch-map"},   // Learn guest touchscreen
                 {u"hardware-config", u"site-setup"},     // Site Setup
+                {u"hardware-config", u"bluetooth"},      // Bluetooth scanner (pair one with a tablet)
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {
