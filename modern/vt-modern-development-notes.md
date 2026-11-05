@@ -114,6 +114,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 18:15 ET — Bob (Claude) — Released the held Pi/tablet update
+- **What:** Owner released the hold. Going out: camera Scan hides the keyboard first; bigger centered camera window, guide line in the middle; product camera scans stay open 20 s (ID 30 s); scripts (ILSA export/profile/tie-out/price book/items/tree, vt-start). Tablet APK built from this commit so the Pi and tablets carry the same build number.
+- **Why:** Owner 2026-11-05: build it.
+- **Files:** (none)
+
 ### 2026-11-05 18:12 ET — Bob (Claude) — Tablet camera scan stays open 20 seconds
 - **What:** BarcodeScanner.kt: product scans time out after 20 s (was 10 s); ID scans stay 30 s. It still closes at once on a read or Cancel.
 - **Why:** Owner 2026-11-05: 20 seconds, since there's a Cancel button.
