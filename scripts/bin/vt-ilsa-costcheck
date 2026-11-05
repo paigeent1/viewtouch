@@ -58,6 +58,24 @@ print("\n== Gross profit by year three ways (sales minus cost)")
 for y in sorted(Y):
     t = Y[y]; s = t["sales"] or 1
     print(f"  {y}: cost per unit x qty: GP {1 - t['cost x qty']/s:.1%} | avg cost x qty: GP {1 - t['avg x qty']/s:.1%} | cost as line total: GP {1 - t['cost (as line total)']/s:.1%}")
+print("\n== GP counted properly: lottery departments out, lines without a cost out (shown as their own sales)")
+LOTTERY = {"270", "275", "280", "300", "320", "340", "345", "360", "365", "370", "375", "377", "378", "379", "380", "400", "405", "420"}
+G = defaultdict(lambda: defaultdict(float)); nocost = defaultdict(lambda: defaultdict(float))
+for r in rows("PDetail"):
+    if (r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE")) != ("1", "1"):
+        continue
+    y = year(r.get("TIME_STAMP")); dept = (r.get("DEPT") or "").strip()
+    amt, qty, cost = num(r.get("DETAIL_LINE_AMT")), num(r.get("DETAIL_FOR_QTY")), num(r.get("ITEM_COST"))
+    if dept in LOTTERY:
+        G[y]["lottery sales"] += amt; continue
+    if cost == 0:
+        G[y]["no-cost sales"] += amt; nocost[y][dept] += amt; continue
+    G[y]["sales"] += amt; G[y]["cost"] += cost * qty
+for y in sorted(G):
+    g = G[y]; s = g["sales"] or 1
+    top = ", ".join(f"dept {d} ${a:,.0f}" for d, a in sorted(nocost[y].items(), key=lambda kv: -kv[1])[:4])
+    print(f"  {y}: GP {1 - g['cost']/s:.1%} on ${g['sales']:,.0f} | lottery ${g['lottery sales']:,.0f} | no cost ${g['no-cost sales']:,.0f} ({top})")
+
 print("\n== Example lines with quantity other than 1 (no item, no receipt)")
 for e in ex: print("  ", e)
 ia = defaultdict(lambda: [0, 0.0, 0.0])

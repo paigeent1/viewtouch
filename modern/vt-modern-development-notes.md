@@ -111,6 +111,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 16:18 ET — Bob (Claude) — vt-ilsa-costcheck: GP without lottery and no-cost lines
+- **What:** Result 2026-11-05: every ILSA sale line has unit price (DETAIL_ITEM_PRC), quantity (DETAIL_FOR_QTY) and unit cost at the time (ITEM_COST: 80-93% of lines to 2023, 100% from 2024); GP = 1 - sum(ITEM_COST*FOR_QTY)/sales = 29.6% (2014) .. 32-35%, matching ILSA's InvAdj 20 cost records; AVG_COST empty. Added a section: GP with lottery departments and lines without cost left out (their sales shown separately, with the top departments).
+- **Why:** Owner expects ~25% GP in older years rising to 30-32% recently; no-cost lines were counting as 100% margin.
+- **Files:** `scripts/bin/vt-ilsa-costcheck`
+
 ### 2026-11-05 16:07 ET — Bob (Claude) — vt-ilsa-costcheck; import all ILSA items, no on-hand
 - **What:** New scripts/bin/vt-ilsa-costcheck: per year, for item sale lines, how often price/quantity/cost fields are filled, how quantity is stored, GP three ways, and ILSA's InvAdj type 20 sale cost records. Notes: import all items, no quantities on hand.
 - **Why:** Owner 2026-11-05: import all items; wants sold price and GP on cost at the time.
