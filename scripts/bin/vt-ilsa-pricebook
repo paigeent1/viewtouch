@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Pulls the ILSA price book the ILSA computer sends (ViewTouch ILSA Sync -> Dropbox\\POS project\\
+ilsa-pricebook) to ~/ilsa-pricebook/latest, keeps the previous one, and reports: when it was sent,
+counts, how ILSA's two price fields agree, and what changed since the previous one.
+  vt-ilsa-pricebook          pull from Dropbox and report
+  vt-ilsa-pricebook --local  report on what's already here
+"""
+import csv, os, shutil, subprocess, sys
+from collections import Counter
+
+csv.field_size_limit(1 << 30)
+BASE = os.path.expanduser("~/ilsa-pricebook")
+LATEST, PREV, INCOMING = (os.path.join(BASE, d) for d in ("latest", "previous", "incoming"))
+os.makedirs(BASE, exist_ok=True)
+
+def manifest(d):
+    p = os.path.join(d, "manifest.txt")
+    return dict(l.strip().split("=", 1) for l in open(p, errors="replace") if "=" in l) if os.path.exists(p) else {}
+
+if "--local" not in sys.argv:
+    shutil.rmtree(INCOMING, ignore_errors=True)
+    r = subprocess.run(["rclone", "copy", "dropbox:POS project/ilsa-pricebook", INCOMING], capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(os.path.join(INCOMING, "PLU.csv")):
+        sys.exit("Couldn't get the price book from Dropbox (POS project/ilsa-pricebook). Has the ILSA computer sent it?\n" + r.stderr[-400:])
+    if manifest(INCOMING).get("exported") != manifest(LATEST).get("exported"):
+        shutil.rmtree(PREV, ignore_errors=True)
+        if os.path.isdir(LATEST):
+            os.rename(LATEST, PREV)
+        os.rename(INCOMING, LATEST)
+    else:
+        shutil.rmtree(INCOMING, ignore_errors=True)
+        print("(Same price book as last time.)")
+
+def rows(d, t):
+    p = os.path.join(d, t + ".csv")
+    if not os.path.exists(p): return
+    with open(p, newline="", encoding="utf-8-sig", errors="replace") as fh:
+        yield from csv.DictReader(fh)
+
+def num(s):
+    try: return round(float(s), 2)
+    except (TypeError, ValueError): return None
+
+m = manifest(LATEST)
+print(f"Price book sent {m.get('exported', '?')} from {m.get('computer', '?')} ({m.get('database', '?')})")
+print("  " + ", ".join(f"{k}={v}" for k, v in m.items() if k not in ("exported", "computer", "database")))
+
+def book(d):
+    prc = {}
+    for r in rows(d, "PRC_DATA"):
+        if (r.get("LEVEL") or "1") in ("1", "") and (r.get("ACTIVE") or "1") not in ("0", "False"):
+            prc.setdefault(r.get("PRC_NAME"), num(r.get("PRICE")))
+    items = {}
+    for r in rows(d, "PLU"):
+        u = (r.get("PLU_NUM") or "").strip()
+        if u:
+            items[u] = {"name": (r.get("POS_DESC") or r.get("PLU_DESC") or "").strip(), "active": r.get("ACTIVE"),
+                        "dept": r.get("DEPT_NUM"), "last": num(r.get("LAST_PRICE")), "prc": prc.get(r.get("PRC_NAME"))}
+    return items
+
+cur = book(LATEST)
+act = Counter("active" if (i["active"] or "1") not in ("0", "False") else "inactive" for i in cur.values())
+print(f"\nItems: {len(cur)} ({act['active']} active, {act['inactive']} inactive)")
+agree = Counter()
+for i in cur.values():
+    if i["prc"] is None: agree["no PRC_DATA price"] += 1
+    elif i["last"] == i["prc"]: agree["LAST_PRICE = PRC_DATA price"] += 1
+    else: agree["LAST_PRICE differs from PRC_DATA price"] += 1
+print("ILSA's two price fields:", dict(agree))
+
+if os.path.isdir(PREV):
+    old = book(PREV); pm = manifest(PREV)
+    new = [u for u in cur if u not in old]
+    gone = [u for u in old if u not in cur]
+    changed = [u for u in cur if u in old and (cur[u]["prc"], cur[u]["last"]) != (old[u]["prc"], old[u]["last"])]
+    print(f"\nSince {pm.get('exported', '?')}: {len(new)} new items, {len(changed)} price changes, {len(gone)} removed")
+    for u in new[:15]:
+        print(f"  NEW   {u}  {cur[u]['name']}  ${cur[u]['prc'] or cur[u]['last']}")
+    for u in changed[:25]:
+        print(f"  PRICE {u}  {cur[u]['name']}  ${old[u]['prc'] or old[u]['last']} -> ${cur[u]['prc'] or cur[u]['last']}")
+else:
+    print("\n(First price book: changes are listed from the next one on.)")

@@ -110,6 +110,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 14:48 ET — Bob (Claude) — ILSA price book sync: Windows 7 task every 15 min + Pi puller
+- **What:** New tools/ilsa-windows/ (Install_ViewTouch_ILSA_Sync.bat, ViewTouch_ILSA_Sync.ps1, ViewTouch_ILSA_Sync_hidden.vbs, README.txt): on the ILSA Windows 7 PC, reads ILSA read-only through the 32-bit Jet driver (PowerShell 2.0-safe), writes PLU, PRC_DATA, PRC_NAME, Inv_Info, Dept, Dept_Grp, Pos_Flag to CSV, and only when they changed copies them with a manifest to Dropbox\POS project\ilsa-pricebook; scheduled every 15 minutes (hidden window), first run sends the initial price book; settings in C:\ViewTouchSync\settings.txt (MDB=, DROPBOX=), log sync.log, last_check.txt. New scripts/bin/vt-ilsa-pricebook (Pi): pulls it with rclone to ~/ilsa-pricebook/latest (keeps previous), reports counts, whether PLU.LAST_PRICE agrees with PRC_DATA, and new items / price changes since the previous one. Replaces Neil's Push_ILSA_Label_Pricebook (last push 2026-11-03 08:41; nothing pulled on the Pi since 11-03).
+- **Why:** Owner 2026-11-05: wants his own batch on the ILSA Win7 box running every 15 minutes with changes, and to send the initial price book now.
+- **Files:** `tools/ilsa-windows/*, scripts/bin/vt-ilsa-pricebook`
+- **Next person must know:** Then: import the price book into ViewTouch items (dup names merged into alt UPCs) and a Pi schedule that syncs changes into ViewTouch and refreshes the Labels price book.
+
 ### 2026-11-05 14:27 ET — Bob (Claude) — ILSA: keep the completed history, merge the latest copy at import
 - **What:** Backlog: build ~/ilsa-history/ilsa-history.db from the three source files now; at cutover merge the owner's latest ILSA copy (its days replace stored days), then import into ViewTouch.
 - **Why:** Owner 2026-11-05.
