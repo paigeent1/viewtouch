@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""ILSA's item tree for review: department group > department > manufacturer > product group >
+sub group, with item counts and sales since 2024, plus things that look off (blank manufacturers,
+manufacturer spellings that look alike, departments or groups with nothing sold, brands spread over
+several departments). Item names, codes and setup only.
+  vt-ilsa-tree [--history ~/ilsa-export/"copy bhdan 10-29-2026"] > ~/ilsa-tree.txt
+"""
+import csv, difflib, os, re, sys
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+BOOK = os.path.expanduser("~/ilsa-pricebook/latest")
+
+def rows(d, t):
+    for f in os.listdir(d):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(d, f), newline="", encoding="utf-8-sig", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+def clean(s): return re.sub(r"\s+", " ", (s or "").strip())
+def code(s):
+    s = (s or "").strip()
+    return s[:-2] if s.endswith(".0") and s[:-2].isdigit() else s
+def num(s):
+    try: return float((s or "").replace("$", "").replace(",", ""))
+    except ValueError: return 0.0
+
+sold = Counter(); sold_amt = Counter()
+if "--history" in sys.argv:
+    h = sys.argv[sys.argv.index("--history") + 1]
+    US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+    for r in rows(h, "PDetail"):
+        if (r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE")) != ("1", "1"):
+            continue
+        m = US.match((r.get("TIME_STAMP") or "").strip())
+        y = int(m.group(3)) if m else 0
+        y = y + (2000 if y < 70 else 1900) if 0 < y < 100 else y
+        if y >= 2024:
+            u = code(r.get("PLU")); sold[u] += num(r.get("DETAIL_FOR_QTY")); sold_amt[u] += num(r.get("DETAIL_LINE_AMT"))
+
+dept = {code(r.get("DEPT_NUM")): (clean(r.get("DEPT_NAME")), code(r.get("DEPT_GROUP"))) for r in rows(BOOK, "Dept")}
+grp = {code(r.get("DEPT_GROUP")): clean(r.get("DEPT_GRP_NAME")) for r in rows(BOOK, "Dept_Grp")}
+tree = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(Counter))))
+mfg_depts = defaultdict(set); mfg_count = Counter(); blank_mfg = Counter()
+for r in rows(BOOK, "PLU"):
+    u = code(r.get("PLU_NUM")); d = code(r.get("DEPT_NUM"))
+    dn, g = dept.get(d, (f"DEPT {d}", "?"))
+    mfg = clean(r.get("MANUF")).upper() or "(blank)"
+    pg = clean(r.get("PROD_GRP")).upper() or "(blank)"
+    sg = clean(r.get("SUBGROUP")).upper() or "(blank)"
+    c = tree[f"{g} {grp.get(g, '?')}"][f"{d} {dn}"][mfg][pg]
+    c["items"] += 1; c["sold items"] += 1 if sold[u] else 0; c["units"] += sold[u]; c["$"] += sold_amt[u]
+    c["subgroups:" + sg] += 1
+    mfg_depts[mfg].add(dn); mfg_count[mfg] += 1
+    if mfg == "(blank)": blank_mfg[dn] += 1
+
+print("ILSA item tree: group > department > manufacturer (items, items sold since 2024, $ since 2024)")
+for g in sorted(tree, key=lambda x: int(x.split()[0]) if x.split()[0].isdigit() else 999):
+    gi = sum(c["items"] for d in tree[g].values() for m in d.values() for c in m.values())
+    print(f"\n# GROUP {g}: {gi} items")
+    for d in sorted(tree[g], key=lambda x: int(x.split()[0]) if x.split()[0].isdigit() else 999):
+        di = sum(c["items"] for m in tree[g][d].values() for c in m.values())
+        ds = sum(c["sold items"] for m in tree[g][d].values() for c in m.values())
+        da = sum(c["$"] for m in tree[g][d].values() for c in m.values())
+        print(f"  DEPT {d}: {di} items, {ds} sold since 2024, ${da:,.0f}")
+        mf = sorted(tree[g][d].items(), key=lambda kv: -sum(c["$"] for c in kv[1].values()))
+        for mfg, pgs in mf[:12]:
+            mi = sum(c["items"] for c in pgs.values()); ms = sum(c["sold items"] for c in pgs.values()); ma = sum(c["$"] for c in pgs.values())
+            top = ", ".join(f"{p} ({c['items']})" for p, c in sorted(pgs.items(), key=lambda kv: -kv[1]["$"])[:5])
+            print(f"    {mfg}: {mi} items, {ms} sold, ${ma:,.0f} | product groups: {len(pgs)}: {top}")
+        if len(mf) > 12:
+            print(f"    ... {len(mf) - 12} more manufacturers")
+
+print("\n== Things to look at")
+print("Blank manufacturer, by department:", dict(blank_mfg.most_common()))
+names = [m for m in mfg_count if m != "(blank)"]
+seen = set()
+alike = []
+for m in sorted(names):
+    for o in difflib.get_close_matches(m, names, n=4, cutoff=0.82):
+        if o != m and (o, m) not in seen:
+            seen.add((m, o)); alike.append(f"{m} ({mfg_count[m]}) ~ {o} ({mfg_count[o]})")
+print(f"Manufacturer names that look alike ({len(alike)}):")
+for a in alike[:60]: print("  " + a)
+print("Manufacturers in 3+ departments:")
+for m, ds in sorted(mfg_depts.items(), key=lambda kv: -len(kv[1])):
+    if len(ds) >= 3 and m != "(blank)": print(f"  {m}: {', '.join(sorted(ds))}")
+print("\nDone. Attach ~/ilsa-tree.txt for Bob.")
