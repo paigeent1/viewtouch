@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Which store each ILSA export is (its store setup), and whether two exports agree on the days
+they both have (receipts and sales per day). Store setup and daily totals only.
+  vt-ilsa-compare ~/ilsa-export/<A> ~/ilsa-export/<B> [more...]
+"""
+import csv, os, re, sys
+from collections import defaultdict
+
+csv.field_size_limit(1 << 30)
+dirs = [d for d in sys.argv[1:] if os.path.isdir(d)]
+if len(dirs) < 1:
+    sys.exit("Usage: vt-ilsa-compare <export folder> [<export folder> ...]")
+
+def rows(d, t):
+    for f in os.listdir(d):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(d, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def day(s):
+    s = (s or "").strip()
+    if len(s) >= 10 and s[4] == "-": return s[:10]
+    m = US.match(s)
+    if not m: return ""
+    mo, d, y = m.groups(); y = int(y)
+    if y < 100: y += 2000 if y < 70 else 1900
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d}"
+
+daily = {}
+for d in dirs:
+    name = os.path.basename(d.rstrip("/"))
+    print(f"===== {name}")
+    for r in rows(d, "Sys_Pram"):
+        print(f"  store: {r.get('STORE_NAME')} | number {r.get('STORE_NUMBER')} | {r.get('CITY')}, {r.get('STATE')} | type {r.get('Store_Type')}")
+    t = defaultdict(lambda: [0, 0.0])
+    for r in rows(d, "RegSale"):
+        k = day(r.get("START_TIME") or r.get("END_TIME"))
+        if k:
+            t[k][0] += 1
+            try: t[k][1] += float(r.get("SALE_TOTAL") or 0)
+            except ValueError: pass
+    daily[name] = t
+    if t: print(f"  {len(t)} days, {min(t)}..{max(t)}")
+
+names = list(daily)
+for i, a in enumerate(names):
+    for b in names[i + 1:]:
+        both = sorted(set(daily[a]) & set(daily[b]))
+        if not both:
+            print(f"\n{a} vs {b}: no days in common"); continue
+        same = [k for k in both if daily[a][k][0] == daily[b][k][0] and abs(daily[a][k][1] - daily[b][k][1]) < 0.015]
+        diff = [k for k in both if k not in same]
+        print(f"\n{a} vs {b}: {len(both)} days in common ({both[0]}..{both[-1]}): {len(same)} identical, {len(diff)} differ")
+        for k in diff[:15]:
+            print(f"  {k}: {daily[a][k][0]} receipts ${daily[a][k][1]:,.2f} vs {daily[b][k][0]} receipts ${daily[b][k][1]:,.2f}")
+print("\nDone. Paste everything above to Bob.")
