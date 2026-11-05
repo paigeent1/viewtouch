@@ -38,7 +38,7 @@ def rows(d, t):
         yield from csv.DictReader(fh)
 
 def num(s):
-    try: return round(float(s), 2)
+    try: return round(float((s or "").replace("$", "").replace(",", "").strip()), 2)
     except (TypeError, ValueError): return None
 
 m = manifest(LATEST)

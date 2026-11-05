@@ -44,25 +44,41 @@ $tables = @("PLU", "PRC_DATA", "PRC_NAME", "Inv_Info", "Dept", "Dept_Grp", "Pos_
 $conn = New-Object System.Data.OleDb.OleDbConnection("Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$mdb;Mode=Share Deny None;")
 try { $conn.Open() } catch { Log "ERROR: can't open $mdb : $_"; exit 3 }
 
-function Cell($v) {
-    if ($v -eq $null -or $v -is [System.DBNull]) { return '""' }
-    if ($v -is [DateTime]) { $s = $v.ToString("yyyy-MM-dd HH:mm:ss") } else { $s = $v.ToString() }
-    return '"' + $s.Replace('"', '""').Replace("`r", " ").Replace("`n", " ") + '"'
-}
-
 $tmp = Join-Path $Root "tmp"
+if (Test-Path $tmp) { Remove-Item (Join-Path $tmp "*") -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 $counts = @()
 foreach ($t in $tables) {
+    # Fast: the Access driver writes the CSV itself (seconds, not minutes).
+    $cmd = $conn.CreateCommand()
+    $cmd.CommandText = "SELECT * INTO [Text;HDR=Yes;DATABASE=$tmp].[$t#csv] FROM [$t]"
+    try {
+        $n = $cmd.ExecuteNonQuery()
+        $counts += "$t=$n"
+        continue
+    } catch {
+        Log "note: fast export of $t failed ($_); using the slow way"
+        Remove-Item (Join-Path $tmp "$t.csv") -Force -ErrorAction SilentlyContinue
+    }
+    # Slow way (only if the fast one isn't available): row by row.
     $cmd = $conn.CreateCommand(); $cmd.CommandText = "SELECT * FROM [$t]"
     try { $rd = $cmd.ExecuteReader() } catch { Log "note: table $t not readable ($_)"; continue }
     $w = New-Object System.IO.StreamWriter((Join-Path $tmp "$t.csv"), $false, (New-Object System.Text.UTF8Encoding($false)))
-    $names = @(); for ($i = 0; $i -lt $rd.FieldCount; $i++) { $names += '"' + $rd.GetName($i) + '"' }
+    $fc = $rd.FieldCount
+    $names = New-Object 'string[]' $fc
+    for ($i = 0; $i -lt $fc; $i++) { $names[$i] = '"' + $rd.GetName($i) + '"' }
     $w.WriteLine([string]::Join(",", $names))
+    $vals = New-Object 'object[]' $fc
+    $cells = New-Object 'string[]' $fc
     $n = 0
     while ($rd.Read()) {
-        $cells = New-Object 'string[]' $rd.FieldCount
-        for ($i = 0; $i -lt $rd.FieldCount; $i++) { $cells[$i] = Cell $rd.GetValue($i) }
+        [void]$rd.GetValues($vals)
+        for ($i = 0; $i -lt $fc; $i++) {
+            $v = $vals[$i]
+            if ($v -is [System.DBNull]) { $cells[$i] = '""' }
+            elseif ($v -is [DateTime]) { $cells[$i] = '"' + $v.ToString("yyyy-MM-dd HH:mm:ss") + '"' }
+            else { $cells[$i] = '"' + $v.ToString().Replace('"', '""') + '"' }
+        }
         $w.WriteLine([string]::Join(",", $cells)); $n++
     }
     $rd.Close(); $w.Close()

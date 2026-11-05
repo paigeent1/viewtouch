@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 15:16 ET — Bob (Claude) — ILSA sync: fast export (Access writes the CSVs)
+- **What:** ViewTouch_ILSA_Sync.ps1: each table is exported with Jet's own text driver (SELECT * INTO [Text;HDR=Yes;DATABASE=C:\ViewTouchSync\tmp].[T#csv]), seconds instead of minutes; the row-by-row way stays only as a fallback, without a function call per value. vt-ilsa-pricebook reads prices written with $ or commas.
+- **Why:** Owner 2026-11-05: the first run sat on step 1 for 17+ minutes on the Samsung Slate (PowerShell 2.0 building ~3 million values one by one), and it would have repeated every 15 minutes.
+- **Files:** `tools/ilsa-windows/ViewTouch_ILSA_Sync.ps1, scripts/bin/vt-ilsa-pricebook`
+
 ### 2026-11-05 14:53 ET — Bob (Claude) — ILSA sync: database is C:\ilsa\data\ilsacorp.mdb
 - **What:** tools/ilsa-windows: the installer writes MDB=C:\ilsa\data\ilsacorp.mdb to settings.txt and the script tries it first.
 - **Why:** Owner 2026-11-05: that's the ILSA database to read on the ILSA Windows 7 computer.
