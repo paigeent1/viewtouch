@@ -110,6 +110,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 12:24 ET — Bob (Claude) — vt-ilsa-range: quick date range of an ILSA export
+- **What:** New scripts/bin/vt-ilsa-range <export folder>: receipts by year (count, sales, first and last day) from RegSale only, for quickly checking which period each ILSA copy covers.
+- **Why:** Owner 2026-11-05: check every .mdb in the Pi's Downloads for more history.
+- **Files:** `scripts/bin/vt-ilsa-range`
+
 ### 2026-11-05 11:58 ET — Bob (Claude) — ILSA: ILSA - Copy.mdb covers 2008-11..2013-07
 - **What:** Backlog (ILSA import): ILSA - Copy.mdb holds 2008-11-06..2013-07-23 (a superset of Copy of ILSA.mdb); gap now 2013-07-24..2014-03-20.
 - **Why:** Owner's check 2026-11-05.

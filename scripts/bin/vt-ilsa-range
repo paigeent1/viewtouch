@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Quick look at an ILSA export: receipts by year (count, sales, first and last day) from RegSale only.
+  vt-ilsa-range ~/ilsa-export/<database name>
+"""
+import csv, os, re, sys
+from collections import defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+p = next((os.path.join(D, f) for f in (os.listdir(D) if os.path.isdir(D) else []) if f.lower() == "regsale.csv"), None)
+if not p:
+    sys.exit(f"  no receipts table in {D}")
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def day(s):
+    s = (s or "").strip()
+    if len(s) >= 10 and s[4] == "-": return s[:10]
+    m = US.match(s)
+    if not m: return ""
+    mo, d, y = m.groups(); y = int(y)
+    if y < 100: y += 2000 if y < 70 else 1900
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d}"
+n, amt, first, last = defaultdict(int), defaultdict(float), {}, {}
+with open(p, newline="", errors="replace") as fh:
+    for r in csv.DictReader(fh):
+        d = day(r.get("START_TIME") or r.get("END_TIME"))
+        y = d[:4] or "?"
+        n[y] += 1
+        try: amt[y] += float(r.get("SALE_TOTAL") or 0)
+        except ValueError: pass
+        if d:
+            first[y] = min(first.get(y, d), d); last[y] = max(last.get(y, d), d)
+if not n:
+    print("  no receipts")
+for y in sorted(n):
+    print(f"  {y}: {n[y]} receipts, ${amt[y]:,.2f}, {first.get(y, '?')}..{last.get(y, '?')}")
