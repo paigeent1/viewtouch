@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Does ILSA's history hold what each item sold for and its cost at the time? Per year, for the item
+sale lines on receipts (PDetail 1/1): how often the price, quantity and cost fields are filled, how the
+quantity is stored, and the gross profit they give; plus ILSA's sale cost records (InvAdj type 20).
+Counts and dollars only.   vt-ilsa-costcheck ~/ilsa-export/<database name>
+"""
+import csv, os, re, sys
+from collections import defaultdict
+
+csv.field_size_limit(1 << 30)
+D = sys.argv[1] if len(sys.argv) > 1 else ""
+if not os.path.isdir(D):
+    sys.exit("Usage: vt-ilsa-costcheck ~/ilsa-export/<database name>")
+
+def rows(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(D, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+
+def num(s):
+    try: return float((s or "").replace("$", "").replace(",", ""))
+    except ValueError: return 0.0
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def year(s):
+    s = (s or "").strip()
+    if len(s) >= 4 and s[:4].isdigit(): return s[:4]
+    m = US.match(s)
+    if not m: return "?"
+    y = int(m.group(3)); return str(y + (2000 if y < 70 else 1900) if y < 100 else y)
+
+Y = defaultdict(lambda: defaultdict(float))
+ex = []
+for r in rows("PDetail"):
+    if (r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE")) != ("1", "1"):
+        continue
+    y = year(r.get("TIME_STAMP")); t = Y[y]
+    prc, amt = num(r.get("DETAIL_ITEM_PRC")), num(r.get("DETAIL_LINE_AMT"))
+    at, fq = num(r.get("DETAIL_AT_QTY")), num(r.get("DETAIL_FOR_QTY"))
+    cost, avg = num(r.get("ITEM_COST")), num(r.get("AVG_COST"))
+    qty = amt / prc if prc else 0.0
+    t["lines"] += 1; t["sales"] += amt
+    t["price filled"] += prc != 0; t["cost filled"] += cost != 0; t["avg cost filled"] += avg != 0
+    t["AT_QTY filled"] += at != 0; t["FOR_QTY filled"] += fq != 0
+    t["qty = amt/price is whole"] += prc != 0 and abs(qty - round(qty)) < 0.001
+    t["cost x qty"] += cost * qty; t["avg x qty"] += avg * qty; t["cost (as line total)"] += cost
+    if len(ex) < 6 and cost and prc and abs(qty - 1) > 0.01:
+        ex.append({k: r.get(k) for k in ("DETAIL_ITEM_PRC", "DETAIL_LINE_AMT", "DETAIL_AT_QTY", "DETAIL_FOR_QTY", "ITEM_COST", "AVG_COST", "CUR_PRC")})
+print("== Item sale lines by year: how often each field is filled")
+for y in sorted(Y):
+    t = Y[y]; n = t["lines"] or 1
+    print(f"  {y}: {int(t['lines'])} lines, sales ${t['sales']:,.2f} | price {t['price filled']/n:.0%}, cost {t['cost filled']/n:.0%},"
+          f" avg cost {t['avg cost filled']/n:.0%}, AT_QTY {t['AT_QTY filled']/n:.0%}, FOR_QTY {t['FOR_QTY filled']/n:.0%},"
+          f" whole qty {t['qty = amt/price is whole']/n:.0%}")
+print("\n== Gross profit by year three ways (sales minus cost)")
+for y in sorted(Y):
+    t = Y[y]; s = t["sales"] or 1
+    print(f"  {y}: cost per unit x qty: GP {1 - t['cost x qty']/s:.1%} | avg cost x qty: GP {1 - t['avg x qty']/s:.1%} | cost as line total: GP {1 - t['cost (as line total)']/s:.1%}")
+print("\n== Example lines with quantity other than 1 (no item, no receipt)")
+for e in ex: print("  ", e)
+ia = defaultdict(lambda: [0, 0.0, 0.0])
+for r in rows("InvAdj"):
+    if r.get("REC_TYPE") == "20":
+        a = ia[year(r.get("TIME_STAMP"))]; a[0] += 1; a[1] += num(r.get("QTY")); a[2] += num(r.get("TOTAL_COST"))
+print("\n== ILSA sale cost records (InvAdj type 20) by year: rows, units, total cost")
+for y in sorted(ia):
+    n, q, c = ia[y]; print(f"  {y}: {n} rows, {q:,.0f} units, cost ${c:,.2f}" + (f", vs sales GP {1 - c/Y[y]['sales']:.1%}" if Y[y]['sales'] else ""))
+print("\nDone. Paste everything above to Bob.")
