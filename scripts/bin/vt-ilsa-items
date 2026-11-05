@@ -2,8 +2,8 @@
 """ILSA price book -> a ViewTouch menu file (Menu Builder > Import a menu), plus review reports.
   vt-ilsa-items [--history ~/ilsa-export/"copy bhdan 10-29-2026"]
 Reads ~/ilsa-pricebook/latest (what the ILSA computer sends). One ViewTouch item per ILSA item:
-NOTHING is merged (the owner decides merges himself). ILSA's ACTIVE flag is ignored; lottery is left
-out. One category per ILSA department. Tax: ILSA's POS flag (tax group 1 = merchandise, otherwise
+NOTHING is merged (the owner decides merges himself). ILSA's ACTIVE flag is ignored; lottery and vapor
+(no longer sold) are left out: history only. One category per ILSA department. Tax: ILSA's POS flag (tax group 1 = merchandise, otherwise
 none). Barcodes: PLU_NUM + Alt_PLUNum + UPC_E. No quantities on hand.
 Writes ~/ilsa-items/viewtouch-menu.json, and for review:
   possible-duplicates.csv  same name in the same department, each with its UPC, price, last sale
@@ -20,6 +20,7 @@ OUT = os.path.expanduser("~/ilsa-items")
 INHOUSE = "708694"
 LOTTERY = {"270", "275", "280", "300", "320", "340", "345", "360", "365", "370", "375", "377", "378", "379",
            "380", "400", "405", "420"}
+RETIRED = {"55": "vapor", "56": "vapor"}   # departments no longer sold: history only (owner 2026-11-05)
 
 def rows(d, t):
     for f in os.listdir(d):
@@ -69,6 +70,8 @@ for r in rows(BOOK, "PLU"):
     d = code(r.get("DEPT_NUM"))
     if d in LOTTERY:
         skipped["lottery"] += 1; continue
+    if d in RETIRED:
+        skipped[RETIRED[d]] += 1; continue
     name = clean(r.get("PLU_DESC")) or clean(r.get("POS_DESC")) or f"ITEM {upc}"
     flag = clean(r.get("POS_FLAG_NAME")).upper()
     codes = [upc] + [c for c in (code(r.get("Alt_PLUNum")), code(r.get("UPC_E"))) if c and c != upc]
