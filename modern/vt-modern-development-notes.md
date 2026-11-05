@@ -110,6 +110,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 13:25 ET — Bob (Claude) — Pi: desktop shortcut and boot autostart now run vt-start
+- **What:** On the HCA beta Pi, ~/Desktop/ViewTouch.desktop and ~/.config/autostart/ViewTouch.desktop ran 'modern/build/vtmodern --serve' (no --customer-display), so after the 2026-11-05 Debian update and reboot the guest screen didn't open. Both now Exec=/usr/local/bin/vt-start (guest screen, scanner, monitors side by side, no rebuild).
+- **Why:** Owner 2026-11-05: guest screen not booting.
+- **Files:** (none)
+- **Next person must know:** vt-install should write the desktop shortcut and autostart entry with Exec=/usr/local/bin/vt-start on new Pis (and link vt-start).
+
 ### 2026-11-05 13:23 ET — Bob (Claude) — vt-start: start ViewTouch with the guest screen, no rebuild
 - **What:** New scripts/bin/vt-start: stops ViewTouch politely if running, puts the monitors side by side again (~/.config/vt-guest-display.sh), and starts the existing build with --serve and --customer-display (from ~/.vt-customer-display) and the site's scanner, like vt-server but without building. For the Pi's desktop shortcut and after reboots.
 - **Why:** Owner 2026-11-05: guest screen not coming up after a reboot; the packaging .desktop (Exec=vtmodern) starts ViewTouch without the customer display; the update is on hold, so restarting must not rebuild from the newer code.
