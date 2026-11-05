@@ -186,7 +186,7 @@ object BarcodeScanner {
         // Auto-shutoff after 20 seconds if no barcode is scanned
         val r = Runnable { stop(activity) }
         timeoutRunnable = r
-        mainHandler.postDelayed(r, if (idMode) 30000 else 10000)
+        mainHandler.postDelayed(r, if (idMode) 30000 else 20000)
     }
 
     @SuppressLint("MissingPermission")

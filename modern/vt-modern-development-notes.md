@@ -114,6 +114,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 18:12 ET — Bob (Claude) — Tablet camera scan stays open 20 seconds
+- **What:** BarcodeScanner.kt: product scans time out after 20 s (was 10 s); ID scans stay 30 s. It still closes at once on a read or Cancel.
+- **Why:** Owner 2026-11-05: 20 seconds, since there's a Cancel button.
+- **Files:** `modern/android/src/org/viewtouch/pos/BarcodeScanner.kt`
+
 ### 2026-11-05 17:50 ET — Bob (Claude) — Backlog: full-store physical inventory to settle legacy UPCs
 - **What:** Owner will review legacy in-house UPCs and scan the whole store; the process is to be agreed with him, based on items selling; likely shape noted.
 - **Why:** Owner 2026-11-05.
