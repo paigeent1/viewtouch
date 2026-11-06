@@ -115,6 +115,33 @@ def x11_outputs():
     return [o for o in outs if o["connected"]], total
 
 
+def x11_modes():
+    """{output: [{"size": "1920x1080", "rates": [60.0, 50.0], "preferred": True, "current": False}]}"""
+    modes, cur = {}, None
+    for line in run("xrandr").splitlines():
+        h = re.match(r"^(\S+) (connected|disconnected)", line)
+        if h:
+            cur = h.group(1) if h.group(2) == "connected" else None
+            if cur:
+                modes[cur] = []
+            continue
+        m = re.match(r"^\s+(\d+x\d+)(i?)\s+(.*)$", line)
+        if not cur or not m or m.group(2):   # interlaced modes (1920x1080i) left out: they flicker
+            continue
+        rates, pref, current = [], False, False
+        for tok in re.findall(r"[\d.]+[*+ ]*\+?", m.group(3)):
+            r = re.match(r"([\d.]+)", tok)
+            if r:
+                rates.append(round(float(r.group(1)), 2))
+                pref = pref or "+" in tok
+                current = current or "*" in tok
+        if any(x["size"] == m.group(1) for x in modes[cur]):
+            continue
+        modes[cur].append({"size": m.group(1), "rates": sorted(set(rates), reverse=True),
+                           "preferred": pref, "current": current})
+    return modes
+
+
 def wayland_outputs():
     text = run("wlr-randr")
     if not text:
@@ -192,7 +219,14 @@ def main():
     if outs is None:
         problems.append("Couldn't read the Pi's screens (no desktop session reached).")
         outs = []
+    if report["session"] == "x11":
+        modes = x11_modes()
+        for o in outs:
+            o["modes"] = modes.get(o["name"], [])
+            o["best"] = next((m["size"] for m in o["modes"] if m["preferred"]), "")
     report["outputs"] = outs
+    report["savedModes"] = dict(l.strip().split("=", 1) for l in open(os.path.join(HOME, ".vt-screen-modes"))
+                                if "=" in l) if os.path.exists(os.path.join(HOME, ".vt-screen-modes")) else {}
     names = [o["name"] for o in outs]
     saved = report["registerSaved"]
     reg = saved if saved in names else (names[0] if names else "")
@@ -206,8 +240,11 @@ def main():
     for o in outs:
         hz = re.match(r"([\d.]+)", o.get("rate") or "")
         if hz and float(hz.group(1)) < 55:
-            problems.append("%s runs at %s, which can flicker. Use 'Make this the register' on the register's "
-                            "monitor to set both monitors to their own best mode." % (o["name"], o["rate"]))
+            problems.append("%s runs at %s, which can flicker. Tap 'Best mode' on %s." % (o["name"], o["rate"], o["name"]))
+    for o in outs:
+        if o["name"] == reg and o.get("best") and "%dx%d" % (o["w"], o["h"]) != o["best"]:
+            problems.append("The register (%s) is at %dx%d; its best is %s. Tap 'Best mode' on %s." % (
+                o["name"], o["w"], o["h"], o["best"], o["name"]))
     if report["guestOn"] and len(names) < 2:
         problems.append("The guest display is on, but only one monitor is plugged in.")
     if report["session"] == "x11" and len(names) > 1 and reg:

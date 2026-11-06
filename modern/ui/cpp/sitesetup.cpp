@@ -275,6 +275,29 @@ void LayoutController::siteAction(const QString &action)
         return;
     }
     struct Tool { const char16_t *action; const char16_t *program; QStringList args; const char *busy; bool restarts; };
+    // Screen check: a monitor's size and rate (vt-screen-mode): "best:HDMI-1" or
+    // "mode:HDMI-1:1920x1080:60". Only a monitor, size and rate the last look found.
+    QStringList modeArgs;
+    if (action.startsWith(u"best:"_s) || action.startsWith(u"mode:"_s)) {
+        const QStringList parts = action.split(u':');
+        QVariantMap output;
+        for (const QVariant &o : screens_.value(u"outputs"_s).toList())
+            if (o.toMap().value(u"name"_s).toString() == parts.value(1))
+                output = o.toMap();
+        bool ok = !output.isEmpty() && (parts.size() == 2 ? parts[0] == u"best" : (parts.size() == 4 && parts[0] == u"mode"));
+        if (ok && parts[0] == u"mode") {
+            ok = false;
+            for (const QVariant &m : output.value(u"modes"_s).toList())
+                if (m.toMap().value(u"size"_s).toString() == parts[2])
+                    for (const QVariant &r : m.toMap().value(u"rates"_s).toList())
+                        ok = ok || QString::number(r.toDouble(), 'f', 2) == parts[3];
+        }
+        if (!ok) {
+            setStatus(tr("That size isn't offered by that monitor. Look again."));
+            return;
+        }
+        modeArgs = parts[0] == u"best" ? QStringList{parts[1], u"best"_s} : QStringList{parts[1], parts[2], parts[3]};
+    }
     // Screen check: this monitor is the register (vt-guest-display on HDMI-1). Only a monitor the
     // last look found, so nothing else reaches the command line.
     QStringList registerArgs;
@@ -291,6 +314,7 @@ void LayoutController::siteAction(const QString &action)
         registerArgs = {u"on"_s, output};
     }
     const Tool tools[] = {
+        {u"screen-mode", u"vt-screen-mode", modeArgs, QT_TR_NOOP("Changing the monitor's size..."), false},
         {u"register", u"vt-guest-display", registerArgs,
          QT_TR_NOOP("Making that monitor the register: ViewTouch restarts..."), true},
         {u"touch-map", u"vt-touch-map", {u"--verbose"_s}, QT_TR_NOOP("Tying each touchscreen to its monitor..."), false},
@@ -306,7 +330,9 @@ void LayoutController::siteAction(const QString &action)
     };
     const Tool *tool = nullptr;
     for (const Tool &t : tools)
-        if (QStringView(t.action) == u"register" ? !registerArgs.isEmpty() : action == QStringView(t.action))
+        if (QStringView(t.action) == u"register"      ? !registerArgs.isEmpty()
+            : QStringView(t.action) == u"screen-mode" ? !modeArgs.isEmpty()
+                                                      : action == QStringView(t.action))
             tool = &t;
     if (!tool) {
         setStatus(tr("Unknown site tool: %1").arg(action));
@@ -332,7 +358,7 @@ void LayoutController::siteAction(const QString &action)
     }
     auto *proc = new QProcess(this);
     proc->setProcessEnvironment(env);
-    const bool screensAfter = action == u"touch-map" || action == u"learn-touch";
+    const bool screensAfter = action == u"touch-map" || action == u"learn-touch" || !modeArgs.isEmpty();
     connect(proc, &QProcess::finished, this, [this, proc, screensAfter](int, QProcess::ExitStatus) {
         QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
         const QStringList rows = out.split(u'\n', Qt::SkipEmptyParts);
@@ -401,6 +427,13 @@ void LayoutController::refreshScreens()
                                   : QVariantMap{{u"problems"_s, QStringList{tr("Couldn't read the screens.")}}};
         screens_.insert(u"checkedAt"_s, QDateTime::currentMSecsSinceEpoch());
         screensBusy_ = false;
+        // Something new to fix: said once on the status line, so whoever is at the register sees it.
+        const QStringList problems = screens_.value(u"problems"_s).toStringList();
+        const QString said = problems.join(u'\n');
+        if (!problems.isEmpty() && said != screenProblemsSaid_)
+            setStatus(tr("Screen check: %n thing(s) to fix (Manager > Hardware Configuration > Screen check). %1", "",
+                         problems.size()).arg(problems.first()));
+        screenProblemsSaid_ = said;
         ++siteRevision_;
         emit siteChanged();
         proc->deleteLater();
@@ -409,5 +442,19 @@ void LayoutController::refreshScreens()
     proc->start(u"python3"_s, {program, u"--json"_s});
     ++siteRevision_;
     emit siteChanged();
+#endif
+}
+
+void LayoutController::startScreenSelfCheck()
+{
+#ifndef Q_OS_ANDROID
+    // Only on the computer that drives the monitors (the Pi): vt-screens there and a screen to check.
+    if (!QFile::exists(toolPath(u"vt-screens"_s)) || QGuiApplication::screens().isEmpty()
+        || QGuiApplication::platformName() == u"offscreen" || QGuiApplication::platformName() == u"minimal")
+        return;
+    QTimer::singleShot(20 * 1000, this, [this] { refreshScreens(); });
+    screenCheckTimer_.setInterval(10 * 60 * 1000);
+    connect(&screenCheckTimer_, &QTimer::timeout, this, &LayoutController::refreshScreens, Qt::UniqueConnection);
+    screenCheckTimer_.start();
 #endif
 }

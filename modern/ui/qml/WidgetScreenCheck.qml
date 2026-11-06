@@ -141,11 +141,29 @@ Item {
                                               : qsTr("No ViewTouch window on it.")
                                     }
                                 }
-                                Tool {
-                                    text: card.r === qsTr("REGISTER") ? qsTr("Make this the register again") : qsTr("Make this the register")
-                                    enabled: w.admin && w.outputs.length > 1
-                                    implicitWidth: 300
-                                    onClicked: w.run("register:" + card.modelData.name)
+                                ColumnLayout {
+                                    spacing: 6
+                                    Tool {
+                                        text: card.r === qsTr("REGISTER") ? qsTr("Make this the register again") : qsTr("Make this the register")
+                                        enabled: w.admin && w.outputs.length > 1
+                                        Layout.preferredWidth: 300
+                                        onClicked: w.run("register:" + card.modelData.name)
+                                    }
+                                    RowLayout {
+                                        spacing: 6
+                                        Tool {
+                                            text: qsTr("Best mode")
+                                            enabled: w.admin
+                                            Layout.preferredWidth: 147
+                                            onClicked: w.run("best:" + card.modelData.name)
+                                        }
+                                        Tool {
+                                            text: qsTr("Change…")
+                                            enabled: w.admin && (card.modelData.modes ?? []).length > 0
+                                            Layout.preferredWidth: 147
+                                            onClicked: { modePicker.output = card.modelData; modePicker.open() }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -206,10 +224,69 @@ Item {
                         text: qsTr("1. Tap 'Show each monitor's name on it' to see which port is which.\n"
                                    + "2. On the monitor that should be the register, tap 'Make this the register'. ViewTouch restarts.\n"
                                    + "3. If a touch lands on the wrong screen, tap 'Tie touchscreens again'; if it's still wrong, 'Learn guest touchscreen'.\n"
-                                   + "From the Pi's terminal the same is: vt-screens (report), vt-guest-display on HDMI-1, vt-touch-map.")
+                                   + "4. If a monitor flickers, looks blurry or doesn't fill the screen, tap its 'Best mode' (or 'Change\u2026' to pick one).\n"
+                                   + "The Pi checks the screens by itself every 10 minutes and says so on the status line when something needs fixing.\n"
+                                   + "From the Pi's terminal the same is: vt-screens (report), vt-guest-display on HDMI-1, vt-screen-mode HDMI-1 best, vt-touch-map.")
                     }
                 }
             }
+    }
+
+    // "Change...": the sizes and rates that monitor offers; the one picked is kept after reboots.
+    Popup {
+        id: modePicker
+        property var output: ({})
+        readonly property var choices: {
+            const out = []
+            for (const m of (output.modes ?? []))
+                for (const r of (m.rates ?? []))
+                    out.push({ size: m.size, rate: Number(r).toFixed(2), preferred: m.preferred, current: m.current,
+                               label: m.size.replace("x", " × ") + "  at " + Math.round(r) + " Hz"
+                                      + (m.preferred && r === m.rates[0] ? qsTr("  (its best)") : "")
+                                      + (m.current && Math.round(r) === parseInt(output.rate) ? qsTr("  ← now") : "") })
+            return out
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 40 : 700, 700)
+        height: Math.min(parent ? parent.height - 40 : 700, 760)
+        modal: true
+        padding: 16
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 20
+                font.bold: true
+                text: qsTr("%1: pick a size and refresh rate").arg(modePicker.output.name ?? "")
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 14
+                opacity: 0.75
+                text: qsTr("60 Hz is steady; under 55 Hz can flicker. Kept after reboots. 'Best mode' goes back to the monitor's own choice.")
+            }
+            ListView {
+                id: modeList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 6
+                model: modePicker.choices
+                ScrollBar.vertical: TouchScrollBar { needed: modeList.contentHeight > modeList.height + 1 }
+                delegate: Tool {
+                    required property var modelData
+                    width: modeList.width - 40
+                    text: modelData.label
+                    font.bold: modelData.current
+                    onClicked: { w.run("mode:" + modePicker.output.name + ":" + modelData.size + ":" + modelData.rate); modePicker.close() }
+                }
+            }
+            Tool { text: qsTr("Cancel"); Layout.alignment: Qt.AlignRight; onClicked: modePicker.close() }
+        }
     }
 
     // Each monitor's name in big letters on that monitor, for a few seconds.

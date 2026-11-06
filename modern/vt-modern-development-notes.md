@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:22 ET — Bob (Claude) — Screen check: resolution and refresh rate, fixed by the operator; self-check every 10 minutes
+- **What:** Screen check shows each monitor's size and rate; 'Best mode' (its preferred size, xrandr --auto) and 'Change…' (a list of the sizes and rates it offers) per monitor, kept after reboots. New scripts/bin/vt-screen-mode OUT best|WxH [rate] (checks the monitor offers it, saves ~/.vt-screen-modes, sets it, lays the monitors out again via the new vt-guest-display layout, which doesn't restart ViewTouch). vt-guest-display uses ~/.vt-screen-modes (else --auto). vt-screens lists each monitor's modes (interlaced left out) and flags the register below its best size and any monitor under 55 Hz. ViewTouch checks the screens 20 s after start and every 10 minutes (Pi only, when vt-screens is there; not offscreen); a new problem goes on the status line once: 'Screen check: N thing(s) to fix (Manager > Hardware Configuration > Screen check)'. siteAction best:<out> and mode:<out>:<WxH>:<rate> accept only a monitor, size and rate the last look found.
+- **Why:** Owner 2026-11-06: the register ran at 1280x720 48 Hz and flickered; he wants ViewTouch to check resolution and refresh by itself so an operator can diagnose and correct it without a call.
+- **Files:** `modern/ui/cpp/layoutcontroller.cpp`, `modern/ui/cpp/layoutcontroller.hh`, `modern/ui/cpp/sitesetup.cpp`, `modern/ui/qml/WidgetScreenCheck.qml`, `scripts/bin/vt-guest-display`, `scripts/bin/vt-screen-mode`, `scripts/bin/vt-screens`
+
 ### 2026-11-06 14:19 ET — Bob (Claude) — Price book review: before/after sheet with ¢ names
 - **What:** vt-pricebook-cleanup also writes ~/pricebook-cleanup/names-before-after.csv: UPC, item number, Before, After, Why, Check for every name that would change, plus every name with a ¢ (no change, listed for review).
 - **Why:** Owner 2026-11-06: a CSV of the fraction and ¢ changes, before and after, to review.

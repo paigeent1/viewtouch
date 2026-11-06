@@ -106,13 +106,17 @@ public:
     // A site tool, in the background (the status line says how it went). Admins.
     //   check-tablets, push-tablets, scan-tvs, learn-touch, guest-on, guest-off, restart,
     //   touch-map (tie each touchscreen to its monitor again), register:<output> (that monitor is the
-    //   register: vt-guest-display on <output>, ViewTouch restarts)
+    //   register: vt-guest-display on <output>, ViewTouch restarts), best:<output> and
+    //   mode:<output>:<WxH>:<rate> (that monitor's size and refresh rate, vt-screen-mode)
     Q_INVOKABLE void siteAction(const QString &action);
     // Screen check (Hardware Configuration > Screen check, sitesetup.cpp): what vt-screens --json last
     // found (outputs, register, guest, touch, problems; refreshScreens() looks again, then siteChanged)
     // plus what ViewTouch itself sees: qtScreens [{name, x, y, w, h, primary, model, windows: [title]}].
     Q_INVOKABLE QVariantMap screenCheck() const;
     Q_INVOKABLE void refreshScreens();
+    // The screens checked by themselves: 20 s after start, then every 10 minutes (Pi only, when
+    // vt-screens is there). A new problem puts "Screen check: ..." on the status line.
+    void startScreenSelfCheck();
     int siteRevision() const { return siteRevision_; }
 
     // Persists a layout; false (with a message) when it could not.
@@ -407,6 +411,8 @@ private:
     int siteRevision_ = 0;
     QVariantMap screens_;        // vt-screens --json, last look
     bool screensBusy_ = false;
+    QTimer screenCheckTimer_;
+    QString screenProblemsSaid_;   // the problems last put on the status line (said once each)
     QString lastScan_;
     qint64 lastScanAt_ = 0;
     qint64 lastIdScanAt_ = 0;

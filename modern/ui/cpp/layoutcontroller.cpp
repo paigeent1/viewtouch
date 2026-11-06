@@ -132,6 +132,7 @@ LayoutController::LayoutController(Layout layout, QObject *parent)
         });
     nav_.reset(homePageOf(layout_));
     refresh();
+    startScreenSelfCheck();
 }
 
 bool LayoutController::eventFilter(QObject *watched, QEvent *event)

@@ -8,8 +8,12 @@
 #                          touchscreen is which (both report the same name); remembered by USB port
 #   vt-guest-display touch --or-map   the same, and if nobody touches it, tie them as last learned
 #                          (Hardware Configuration's "Learn guest touchscreen" button)
+#   vt-guest-display layout   set the monitors up again (sizes from ~/.vt-screen-modes, see
+#                          vt-screen-mode) without restarting ViewTouch
 # Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
 MODE="${1:-on}"
+# layout: only when the guest display is on (else the second monitor mirrors, nothing to lay out).
+if [ "$MODE" = layout ] && [ "$(cat "$HOME/.vt-customer-display" 2>/dev/null)" != window ]; then exit 0; fi
 # vt-guest-display on HDMI-2: that monitor is the register (the other one the guest's), kept for good.
 if [ "$MODE" = on ] && [ -n "$2" ]; then echo "$2" > "$HOME/.vt-pos-output"; fi
 STATE="$HOME/.vt-customer-display"
@@ -86,7 +90,12 @@ elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
     # name took the first mode of that size, which on the register was 1280x720 at 48 Hz: a flicker.
     # The register's monitor is the Pi's primary one: ViewTouch opens the register on the primary
     # monitor and the guest's screen on the other, whatever their order.
-    cmd="xrandr --output $first --primary --auto; xrandr --output $second --auto --right-of $first"
+    # A size the store chose on Screen check (vt-screen-mode, ~/.vt-screen-modes: HDMI-1=1920x1080@60).
+    margs() {
+        local m; m=$(sed -n "s/^$1=//p" "$HOME/.vt-screen-modes" 2>/dev/null | tail -n 1)
+        case "$m" in ""|best) echo "--auto" ;; *@*) echo "--mode ${m%@*} --rate ${m#*@}" ;; *) echo "--mode $m" ;; esac
+    }
+    cmd="xrandr --output $first --primary $(margs "$first"); xrandr --output $second $(margs "$second") --right-of $first"
 else
     echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
 fi
@@ -111,4 +120,5 @@ printf '#!/bin/sh\nsleep 3\nexport DISPLAY=:0\n%s\n' "$cmd" > "$BOOT"; chmod +x 
 printf '[Desktop Entry]\nType=Application\nName=vt-guest-display\nExec=%s\n' "$BOOT" > "$AUTOSTART"
 echo window > "$STATE"
 echo "Customer display on $second (the POS stays on $first)."
+[ "$MODE" = layout ] && exit 0
 vt-server
