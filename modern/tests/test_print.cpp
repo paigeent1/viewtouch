@@ -144,7 +144,7 @@ TEST_CASE("ID check on receipts: the customer's copy says checked 21+; the date 
     CHECK(contains(store, "Date of birth: 01/25/1987"));
     check.printDob = false;
     check.ageIdExpired = true;
-    CHECK(contains(renderText(receipt(check, ctx(seed.settings)), 42), "Expired ID accepted"));
+    CHECK(contains(renderText(receipt(check, ctx(seed.settings)), 42), "ID expired"));
     // Never saved: the printing flag doesn't survive a save and load; the date does.
     check.printDob = true;
     const std::optional<core::Check> back = app::checkFromJson(app::toJson(check));

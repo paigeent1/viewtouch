@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:26 ET — Bob (Claude) — Receipt says 'ID expired' for an expired ID
+- **What:** An expired ID is still accepted (as before); the receipt line now reads 'ID expired' (was 'Expired ID accepted'), and the cashier's screen says '· ID expired'.
+- **Why:** Owner 2026-11-06: accept expired IDs, note 'ID expired' on the receipt.
+- **Files:** `modern/print/tickets.cpp, modern/app/pos_service.cpp, modern/tests/test_print.cpp`
+
 ### 2026-11-06 10:25 ET — Bob (Claude) — Exception pictures include the date of birth
 - **What:** TicketPrinter::saveExceptionTickets renders each exception check with printDob, so the saved pictures (end of day and Save exception tickets) show 'Date of birth: MM/DD/YYYY' under 'ID checked 21+' when an ID was scanned, like the voids and error corrects the customer's copy hides.
 - **Why:** Owner 2026-11-06: same logic as voids/error corrects: not on the customer's copy, on the cashier's screen, and in the exception pictures (internal records).

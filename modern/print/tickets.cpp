@@ -226,7 +226,7 @@ Document receipt(const Check &check, const TicketContext &ctx)
         d.blank();
         d.center(ctx.tr("ID checked %1+", {std::to_string(check.ageVerified)}));
         if (check.ageIdExpired)
-            d.center(ctx.tr("Expired ID accepted"));
+            d.center(ctx.tr("ID expired"));
         if (check.printDob && check.ageDob.size() == 10)   // YYYY-MM-DD -> MM/DD/YYYY
             d.center(ctx.tr("Date of birth: %1", {check.ageDob.substr(5, 2) + "/" + check.ageDob.substr(8, 2) + "/"
                                                   + check.ageDob.substr(0, 4)}));

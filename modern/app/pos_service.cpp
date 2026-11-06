@@ -2251,7 +2251,7 @@ QVariantMap PosService::checkInfo() const
              if (c->ageDob.size() == 10)
                  t += tr("  ·  DOB %1").arg(qs(c->ageDob.substr(5, 2) + "/" + c->ageDob.substr(8, 2) + "/" + c->ageDob.substr(0, 4)));
              if (c->ageIdExpired)
-                 t += tr("  ·  expired ID");
+                 t += tr("  ·  ID expired");
              return t;
          }()},
     };
