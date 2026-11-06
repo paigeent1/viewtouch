@@ -628,6 +628,18 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"TUBES"_s});
     REQUIRE(pos.browseRetailLabels({u"TOBACCO"_s, u"TOBACCO ACC"_s, u"ZEN"_s, u"TUBES"_s}));
     CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"KING"_s});
+
+    // A price book's department (it has a department group): the Retail screen only. The order screens'
+    // list leaves its items out; the whole list, scans and lookups still have them.
+    bool retailOnly = false;
+    for (const QVariant &c : pos.menuCategories())
+        if (c.toMap()[u"name"_s] == u"TOBACCO ACC"_s)
+            retailOnly = c.toMap()[u"retailOnly"_s].toBool();
+    CHECK(retailOnly);
+    CHECK(pos.orderItems().size() == pos.menuItems().size() - 2);
+    CHECK_FALSE(names(pos.orderItems()).contains(u"ZEN TUBE"_s));
+    CHECK(names(pos.menuItems()).contains(u"ZEN TUBE"_s));
+    CHECK(pos.itemForCode(u"016165009116"_s).value(u"name"_s) == u"ZEN TUBE"_s);
     qputenv("HOME", oldHome);
 }
 

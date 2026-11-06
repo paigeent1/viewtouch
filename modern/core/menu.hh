@@ -160,6 +160,9 @@ struct MenuCategory {
     std::string taxClass;               // "food", "alcohol"...; empty: food
     // Retail: the department group it's in ("CIGARS", ILSA's Dept_Grp): the top of the Labels screen's tree.
     std::string group;
+    // Sold only on the Retail screen (scanned or looked up): left off the order screens' menus, and its
+    // items aren't sent to the tablets for them (a price book's departments).
+    bool retailOnly = false;
     // Its items' buttons on the order screen: their size ("small", "medium",
     // "large"; empty: as many as fit, as big as they can be), with photos,
     // without prices.

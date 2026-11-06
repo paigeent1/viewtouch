@@ -23,6 +23,14 @@ struct ImportedItem {
     QString onIt;              // what's on it, "lettuce, tomato"
     QString photo;             // a picture's file name, next to the spreadsheet
     QString barcode;           // the package's barcode(s), "012345678905"
+    QString moreBarcodes;      // other barcodes for the same item ("More UPCs")
+    QString cost;              // the store's cost, "1.85"; empty: none given
+    QString number;            // its number for ringing it in ("Item #")
+    QString tax;               // Alcohol, Food, Merchandise / Retail, None
+    QString maker;             // the brand
+    QString productGroup;
+    QString subGroup;
+    QString printer;           // "Prints to": Bar, Kitchen, or blank (none)
 };
 
 struct MenuImport {
@@ -31,9 +39,11 @@ struct MenuImport {
     QStringList columns;       // what each column was taken to be
 };
 
-// Columns by their header (Name / Item, Price, Category / Section / Group,
-// Description, Ingredients / On it, Photo; English or Spanish), else name, price,
-// category in that order. Prices: "$3.50", "3,50", "3.50".
+// Columns by their header (Name / Item, Price, Category / Section / Type,
+// Description, Ingredients / On it, Photo, UPC, More UPCs, Cost, Item #, Tax, Maker,
+// Product group, Sub group, Prints to; English or Spanish), else name, price,
+// category in that order. "Cost" is the store's cost, never the price.
+// Prices: "$3.50", "3,50", "3.50".
 MenuImport readMenuCsv(const QString &text);
 
 } // namespace vt::app

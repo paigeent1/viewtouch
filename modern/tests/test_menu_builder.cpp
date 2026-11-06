@@ -290,6 +290,55 @@ TEST_CASE("Menu import: the usual spreadsheet shapes", "[menubuilder][import]")
     CHECK(r.columns.contains(u"onIt"_s));
 }
 
+TEST_CASE("Menu import: the store's item sheet (cost, UPCs, item #, tax, maker, groups, prints to)", "[menubuilder][import]")
+{
+    // The template sent to the owner: Cost before Price must never become the price.
+    const MenuImport r = readMenuCsv(
+        u"Name,Cost,Price,Category,UPC,More UPCs,Item #,Tax,Maker,Product group,Sub group,Prints to,Notes\n"
+        "EXAMPLE BOURBON 1.5OZ,2.40,11.00,Whiskey,,,310,Alcohol,Example Distillery,Bourbon,,Bar,a note\n"
+        "EXAMPLE SODA 12OZ,0.95,3.50,Beverages,16165009116,036000291452,,Food,Example Soda Co,Soda,Root Beer,Bar,\n"
+        "EXAMPLE CIGAR,6.10,12.50,Premium Cigars,036000291469,,,Merchandise,Example Cigars,Robusto,Maduro,,\n"_s);
+    REQUIRE(r.problems.isEmpty());
+    REQUIRE(r.items.size() == 3);
+    CHECK(r.items[0].price == 11.0);
+    CHECK(r.items[0].cost == u"2.40"_s);
+    CHECK(r.items[0].number == u"310"_s);
+    CHECK(r.items[1].moreBarcodes == u"036000291452"_s);
+    CHECK(r.items[2].printer.isEmpty());
+
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    QVariantList rows;
+    for (const ImportedItem &i : r.items) {
+        QVariantMap row{{u"name"_s, i.name}, {u"price"_s, i.price}, {u"category"_s, i.category},
+                        {u"barcodes"_s, (i.barcode + u' ' + i.moreBarcodes).trimmed()}, {u"cost"_s, i.cost},
+                        {u"number"_s, i.number}, {u"tax"_s, i.tax}, {u"maker"_s, i.maker},
+                        {u"productGroup"_s, i.productGroup}, {u"subGroup"_s, i.subGroup}, {u"printer"_s, i.printer}};
+        rows << row;
+    }
+    CHECK(pos.importMenuRows(rows, QString(), false) == 3);
+    const auto item = [&](const QString &name) {
+        for (const core::MenuItem &m : pos.shared()->menu)
+            if (QString::fromStdString(m.name) == name)
+                return m;
+        return core::MenuItem{};
+    };
+    const core::MenuItem bourbon = item(u"EXAMPLE BOURBON 1.5OZ"_s);
+    CHECK(bourbon.price.cents() == 1100);
+    CHECK(bourbon.taxClass == core::TaxClass::Alcohol);
+    CHECK(bourbon.number == "310");
+    CHECK(bourbon.printer == "bar");
+    CHECK(bourbon.manufacturer == "Example Distillery");
+    CHECK(bourbon.productGroup == "Bourbon");
+    CHECK(std::ranges::any_of(bourbon.recipe, [](const core::RecipeLine &l) { return l.ingredientId == "__cost__" && l.quantity == 2.4; }));
+    const core::MenuItem soda = item(u"EXAMPLE SODA 12OZ"_s);   // its UPC lost its 0 in the sheet: both forms
+    CHECK(soda.barcodes == std::vector<std::string>{"16165009116", "016165009116", "036000291452"});
+    CHECK(soda.subGroup == "Root Beer");
+    const core::MenuItem cigar = item(u"EXAMPLE CIGAR"_s);
+    CHECK(cigar.taxClass == core::TaxClass::Merchandise);
+    CHECK(cigar.printer.empty());                                // Prints to blank: no ticket
+}
+
 TEST_CASE("Menu import: into the menu, categories made, prices updated if asked", "[menubuilder][import]")
 {
     PosService pos(test::seedPosData(), nullptr);

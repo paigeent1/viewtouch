@@ -47,6 +47,11 @@ Dialog {
                 width: ListView.view.width
                 Label { Layout.fillWidth: true; text: (modelData.photoData || modelData.photo ? "📷 " : "") + modelData.name; elide: Text.ElideRight }
                 Label { text: menu.pos.currencySymbol + Number(modelData.price).toFixed(2) }
+                Label {   // the sheet's cost, beside the price, so a mixed-up column shows before importing
+                    visible: (modelData.cost ?? "") !== ""
+                    text: qsTr("cost %1").arg(menu.pos.currencySymbol + (modelData.cost ?? ""))
+                    opacity: 0.7
+                }
                 Label { Layout.preferredWidth: 180; text: modelData.category; opacity: 0.7; elide: Text.ElideRight }
             }
         }

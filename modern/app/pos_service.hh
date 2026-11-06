@@ -934,6 +934,7 @@ public:
     QString onBreakSince() const override;
     QStringList soldOut() const override;
     QVariantList menuItems() const override;
+    QVariantList orderItems() const override;
     QVariantList menuCategories() const override;
     QVariantList choiceGroups() const override;
     // The Menu Builder (pos_menu_builder.cpp).
@@ -993,6 +994,13 @@ public:
     QVariantList expoTicketsNow() const;
     QVariantMap dashboardNow() const;
     QVariantList menuItemsNow() const;
+    QVariantList orderItemsNow() const;
+    // The item list as last made, for this computer's own screens (every binding that shows it asks
+    // again; with a 30,000-item price book making it each time froze the Pi): made again after any
+    // change (the signals below), a new meal period or language.
+    mutable std::optional<QVariantList> menuItemsCache_;
+    mutable std::string menuItemsCachePeriod_;
+    mutable QString menuItemsCacheLanguage_;
     QVariantList menuCategoriesNow() const;
     QVariantList choiceGroupsNow() const;
     QVariantList closedChecksNow() const;

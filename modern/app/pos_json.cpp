@@ -1047,6 +1047,8 @@ QJsonObject toJson(const PosSettings &s)
                                {u"noDiscount"_s, c.noDiscount}};
                  if (!c.group.empty())
                      x.insert(u"group"_s, qs(c.group));
+                 if (c.retailOnly)
+                     x.insert(u"retailOnly"_s, true);
                  out.append(x);
              }
              return out;
@@ -1592,6 +1594,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         cat.shades = c.value(u"shades").toBool();
         cat.noDiscount = c.value(u"noDiscount").toBool();
         cat.group = ss(c.value(u"group").toString().trimmed());
+        cat.retailOnly = c.value(u"retailOnly").toBool();
         if (!cat.id.empty())
             s.menuCategories.push_back(std::move(cat));
     }

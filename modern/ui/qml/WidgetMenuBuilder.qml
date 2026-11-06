@@ -227,10 +227,11 @@ Item {
     function categoryDraft(c) {
         return c ? { id: c.id, name: c.name, color: c.color, periods: c.periods.slice(), printer: c.printer,
                      station: c.station, taxClass: c.taxClass, buttonSize: c.buttonSize ?? "", photos: c.photos === true,
-                     hidePrice: c.hidePrice === true, shades: c.shades === true, noDiscount: c.noDiscount === true }
+                     hidePrice: c.hidePrice === true, shades: c.shades === true, noDiscount: c.noDiscount === true,
+                     retailOnly: c.retailOnly === true }
                  : { id: "", name: "", color: StoreColors.starters[categories.length % StoreColors.starters.length], periods: [],
                      printer: "kitchen", station: "", taxClass: "food", buttonSize: "", photos: false, hidePrice: false, shades: false,
-                     noDiscount: false }
+                     noDiscount: false, retailOnly: false }
     }
     function groupDraft(g) {
         const kind = !g ? "one" : g.max === 1 ? "one" : g.max === 0 ? "any" : "upTo"
@@ -2265,6 +2266,14 @@ Item {
                                     onToggled: w.set("noDiscount", checked)
                                     ToolTip.visible: hovered
                                     ToolTip.text: qsTr("None of its items can be discounted or comped (cigarettes): set on all of them when saved.")
+                                }
+                                Label { text: qsTr("🏷 Retail screen only") }
+                                Switch {
+                                    objectName: "builderCategoryRetailOnly"
+                                    checked: w.draft.retailOnly === true
+                                    onToggled: w.set("retailOnly", checked)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Sold on the Retail screen only (scanned or looked up): left off the bar and restaurant menus.")
                                 }
                             }
                             Label { text: qsTr("New items in it start with"); font.pixelSize: 16; font.bold: true }

@@ -10,6 +10,8 @@
 
 #include <QDateTime>
 
+#include <unordered_set>
+
 using namespace Qt::StringLiterals;
 using namespace vt::core;
 
@@ -633,8 +635,27 @@ QVariantList PosService::menuCategoriesNow() const
                                {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)},
                                {u"taxClass"_s, qs(c.taxClass)}, {u"buttonSize"_s, qs(c.buttonSize)},
                                {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                               {u"noDiscount"_s, c.noDiscount}});
+                               {u"noDiscount"_s, c.noDiscount}, {u"retailOnly"_s, c.retailOnly}});
     }
+    return out;
+}
+
+QVariantList PosService::orderItemsNow() const
+{
+    // The item list in the menu's order (one entry per item), less the retail-only categories' items.
+    const QVariantList all = menuItems();
+    if (all.size() != qsizetype(s_->menu.size()))
+        return all;
+    std::unordered_set<std::string> retail;
+    for (const MenuCategory &c : s_->categories())
+        if (c.retailOnly)
+            retail.insert(c.id);
+    if (retail.empty())
+        return all;
+    QVariantList out;
+    for (qsizetype i = 0; i < all.size(); ++i)
+        if (!retail.contains(s_->menu[std::size_t(i)].family))
+            out.append(all[i]);
     return out;
 }
 

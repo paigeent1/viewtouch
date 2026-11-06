@@ -188,6 +188,9 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap stockLeft READ stockLeft NOTIFY dayChanged)
     // The menu for the 86 list [{id, name, family, price, modifier, available}].
     Q_PROPERTY(QVariantList menuItems READ menuItems NOTIFY adminChanged)
+    // The items for the order screens' menus: the menu less the retail-only categories (a price book
+    // stays on the main computer; scans and lookups find those).
+    Q_PROPERTY(QVariantList orderItems READ orderItems NOTIFY adminChanged)
     // The menu's categories, in order: [{id, name, color, periods, count, now}]
     // (now: on the menu at this hour).
     Q_PROPERTY(QVariantList menuCategories READ menuCategories NOTIFY adminChanged)
@@ -385,6 +388,7 @@ public:
     virtual QVariantMap stockLeft() const = 0;
     virtual QStringList soldOut() const = 0;
     virtual QVariantList menuItems() const = 0;
+    virtual QVariantList orderItems() const = 0;
     virtual QVariantList menuCategories() const = 0;
     virtual QVariantList choiceGroups() const = 0;
     virtual QVariantList menuTemplates() const = 0;

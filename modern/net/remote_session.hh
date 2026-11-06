@@ -184,6 +184,7 @@ public:
     void takeOver(const QString &pin) override;
     QStringList soldOut() const override { return v(u"soldOut").toStringList(); }
     QVariantList menuItems() const override { return v(u"menuItems").toList(); }
+    QVariantList orderItems() const override { return v(u"orderItems").toList(); }
     QVariantList menuCategories() const override { return v(u"menuCategories").toList(); }
     QVariantList choiceGroups() const override { return v(u"choiceGroups").toList(); }
     QVariantList menuTemplates() const override { return v(u"menuTemplates").toList(); }

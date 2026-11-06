@@ -273,6 +273,8 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.taxClass = ss(record.value(u"taxClass"_s).toString());
     if (record.contains(u"group"_s))
         c.group = ss(record.value(u"group"_s).toString().trimmed());
+    if (record.contains(u"retailOnly"_s))
+        c.retailOnly = record.value(u"retailOnly"_s).toBool();
     if (record.contains(u"buttonSize"_s)) {
         const QString size = record.value(u"buttonSize"_s).toString();
         if (!QStringList{QString(), u"small"_s, u"medium"_s, u"large"_s}.contains(size))
@@ -677,6 +679,12 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
     }
     if (card.contains(u"taxClass"_s))
         item.taxClass = taxClassFromString(ss(card.value(u"taxClass"_s).toString()));
+    if (card.contains(u"manufacturer"_s))
+        item.manufacturer = ss(card.value(u"manufacturer"_s).toString().trimmed());
+    if (card.contains(u"productGroup"_s))
+        item.productGroup = ss(card.value(u"productGroup"_s).toString().trimmed());
+    if (card.contains(u"subGroup"_s))
+        item.subGroup = ss(card.value(u"subGroup"_s).toString().trimmed());
     if (card.contains(u"printer"_s))
         item.printer = ss(card.value(u"printer"_s).toString());
     if (card.contains(u"station"_s))
@@ -1220,6 +1228,48 @@ int PosService::addMenuItemsFromText(const QString &categoryId, const QString &t
 // Rows read from a spreadsheet (LayoutController::readMenuFile): each in
 // its category (made if new; none named: `categoryId`); an item already on
 // the menu is skipped, or gets the new price with `updatePrices`.
+namespace {
+// A spreadsheet row's barcodes; an 11-digit one also as the 12-digit UPC-A (a spreadsheet that took the
+// column for numbers dropped its leading 0: 016165009116 became 16165009116).
+QString sheetBarcodes(const QVariantMap &r)
+{
+    QStringList out;
+    for (const QString &c : PosService::barcodeList(r.value(u"barcodes"_s).toString())) {
+        out << c;
+        if (c.size() == 11 && std::ranges::all_of(c, [](QChar ch) { return ch.isDigit(); }))
+            out << u'0' + c;
+    }
+    out.removeDuplicates();
+    return out.join(u' ');
+}
+
+// The rest of a new item from the sheet: cost, number, tax, maker, groups, where it prints.
+QVariantMap sheetExtras(const QVariantMap &r)
+{
+    QVariantMap card;
+    if (const QString c = r.value(u"cost"_s).toString(); !c.isEmpty())
+        card.insert(u"cost"_s, c);
+    if (const QString n = r.value(u"number"_s).toString().trimmed(); !n.isEmpty())
+        card.insert(u"number"_s, n);
+    if (const QString t = r.value(u"tax"_s).toString().trimmed().toLower(); !t.isEmpty()) {
+        const QString tax = t.startsWith(u"alc"_s) || t == u"liquor"_s || t == u"beer"_s || t == u"wine"_s ? u"alcohol"_s
+                            : t.startsWith(u"merch"_s) || t.startsWith(u"retail"_s) || t == u"tobacco"_s ? u"merchandise"_s
+                            : t == u"none"_s || t == u"no"_s || t.startsWith(u"exempt"_s) || t.startsWith(u"non"_s) ? u"none"_s
+                                                                                                              : u"food"_s;
+        card.insert(u"taxClass"_s, tax);
+    }
+    if (const QString m = r.value(u"maker"_s).toString().trimmed(); !m.isEmpty())
+        card.insert(u"manufacturer"_s, m);
+    if (const QString g = r.value(u"productGroup"_s).toString().trimmed(); !g.isEmpty())
+        card.insert(u"productGroup"_s, g);
+    if (const QString g = r.value(u"subGroup"_s).toString().trimmed(); !g.isEmpty())
+        card.insert(u"subGroup"_s, g);
+    if (r.contains(u"printer"_s))
+        card.insert(u"printer"_s, r.value(u"printer"_s).toString().trimmed().toLower());
+    return card;
+}
+} // namespace
+
 int PosService::importMenuRows(const QVariantList &rows, const QString &categoryId, bool updatePrices)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
@@ -1263,10 +1313,28 @@ int PosService::importMenuRows(const QVariantList &rows, const QString &category
             QVariantMap card{{u"id"_s, qs(existing->id)}, {u"name"_s, qs(existing->name)}};
             if (!photo.isEmpty() && existing->image.empty())
                 card.insert(u"image"_s, photo);
-            if (const QString b = r.value(u"barcodes"_s).toString().trimmed(); !b.isEmpty() && existing->barcodes.empty())
+            if (const QString b = sheetBarcodes(r); !b.isEmpty() && existing->barcodes.empty())
                 card.insert(u"barcodes"_s, b);
-            if (updatePrices)
+            if (updatePrices) {
                 card.insert(u"price"_s, QString::number(price, 'f', 2));
+                // The sheet's cost too, keeping a pack's link to its box or carton.
+                if (const QString cost = r.value(u"cost"_s).toString(); !cost.isEmpty()) {
+                    card.insert(u"cost"_s, cost);
+                    for (const RecipeLine &rl : existing->recipe)
+                        if (rl.ingredientId.starts_with("__parent__:")) {
+                            card.insert(u"parentUpc"_s, qs(rl.ingredientId.substr(11)));
+                            card.insert(u"packSize"_s, QString::number(int(rl.quantity > 0 ? rl.quantity : 1)));
+                        }
+                }
+            }
+            // A maker or group it doesn't have yet.
+            for (const auto &[from, to] : {std::pair{u"maker"_s, u"manufacturer"_s}, {u"productGroup"_s, u"productGroup"_s},
+                                           {u"subGroup"_s, u"subGroup"_s}}) {
+                const std::string &now = to == u"manufacturer"_s ? existing->manufacturer
+                                         : to == u"productGroup"_s ? existing->productGroup : existing->subGroup;
+                if (const QString v = r.value(from).toString().trimmed(); !v.isEmpty() && now.empty())
+                    card.insert(to, v);
+            }
             if (card.size() == 2) {
                 skipped << name;
                 continue;
@@ -1277,13 +1345,14 @@ int PosService::importMenuRows(const QVariantList &rows, const QString &category
             continue;
         }
         QVariantMap card{{u"name"_s, name}, {u"price"_s, QString::number(price, 'f', 2)}, {u"family"_s, category}};
+        card.insert(sheetExtras(r));
         if (!photo.isEmpty())
             card.insert(u"image"_s, photo);
         if (const QString d = r.value(u"description"_s).toString().trimmed(); !d.isEmpty())
             card.insert(u"description"_s, d);
         if (const QString on = r.value(u"onIt"_s).toString().trimmed(); !on.isEmpty())
             card.insert(u"onIt"_s, on);
-        if (const QString b = r.value(u"barcodes"_s).toString().trimmed(); !b.isEmpty())
+        if (const QString b = sheetBarcodes(r); !b.isEmpty())
             card.insert(u"barcodes"_s, b);
         if (!saveMenuItemCard(card))
             return added;
@@ -1353,7 +1422,9 @@ int PosService::importMenuFile(const QVariantMap &file)
             it != here.end()) {
             categoryOf[c.id] = it->id;
             // Its department group, if it has none yet (the price book's, added after the first import).
-            if (it->group.empty() && !c.group.empty() && !saveCategory({{u"id"_s, qs(it->id)}, {u"name"_s, qs(it->name)}, {u"group"_s, qs(c.group)}}))
+            // A price book's department (it has a department group) is sold on the Retail screen only.
+            if (it->group.empty() && !c.group.empty()
+                && !saveCategory({{u"id"_s, qs(it->id)}, {u"name"_s, qs(it->name)}, {u"group"_s, qs(c.group)}, {u"retailOnly"_s, true}}))
                 return 0;
             continue;
         }
@@ -1364,7 +1435,7 @@ int PosService::importMenuFile(const QVariantMap &file)
         if (!saveCategory({{u"name"_s, qs(c.name)}, {u"color"_s, qs(c.color)}, {u"periods"_s, periods},
                            {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
                            {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                           {u"group"_s, qs(c.group)}}))
+                           {u"group"_s, qs(c.group)}, {u"retailOnly"_s, c.retailOnly || !c.group.empty()}}))
             return 0;
         for (const MenuCategory &x : s_->categories())
             if (sameName(x.name, qs(c.name)))

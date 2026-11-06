@@ -996,7 +996,16 @@ QVariantMap LayoutController::readMenuFile(const QUrl &file) const
     int photos = 0;
     for (const vt::app::ImportedItem &i : read.items) {
         QVariantMap row{{u"row"_s, i.row}, {u"name"_s, i.name}, {u"price"_s, i.price}, {u"category"_s, i.category},
-                        {u"description"_s, i.description}, {u"onIt"_s, i.onIt}, {u"barcodes"_s, i.barcode}};
+                        {u"description"_s, i.description}, {u"onIt"_s, i.onIt},
+                        {u"barcodes"_s, (i.barcode + u' ' + i.moreBarcodes).trimmed()}};
+        // The rest only when the sheet has them (an older one's rows stay as they were).
+        for (const auto &[key, value] : {std::pair{u"cost"_s, i.cost}, {u"number"_s, i.number}, {u"tax"_s, i.tax},
+                                         {u"maker"_s, i.maker}, {u"productGroup"_s, i.productGroup},
+                                         {u"subGroup"_s, i.subGroup}})
+            if (!value.isEmpty())
+                row.insert(key, value);
+        if (read.columns.contains(u"printer"_s))   // a "Prints to" column: blank is no printer (retail)
+            row.insert(u"printer"_s, i.printer);
         if (!i.photo.isEmpty()) {
             QString path = QDir::isAbsolutePath(i.photo) ? i.photo : beside.filePath(i.photo);
             if (!QFileInfo::exists(path))   // "Tacos.JPG" for tacos.jpg

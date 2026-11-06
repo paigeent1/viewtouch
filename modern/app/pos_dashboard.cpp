@@ -259,7 +259,22 @@ QVariantList PosService::menuItems() const
 {
     if (!user())
         return {};
-    return s_->memo(u"menuItems "_s + language(), [this] { return QVariant(menuItemsNow()); }).toList();
+    if (s_->memoOn())   // the server making every screen's update: once for all of them
+        return s_->memo(u"menuItems "_s + language(), [this] { return QVariant(menuItemsNow()); }).toList();
+    const std::string period = currentMealPeriod();
+    const QString lang = language();
+    if (!menuItemsCache_ || menuItemsCachePeriod_ != period || menuItemsCacheLanguage_ != lang) {
+        menuItemsCache_ = menuItemsNow();
+        menuItemsCachePeriod_ = period;
+        menuItemsCacheLanguage_ = lang;
+    }
+    return *menuItemsCache_;
+}
+QVariantList PosService::orderItems() const
+{
+    if (!user())
+        return {};
+    return s_->memo(u"orderItems "_s + language(), [this] { return QVariant(orderItemsNow()); }).toList();
 }
 QVariantList PosService::menuCategories() const
 {

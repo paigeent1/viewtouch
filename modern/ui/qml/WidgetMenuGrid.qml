@@ -16,7 +16,7 @@ Item {
     // 30,000-item price book would otherwise go to every tablet on every change.
     Item {
         visible: false
-        readonly property var p: w.pos
+        readonly property var p: w.search ? w.pos : null   // only a search (Find Item) lists every item
         property var asked: null
         function ask() {
             if (asked === p) return
@@ -37,9 +37,12 @@ Item {
     readonly property string typed: pos && search ? pos.textEntry.trim().toLowerCase() : ""
     readonly property string face: zone.st.font ?? "DejaVu Sans"
 
-    readonly property var items: pos ? pos.menuItems.filter(i => !i.modifier) : []
+    // The order screens: the menu less the retail-only categories (a price book stays on the main
+    // computer); a search (Find Item) looks through every item.
+    readonly property var allItems: pos ? (search ? pos.menuItems : pos.orderItems) : []
+    readonly property var items: allItems.filter(i => !i.modifier)
     // The menu's categories with items, in their order (Menu Builder).
-    readonly property var categories: pos ? pos.menuCategories.filter(c => c.count > 0) : []
+    readonly property var categories: pos ? pos.menuCategories.filter(c => c.count > 0 && (search || !c.retailOnly)) : []
     // The guest's allergies (the check's): items that contain one are marked.
     readonly property var allergies: pos && pos.hasCheck ? (pos.check.allergies ?? []) : []
     // ★ Favorites first: the items marked so, then today's best sellers (12 in all).
@@ -195,7 +198,7 @@ Item {
                 enabled: w.picked !== ""
                 opacity: enabled ? 1 : 0.4
                 Layout.preferredWidth: 170; Layout.preferredHeight: parent.keyH
-                readonly property var item: w.pos ? w.pos.menuItems.find(i => i.id === w.picked) : null
+                readonly property var item: w.allItems.find(i => i.id === w.picked) ?? null
                 text: "🎨 " + qsTr("Color…")
                 baseColor: item && item.buttonColor ? item.buttonColor : "#343c49"
                 fontScale: 0.32
@@ -257,7 +260,7 @@ Item {
             pos: w.pos
             noneText: qsTr("No color")
             color: {
-                const i = w.pos ? w.pos.menuItems.find(x => x.id === w.picked) : null
+                const i = w.allItems.find(x => x.id === w.picked) ?? null
                 return i ? i.buttonColor : ""
             }
             onPicked: c => {
