@@ -1001,6 +1001,8 @@ public:
     mutable std::optional<QVariantList> menuItemsCache_;
     mutable std::string menuItemsCachePeriod_;
     mutable QString menuItemsCacheLanguage_;
+    mutable int menuItemsCacheRevision_ = -1;
+    mutable std::size_t menuItemsCacheSize_ = 0;
     QVariantList menuCategoriesNow() const;
     QVariantList choiceGroupsNow() const;
     QVariantList closedChecksNow() const;

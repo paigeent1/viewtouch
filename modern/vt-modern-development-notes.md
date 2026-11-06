@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 20:30 ET — Bob (Claude) — Item-list cache also keyed by the menu's revision and size
+- **What:** PosService::menuItems' cache is made again when s_->adminRevision or the menu's size changed, besides the change signals.
+- **Why:** CI: test_pos_flow.cpp:3327 (a new item added from Manager > Menu didn't show on the menu grid): the cached list was stale on that path.
+- **Files:** `modern/app/pos_service.hh, modern/app/pos_dashboard.cpp`
+
 ### 2026-11-05 20:14 ET — Bob (Claude) — Test fix: item sheet test names app:: types
 - **What:** test_menu_builder.cpp's new item sheet test used MenuImport / ImportedItem without app::; CI didn't compile.
 - **Why:** Modern checks run 42141177016 failed to build.

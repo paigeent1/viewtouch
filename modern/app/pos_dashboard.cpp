@@ -263,10 +263,14 @@ QVariantList PosService::menuItems() const
         return s_->memo(u"menuItems "_s + language(), [this] { return QVariant(menuItemsNow()); }).toList();
     const std::string period = currentMealPeriod();
     const QString lang = language();
-    if (!menuItemsCache_ || menuItemsCachePeriod_ != period || menuItemsCacheLanguage_ != lang) {
+    // Also made again when the menu's revision or size moved without a signal reaching this screen.
+    if (!menuItemsCache_ || menuItemsCachePeriod_ != period || menuItemsCacheLanguage_ != lang
+        || menuItemsCacheRevision_ != s_->adminRevision || menuItemsCacheSize_ != s_->menu.size()) {
         menuItemsCache_ = menuItemsNow();
         menuItemsCachePeriod_ = period;
         menuItemsCacheLanguage_ = lang;
+        menuItemsCacheRevision_ = s_->adminRevision;
+        menuItemsCacheSize_ = s_->menu.size();
     }
     return *menuItemsCache_;
 }
