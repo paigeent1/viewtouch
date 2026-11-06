@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "item-lookup",
+  "name": "Item Look Up",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "public",
+  "zones": [
+    {
+      "id": "lookup",
+      "kind": "itemLookup",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1888,
+        "h": 1048
+      },
+      "shape": "rect",
+      "behavior": "none"
+    }
+  ]
+}

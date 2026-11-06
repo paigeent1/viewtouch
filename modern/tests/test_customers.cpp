@@ -648,6 +648,14 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
     CHECK_FALSE(names(pos.orderItems()).contains(u"ZEN TUBE"_s));
     CHECK(names(pos.menuItems()).contains(u"ZEN TUBE"_s));
     CHECK(pos.itemForCode(u"016165009116"_s).value(u"name"_s) == u"ZEN TUBE"_s);
+
+    // Item Look Up and Labels: found by name; an item added later is found too (the list is made again).
+    REQUIRE(pos.findRetailLabels(u"zen"_s));
+    CHECK(pos.retailLabels()[u"matches"_s].toList().size() == 2);
+    CHECK(pos.importMenuRows({QVariantMap{{u"name"_s, u"ZEN WIDE TUBE"_s}, {u"price"_s, 10.5}, {u"category"_s, u"TOBACCO ACC"_s},
+                                          {u"barcodes"_s, u"016165009123"_s}}}, QString(), false) == 1);
+    REQUIRE(pos.findRetailLabels(u"zen"_s));
+    CHECK(pos.retailLabels()[u"matches"_s].toList().size() == 3);
     qputenv("HOME", oldHome);
 }
 

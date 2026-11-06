@@ -14,6 +14,21 @@ Item {
     id: w
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
+    // What this screen shows comes to a tablet only while it's shown (PosServer: on request).
+    Item {
+        visible: false
+        readonly property var p: w.pos
+        property var asked: null
+        function ask() {
+            if (asked === p) return
+            if (asked) asked.want("retailLabels", false)
+            asked = p
+            if (p) p.want("retailLabels", true)
+        }
+        onPChanged: ask()
+        Component.onCompleted: ask()
+        Component.onDestruction: if (asked) asked.want("retailLabels", false)
+    }
     readonly property var info: pos ? pos.retailLabels : ({})
     readonly property var templates: info.templates ?? []
     property string chosen: ""

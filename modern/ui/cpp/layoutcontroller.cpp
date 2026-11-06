@@ -1670,6 +1670,11 @@ void LayoutController::scanned(const QString &code)
         call(u"priceCheckCode"_s, {c}, [](const QVariant &) {});
         return;
     }
+    // Item Look Up shown: the scan is looked up there (it rings nothing by itself).
+    if (std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"itemLookup"; })) {
+        keep(u"lookupScan"_s, c);
+        return;
+    }
     const auto *page = currentPage();
     // Scans count only where they mean something: Retail and the order screens (ring it in), Pay
     // (a coupon, a gift card), and screens with a search or a scan field (Gift Card, Find, the Item /

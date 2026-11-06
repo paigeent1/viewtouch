@@ -115,6 +115,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 22:15 ET — Bob (Claude) — Item Look Up: the Retail screen's ALPHA LOOK UP and PRICE CHECK, like the label utility
+- **What:** New widget itemLookup (WidgetItemLookup.qml) on a new starter page item-lookup: a search box (part of a name, or a UPC; a scan on that page goes into it) and the department tree (group › department › brand › product group › sub group) with Show all items; big rows with name, price and UPC; big ▲ ▼ page buttons. Touching an item rings it in on the Retail screen (keeps X TIMES and RETURN), or in Price Check shows its price. It uses the Labels screen's server-side search (retailLabels), so it doesn't load the whole item list. The Labels list built from the menu is now cached once per menu change (PosShared::serial + adminRevision + size), and retailLabels goes to a tablet only while the Labels screen or Item Look Up shows (onRequest).
+- **Why:** Owner, 2026-11-05 evening: after loading 31,700 items, ALPHA LOOK UP (Menu Builder) hung and PRICE CHECK showed a 4x3 grid of 12 buttons; asked for something like the label utility, with large up/down buttons.
+- **Files:** `modern/ui/qml/WidgetItemLookup.qml, seed/pages/item-lookup.json, ui/qml/WidgetRetailEntry.qml, WidgetRetailLabels.qml, ZoneItem.qml, ui/cpp/layoutcontroller.cpp, editorcontroller.cpp, layout/schema.cpp, CMakeLists.txt, app/pos_inventory.cpp, app/pos_service.hh, net/pos_server.cpp, tests/test_customers.cpp`
+- **Next person must know:** Menu Builder itself still loads every item into the screen (allItems from pos.menuItems): slow with a price book; BOX ↔ STICK on the Retail screen still opens it. Next: Menu Builder asks the main computer per department and per search.
+
 ### 2026-11-05 20:30 ET — Bob (Claude) — Item-list cache also keyed by the menu's revision and size
 - **What:** PosService::menuItems' cache is made again when s_->adminRevision or the menu's size changed, besides the change signals.
 - **Why:** CI: test_pos_flow.cpp:3327 (a new item added from Manager > Menu didn't show on the menu grid): the cached list was stale on that path.

@@ -208,6 +208,8 @@ public:
 
     std::int64_t now() const { return now_(); }
     void setClock(std::function<std::int64_t()> now) { now_ = std::move(now); }
+    // Which store data this is (caches kept outside it tell one from another, even at the same address).
+    const std::uint64_t serial = [] { static std::uint64_t n = 0; return ++n; }();
 
     // While the server makes every screen's update at once (nothing changes
     // meanwhile), what's the same for all of them (the kitchen's tickets, the

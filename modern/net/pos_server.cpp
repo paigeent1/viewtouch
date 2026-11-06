@@ -75,7 +75,8 @@ bool onRequest(const QString &key)
     // The closed checks, and the whole item list (a retail price book is tens of thousands of items):
     // scans and typed numbers ask the main computer (itemForCode), so only the screens that list the
     // items (Menu Builder, the menu grid, Sold Out) ask for it.
-    return key == u"closedChecks" || key == u"menuItems";
+    // The Labels screen and Item Look Up (retailLabels) likewise: only to a screen showing one.
+    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels";
 }
 
 // Screens that ask for things (this version) get the open checks in two

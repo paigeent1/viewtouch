@@ -834,11 +834,24 @@ QVariantMap PosService::retailLabels() const
     const QString q = labelQuery_.trimmed();
     // The items: ViewTouch's menu once the price book is in it; until then Neil's ILSA price book while it's
     // there (the label utility prints from it).
-    std::vector<LabelItem> fromMenu;
+    // ViewTouch's own items, made once per menu change (every screen showing labels or Item Look Up
+    // asks again on each change of its own; a 30,000-item price book took a moment each time).
+    struct MenuLabels {
+        std::uint64_t shared = 0;
+        int revision = -1;
+        std::size_t size = 0;
+        std::vector<LabelItem> items;
+    };
+    static MenuLabels cache;
+    std::vector<LabelItem> &fromMenu = cache.items;
     static const std::vector<LabelItem> noBook;
     const auto withUpc = std::ranges::count_if(s_->menu, [](const MenuItem &m) { return !m.barcodes.empty(); });
     const std::vector<LabelItem> &book = std::size_t(withUpc) >= kOwnPriceBookItems ? noBook : pricebookItems();
-    if (book.empty()) {
+    if (book.empty() && (cache.shared != s_->serial || cache.revision != s_->adminRevision || cache.size != s_->menu.size())) {
+        cache.shared = s_->serial;
+        cache.revision = s_->adminRevision;
+        cache.size = s_->menu.size();
+        fromMenu.clear();
         std::map<QString, QString> categoryNames, categoryGroups;
         for (const MenuCategory &c : s_->categories()) {
             categoryNames[qs(c.id)] = qs(c.name);

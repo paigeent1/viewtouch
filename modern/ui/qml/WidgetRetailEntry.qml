@@ -29,8 +29,8 @@ Rectangle {
         { lbl: "Lighter\nRefill", col: "#60a5fa", rad: 10, w: 95, cmd: "", pg: "", code: "LIGHTER-REFILL" },
         { lbl: "EMPTY\nBOX", col: "#4ade80", rad: 10, w: 95, cmd: "", pg: "", code: "EMPTY-BOX" },
         { lbl: "Manager\nLog On/Off", col: "#e2e8f0", rad: 10, w: 105, cmd: "", pg: "manager", code: "" },
-        { lbl: "PRICE\nCHECK", col: "#fde047", rad: 30, w: 105, cmd: "", pg: "find-item", code: "" },
-        { lbl: "ALPHA LOOK\nUP", col: "#fde047", rad: 30, w: 150, cmd: "", pg: "menu-builder", code: "" },
+        { lbl: "PRICE\nCHECK", col: "#fde047", rad: 30, w: 105, cmd: "LOOKUP_PRICE", pg: "", code: "" },
+        { lbl: "ALPHA LOOK\nUP", col: "#fde047", rad: 30, w: 150, cmd: "LOOKUP_RING", pg: "", code: "" },
         { lbl: "X\nTIMES", col: "#f1f5f9", rad: 30, w: 135, cmd: "X_TIMES", pg: "", code: "" },
         { lbl: "MISC\nTXBL", col: "#38bdf8", rad: 30, w: 105, cmd: "", pg: "", code: "MISC-TXBL" },
         { lbl: "SUSPEND", col: "#c084fc", rad: 30, w: 165, cmd: "releaseCheck", pg: "", code: "" }
@@ -46,6 +46,22 @@ Rectangle {
         { lbl: "Exit POS", col: "#2563eb", rad: 10, cmd: "logout", pg: "", code: "" },
         { lbl: "Cust LookUp", col: "#2dd4bf", rad: 10, cmd: "", pg: "check-customer", code: "" }
     ]
+    // An item touched in Item Look Up: rung in here, with the X TIMES set before.
+    Timer {
+        interval: 80
+        running: ilsaRoot.visible
+        repeat: true
+        onTriggered: {
+            if (!ilsaRoot.controller) return
+            const code = ilsaRoot.controller.take("lookupRing")
+            const qty = ilsaRoot.controller.take("lookupQty")
+            const ret = ilsaRoot.controller.take("lookupReturnMode")
+            if (!code) return
+            if (qty) ilsaRoot.pendingQty = Number(qty)
+            if (ret === true) ilsaRoot.itemReturnMode = true
+            ilsaRoot.ringInput(String(code))
+        }
+    }
     function ringInput(codeStr) {
         var clean = codeStr.trim(); if (clean === "") return
         // The same as a scan: the item rings in (a check starts by itself) and keeps the code typed.
@@ -62,6 +78,14 @@ Rectangle {
     function fireBtn(grp, idx, b) {
         if (editButtonsMode) { editingGroup = grp; editingIdx = idx; editLbl.text = b.lbl.replace("\n", " "); editCol.text = b.col; editCode.text = b.code; editPg.text = b.pg; editCmd.text = b.cmd; btnEditPopup.open(); return }
         if (b.cmd === "X_TIMES") pressPad("X_TIMES")
+        else if ((b.cmd === "LOOKUP_RING" || b.cmd === "LOOKUP_PRICE") && controller) {
+            // Item Look Up: found there, rung here when it comes back (lookupRing, below).
+            controller.keep("lookupMode", b.cmd === "LOOKUP_PRICE" ? "price" : "ring")
+            controller.keep("lookupReturn", controller.pageId)
+            controller.keep("lookupQty", pendingQty)          // the X TIMES and RETURN set before, kept
+            controller.keep("lookupReturnMode", itemReturnMode)
+            controller.jumpToPage("item-lookup")
+        }
         else if (b.cmd === "toggleReturn") { itemReturnMode = !itemReturnMode; statusMsg = itemReturnMode ? "RETURN MODE" : "" }
         else if (b.code !== "") ringInput(b.code)
         else if (b.pg !== "" && controller) controller.jumpToPage(b.pg)
