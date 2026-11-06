@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:48 ET — Bob (Claude) — Handoff: where Part One left off
+- **What:** Branch bob/big-catalog (head ff8d33a1) is ahead of main 9f879118 (installed on the Pi). On the branch: DOB reprint (gift / customer / with DOB), ID line on receipts, exception pictures with DOB, gift receipts *****, ID expired, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X (register monitor choice). CI run 42246143289 was checking it; known failures are the 31 on main's run 42234138120.
+- **Why:** The owner is starting a new chat (ViewTouch Development Part Two).
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** 1) Confirm CI 42246143289 shows only main's 31 failures. 2) Build the APK from the branch head, fast-forward main, send the Pi update command. 3) Ask which HDMI port the big (register) monitor is on (HDMI-1 = nearest USB-C power), then have the owner run: vt-guest-display on HDMI-X; beep3. Touch alignment was fixed on Nov 6 with xinput map-to-output. Backlog: Price book cleanup (owner reviews the fraction list first, then fill length/ring gauge), legacy receipt history import, customer accounts, retail-entry missing jump targets, Wayland redo later.
+
 ### 2026-11-06 10:46 ET — Bob (Claude) — DOB reprint setting under Receipts
 - **What:** Reprint with date of birth: manager only is listed in Store Settings' Receipts section (it fell into More).
 - **Why:** CI test: every setting is in a section; the owner asked for it under receipt settings.
