@@ -123,6 +123,10 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** Owner 2026-11-06 14:58 approved names-before-after.csv (745 names; 17,969 sizes from names) and said push it; the cleanup screen (bob/pricebook-screen) isn't ready, so this applies the same rules from the terminal.
 - **Files:** `scripts/bin/vt-pricebook-cleanup`
 - **Next person must know:** The importer only fills empty fields of existing items, so ILSA re-imports keep these names; the automatic ILSA sync (next) must keep them too.
+### 2026-11-06 15:55 ET — Bob (Claude) — vt-server installs the emoji font when it's missing
+- **What:** vt-server: if fonts-noto-color-emoji isn't installed, apt-get installs it once and refreshes the font cache (like Qt Multimedia).
+- **Why:** Owner 2026-11-06: the top bar's icons (battery, Wi-Fi, customer count) showed as boxes; the Pi had no emoji font at all (fc-list: 0), so on X11 nothing could draw them.
+- **Files:** `scripts/bin/vt-server`
 
 ### 2026-11-06 14:26 ET — Bob (Claude) — Register window: placed on the main monitor by its exact place; no refit loop
 - **What:** main.cpp present(): the register window gets setScreen(primary) and setGeometry(primary's geometry) before showFullScreen, at start and on every refit. Refit: one 800 ms timer for several screen changes at once; skipped when the window is already full screen on the primary; screen changes it causes itself (1.5 s) ignored; after 4 tries in a minute it stops and logs 'Couldn't keep the register full screen on <monitor>'.
