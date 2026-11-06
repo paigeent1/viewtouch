@@ -69,7 +69,7 @@ Record every change, time-stamped, at the top of `modern/vt-modern-development-n
 ## Used by ViewTouch's Labels screen (tablets)
 - `vt-label-utility --print-job job.json` prints with no window: `{"template", "items": [{"upc", "qty"}], "qty"}`, in the items' order.
 - `vt-label-utility --preview-job job.json --out label.png` draws one label exactly as it prints: `{"template", "upc"}` (exit 3: UPC not found).
-- Both look items up in the same list the window uses (the ILSA temp price book while it exists).
+- Both look items up in the same list the window uses: ViewTouch's items once it has 1,000+ retail items (the ILSA price book imported), else the ILSA temp price book while it exists.
 
 ## Barcodes print the code exactly as stored (2026-11-03)
 - Labels are scanned back in (receiving, the register), so the barcode always gives the same number the price book / ViewTouch has.

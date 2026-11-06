@@ -546,6 +546,41 @@ TEST_CASE("Labels screen: lists Neil's ILSA price book while it's there", "[labe
     qputenv("HOME", oldHome);
 }
 
+TEST_CASE("Labels screen: once the price book is in ViewTouch, it lists ViewTouch's items, not Neil's file", "[labels]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    QDir().mkpath(home.path() + u"/.local/share/ViewTouch"_s);
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, u"test_pricebook2"_s);
+        db.setDatabaseName(home.path() + u"/.local/share/ViewTouch/ilsa_temp_pricebook.db"_s);
+        REQUIRE(db.open());
+        QSqlQuery q(db);
+        REQUIRE(q.exec(u"CREATE TABLE items(upc, name, dept_num, dept_grp, category, price, cost, mfg, prod_grp, sub_grp, pack_qty, altupc)"_s));
+        REQUIRE(q.exec(u"INSERT INTO items VALUES('01234567890','ZIPPO CLASSIC','30','','LIGHTERS',22.5,10,'GENERAL','','',1,NULL)"_s));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(u"test_pricebook2"_s);
+
+    app::PosData data = test::seedPosData();
+    for (int i = 0; i < 1000; ++i) {                                                     // the imported price book
+        core::MenuItem m;
+        m.id = "ilsa-" + std::to_string(i);
+        m.name = "ITEM " + std::to_string(i);
+        m.family = data.menu.front().family;
+        m.barcodes = {std::to_string(70000000000LL + i)};
+        data.menu.push_back(m);
+    }
+    PosService pos(std::move(data), nullptr);
+    REQUIRE(pos.findRetailLabels(u"01234567890"_s));                                     // Neil's file: not read
+    CHECK(pos.retailLabels()[u"matches"_s].toList().isEmpty());
+    REQUIRE(pos.findRetailLabels(u"70000000005"_s));                                     // ViewTouch's own item
+    CHECK(names(pos.retailLabels()[u"matches"_s].toList()) == QStringList{u"ITEM 5"_s});
+    qputenv("HOME", oldHome);
+}
+
 namespace {
 // The barcode on the back of a license (AAMVA), with this date of birth and expiration (MMDDYYYY).
 QString license(const QString &dob, const QString &expires)

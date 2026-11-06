@@ -713,7 +713,12 @@ struct LabelItem {
     QStringList codes;     // the same codes, for scanning
 };
 
-// While ~/.local/share/ViewTouch/ilsa_temp_pricebook.db exists (Neil's ILSA price book, until Jan 1), the
+// Once the ILSA price book has been imported into ViewTouch (at least this many items with a UPC), the Labels
+// screen lists ViewTouch's own items and Neil's file is no longer read (tools/vt_label_utility.py
+// OWN_PRICE_BOOK_ITEMS: the same rule).
+constexpr std::size_t kOwnPriceBookItems = 1000;
+
+// Until then, while ~/.local/share/ViewTouch/ilsa_temp_pricebook.db exists (Neil's ILSA price book), the
 // label utility prints from it, so the Labels screen lists it too: same groups, brands and UPCs as
 // tools/vt_label_utility.py load_from_viewtouch_db(). Read-only; read again only when the file changes.
 QString pricebookPath()
@@ -823,9 +828,12 @@ QVariantMap PosService::retailLabels() const
     }
     QVariantList matches;
     const QString q = labelQuery_.trimmed();
-    // The items: Neil's ILSA price book while it's there (the label utility prints from it), else ViewTouch's menu.
+    // The items: ViewTouch's menu once the price book is in it; until then Neil's ILSA price book while it's
+    // there (the label utility prints from it).
     std::vector<LabelItem> fromMenu;
-    const std::vector<LabelItem> &book = pricebookItems();
+    static const std::vector<LabelItem> noBook;
+    const auto withUpc = std::ranges::count_if(s_->menu, [](const MenuItem &m) { return !m.barcodes.empty(); });
+    const std::vector<LabelItem> &book = std::size_t(withUpc) >= kOwnPriceBookItems ? noBook : pricebookItems();
     if (book.empty()) {
         std::map<QString, QString> categoryNames;
         for (const MenuCategory &c : s_->categories())

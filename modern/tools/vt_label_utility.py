@@ -540,9 +540,18 @@ def parse_vt_menu_dict(m, seen, items):
             "is_retail": is_retail
         })
 
-def load_from_viewtouch_db():
+# Once the ILSA price book has been imported into ViewTouch (at least this many retail items), labels come
+# from ViewTouch's own items and Neil's temporary ILSA price book file is no longer read. The Labels screen
+# (pos_inventory.cpp, kOwnPriceBookItems) uses the same rule.
+OWN_PRICE_BOOK_ITEMS = 1000
 
-    # --- TEMPORARY ILSA PRICEBOOK HOOK (FOR LABEL UTILITY TRAINING BEFORE JAN 1) ---
+
+def load_from_viewtouch_db():
+    vt_items = load_viewtouch_menu_items()
+    if sum(1 for it in vt_items if it.get("is_retail")) >= OWN_PRICE_BOOK_ITEMS:
+        return vt_items
+
+    # --- TEMPORARY ILSA PRICEBOOK HOOK (Neil): only until the price book is in ViewTouch ---
     temp_db = os.path.expanduser("~/.local/share/ViewTouch/ilsa_temp_pricebook.db")
     if os.path.exists(temp_db):
         try:
@@ -588,6 +597,11 @@ def load_from_viewtouch_db():
         except Exception as e:
             print(f"Warning reading temp pricebook, falling back to viewtouch.db: {e}")
     # --------------------------------------------------------------------------------
+    return vt_items
+
+
+def load_viewtouch_menu_items():
+    """ViewTouch's own items (viewtouch.db, read-only)."""
     items = []
     seen = set()
     if os.path.exists(VT_DB_PATH):

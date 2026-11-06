@@ -115,6 +115,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 19:06 ET — Bob (Claude) — Labels read ViewTouch's own price book once the ILSA items are imported
+- **What:** The label utility (vt_label_utility.py load_from_viewtouch_db) and the Labels screen (pos_inventory.cpp retailLabels) now use ViewTouch's own items as soon as ViewTouch has 1,000+ items with a UPC (OWN_PRICE_BOOK_ITEMS / kOwnPriceBookItems). Below that they still use Neil's temporary ILSA price book (~/.local/share/ViewTouch/ilsa_temp_pricebook.db) while it exists. New test in test_customers.cpp; LABEL_UTILITY_NOTES updated.
+- **Why:** Owner: change the label utility to look at the ViewTouch price book after the ILSA upload (BH beta, 2026-11-05). Neil's hook (commit 15fb4f20, 'TEMPORARY ILSA PRICEBOOK HOOK') always preferred the temp file whenever it existed.
+- **Files:** `modern/tools/vt_label_utility.py, modern/app/pos_inventory.cpp, modern/tests/test_customers.cpp, modern/tools/LABEL_UTILITY_NOTES.md`
+- **Next person must know:** No step needed on the Pi: after the Menu Builder import the switch is automatic. The temp file can be deleted later; nothing reads it once ViewTouch has the items.
+
 ### 2026-11-05 18:54 ET — Bob (Claude) — vt-ilsa-items: UPCs as scanners send them (leading 0 restored)
 - **What:** ILSA stores codes as numbers, so a UPC-A's leading 0 is dropped (016165009116 -> 16165009116) and a scanned code wouldn't match. Each 11-digit code also gets its 12-digit form ('0' + code); a 13-digit code starting with 0 also gets its 12-digit form. The code as ILSA has it stays first.
 - **Why:** Owner 2026-11-05: Zen tubes (UPC 0 16165 00911 6) found by lookup but a Bluetooth scan said not on file.
