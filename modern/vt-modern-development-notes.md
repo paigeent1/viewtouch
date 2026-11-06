@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:06 ET — Bob (Claude) — Price book cleanup: owner's rulings on the review list
+- **What:** vt-pricebook-cleanup: 5½+ / 6¼+ / 6¾+ read as 5⅝ / 6⅜ / 6⅞ without a 'check' flag; a size stuck to a word (PRIS5½+X46) gets a space and is read as a size (PRIS 5⅝X46); ring gauges up to 100 count as sizes (ASYLUM 9 9X90). Self-test 32 of 32.
+- **Why:** Owner 2026-11-06 after reviewing the first list (31,702 items: 733 names, 17,956 sizes, 453 odd cases): a half plus + is a half and an eighth; add the space in PRIS; 9x90 is a real cigar.
+- **Files:** `scripts/bin/vt-pricebook-cleanup`
+- **Next person must know:** Next: the Price book cleanup screen in ViewTouch (approve all / edit one / skip), using these same rules.
+
 ### 2026-11-06 12:54 ET — Bob (Claude) — Release 2026-11-06 (c): Screen check, vt-share, upstream group 2, price book review
 - **What:** bob/release-1106c: bob/screen-check plus the commits of bob/upstream-group2, bob/pricebook-fractions and bob/seed-jump-targets cherry-picked on top (no merge commits; same code as bob/release-1106b). Each part passed CI on its own with only main's 28 known failing test cases (screen-check 42257012418, upstream-group2 42259921064).
 - **Why:** Release (b) used merge commits: build numbers (commit counts) then ran out of order in the build history (test_net 'Versions' failed in CI 42262248675), which would also confuse the tablets' version checks. Keep main's history linear.

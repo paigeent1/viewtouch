@@ -36,6 +36,7 @@ R_PLUS = "+ = an eighth (6+ -> 6⅛)"
 R_PLUS2 = "++ read as two eighths (6++ -> 6¼)"
 R_GPLUS = "fraction then + (6½+ -> 6⅝)"
 R_SIZE = "size from name"
+R_STUCK = "space before a size stuck to a word (PRIS5½+X46 -> PRIS 5⅝X46)"
 
 PACK_WORD = r"(?:PK|PKS|PACK|PAK|CT|CNT|COUNT|PC|PCS)\b"
 AND_WORD = r"(?:LIGHTER|CUTTER|FREE|GIFT|ASH|CASE)"
@@ -87,7 +88,10 @@ def fix_fractions(name):
             flags.append(f"{digits}+{re.match(r'\d+', after).group(0)}: a deal? (left alone)")
             out += keep
             continue
-        if lead and re.match(r"[A-Za-z./$]", lead):
+        # A size stuck to a word (PRIS5½+X46): a space goes in, then it's read like any size.
+        # Owner 2026-11-06. Without an X and a gauge after it, it's left alone.
+        stuck = bool(lead) and bool(re.match(r"[A-Za-z]", lead)) and bool(re.match(r"\s*[xX×]\s*\d{2,3}", after))
+        if lead and re.match(r"[A-Za-z./$]", lead) and not stuck:
             flags.append(f"+ after '{lead}{digits}{glyph}' (not a size? left alone)")
             out += keep
             continue
@@ -109,9 +113,11 @@ def fix_fractions(name):
             flags.append(f"{digits}{glyph}{m.group(0)}: can't tell (left alone)")
             out += keep
             continue
+        if stuck:
+            rules.append(R_STUCK)
+            seg = seg[:len(seg) - len(digits) - len(glyph)] + " " + digits + glyph
         if glyph:
-            rules.append(R_GPLUS)
-            flags.append(f"{digits}{glyph}+ read as {digits}{GLYPH[total]}: check")
+            rules.append(R_GPLUS)   # owner 2026-11-06: 5½+ is 5⅝ (a half and an eighth)
         elif n == 2:
             rules.append(R_PLUS2)
             flags.append(f"{digits}++ read as {digits}{GLYPH[total]}: check")
@@ -138,7 +144,7 @@ def parse_size(name):
             flags.append(f"'{text}' then a pack word: a pack count? (no size)")
         elif length < 3:
             flags.append(f"'{text}': {m.group(1)} is short for a cigar, a pack count? (no size)")
-        elif length > 12 or not 20 <= g1 <= 80 or (g2 and not 20 <= g2 <= 80):
+        elif length > 12 or not 20 <= g1 <= 100 or (g2 and not 20 <= g2 <= 100):   # 9X90 is real (owner)
             flags.append(f"'{text}': odd size (no size)")
         else:
             found.append((round(length * 16) / 16, g1, g2))
@@ -199,7 +205,7 @@ EXAMPLES = [
     ("TORO 6 1/8 X 52", "TORO 6⅛ X 52", "6 1/8", "52", "", False),
     ("ROBUSTO 4-3/4X50", "ROBUSTO 4¾X50", "4 3/4", "50", "", False),
     ("CHURCHILL 7++ X 48", "CHURCHILL 7¼ X 48", "7 1/4", "48", "", True),
-    ("LANCERO 7 1/2+ X 38", "LANCERO 7⅝ X 38", "7 5/8", "38", "", True),
+    ("LANCERO 7 1/2+ X 38", "LANCERO 7⅝ X 38", "7 5/8", "38", "", False),
     ("CORONA 5½ X 42", "", "5 1/2", "42", "", False),
     ("ROBUSTO 5 X 50", "", "5", "50", "", False),
     ("GORDO 6X60 BOX OF 20", "", "6", "60", "", False),
@@ -218,6 +224,11 @@ EXAMPLES = [
     ("21+ ONLY", "", "", "", "", True),
     ("B7G1+ BONUS", "", "", "", "", True),
     ("FRUIT CIGARILLO 4X28", "", "4", "28", "", False),
+    ("AF ANEJO #46 5½+X46", "AF ANEJO #46 5⅝X46", "5 5/8", "46", "", False),
+    ("ASHTON SYMMETRY PRIS5½+X46 BX25", "ASHTON SYMMETRY PRIS 5⅝X46 BX25", "5 5/8", "46", "", False),
+    ("ASYLUM 9 9X90", "", "9", "90", "", False),
+    ("XIKAR HUMISTORE 4X10 BAG", "", "", "", "", True),
+    ("FASFIL 5X BUTANE 300ML", "", "", "", "", True),
     ("NO SIZE HERE", None, "", "", "", False),
 ]
 
