@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 17:18 ET — Bob (Claude) — Release 2026-11-06 (e): guest-screen videos with sound, label utility 1.2
+- **What:** bob/release-1106e = main 0419676 + guest-screen videos (Dropbox, auto-prepared to H.264 with blurred sides for upright phone videos, Sound switch per video, muted during an open check, rotation keeps going) + vt-guest-audio (sound out the guest monitor's HDMI) + vt-server installs ffmpeg + Site Setup 'Messages and pictures' opens Customer display + label utility 1.2 (managers only change templates, Rename, Save As, Test Print, Quick Label for everyone; Printer Offset open to all). CI 42301483618: main's 28 known failing test cases only. Linear.
+- **Why:** One Pi update and one tablet build.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** Owner decisions recorded 2026-11-06: customer found shows just the name, with buttons for past transactions and past items (newest first); subscription = HCA hospitality program (automatic card top-ups, subscription pricing at bar and retail, quarterly cigar dinners, event perks, personal humidor privileges), not yet settled; billboard screens (signage only) on Fire TV (first: Insignia NS-24F201NA26) in progress on bob/billboard; scanner speed index + duplicate guard: not now.
+
 ### 2026-11-06 17:01 ET — Bob (Claude) — Site Setup: 'Messages and pictures' opens Store Settings at Customer display
 - **What:** WidgetSiteSetup's button sets the remembered Store Settings section (widget state adminSection:store = display) before jumping to admin-store.
 - **Why:** Owner 2026-11-06 17:00: the button opened Store Settings at 'The store' instead of Customer display.
