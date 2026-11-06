@@ -292,9 +292,11 @@ QString TicketPrinter::saveExceptionTickets(const PosSettings &settings, const R
     keep(reportTicket(exceptions, ctx), u"exceptions-report"_s);
     for (const ExceptionTicket &t : tickets) {
         Document d;
-        if (t.check)
-            d = receipt(*t.check, ctx);
-        else if (t.noSale)
+        if (t.check) {   // the store's copy: with the buyer's date of birth when an ID was scanned
+            core::Check k = *t.check;
+            k.printDob = true;
+            d = receipt(k, ctx);
+        } else if (t.noSale)
             d = noSaleTicket(*t.noSale, t.number, t.drawer, ctx);
         else
             continue;
