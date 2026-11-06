@@ -259,6 +259,9 @@ const MenuItem *PosService::findItem(const QString &idOrName) const
         for (const MenuItem &m : s_->menu)
             if (std::ranges::find(m.barcodes, key) != m.barcodes.end())
                 return &m;
+        for (const MenuItem &m : s_->menu)   // the same UPC read another way (a 0 in front...)
+            if (std::ranges::any_of(m.barcodes, [&](const std::string &b) { return sameBarcode(b, key); }))
+                return &m;
     }
     return nullptr;
 }
@@ -270,6 +273,32 @@ QStringList PosService::barcodeList(const QString &text)
         if (!out.contains(c))
             out << c;
     return out;
+}
+
+bool PosService::sameBarcode(const std::string &stored, const std::string &scanned)
+{
+    if (stored.empty() || scanned.empty())
+        return false;
+    if (stored == scanned)
+        return true;
+    const auto digits = [](const std::string &s) {
+        return std::ranges::all_of(s, [](char ch) { return ch >= '0' && ch <= '9'; });
+    };
+    if (!digits(stored) || !digits(scanned))
+        return false;
+    // A UPC-A read as an EAN-13: the same 12 digits with a 0 in front (either way round).
+    if (scanned.size() == 13 && stored.size() == 12 && scanned[0] == '0')
+        return scanned.compare(1, 12, stored) == 0;
+    if (stored.size() == 13 && scanned.size() == 12 && stored[0] == '0')
+        return stored.compare(1, 12, scanned) == 0;
+    // 11 digits: a UPC-A without its check digit.
+    if (scanned.size() == 11 && stored.size() == 12 && stored.compare(0, 11, scanned) == 0) {
+        int sum = 0;
+        for (int i = 0; i < 11; ++i)
+            sum += (scanned[10 - i] - '0') * (i % 2 == 0 ? 3 : 1);
+        return stored[11] == char('0' + (10 - sum % 10) % 10);
+    }
+    return false;
 }
 
 QString PosService::barcodeProblem(const QStringList &codes, const std::string &itemId) const

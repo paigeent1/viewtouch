@@ -490,6 +490,10 @@ public:
     // they can't be item `itemId`'s (empty: they can).
     static QStringList barcodeList(const QString &text);
     QString barcodeProblem(const QStringList &codes, const std::string &itemId) const;
+    // A scanned code is this stored barcode: the same, or the same UPC-A read
+    // another way (13 digits with a 0 in front: a scanner reading it as an
+    // EAN-13; 11 digits: the check digit left off).
+    static bool sameBarcode(const std::string &stored, const std::string &scanned);
     QString format(Money amount) const;
 
     // --- session -----------------------------------------------------------

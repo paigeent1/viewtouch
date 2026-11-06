@@ -648,6 +648,13 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
     CHECK_FALSE(names(pos.orderItems()).contains(u"ZEN TUBE"_s));
     CHECK(names(pos.menuItems()).contains(u"ZEN TUBE"_s));
     CHECK(pos.itemForCode(u"016165009116"_s).value(u"name"_s) == u"ZEN TUBE"_s);
+    // The same UPC read as an EAN-13 (a 0 in front), or without its check digit: still that item.
+    CHECK(pos.itemForCode(u"0016165009116"_s).value(u"id"_s) == u"ilsa-16165009116"_s);
+    CHECK(pos.itemForCode(u"01616500911"_s).value(u"id"_s) == u"ilsa-16165009116"_s);
+    CHECK(pos.itemForCode(u"1016165009116"_s).isEmpty());   // another digit in front: another code
+    CHECK(pos.itemForCode(u"0016165009116"_s, true).isEmpty());   // a typed item number: exact only
+    CHECK(PosService::sameBarcode("0016165009116", "016165009116"));   // stored as EAN-13, scanned as UPC-A
+    CHECK_FALSE(PosService::sameBarcode("016165009116", "01616500911X"));
 
     // Item Look Up and Labels: found by name; an item added later is found too (the list is made again).
     REQUIRE(pos.findRetailLabels(u"zen"_s));

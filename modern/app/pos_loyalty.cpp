@@ -250,19 +250,19 @@ QVariantMap PosService::itemForCode(const QString &code, bool numberOnly) const
     const std::string c = ss(code.trimmed());
     if (c.empty() || !user())
         return {};
-    std::string c12;
-    if (c.size() == 11 && std::ranges::all_of(c, [](char ch) { return ch >= '0' && ch <= '9'; })) {
-        int sum = 0;
-        for (int i = 0; i < 11; ++i)
-            sum += (c[10 - i] - '0') * (i % 2 == 0 ? 3 : 1);
-        c12 = c + char('0' + (10 - sum % 10) % 10);
-    }
+    // Exact first (a number or barcode as stored), then the same UPC read
+    // another way: 11 digits (no check digit), or 13 with a 0 in front (a
+    // scanner reading a UPC-A as an EAN-13).
     for (const MenuItem &m : s_->menu) {
-        const bool hit = m.number == c
-            || (!numberOnly && std::ranges::any_of(m.barcodes, [&](const std::string &b) { return b == c || (!c12.empty() && b == c12); }));
+        const bool hit = m.number == c || (!numberOnly && std::ranges::find(m.barcodes, c) != m.barcodes.end());
         if (hit)
             return {{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}};
     }
+    if (numberOnly)
+        return {};
+    for (const MenuItem &m : s_->menu)
+        if (std::ranges::any_of(m.barcodes, [&](const std::string &b) { return sameBarcode(b, c); }))
+            return {{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}};
     return {};
 }
 
