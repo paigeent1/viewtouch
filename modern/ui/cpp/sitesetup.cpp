@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QHostAddress>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -18,7 +19,9 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScreen>
 #include <QTimer>
+#include <QWindow>
 
 #include <algorithm>
 
@@ -93,6 +96,16 @@ QString firstLine(const QString &path)
 {
     QFile f(path);
     return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readLine()).trimmed() : QString();
+}
+
+// A vt-* tool: installed in /usr/local/bin, or (one added since this Pi linked them) in the repo.
+QString toolPath(const QString &name)
+{
+    const QString installed = u"/usr/local/bin/"_s + name;
+    if (QFile::exists(installed))
+        return installed;
+    const QString repo = QDir::home().filePath(u"viewtouch-main/scripts/bin/"_s + name);
+    return QFile::exists(repo) ? repo : installed;
 }
 
 QString thisAddress()
@@ -262,26 +275,44 @@ void LayoutController::siteAction(const QString &action)
         return;
     }
     struct Tool { const char16_t *action; const char16_t *program; QStringList args; const char *busy; bool restarts; };
+    // Screen check: this monitor is the register (vt-guest-display on HDMI-1). Only a monitor the
+    // last look found, so nothing else reaches the command line.
+    QStringList registerArgs;
+    if (action.startsWith(u"register:"_s)) {
+        const QString output = action.mid(9);
+        bool known = false;
+        for (const QVariant &o : screens_.value(u"outputs"_s).toList())
+            known = known || o.toMap().value(u"name"_s).toString() == output;
+        static const QRegularExpression safe(uR"(^[A-Za-z0-9-]{1,24}$)"_s);
+        if (!known || !safe.match(output).hasMatch()) {
+            setStatus(tr("No monitor called %1 is plugged in. Look again.").arg(output));
+            return;
+        }
+        registerArgs = {u"on"_s, output};
+    }
     const Tool tools[] = {
-        {u"check-tablets", u"/usr/local/bin/vt-status", {}, QT_TR_NOOP("Checking the tablets..."), false},
-        {u"push-tablets", u"/usr/local/bin/vt-tablets", {}, QT_TR_NOOP("Sending the app to the tablets..."), false},
-        {u"scan-tvs", u"/usr/local/bin/vt-directv", {u"scan"_s, u"--save"_s},
+        {u"register", u"vt-guest-display", registerArgs,
+         QT_TR_NOOP("Making that monitor the register: ViewTouch restarts..."), true},
+        {u"touch-map", u"vt-touch-map", {u"--verbose"_s}, QT_TR_NOOP("Tying each touchscreen to its monitor..."), false},
+        {u"check-tablets", u"vt-status", {}, QT_TR_NOOP("Checking the tablets..."), false},
+        {u"push-tablets", u"vt-tablets", {}, QT_TR_NOOP("Sending the app to the tablets..."), false},
+        {u"scan-tvs", u"vt-directv", {u"scan"_s, u"--save"_s},
          QT_TR_NOOP("Looking for DIRECTV receivers and smart TVs on this network (about 30 seconds)..."), false},
-        {u"learn-touch", u"/usr/local/bin/vt-guest-display", {u"touch"_s, u"--or-map"_s},
+        {u"learn-touch", u"vt-guest-display", {u"touch"_s, u"--or-map"_s},
          QT_TR_NOOP("Touch the GUEST screen now (20 seconds)... tap a blank spot."), false},
-        {u"guest-on", u"/usr/local/bin/vt-guest-display", {u"on"_s}, QT_TR_NOOP("Turning the guest display on: ViewTouch restarts..."), true},
-        {u"guest-off", u"/usr/local/bin/vt-guest-display", {u"off"_s}, QT_TR_NOOP("Turning the guest display off: ViewTouch restarts..."), true},
-        {u"restart", u"/usr/local/bin/vt-server", {}, QT_TR_NOOP("Restarting ViewTouch..."), true},
+        {u"guest-on", u"vt-guest-display", {u"on"_s}, QT_TR_NOOP("Turning the guest display on: ViewTouch restarts..."), true},
+        {u"guest-off", u"vt-guest-display", {u"off"_s}, QT_TR_NOOP("Turning the guest display off: ViewTouch restarts..."), true},
+        {u"restart", u"vt-server", {}, QT_TR_NOOP("Restarting ViewTouch..."), true},
     };
     const Tool *tool = nullptr;
     for (const Tool &t : tools)
-        if (action == QStringView(t.action))
+        if (QStringView(t.action) == u"register" ? !registerArgs.isEmpty() : action == QStringView(t.action))
             tool = &t;
     if (!tool) {
         setStatus(tr("Unknown site tool: %1").arg(action));
         return;
     }
-    const QString program = QString::fromUtf16(tool->program);
+    const QString program = toolPath(QString::fromUtf16(tool->program));
     if (!QFile::exists(program)) {
         setStatus(tr("%1 isn't installed on this computer.").arg(QFileInfo(program).fileName()));
         return;
@@ -301,7 +332,8 @@ void LayoutController::siteAction(const QString &action)
     }
     auto *proc = new QProcess(this);
     proc->setProcessEnvironment(env);
-    connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+    const bool screensAfter = action == u"touch-map" || action == u"learn-touch";
+    connect(proc, &QProcess::finished, this, [this, proc, screensAfter](int, QProcess::ExitStatus) {
         QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
         const QStringList rows = out.split(u'\n', Qt::SkipEmptyParts);
         // The outcome: the last line or two, not the whole log.
@@ -310,8 +342,72 @@ void LayoutController::siteAction(const QString &action)
         ++siteRevision_;
         emit siteChanged();
         proc->deleteLater();
+        if (screensAfter)
+            refreshScreens();   // the Screen check shows where the touches land now
     });
     QTimer::singleShot(10 * 60 * 1000, proc, [proc] { proc->kill(); });
     proc->start(program, tool->args);
+#endif
+}
+
+QVariantMap LayoutController::screenCheck() const
+{
+#ifdef Q_OS_ANDROID
+    return {{u"android"_s, true}};
+#else
+    QVariantMap out = screens_;
+    out.insert(u"android"_s, false);
+    out.insert(u"busy"_s, screensBusy_);
+    // What ViewTouch itself sees, and which of its windows is on which monitor.
+    QVariantList qt;
+    const QScreen *primary = QGuiApplication::primaryScreen();
+    for (QScreen *sc : QGuiApplication::screens()) {
+        QVariantList windows;
+        for (QWindow *win : QGuiApplication::topLevelWindows())
+            if (win->isVisible() && win->screen() == sc && !win->title().isEmpty())
+                windows.append(win->title());
+        const QRect g = sc->geometry();
+        qt.append(QVariantMap{{u"name"_s, sc->name()}, {u"x"_s, g.x()}, {u"y"_s, g.y()}, {u"w"_s, g.width()},
+                              {u"h"_s, g.height()}, {u"primary"_s, sc == primary},
+                              {u"model"_s, QStringList{sc->manufacturer(), sc->model()}.join(u' ').trimmed()},
+                              {u"windows"_s, windows}});
+    }
+    out.insert(u"qtScreens"_s, qt);
+    return out;
+#endif
+}
+
+void LayoutController::refreshScreens()
+{
+#ifndef Q_OS_ANDROID
+    if (screensBusy_)
+        return;
+    const QString program = toolPath(u"vt-screens"_s);
+    if (!QFile::exists(program)) {
+        screens_ = {{u"problems"_s, QStringList{tr("vt-screens isn't installed on this computer.")}}};
+        ++siteRevision_;
+        emit siteChanged();
+        return;
+    }
+    screensBusy_ = true;
+    auto *proc = new QProcess(this);
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (!env.contains(u"DISPLAY"_s))
+        env.insert(u"DISPLAY"_s, u":0"_s);
+    proc->setProcessEnvironment(env);
+    connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+        const QJsonDocument doc = QJsonDocument::fromJson(proc->readAllStandardOutput());
+        screens_ = doc.isObject() ? doc.object().toVariantMap()
+                                  : QVariantMap{{u"problems"_s, QStringList{tr("Couldn't read the screens.")}}};
+        screens_.insert(u"checkedAt"_s, QDateTime::currentMSecsSinceEpoch());
+        screensBusy_ = false;
+        ++siteRevision_;
+        emit siteChanged();
+        proc->deleteLater();
+    });
+    QTimer::singleShot(30 * 1000, proc, [proc] { proc->kill(); });
+    proc->start(u"python3"_s, {program, u"--json"_s});
+    ++siteRevision_;
+    emit siteChanged();
 #endif
 }

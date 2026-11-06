@@ -2,10 +2,11 @@
 # Ties each touchscreen to its own monitor (X11): the guest's touchscreen (learned once with
 # `vt-guest-display touch`, remembered by the USB port it's plugged into) to the second monitor,
 # every other touchscreen to the first (the POS). Run by vt-guest-display and after every reboot.
-#   vt-touch-map          tie them now
+#   vt-touch-map          tie them now (--verbose: and say where each one went)
 #   vt-touch-map --watch  and again whenever a touchscreen (re)connects or the monitors change: X
 #                         forgets the tie when a device reconnects (a reboot, a USB hiccup)
 export DISPLAY="${DISPLAY:-:0}"
+[ "$1" = --verbose ] && export VT_TOUCH_VERBOSE=1   # say where each one went (Screen check)
 if [ "$1" = --watch ]; then
     for p in $(pgrep -f "vt-touch-map --watc[h]"); do [ "$p" != "$$" ] && kill "$p" 2>/dev/null; done   # one watcher
     last=""

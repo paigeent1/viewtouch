@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+"""What the Pi sees on its screens, for Hardware Configuration > Screen check (and by hand).
+
+  vt-screens          a plain report: each monitor (port, size, name, primary), which one is the
+                      register and which the guest screen, each touchscreen (USB port, which monitor
+                      its touches land on), and anything that looks wrong
+  vt-screens --json   the same for ViewTouch's Screen check page
+
+Reads only (xrandr, xinput, udevadm and the vt-guest-display files); changes nothing.
+The register's port is the one saved by `vt-guest-display on HDMI-X` (~/.vt-pos-output), else the
+first monitor listed, the same rule vt-guest-display and vt-touch-map use.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+TOUCH = re.compile(r"touch|ctp|ilitek|goodix|egalax|eeti", re.I)
+
+
+def run(*args):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=10,
+                              env=dict(os.environ, DISPLAY=os.environ.get("DISPLAY", ":0"))).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def first_line(path):
+    try:
+        with open(os.path.join(HOME, path)) as f:
+            return f.readline().strip()
+    except OSError:
+        return ""
+
+
+def edid_name(hexdump):
+    """The monitor's own name and maker from its EDID (descriptor 0xFC), if it gives one."""
+    try:
+        b = bytes.fromhex(hexdump)
+    except ValueError:
+        return ""
+    if len(b) < 128:
+        return ""
+    name = ""
+    for off in (54, 72, 90, 108):
+        d = b[off:off + 18]
+        if d[0:3] == b"\0\0\0" and d[3] == 0xFC:
+            name = d[5:18].split(b"\n")[0].decode("ascii", "replace").strip()
+    m = (b[8] << 8) | b[9]
+    maker = "".join(chr(((m >> s) & 0x1F) + 64) for s in (10, 5, 0))
+    return " ".join(x for x in (maker if maker.isalpha() else "", name) if x)
+
+
+def x11_outputs():
+    text = run("xrandr", "--verbose")
+    if not text:
+        return None, (0, 0)
+    total = (0, 0)
+    m = re.search(r"current (\d+) x (\d+)", text)
+    if m:
+        total = (int(m.group(1)), int(m.group(2)))
+    outs, cur, in_edid, edid = [], None, False, ""
+    for line in text.splitlines():
+        h = re.match(r"^(\S+) (connected|disconnected)( primary)?\s*(?:(\d+)x(\d+)\+(\d+)\+(\d+))?.*?(?:(\d+)mm x (\d+)mm)?$", line)
+        if h:
+            if cur is not None:
+                cur["model"] = edid_name(edid)
+            cur = {"name": h.group(1), "connected": h.group(2) == "connected", "primary": bool(h.group(3)),
+                   "w": int(h.group(4) or 0), "h": int(h.group(5) or 0),
+                   "x": int(h.group(6) or 0), "y": int(h.group(7) or 0),
+                   "mmW": int(h.group(8) or 0), "mmH": int(h.group(9) or 0), "rate": ""}
+            outs.append(cur)
+            in_edid, edid = False, ""
+            continue
+        if cur is None:
+            continue
+        s = line.strip()
+        if s == "EDID:":
+            in_edid = True
+            continue
+        if in_edid:
+            if re.fullmatch(r"[0-9a-fA-F]+", s):
+                edid += s
+                continue
+            in_edid = False
+        r = re.search(r"\*current", line)
+        if r and not cur["rate"]:
+            v = re.search(r"v:.*?clock\s+([\d.]+)Hz", line)
+            if v:
+                cur["rate"] = "%.0f Hz" % float(v.group(1))
+    if cur is not None:
+        cur["model"] = edid_name(edid)
+    # The older xrandr layout puts the refresh on the line after "*current"
+    if any(o["connected"] and not o["rate"] for o in outs):
+        name = None
+        for line in text.splitlines():
+            h = re.match(r"^(\S+) (connected|disconnected)", line)
+            if h:
+                name, take = h.group(1), False
+                continue
+            if "*current" in line:
+                take = True
+                continue
+            if name and take:
+                v = re.search(r"clock\s+([\d.]+)Hz", line)
+                if v:
+                    for o in outs:
+                        if o["name"] == name and not o["rate"]:
+                            o["rate"] = "%.0f Hz" % float(v.group(1))
+                    take = False
+    return [o for o in outs if o["connected"]], total
+
+
+def wayland_outputs():
+    text = run("wlr-randr")
+    if not text:
+        return None
+    outs, cur = [], None
+    for line in text.splitlines():
+        if re.match(r"^\S", line):
+            cur = {"name": line.split()[0], "connected": True, "primary": False, "w": 0, "h": 0, "x": 0, "y": 0,
+                   "mmW": 0, "mmH": 0, "rate": "", "model": line.split('"')[1] if '"' in line else ""}
+            outs.append(cur)
+        elif cur is not None:
+            m = re.search(r"(\d+)x(\d+) px, ([\d.]+) Hz.*current", line)
+            if m:
+                cur.update(w=int(m.group(1)), h=int(m.group(2)), rate="%.0f Hz" % float(m.group(3)))
+            m = re.search(r"Position: (\d+),(\d+)", line)
+            if m:
+                cur.update(x=int(m.group(1)), y=int(m.group(2)))
+            m = re.search(r"Physical size: (\d+)x(\d+) mm", line)
+            if m:
+                cur.update(mmW=int(m.group(1)), mmH=int(m.group(2)))
+    return outs
+
+
+def usb_port(dev_id):
+    props = run("xinput", "list-props", str(dev_id))
+    m = re.search(r'Device Node[^"]*"([^"]+)"', props)
+    if not m:
+        return ""
+    info = run("udevadm", "info", "-q", "property", "-n", m.group(1))
+    p = re.search(r"^ID_PATH=(.*)$", info, re.M)
+    # The port only: a touchscreen is two devices on interfaces :1.0 and :1.1 of the same port.
+    return re.sub(r"(usb-\d+:[\d.]+):\d+\.\d+$", r"\1", p.group(1)) if p else ""
+
+
+def touch_target(dev_id, outs, total):
+    """The monitor this touchscreen's touches land on (its Coordinate Transformation Matrix)."""
+    props = run("xinput", "list-props", str(dev_id))
+    m = re.search(r"Coordinate Transformation Matrix[^:]*:\s*([-\d., ]+)", props)
+    if not m or not total[0]:
+        return ""
+    v = [float(x) for x in m.group(1).replace(",", " ").split()]
+    if len(v) != 9:
+        return ""
+    sx, tx, sy, ty = v[0], v[2], v[4], v[5]
+    if abs(sx - 1) < 0.01 and abs(sy - 1) < 0.01 and abs(tx) < 0.01 and abs(ty) < 0.01:
+        return "(all screens)" if len(outs) > 1 else (outs[0]["name"] if outs else "")
+    W, H = total
+    for o in outs:
+        if (abs(o["w"] / W - sx) < 0.02 and abs(o["h"] / H - sy) < 0.02
+                and abs(o["x"] / W - tx) < 0.02 and abs(o["y"] / H - ty) < 0.02):
+            return o["name"]
+    return "(somewhere else)"
+
+
+def main():
+    as_json = "--json" in sys.argv[1:]
+    report = {"session": "", "outputs": [], "register": "", "registerSaved": first_line(".vt-pos-output"),
+              "guest": "", "guestOn": first_line(".vt-customer-display") not in ("", "off"),
+              "guestTouchPort": first_line(".vt-guest-touch"), "touch": [], "problems": []}
+    outs, total = (None, (0, 0))
+    if shutil.which("xrandr"):
+        outs, total = x11_outputs()
+        if outs is not None:
+            report["session"] = "x11"
+    if outs is None and shutil.which("wlr-randr"):
+        os.environ.setdefault("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+        for wd in (os.environ.get("WAYLAND_DISPLAY"), "wayland-0", "wayland-1"):
+            if wd:
+                os.environ["WAYLAND_DISPLAY"] = wd
+                outs = wayland_outputs()
+                if outs is not None:
+                    report["session"] = "wayland"
+                    break
+    problems = report["problems"]
+    if outs is None:
+        problems.append("Couldn't read the Pi's screens (no desktop session reached).")
+        outs = []
+    report["outputs"] = outs
+    names = [o["name"] for o in outs]
+    saved = report["registerSaved"]
+    reg = saved if saved in names else (names[0] if names else "")
+    report["register"] = reg
+    report["guest"] = next((n for n in names if n != reg), "") if report["guestOn"] else ""
+    if saved and saved not in names:
+        problems.append("The register is set to %s, but no monitor is plugged in there%s." % (
+            saved, " (it's using %s)" % reg if reg else ""))
+    if not names:
+        problems.append("No monitor found.")
+    if report["guestOn"] and len(names) < 2:
+        problems.append("The guest display is on, but only one monitor is plugged in.")
+    if report["session"] == "x11" and len(names) > 1 and reg:
+        prim = next((o["name"] for o in outs if o["primary"]), "")
+        if prim != reg:
+            problems.append("The register is %s but the Pi's main (primary) monitor is %s: ViewTouch opens "
+                            "the register on the primary one. Use 'Make this the register' on %s." % (
+                                reg, prim or "not set", reg))
+    if len(names) > 1 and not saved:
+        problems.append("Which monitor is the register hasn't been chosen; it's %s because the Pi lists it "
+                        "first. Use 'Make this the register' on the right one." % reg)
+
+    if report["session"] == "x11" and shutil.which("xinput"):
+        for line in run("xinput", "list").splitlines():
+            m = re.search(r"↳\s*(.*?)\s+id=(\d+)\s+\[slave\s+pointer", line)
+            if not m or not TOUCH.search(m.group(1)):
+                continue
+            dev = int(m.group(2))
+            port = usb_port(dev)
+            guest_port = re.sub(r"(usb-\d+:[\d.]+):\d+\.\d+$", r"\1", report["guestTouchPort"])
+            is_guest = bool(guest_port) and port == guest_port and len(names) > 1
+            want = report["guest"] if is_guest and report["guest"] else reg
+            got = touch_target(dev, outs, total)
+            report["touch"].append({"id": dev, "name": m.group(1), "port": port, "guest": is_guest,
+                                    "landsOn": got, "shouldLandOn": want})
+            if got and want and got != want:
+                problems.append("Touchscreen %s (USB %s) lands on %s; it should be %s. Use 'Tie touchscreens "
+                                "again'." % (m.group(1), port or "?", got, want))
+        if report["guestOn"] and len(report["touch"]) > 1 and not report["guestTouchPort"]:
+            problems.append("Two touchscreens, but the guest one hasn't been learned. Use 'Learn guest "
+                            "touchscreen'.")
+
+    if as_json:
+        print(json.dumps(report))
+        return
+    print("Screens (%s):" % (report["session"] or "not reached"))
+    for o in outs:
+        role = "REGISTER" if o["name"] == reg else ("GUEST" if o["name"] == report["guest"] else "")
+        size = ' %.0f"' % ((o["mmW"] ** 2 + o["mmH"] ** 2) ** 0.5 / 25.4) if o["mmW"] else ""
+        print("  %-8s %-9s %dx%d%s %s%s%s" % (o["name"], role, o["w"], o["h"], (" " + o["rate"]) if o["rate"] else "",
+                                         (o["model"] + " ") if o["model"] else "", size.strip(),
+                                         "  [primary]" if o["primary"] else ""))
+    for t in report["touch"]:
+        print("  touch %s (USB %s)%s -> %s" % (t["name"], t["port"] or "?", " [guest]" if t["guest"] else "",
+                                               t["landsOn"] or "?"))
+    print("Register: %s%s" % (reg or "?", "" if saved else " (not chosen; first listed)"))
+    print("Guest display: %s" % (("on " + report["guest"]) if report["guestOn"] else "off"))
+    for p in problems:
+        print("  ! " + p)
+    if not problems:
+        print("All good.")
+
+
+if __name__ == "__main__":
+    main()

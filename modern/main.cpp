@@ -877,6 +877,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"vt-touch-map"},   // Learn guest touchscreen
                 {u"hardware-config", u"site-setup"},     // Site Setup
                 {u"hardware-config", u"bluetooth"},      // Bluetooth scanner (pair one with a tablet)
+                {u"hardware-config", u"screen-check"},   // Screen check (which monitor is the register)
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {

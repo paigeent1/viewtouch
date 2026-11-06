@@ -174,6 +174,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetGuestOrder.qml
             ui/qml/WidgetGuestMessages.qml
             ui/qml/WidgetSiteSetup.qml
+            ui/qml/WidgetScreenCheck.qml
             ui/qml/WidgetReceiptLookup.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml

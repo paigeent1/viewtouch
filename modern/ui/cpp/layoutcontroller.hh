@@ -104,8 +104,15 @@ public:
     // Saves what's given (siteName, serverAddr, serverPort, scanner, scannerBaud, tablets). Admins.
     Q_INVOKABLE bool saveSiteSettings(const QVariantMap &values);
     // A site tool, in the background (the status line says how it went). Admins.
-    //   check-tablets, push-tablets, scan-tvs, learn-touch, guest-on, guest-off, restart
+    //   check-tablets, push-tablets, scan-tvs, learn-touch, guest-on, guest-off, restart,
+    //   touch-map (tie each touchscreen to its monitor again), register:<output> (that monitor is the
+    //   register: vt-guest-display on <output>, ViewTouch restarts)
     Q_INVOKABLE void siteAction(const QString &action);
+    // Screen check (Hardware Configuration > Screen check, sitesetup.cpp): what vt-screens --json last
+    // found (outputs, register, guest, touch, problems; refreshScreens() looks again, then siteChanged)
+    // plus what ViewTouch itself sees: qtScreens [{name, x, y, w, h, primary, model, windows: [title]}].
+    Q_INVOKABLE QVariantMap screenCheck() const;
+    Q_INVOKABLE void refreshScreens();
     int siteRevision() const { return siteRevision_; }
 
     // Persists a layout; false (with a message) when it could not.
@@ -398,6 +405,8 @@ private:
     void refreshGuest();
     QString status_;
     int siteRevision_ = 0;
+    QVariantMap screens_;        // vt-screens --json, last look
+    bool screensBusy_ = false;
     QString lastScan_;
     qint64 lastScanAt_ = 0;
     qint64 lastIdScanAt_ = 0;

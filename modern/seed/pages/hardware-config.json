@@ -290,6 +290,31 @@
       ]
     },
     {
+      "id": "screen-check",
+      "kind": "button",
+      "label": "Screen check",
+      "rect": {
+        "x": 600,
+        "y": 940,
+        "w": 340,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#1f6f73"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "screen-check"
+        }
+      ]
+    },
+    {
       "id": "back",
       "kind": "button",
       "rect": {

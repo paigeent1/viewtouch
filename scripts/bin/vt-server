@@ -12,6 +12,8 @@ if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; t
         || echo "Couldn't install Qt Multimedia; ViewTouch builds without video (pictures and GIFs still work)."
 fi
 cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
+# A vt-* command added since this Pi linked them (e.g. vt-screens): linked now, so it runs by name.
+for f in "$VT_REPO"/scripts/bin/vt-*; do [ -e "/usr/local/bin/$(basename "$f")" ] || sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || true; done
 sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
 # Stop ViewTouch the polite way first (it saves and closes the database on
 # SIGTERM); force it only if it is still running after 10 seconds.
