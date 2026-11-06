@@ -6,6 +6,9 @@ Nothing is changed: it reads ViewTouch's item list (viewtouch.db, opened read-on
   vt-pricebook-cleanup                 write ~/pricebook-cleanup/fractions.csv and print a summary
   vt-pricebook-cleanup --all           also print every suggestion, not just the first 40
   vt-pricebook-cleanup --db FILE       read another copy of viewtouch.db
+  vt-pricebook-cleanup --apply         APPLY the suggested names and fill empty sizes (owner approved the
+                                       before/after sheet 2026-11-06): stops ViewTouch, backs up viewtouch.db,
+                                       changes the items, starts ViewTouch again (vt-server)
   vt-pricebook-cleanup --out DIR       write fractions.csv there instead
   vt-pricebook-cleanup --self-test     check the name rules against a table of examples
 
@@ -272,9 +275,78 @@ def cut(text, n):
     return text if len(text) <= n else text[:n - 1] + "…"
 
 
+def apply(db, out_dir):
+    """Stops ViewTouch, backs up the database, applies every suggested name and fills empty sizes."""
+    import shutil, subprocess, time
+    os.makedirs(out_dir, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%d_%H%M%S")
+    print("Stopping ViewTouch (it saves first)...")
+    subprocess.run(["pkill", "-TERM", "-x", "vtmodern"])
+    for _ in range(40):
+        if subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode != 0:
+            break
+        time.sleep(0.5)
+    else:
+        sys.exit("ViewTouch didn't stop; nothing was changed.")
+    backup = os.path.join(out_dir, f"viewtouch-before-cleanup-{stamp}.db")
+    src = sqlite3.connect(db)
+    dst = sqlite3.connect(backup)
+    src.backup(dst)   # a whole, consistent copy (its journal included)
+    dst.close()
+    print(f"Backup: {backup}")
+    changed, sized = [], 0
+    try:
+        src.execute("BEGIN IMMEDIATE")
+        for (iid, raw) in src.execute("SELECT id, json FROM menu_items").fetchall():
+            try:
+                item = json.loads(raw)
+            except ValueError:
+                continue
+            r = review(item)
+            if not r:
+                continue
+            touched = False
+            if r["suggested_name"]:
+                changed.append((iid, item.get("name", ""), r["suggested_name"]))
+                item["name"] = r["suggested_name"]
+                touched = True
+            if r["length_in"]:
+                item["length"] = float(r["length_in"]); touched = True
+            if r["ring_gauge"]:
+                item["ringGauge"] = int(r["ring_gauge"]); touched = True
+            if r["ring_gauge2"]:
+                item["ringGauge2"] = int(r["ring_gauge2"]); touched = True
+            if r["length_in"] or r["ring_gauge"] or r["ring_gauge2"]:
+                sized += 1
+            if touched:
+                src.execute("UPDATE menu_items SET json = ? WHERE id = ?", (json.dumps(item, ensure_ascii=False), iid))
+        src.commit()
+    except Exception as e:
+        src.rollback()
+        src.close()
+        subprocess.Popen(["vt-server"])
+        sys.exit(f"Nothing was changed ({e}). ViewTouch is starting again.")
+    src.close()
+    log = os.path.join(out_dir, f"applied-{stamp}.csv")
+    with open(log, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(["item_id", "before", "after"])
+        w.writerows(changed)
+    print(f"Applied: {len(changed):,} names changed, {sized:,} items got a size. List: {log}")
+    print(f"To undo: stop ViewTouch, copy {backup} over {db}, run vt-server.")
+    print("Starting ViewTouch again...")
+    return subprocess.call(["vt-server"])
+
+
 def main(argv):
     if "--self-test" in argv:
         return self_test()
+    if "--apply" in argv:
+        db = os.path.expanduser(argv[argv.index("--db") + 1]) if "--db" in argv else VT_DB
+        out_dir = os.path.expanduser(argv[argv.index("--out") + 1]) if "--out" in argv else OUT_DIR
+        if not os.path.exists(db):
+            sys.exit(f"Can't find ViewTouch's database: {db}")
+        return apply(db, out_dir)
     db = VT_DB
     if "--db" in argv:
         db = os.path.expanduser(argv[argv.index("--db") + 1])
