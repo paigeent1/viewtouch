@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:24 ET — Bob (Claude) — Server refuses odd input from screens
+- **What:** Ported upstream df89b9f (app code only; its new test file was left out). A kitchen screen can only be set to one of the store's stations (or none). Opening a table refuses an empty name, a name over 40 characters, or one with spaces at the ends. Posted messages can be at most a month ahead and twenty at a time. The command list moved into PosService::commandTable() with commandNames() for tests; invoke() works the same.
+- **Why:** A screen could send any text as its station or table name (an empty or 5,000-character table showed up on the floor, receipts and reports), and posted messages had no limit, piling up in the settings every screen receives.
+- **Files:** `modern/app/pos_commands.cpp`, `modern/app/pos_kitchen.cpp`, `modern/app/pos_service.cpp`, `modern/app/pos_service.hh`
+
 ### 2026-11-06 11:23 ET — Bob (Claude) — Labor report total equals the sum of its rows
 - **What:** Ported upstream f510043. The Labor report rounds each person's pay to the cent first and the total is those rows added up, plus a test with three half-hour shifts at $10.01.
 - **Why:** The total was rounded once at the end, so it could be a cent or two different from adding up the rows.
