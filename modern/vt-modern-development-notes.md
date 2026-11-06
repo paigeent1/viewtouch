@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:04 ET — Bob (Claude) — Release: main moved up to bob/big-catalog
+- **What:** main fast-forwarded from 9f879118 to the bob/big-catalog head (DOB reprint choices, ID line and 'ID expired' on receipts, exception pictures with DOB, gift receipts *****, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X). CI run 42246143289 (ff8d33a1): the same 28 failing test cases / 31 failing lines as main's run 42234138120, nothing new. The tablet APK is built from this commit so its build number matches the server's.
+- **Why:** Part Two step 2: put the branch on the Pi and the tablets; the register monitor choice needs vt-guest-display on HDMI-X.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** After git pull and vt-server, the owner runs vt-guest-display on HDMI-X with the big (register) monitor's port.
+
 ### 2026-11-06 10:48 ET — Bob (Claude) — Handoff: where Part One left off
 - **What:** Branch bob/big-catalog (head ff8d33a1) is ahead of main 9f879118 (installed on the Pi). On the branch: DOB reprint (gift / customer / with DOB), ID line on receipts, exception pictures with DOB, gift receipts *****, ID expired, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X (register monitor choice). CI run 42246143289 was checking it; known failures are the 31 on main's run 42234138120.
 - **Why:** The owner is starting a new chat (ViewTouch Development Part Two).
