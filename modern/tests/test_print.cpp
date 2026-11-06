@@ -9,6 +9,7 @@
 #include "print/spooler.hh"
 #include "print/ticket_printer.hh"
 #include "print/tickets.hh"
+#include "app/pos_json.hh"
 #include "print/ticket_image.hh"
 #include <QFileInfo>
 #include "qt_catch.hh"
@@ -125,6 +126,31 @@ TEST_CASE("Privacy notice: on receipts with a customer's details, the full one o
     CHECK(contains(full, "123 Main Street"));                     // {contact}: the receipt header
     CHECK(contains(full, "Effective November 4, 2026"));
     CHECK(contains(full, "do not sell"));
+}
+
+TEST_CASE("ID check on receipts: the customer's copy says checked 21+; the date of birth only when asked", "[print][age]")
+{
+    const app::PosData seed = test::seedPosData();
+    core::Check check = burgerCheck(seed.settings, seed.menu);
+    check.ageVerified = 21;
+    check.ageHow = "scan";
+    check.ageDob = "1987-01-25";   // made up
+    const std::string customer = renderText(receipt(check, ctx(seed.settings)), 42);
+    CHECK(contains(customer, "ID checked 21+"));
+    CHECK_FALSE(contains(customer, "Date of birth"));
+    CHECK_FALSE(contains(customer, "1987"));
+    check.printDob = true;   // Reprint Receipt's "with DOB": the store's copy
+    const std::string store = renderText(receipt(check, ctx(seed.settings)), 42);
+    CHECK(contains(store, "Date of birth: 01/25/1987"));
+    check.printDob = false;
+    check.ageIdExpired = true;
+    CHECK(contains(renderText(receipt(check, ctx(seed.settings)), 42), "Expired ID accepted"));
+    // Never saved: the printing flag doesn't survive a save and load; the date does.
+    check.printDob = true;
+    const std::optional<core::Check> back = app::checkFromJson(app::toJson(check));
+    REQUIRE(back);
+    CHECK_FALSE(back->printDob);
+    CHECK(back->ageDob == "1987-01-25");
 }
 
 TEST_CASE("Receipt and kitchen ticket contents", "[print]")

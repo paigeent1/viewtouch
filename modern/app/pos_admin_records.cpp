@@ -103,6 +103,7 @@ QVariantList PosService::adminRecords(const QString &panel)
         }();
         add({{u"storeName"_s, qs(s_->settings.storeName)}, {u"storeZip"_s, qs(s_->settings.storeZip)}, {u"giftCardLocation"_s, qs(s_->settings.giftCardLocation)}, {u"topRibbonShowWeather"_s, s_->settings.topRibbonShowWeather}, {u"language"_s, qs(s_->settings.language)}, {u"currencySymbol"_s, qs(s_->settings.currencySymbol)},
              {u"receiptHeader"_s, qs(s_->settings.receiptHeader)}, {u"receiptFooter"_s, qs(s_->settings.receiptFooter)},
+             {u"dobReprintNeedsManager"_s, s_->settings.dobReprintNeedsManager},
              {u"receiptFreeChoices"_s, s_->settings.receiptFreeChoices},
              {u"receiptShowVoids"_s, s_->settings.receiptShowVoids},
              {u"ageAlcohol"_s, s_->settings.ageAlcohol}, {u"ageTobacco"_s, s_->settings.ageTobacco},

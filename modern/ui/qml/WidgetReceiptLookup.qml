@@ -152,6 +152,16 @@ Item {
                     enabled: w.check !== null
                     onClicked: w.pos.reprintCheck(w.check.id, true)
                 }
+                Button {
+                    // The store's copy with the buyer's date of birth (from the ID scan); a manager's, if
+                    // Store Settings says so. Customers' receipts never show it.
+                    objectName: "lookupDob"
+                    visible: w.check !== null && w.check.hasDob === true
+                    text: qsTr("Reprint\nwith DOB")
+                    implicitWidth: w.unit * 6; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 0.85
+                    palette.button: "#7c2d12"; palette.buttonText: "white"
+                    onClicked: w.pos.reprintCheck(w.check.id, false, true)
+                }
                 Button { text: "▲"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 1.4; onClicked: w.choose(w.index - 1) }
                 Button { text: "▼"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 1.4; onClicked: w.choose(w.index + 1) }
                 Item { Layout.fillWidth: true }

@@ -714,7 +714,8 @@ TEST_CASE("ID checks: alcohol asks for the ID; a scan of the license lets it in,
     REQUIRE(c);
     CHECK(c->ageVerified == 21);
     CHECK(c->ageHow == "scan");
-    CHECK(c->ageId4 == "5789");                                          // only the last 4
+    CHECK(c->ageId4 == "5789");                                          // only the last 4 of the number
+    CHECK(c->ageDob.size() == 10);                                       // the date of birth, for a "with DOB" reprint
     CHECK_FALSE(c->ageIdExpired);
     REQUIRE(pos.addItem(u"draft-beer"_s));                               // no second ask
     CHECK(pos.lines().size() == 2);

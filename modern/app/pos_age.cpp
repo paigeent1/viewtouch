@@ -76,7 +76,7 @@ bool PosService::saveIdChecks(const QVariantMap &values)
 }
 
 // The ID passed: on the check, then the item waiting goes in.
-bool PosService::agePassed(int age, const char *how, const std::string &idNumber, bool expired)
+bool PosService::agePassed(int age, const char *how, const std::string &idNumber, bool expired, const IdDate &birth)
 {
     const QString item = ageAsk_.value(u"item"_s).toString();
     const PendingScan scan = std::exchange(ageAskScan_, {});
@@ -90,6 +90,9 @@ bool PosService::agePassed(int age, const char *how, const std::string &idNumber
         c->ageAt = now();
         c->ageId4 = idNumber.size() > 4 ? idNumber.substr(idNumber.size() - 4) : idNumber;
         c->ageIdExpired = c->ageIdExpired || expired;
+        if (birth.valid())   // printed only on a reprint "with date of birth"
+            c->ageDob = QStringLiteral("%1-%2-%3").arg(birth.year, 4, 10, QChar(u'0')).arg(birth.month, 2, 10, QChar(u'0'))
+                            .arg(birth.day, 2, 10, QChar(u'0')).toStdString();
         noteEvent(*c, (std::string_view(how) == "hand" ? tr("ID checked by hand (date of birth typed): %1+").arg(age)
                                                        : tr("ID scanned: %1+").arg(age))
                           + (expired ? tr(", expired ID accepted") : QString()),
@@ -123,7 +126,7 @@ bool PosService::checkAge(const IdDate &birth, const IdDate &expires, const char
         emit checkChanged();
         return fail(tr("Under %1: %2 can't be sold.").arg(need).arg(name));
     }
-    if (!agePassed(need, how, idNumber, expired))
+    if (!agePassed(need, how, idNumber, expired, birth))
         return false;
     if (expired)
         emit notice(tr("Expired ID accepted: noted on the receipt."));

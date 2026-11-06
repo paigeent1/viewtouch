@@ -178,7 +178,7 @@ QJsonObject toJson(const Check &c)
         {u"rush"_s, c.rush}, {u"vip"_s, c.vip}, {u"allergies"_s, strings(c.allergies)}, {u"coupons"_s, strings(c.coupons)}, {u"subscriptionCard"_s, qs(c.subscriptionCard)},
         {u"ageCheck"_s, c.ageVerified <= 0 ? QJsonValue() : QJsonValue(QJsonObject{{u"age"_s, c.ageVerified}, {u"how"_s, qs(c.ageHow)},
                                                   {u"by"_s, qs(c.ageBy)}, {u"at"_s, qint64(c.ageAt)}, {u"id4"_s, qs(c.ageId4)},
-                                                  {u"expired"_s, c.ageIdExpired}})},
+                                                  {u"dob"_s, qs(c.ageDob)}, {u"expired"_s, c.ageIdExpired}})},
         {u"giftCardFor"_s, [&c] {
             QJsonObject o;
             for (const auto &[number, who] : c.giftCardFor) o.insert(qs(number), qs(who));
@@ -335,6 +335,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         c.ageBy = ss(age.value(u"by").toString());
         c.ageAt = age.value(u"at").toInteger();
         c.ageId4 = ss(age.value(u"id4").toString());
+        c.ageDob = ss(age.value(u"dob").toString());
         c.ageIdExpired = age.value(u"expired").toBool();
     }
     const QJsonObject giftCardFor = o.value(u"giftCardFor").toObject();
@@ -1084,6 +1085,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"receiptShowVoids"_s, s.receiptShowVoids},
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
+        {u"dobReprintNeedsManager"_s, s.dobReprintNeedsManager},
         {u"minimumAge"_s, QJsonObject{{u"alcohol"_s, s.ageAlcohol}, {u"tobacco"_s, s.ageTobacco}}},
         {u"idChecks"_s, QJsonObject{{u"tobacco"_s, s.idCheckTobacco}, {u"alcohol"_s, s.idCheckAlcohol},
                                     {u"tobaccoCategories"_s, strings(s.tobaccoCategories)}, {u"handNeedsManager"_s, s.idHandNeedsManager}}},
@@ -1336,6 +1338,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         s.printers.push_back(printerFromJson(v.toObject()));
     s.receiptHeader = ss(o.value(u"receiptHeader").toString());
     s.receiptFooter = ss(o.value(u"receiptFooter").toString());
+    s.dobReprintNeedsManager = o.value(u"dobReprintNeedsManager").toBool(true);
     const QJsonObject gratuity = o.value(u"gratuity").toObject();
     s.gratuityBp = std::llround(gratuity.value(u"percent").toDouble() * 100.0);
     s.gratuityMinGuests = gratuity.value(u"minGuests").toInt(6);

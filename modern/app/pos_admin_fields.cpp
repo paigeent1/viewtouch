@@ -317,6 +317,8 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"currencySymbol"_s, tr("Currency symbol"), u"string"_s),
             field(u"receiptHeader"_s, tr("Receipt header"), u"text"_s, tr("Address, phone… one per line")),
             field(u"receiptFooter"_s, tr("Receipt footer"), u"text"_s),
+            field(u"dobReprintNeedsManager"_s, tr("Reprint with date of birth: manager only"), u"bool"_s,
+                  tr("On: Reprint Receipt's \"With date of birth\" asks for a manager. Customers' receipts never show it.")),
             with(with(field(u"ageAlcohol"_s, tr("Minimum age for alcohol"), u"int"_s,
                             tr("The youngest a buyer may be (21 in the US). For the ID check on age-restricted sales.")),
                       u"min"_s, 0), u"max"_s, 99),

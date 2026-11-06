@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:19 ET — Bob (Claude) — Receipts: 'ID checked 21+' on the customer's copy; Reprint with DOB; tablet pushes time out
+- **What:** Check.ageDob (YYYY-MM-DD) kept from the ID check (scan or typed), saved in the check's ageCheck JSON ('dob'); Check.printDob is a this-printing-only flag, never saved. Receipts print 'ID checked 21+' (and 'Expired ID accepted') whenever an ID was checked; 'Date of birth: MM/DD/YYYY' only when printDob. Reprint Receipt (WidgetReceiptLookup) gets a 'Reprint with DOB' button (shown when the check has one; checkSearch's selected check says hasDob, never the date): reprintCheck(id, gift, withDob) prints a copy with printDob, records 'Reprinted with the date of birth' (who, when) on the check's history and saves it (closed checks). Store Settings > 'Reprint with date of birth: manager only' (dobReprintNeedsManager, default on). Gift receipts as before (anyone who can settle). vt-tablets: each tablet's install gives up after 3 minutes with a note to run it again.
+- **Why:** Owner 2026-11-06: customer copies say only ID checked 21+, so no DOB ends up in the trash; the DOB comes out only on a reprint from Reprint Receipt, manager-only as a setting. Bar 2 stalled a push today.
+- **Files:** `modern/core/check.hh, core/settings.hh, app/pos_age.cpp, app/pos_search.cpp, app/pos_json.cpp, app/pos_service.hh, app/pos_session.hh, app/pos_commands.cpp, app/pos_admin_fields.cpp, app/pos_admin_save.cpp, app/pos_admin_records.cpp, print/tickets.cpp, ui/qml/WidgetReceiptLookup.qml, tests/test_print.cpp, tests/test_customers.cpp, scripts/bin/vt-tablets`
+- **Next person must know:** Legacy ILSA receipts get the same button when the history importer brings their DOBs.
+
 ### 2026-11-06 10:05 ET — Bob (Claude) — Notes: two more wording fixes
 - **What:** Reworded the reason in the 2026-11-03 retail discounts entry and the ILSA import's age-check line, after a line-by-line review of the whole file.
 - **Why:** Owner 2026-11-06.

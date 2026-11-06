@@ -220,9 +220,16 @@ Document receipt(const Check &check, const TicketContext &ctx)
         d.center(ctx.tr("Thank you!"));
     for (const std::string &l : footer)
         d.center(l);
-    if (check.ageVerified > 0 && check.ageIdExpired) {
+    // The ID check: the customer's copy says only that it was checked; the date of birth only on a
+    // reprint asked for with it (the store's copy).
+    if (check.ageVerified > 0) {
         d.blank();
-        d.center(ctx.tr("ID checked: expired ID accepted"));
+        d.center(ctx.tr("ID checked %1+", {std::to_string(check.ageVerified)}));
+        if (check.ageIdExpired)
+            d.center(ctx.tr("Expired ID accepted"));
+        if (check.printDob && check.ageDob.size() == 10)   // YYYY-MM-DD -> MM/DD/YYYY
+            d.center(ctx.tr("Date of birth: %1", {check.ageDob.substr(5, 2) + "/" + check.ageDob.substr(8, 2) + "/"
+                                                  + check.ageDob.substr(0, 4)}));
     }
     if (receiptNeedsPrivacy(check, ctx.settings)) {
         d.blank();

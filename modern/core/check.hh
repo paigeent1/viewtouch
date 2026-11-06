@@ -296,13 +296,15 @@ struct Check {
     std::vector<std::string> coupons;     // promotions whose code was entered on it (their ids)
     std::string subscriptionCard;         // a subscription (9...) card shown on it: subscription-only promotions apply
     // ID check for age-restricted items (tobacco, alcohol): the age shown (the buyer is at least this
-    // old), how ("scan", "hand"), who checked and when, the ID's last 4 characters. Nothing else from
-    // the ID is kept.
+    // old), how ("scan", "hand"), who checked and when, the ID's last 4 characters and the date of birth
+    // (YYYY-MM-DD; printed only on a "with date of birth" reprint, never on the customer's copy).
     int ageVerified = 0;
     std::string ageHow;
     std::string ageBy;
     std::int64_t ageAt = 0;
     std::string ageId4;
+    std::string ageDob;
+    bool printDob = false;       // this printing only (a reprint with the date of birth): never saved
     bool ageIdExpired = false;   // the ID shown had expired: accepted (it still shows their photo and birth date), noted on the receipt
     std::map<std::string, std::string> giftCardFor;   // card number -> who a card sold on it is for (Purchased For)
     CardHold hold;                        // a tab's card, held

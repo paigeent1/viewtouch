@@ -176,6 +176,8 @@ struct PosSettings {
     // Items 86'd during service are back on the menu after End of Day.
     bool soldOutBackNextDay = true;
     std::string receiptFooter;
+    // Reprint with the buyer's date of birth (Reprint Receipt): only with a manager's PIN when on.
+    bool dobReprintNeedsManager = true;
     // Privacy notice (Store Settings -> Privacy notice). Short: on the receipt of a
     // check with a customer's details on it, and on the customer display before a
     // guest adds their phone or email. Full: printed on request and saved on the

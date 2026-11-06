@@ -512,7 +512,9 @@ public:
     // last `days` (0: ever), a page from `offset` (checkSearch: nextOffset).
     bool searchChecks(const QString &query, int days = 365, int offset = 0);
     void selectFoundCheck(qint64 id);
-    bool reprintCheck(qint64 id, bool gift = false);   // a copy of a found check's receipt (or a gift receipt)
+    // A copy of a found check's receipt, a gift receipt, or a copy with the buyer's date of birth
+    // (from the ID check; Store Settings: a manager's, if dobReprintNeedsManager).
+    bool reprintCheck(qint64 id, bool gift = false, bool withDob = false);
     QVariantMap checkSearch() const override;
     QVariantMap receiving() const override;
     QVariantMap stockCounting() const override;
@@ -1341,7 +1343,7 @@ private:
     QVariantMap ageAsk_;              // an item waiting for the buyer's ID (pos_age.cpp)
     PendingScan ageAskScan_;          // the scan that rang it in, kept for when the ID passes
     bool askForAge(const core::MenuItem &item, int age, const PendingScan &scan);
-    bool agePassed(int age, const char *how, const std::string &idNumber, bool expired = false);
+    bool agePassed(int age, const char *how, const std::string &idNumber, bool expired = false, const core::IdDate &birth = {});
     bool checkAge(const core::IdDate &birth, const core::IdDate &expires, const char *how, const std::string &idNumber);
     QString labelQuery_;
     QStringList labelPath_;

@@ -250,6 +250,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         s_->settings.currencySymbol = ss(record.value(u"currencySymbol"_s).toString());
         s_->settings.receiptHeader = ss(record.value(u"receiptHeader"_s).toString());
         s_->settings.receiptFooter = ss(record.value(u"receiptFooter"_s).toString());
+        if (record.contains(u"dobReprintNeedsManager"_s))
+            s_->settings.dobReprintNeedsManager = record.value(u"dobReprintNeedsManager"_s).toBool();
         if (record.contains(u"receiptFreeChoices"_s))
             s_->settings.receiptFreeChoices = record.value(u"receiptFreeChoices"_s).toBool();
         if (record.contains(u"receiptShowVoids"_s))

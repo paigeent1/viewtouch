@@ -48,7 +48,9 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
         {u"clockIn"_s, [](PosService &p, const QVariantList &) { return QVariant(p.clockIn()); }},
         {u"searchChecks"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.searchChecks(a.value(0).toString(), a.value(1, 365).toInt(), a.value(2, 0).toInt())); }},
         {u"selectFoundCheck"_s, [](PosService &p, const QVariantList &a) { p.selectFoundCheck(a.value(0).toLongLong()); return QVariant(true); }},
-        {u"reprintCheck"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.reprintCheck(a.value(0).toLongLong(), a.value(1).toBool())); }},
+        {u"reprintCheck"_s, [](PosService &p, const QVariantList &a) {
+             return QVariant(p.reprintCheck(a.value(0).toLongLong(), a.value(1).toBool(), a.value(2).toBool()));
+         }},
         {u"receiveDelivery"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.receiveDelivery(a.value(0).toMap())); }},
         {u"printPrepLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printPrepLabels(a.value(0).toMap())); }},
         {u"findRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findRetailLabels(a.value(0).toString())); }},
