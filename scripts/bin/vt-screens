@@ -203,6 +203,11 @@ def main():
             saved, " (it's using %s)" % reg if reg else ""))
     if not names:
         problems.append("No monitor found.")
+    for o in outs:
+        hz = re.match(r"([\d.]+)", o.get("rate") or "")
+        if hz and float(hz.group(1)) < 55:
+            problems.append("%s runs at %s, which can flicker. Use 'Make this the register' on the register's "
+                            "monitor to set both monitors to their own best mode." % (o["name"], o["rate"]))
     if report["guestOn"] and len(names) < 2:
         problems.append("The guest display is on, but only one monitor is plugged in.")
     if report["session"] == "x11" and len(names) > 1 and reg:

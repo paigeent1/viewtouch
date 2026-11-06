@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:18 ET — Bob (Claude) — Register monitor at 48 Hz: each monitor at its own best mode
+- **What:** vt-guest-display (X11): register output --primary --auto, guest output --auto --right-of it, instead of forcing the register's current size by name. vt-screens / Screen check flag any monitor running under 55 Hz.
+- **Why:** Pi report 2026-11-06 14:13: HDMI-1 (register, supports 1920x1080) ran 1280x720 at 48 Hz, because --mode 1280x720 takes the first mode of that name; the owner saw the register 'giggling'. HDMI-2 (guest) tops out at 1366x768.
+- **Files:** `scripts/bin/vt-guest-display`, `scripts/bin/vt-screens`
+- **Next person must know:** Owner's Pi got the same fix by hand (xrandr --auto; ~/.config/vt-guest-display.sh --mode replaced with --auto).
+
 ### 2026-11-06 14:17 ET — Bob (Claude) — Ignore helpers' scratch worktrees
 - **What:** .gitignore: .claude/worktrees/ (the temporary copies Bob's helper agents work in).
 - **Why:** They showed up as untracked files and must never be committed to the public repo.

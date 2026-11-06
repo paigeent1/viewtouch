@@ -82,16 +82,11 @@ elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
     pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)
     if [ -n "$pos" ] && echo "$outs" | grep -qx "$pos"; then first="$pos"; second=$(echo "$outs" | grep -vx "$pos" | sed -n 1p); fi
     [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
-    # The POS monitor at its resolution, progressive (an interlaced "1920x1080i" can flicker):
-    # --mode by name takes the first (progressive) mode of that size.
-    res=$(xrandr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /\*/{print $1; exit}' | sed 's/i$//')
-    # The guest monitor at the POS monitor's resolution when it has it (some prefer 1280x720), else its own.
-    cmd="xrandr --output $second --auto --right-of $first"
-    [ -n "$res" ] && xrandr | awk -v o="$second" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f{print $1}' | grep -qx "$res" \
-        && cmd="xrandr --output $second --mode $res --right-of $first"
+    # Each monitor at its own best mode (--auto: its preferred size and rate). Asking for a size by
+    # name took the first mode of that size, which on the register was 1280x720 at 48 Hz: a flicker.
     # The register's monitor is the Pi's primary one: ViewTouch opens the register on the primary
     # monitor and the guest's screen on the other, whatever their order.
-    cmd="xrandr --output $first --primary${res:+ --mode $res}; $cmd"
+    cmd="xrandr --output $first --primary --auto; xrandr --output $second --auto --right-of $first"
 else
     echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
 fi
