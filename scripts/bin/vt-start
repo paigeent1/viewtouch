@@ -17,5 +17,7 @@ EXTRA=()
 export VT_SERIAL_SCANNER_BAUD="$SERIAL_SCANNER_BAUD"
 # The monitors side by side again (vt-guest-display saved how), in case the desktop came up mirrored.
 [ -n "$GUEST" ] && [ "$GUEST" != off ] && [ -x "$HOME/.config/vt-guest-display.sh" ] && "$HOME/.config/vt-guest-display.sh" >/dev/null 2>&1
-WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$BIN" --serve "${EXTRA[@]}" >/dev/null 2>&1 &
+# Its messages go to ~/.vt-run.log (the run before in ~/.vt-run.log.1): what it said if it stops.
+[ -f "$HOME/.vt-run.log" ] && mv -f "$HOME/.vt-run.log" "$HOME/.vt-run.log.1"
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$BIN" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 &
 echo "ViewTouch started (no rebuild).${GUEST:+ Customer display: $GUEST.}"

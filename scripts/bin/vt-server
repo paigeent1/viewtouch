@@ -25,5 +25,7 @@ EXTRA=()
 # This site's scanner port and speed (vt-site), when set.
 [ -n "$SERIAL_SCANNER" ] && export VT_SERIAL_SCANNER="$SERIAL_SCANNER"
 export VT_SERIAL_SCANNER_BAUD="$SERIAL_SCANNER_BAUD"
-WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$VT_REPO/modern/build/vtmodern" --serve "${EXTRA[@]}" >/dev/null 2>&1 &
+# Its messages go to ~/.vt-run.log (the run before in ~/.vt-run.log.1): what it said if it stops.
+[ -f "$HOME/.vt-run.log" ] && mv -f "$HOME/.vt-run.log" "$HOME/.vt-run.log.1"
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$VT_REPO/modern/build/vtmodern" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 &
 echo "Server rebuilt and restarted.${GUEST:+ Customer display: $GUEST.}"

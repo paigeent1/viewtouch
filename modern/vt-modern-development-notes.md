@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:30 ET — Bob (Claude) — vt-start / vt-server keep ViewTouch's messages in ~/.vt-run.log
+- **What:** Both start vtmodern with its output in ~/.vt-run.log (the previous run's kept as ~/.vt-run.log.1) instead of /dev/null.
+- **Why:** 2026-11-06 the Pi's ViewTouch stopped on its own and nothing it said was kept.
+- **Files:** `scripts/bin/vt-start, scripts/bin/vt-server`
+
 ### 2026-11-06 10:28 ET — Bob (Claude) — Gift receipts: prices shown as *****
 - **What:** giftReceipt lays each item out like the receipt with '*****' where the price goes, and a TOTAL line of '*****' (still no prices, payments or ID line). Reprint… > Gift receipt prints it (anyone who can settle).
 - **Why:** Owner 2026-11-06: gift receipt option with sale prices redacted as '*****'.
