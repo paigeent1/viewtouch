@@ -72,7 +72,10 @@ constexpr quint32 kAlways = 1u << 31;
 // too old to ask gets everything).
 bool onRequest(const QString &key)
 {
-    return key == u"closedChecks";
+    // The closed checks, and the whole item list (a retail price book is tens of thousands of items):
+    // scans and typed numbers ask the main computer (itemForCode), so only the screens that list the
+    // items (Menu Builder, the menu grid, Sold Out) ask for it.
+    return key == u"closedChecks" || key == u"menuItems";
 }
 
 // Screens that ask for things (this version) get the open checks in two

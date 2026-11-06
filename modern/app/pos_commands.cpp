@@ -210,6 +210,7 @@ void PosService::invoke(const QString &method, const QVariantList &args, Reply r
             return QVariant(true);
         }},
         {u"scanCode"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.scanCode(a.value(0).toString())); }},
+        {u"itemForCode"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.itemForCode(a.value(0).toString(), a.value(1).toBool())); }},
         {u"applyCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.applyCoupon(a.value(0).toString())); }},
         {u"removeCoupon"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeCoupon(a.value(0).toString())); }},
         {u"customerJoin"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerJoin(a.value(0).toString(), a.value(1).toBool())); }},

@@ -601,7 +601,8 @@ def load_from_viewtouch_db():
 
 
 def load_viewtouch_menu_items():
-    """ViewTouch's own items (viewtouch.db, read-only)."""
+    """ViewTouch's own items (viewtouch.db, read-only), with the price book's department group, maker,
+    product group and sub group when ViewTouch has them (the ILSA import)."""
     items = []
     seen = set()
     if os.path.exists(VT_DB_PATH):
@@ -609,6 +610,36 @@ def load_viewtouch_menu_items():
             con = sqlite3.connect(f"file:{VT_DB_PATH}?mode=ro", uri=True, timeout=2.0)
             con.row_factory = sqlite3.Row
             tables = [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            cats = {}   # category id -> (name, department group)
+            if "settings" in tables:
+                try:
+                    row = con.execute("SELECT json FROM settings WHERE key='pos'").fetchone()
+                    for c in (json.loads(row[0]).get("menuCategories", []) if row else []):
+                        if isinstance(c, dict) and c.get("id"):
+                            cats[str(c["id"])] = (str(c.get("name") or c["id"]), str(c.get("group") or "").strip().upper())
+                except Exception as e:
+                    print("Note reading ViewTouch's categories:", e)
+
+            def add(obj):
+                if not isinstance(obj, dict):
+                    return
+                obj = dict(obj)
+                cname, cgroup = cats.get(str(obj.get("family") or ""), (None, ""))
+                if cname:
+                    obj["family"] = cname   # the category's name, not its id
+                mf = str(obj.get("manufacturer") or "").strip()
+                if mf.upper() == "GENERAL" or mf.isdigit():
+                    obj["manufacturer"] = ""   # no brand: let the name decide
+                before = len(items)
+                parse_vt_menu_dict(obj, seen, items)
+                if len(items) == before:
+                    return
+                it = items[-1]
+                if cgroup:
+                    it["dept_group"] = cgroup
+                it["prod_grp"] = str(obj.get("productGroup") or "").strip().upper()
+                it["sub_grp"] = str(obj.get("subGroup") or "").strip().upper()
+
             if "menu_items" in tables:
                 for row in con.execute("SELECT * FROM menu_items").fetchall():
                     row_dict = {k: row[k] for k in row.keys()}
@@ -618,20 +649,20 @@ def load_viewtouch_menu_items():
                             try:
                                 obj = json.loads(val.decode("utf-8") if isinstance(val, bytes) else val)
                                 if isinstance(obj, dict):
-                                    parse_vt_menu_dict(obj, seen, items)
+                                    add(obj)
                                     parsed_json = True
                                 elif isinstance(obj, list):
                                     for sub in obj:
-                                        parse_vt_menu_dict(sub, seen, items)
+                                        add(sub)
                                     parsed_json = True
                             except Exception:
                                 pass
                     if not parsed_json and "name" in row_dict:
-                        parse_vt_menu_dict(row_dict, seen, items)
+                        add(row_dict)
             con.close()
         except Exception as e:
             print("Note reading viewtouch.db:", e)
-    return sorted(items, key=lambda x: (x["category"], x["manufacturer"], x["name"]))
+    return sorted(items, key=lambda x: (x["dept_group"], x["category"], x["manufacturer"], x["name"]))
 
 GLOBAL_FIELD_CATALOG = [
     ("static_label", "Label (Static Text)"),

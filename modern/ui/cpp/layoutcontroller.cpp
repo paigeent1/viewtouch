@@ -1607,12 +1607,13 @@ bool LayoutController::numberKey(const QString &key)
         return true;
     } else if (key == u"enter" && !typedNumber_.isEmpty()) {
         const QString number = std::exchange(typedNumber_, QString());
-        for (const QVariant &v : pos_->menuItems())
-            if (v.toMap().value(u"number"_s).toString() == number) {
-                orderItem(v.toMap().value(u"id"_s).toString());
-                return true;
-            }
-        setStatus(tr("No item has number %1.").arg(number));
+        // Asked of the menu itself (on a tablet: of the main computer), not the screens' item list.
+        call(u"itemForCode"_s, {number, true}, [this, number](const QVariant &found) {
+            if (const QString id = found.toMap().value(u"id"_s).toString(); !id.isEmpty())
+                orderItem(id);
+            else
+                setStatus(tr("No item has number %1.").arg(number));
+        });
         return true;
     } else {
         return false;
@@ -1675,33 +1676,34 @@ void LayoutController::scanned(const QString &code)
     if (!sells && !searches)
         return;   // silently: nothing on the screen, nothing said
     const bool ordering = page && (page->kind == u"index" || page->kind == u"items" || page->kind == u"modifier" || page->kind == u"order" || page->id == u"retail-entry");
-    QString c12 = c;
-    if (c.size() == 11 && std::all_of(c.cbegin(), c.cend(), [](QChar ch) { return ch.isDigit(); })) {
-        int sum = 0;
-        for (int i = 0; i < 11; ++i)
-            sum += c.at(10 - i).digitValue() * (i % 2 == 0 ? 3 : 1);
-        c12 = c + QChar(u'0' + ((10 - (sum % 10)) % 10));
-    }
-    for (const QVariant &v : pos_->menuItems()) {
-        const QVariantMap m = v.toMap();
-        const QStringList bcs = m.value(u"barcodes"_s).toString().split(u", "_s);
-        if (m.value(u"number"_s).toString() != c && !bcs.contains(c) && !bcs.contains(c12))
-            continue;
+    const bool retailEntry = page && page->id == u"retail-entry";
+    // The item is looked up in the menu itself (on a tablet: by the main computer), so it's as quick
+    // with a 30,000-item price book as with a bar menu, and tablets don't need the whole item list.
+    call(u"itemForCode"_s, {c}, [this, c, ordering, retailEntry](const QVariant &found) {
+        const QVariantMap m = found.toMap();
+        if (m.isEmpty()) {
+            notOnFile(c);
+            return;
+        }
         if (ordering) {
             const QString itemId = m.value(u"id"_s).toString();
             // The line keeps the code scanned (receipts print it); on the Retail screen the customer
             // has the item in hand, so it goes to no printer or station screen.
-            pos_->invoke(u"noteScan"_s, {c, itemId, page->id == u"retail-entry"});
+            pos_->invoke(u"noteScan"_s, {c, itemId, retailEntry});
             if (!pos_->hasCheck()) {
                 call(u"quickOrder"_s, {}, [this, itemId](const QVariant &) { orderItem(itemId); });
             } else {
                 orderItem(itemId);
             }
-        }
-        else
+        } else {
             setStatus(tr("%1: ring it in on the order screen.").arg(m.value(u"name"_s).toString()));
-        return;
-    }
+        }
+    });
+}
+
+// A scan that's no item: a coupon, a gift card, or "not on file".
+void LayoutController::notOnFile(const QString &c)
+{
     call(u"scanCode"_s, {c}, [this, c](const QVariant &kind) {
         const QString k = kind.toString();
         if (k == u"giftCard" && pageId() != u"gift-card" && activeLayout().page(u"gift-card"_s))

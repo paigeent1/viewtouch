@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <cmath>
 #include <ranges>
+#include <unordered_map>
+#include <unordered_set>
 
 using namespace Qt::StringLiterals;
 using namespace vt::core;
@@ -269,6 +271,8 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.station = ss(record.value(u"station"_s).toString());
     if (record.contains(u"taxClass"_s))
         c.taxClass = ss(record.value(u"taxClass"_s).toString());
+    if (record.contains(u"group"_s))
+        c.group = ss(record.value(u"group"_s).toString().trimmed());
     if (record.contains(u"buttonSize"_s)) {
         const QString size = record.value(u"buttonSize"_s).toString();
         if (!QStringList{QString(), u"small"_s, u"medium"_s, u"large"_s}.contains(size))
@@ -1348,6 +1352,9 @@ int PosService::importMenuFile(const QVariantMap &file)
         if (const auto it = std::ranges::find_if(here, [&](const MenuCategory &x) { return sameName(x.name, qs(c.name)); });
             it != here.end()) {
             categoryOf[c.id] = it->id;
+            // Its department group, if it has none yet (the price book's, added after the first import).
+            if (it->group.empty() && !c.group.empty() && !saveCategory({{u"id"_s, qs(it->id)}, {u"name"_s, qs(it->name)}, {u"group"_s, qs(c.group)}}))
+                return 0;
             continue;
         }
         QStringList periods;   // the meal periods this store has (others: all day)
@@ -1356,7 +1363,8 @@ int PosService::importMenuFile(const QVariantMap &file)
                 periods << qs(p);
         if (!saveCategory({{u"name"_s, qs(c.name)}, {u"color"_s, qs(c.color)}, {u"periods"_s, periods},
                            {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
-                           {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades}}))
+                           {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
+                           {u"group"_s, qs(c.group)}}))
             return 0;
         for (const MenuCategory &x : s_->categories())
             if (sameName(x.name, qs(c.name)))
@@ -1369,21 +1377,48 @@ int PosService::importMenuFile(const QVariantMap &file)
     for (const QVariant &v : file.value(u"items"_s).toList())
         items.push_back(menuItemFromJson(QJsonObject::fromVariantMap(v.toMap())));
     QHash<std::string, std::string> itemOf;
-    std::vector<std::string> taken;
     QStringList skipped;
     std::vector<MenuItem *> adding;
+    int filled = 0;
+    // What's here by name and by first barcode, looked up at once: a price book is tens of thousands of
+    // items, imported in parts into a menu that already has the earlier ones.
+    QHash<QString, std::size_t> byName;
+    std::unordered_map<std::string, std::size_t> byCode;
+    for (std::size_t i = 0; i < s_->menu.size(); ++i) {
+        if (const QString n = qs(s_->menu[i].name).toCaseFolded(); !byName.contains(n))
+            byName.insert(n, i);   // the first by that name, as before
+        if (!s_->menu[i].barcodes.empty())
+            byCode.emplace(s_->menu[i].barcodes.front(), i);
+    }
+    std::unordered_set<std::string> ids;
+    for (const MenuItem &x : s_->menu)
+        ids.insert(x.id);
     for (MenuItem &m : items) {
-        if (const auto it = std::ranges::find_if(s_->menu, [&](const MenuItem &x) { return sameName(x.name, qs(m.name)); });
-            it != s_->menu.end()) {
-            itemOf[m.id] = it->id;
+        if (const auto it = byName.constFind(qs(m.name).toCaseFolded()); it != byName.cend()) {
+            itemOf[m.id] = s_->menu[*it].id;
             skipped << qs(m.name);
+            // Kept as it is, except what it doesn't have yet that the file knows: the price book's maker
+            // and groups (added to ViewTouch after the first import). Found by its UPC when it has one,
+            // so same-name items each get their own.
+            auto here = s_->menu.begin() + std::ptrdiff_t(*it);
+            if (!m.barcodes.empty())
+                if (const auto b = byCode.find(m.barcodes.front()); b != byCode.end())
+                    here = s_->menu.begin() + std::ptrdiff_t(b->second);
+            bool fill = false;
+            for (auto field : {&MenuItem::manufacturer, &MenuItem::productGroup, &MenuItem::subGroup})
+                if ((*here).*field != m.*field && ((*here).*field).empty()) {
+                    (*here).*field = m.*field;
+                    fill = true;
+                }
+            if (fill) {
+                ++filled;
+                if (s_->sink)
+                    s_->sink->saveMenuItem(*here, int(here - s_->menu.begin()));
+            }
             continue;
         }
-        const std::string id = freeId(qs(m.name), [&](const std::string &x) {
-            return std::ranges::any_of(s_->menu, [&](const MenuItem &o) { return o.id == x; })
-                   || std::ranges::find(taken, x) != taken.end();
-        });
-        taken.push_back(id);
+        const std::string id = freeId(qs(m.name), [&](const std::string &x) { return ids.contains(x); });
+        ids.insert(id);
         itemOf[m.id] = id;
         adding.push_back(&m);
     }
@@ -1452,8 +1487,16 @@ int PosService::importMenuFile(const QVariantMap &file)
     settingsChanged();
     menuChanged();
     const int added = int(adding.size());
-    emit notice(skipped.isEmpty() ? tr("Added %n item(s)", nullptr, added)
-                                  : tr("Added %n item(s); already on the menu: %1", nullptr, added).arg(skipped.join(u", "_s)));
+    if (skipped.size() > 20) {   // a price book: thousands of names would fill the screen
+        const qsizetype more = skipped.size() - 20;
+        skipped = skipped.mid(0, 20);
+        skipped << tr("and %n more", nullptr, int(more));
+    }
+    QString said = skipped.isEmpty() ? tr("Added %n item(s)", nullptr, added)
+                                     : tr("Added %n item(s); already on the menu: %1", nullptr, added).arg(skipped.join(u", "_s));
+    if (filled > 0)
+        said += tr("; maker and groups filled in on %n item(s)", nullptr, filled);
+    emit notice(said);
     return added;
 }
 

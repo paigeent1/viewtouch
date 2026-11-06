@@ -370,6 +370,9 @@ QJsonObject toJson(const MenuItem &m)
     if (!m.family.empty()) o.insert(u"family"_s, qs(m.family));
     if (!m.number.empty()) o.insert(u"number"_s, qs(m.number));
     if (!m.barcodes.empty()) o.insert(u"barcodes"_s, strings(m.barcodes));
+    if (!m.manufacturer.empty()) o.insert(u"manufacturer"_s, qs(m.manufacturer));
+    if (!m.productGroup.empty()) o.insert(u"productGroup"_s, qs(m.productGroup));
+    if (!m.subGroup.empty()) o.insert(u"subGroup"_s, qs(m.subGroup));
     if (m.prepMinutes > 0) o.insert(u"prepMinutes"_s, m.prepMinutes);
     if (!m.buttonColor.empty()) o.insert(u"buttonColor"_s, qs(m.buttonColor));
     if (!m.section.empty()) o.insert(u"section"_s, qs(m.section));
@@ -450,6 +453,9 @@ MenuItem menuItemFromJson(const QJsonObject &o)
     m.family = ss(o.value(u"family").toString());
     m.number = ss(o.value(u"number").toVariant().toString().trimmed());
     m.barcodes = strings(o.value(u"barcodes").toArray());
+    m.manufacturer = ss(o.value(u"manufacturer").toString().trimmed());
+    m.productGroup = ss(o.value(u"productGroup").toString().trimmed());
+    m.subGroup = ss(o.value(u"subGroup").toString().trimmed());
     m.prepMinutes = std::clamp(o.value(u"prepMinutes").toVariant().toInt(), 0, 240);
     m.buttonColor = ss(o.value(u"buttonColor").toString());
     m.section = ss(o.value(u"section").toString());
@@ -1033,12 +1039,15 @@ QJsonObject toJson(const PosSettings &s)
                  QJsonArray periods;
                  for (const std::string &p : c.periods)
                      periods.append(qs(p));
-                 out.append(QJsonObject{{u"id"_s, qs(c.id)}, {u"name"_s, qs(c.name)}, {u"color"_s, qs(c.color)},
-                                        {u"periods"_s, periods}, {u"printer"_s, qs(c.printer)},
-                                        {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
-                                        {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos},
-                                        {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                                        {u"noDiscount"_s, c.noDiscount}});
+                 QJsonObject x{{u"id"_s, qs(c.id)}, {u"name"_s, qs(c.name)}, {u"color"_s, qs(c.color)},
+                               {u"periods"_s, periods}, {u"printer"_s, qs(c.printer)},
+                               {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
+                               {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos},
+                               {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
+                               {u"noDiscount"_s, c.noDiscount}};
+                 if (!c.group.empty())
+                     x.insert(u"group"_s, qs(c.group));
+                 out.append(x);
              }
              return out;
          }()},
@@ -1582,6 +1591,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         cat.hidePrice = c.value(u"hidePrice").toBool();
         cat.shades = c.value(u"shades").toBool();
         cat.noDiscount = c.value(u"noDiscount").toBool();
+        cat.group = ss(c.value(u"group").toString().trimmed());
         if (!cat.id.empty())
             s.menuCategories.push_back(std::move(cat));
     }

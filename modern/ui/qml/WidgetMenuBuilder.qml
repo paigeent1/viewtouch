@@ -73,6 +73,22 @@ Item {
     component TouchButton: MenuTouchButton {}
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
+    // The item list comes to a tablet only while a screen shows it (PosServer: on request): a
+    // 30,000-item price book would otherwise go to every tablet on every change.
+    Item {
+        visible: false
+        readonly property var p: w.pos
+        property var asked: null
+        function ask() {
+            if (asked === p) return
+            if (asked) asked.want("menuItems", false)
+            asked = p
+            if (p) p.want("menuItems", true)
+        }
+        onPChanged: ask()
+        Component.onCompleted: ask()
+        Component.onDestruction: if (asked) asked.want("menuItems", false)
+    }
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 340 : 1180) : 1
 

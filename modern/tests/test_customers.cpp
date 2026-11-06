@@ -581,6 +581,56 @@ TEST_CASE("Labels screen: once the price book is in ViewTouch, it lists ViewTouc
     qputenv("HOME", oldHome);
 }
 
+TEST_CASE("Price book: maker, product group, sub group and department group; filled in on a later import", "[labels][import]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());   // no ILSA temp price book here
+
+    // Kept as it's saved.
+    core::MenuItem m;
+    m.id = "zen";
+    m.name = "ZEN TUBE";
+    m.manufacturer = "ZEN";
+    m.productGroup = "TUBES";
+    m.subGroup = "KING";
+    const core::MenuItem back = app::menuItemFromJson(app::toJson(m));
+    CHECK(back.manufacturer == "ZEN");
+    CHECK(back.productGroup == "TUBES");
+    CHECK(back.subGroup == "KING");
+
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    const auto file = [](bool withGroups) {
+        QVariantMap cat{{u"id"_s, u"ilsa-tobacco-acc"_s}, {u"name"_s, u"TOBACCO ACC"_s}, {u"taxClass"_s, u"merchandise"_s}};
+        QVariantMap zen{{u"id"_s, u"ilsa-16165009116"_s}, {u"name"_s, u"ZEN TUBE"_s}, {u"price"_s, 9.99}, {u"taxClass"_s, u"merchandise"_s},
+                        {u"family"_s, u"ilsa-tobacco-acc"_s}, {u"barcodes"_s, QVariantList{u"016165009116"_s}}};
+        QVariantMap other{{u"id"_s, u"ilsa-12345678901"_s}, {u"name"_s, u"ZEN TUBE"_s}, {u"price"_s, 8.99}, {u"taxClass"_s, u"merchandise"_s},
+                          {u"family"_s, u"ilsa-tobacco-acc"_s}, {u"barcodes"_s, QVariantList{u"012345678901"_s}}};
+        if (withGroups) {
+            cat.insert(u"group"_s, u"TOBACCO"_s);
+            zen.insert(u"manufacturer"_s, u"ZEN"_s);
+            zen.insert(u"productGroup"_s, u"TUBES"_s);
+            zen.insert(u"subGroup"_s, u"KING"_s);
+            other.insert(u"manufacturer"_s, u"TOP"_s);
+        }
+        return QVariantMap{{u"format"_s, u"viewtouch-menu"_s}, {u"version"_s, 1}, {u"categories"_s, QVariantList{cat}},
+                           {u"choiceGroups"_s, QVariantList{}}, {u"items"_s, QVariantList{zen, other}}, {u"pictures"_s, QVariantMap{}}};
+    };
+    CHECK(pos.importMenuFile(file(false)) == 2);              // tonight's import: no makers or groups yet
+    CHECK(pos.importMenuFile(file(true)) == 0);               // the next one: nothing added...
+    REQUIRE(pos.browseRetailLabels({}));                      // ...but the tree has them now
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()).contains(u"TOBACCO"_s));
+    REQUIRE(pos.browseRetailLabels({u"TOBACCO"_s, u"TOBACCO ACC"_s}));
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"TOP"_s, u"ZEN"_s});   // each same-name item its own
+    REQUIRE(pos.browseRetailLabels({u"TOBACCO"_s, u"TOBACCO ACC"_s, u"ZEN"_s}));
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"TUBES"_s});
+    REQUIRE(pos.browseRetailLabels({u"TOBACCO"_s, u"TOBACCO ACC"_s, u"ZEN"_s, u"TUBES"_s}));
+    CHECK(names(pos.retailLabels()[u"children"_s].toList()) == QStringList{u"KING"_s});
+    qputenv("HOME", oldHome);
+}
+
 namespace {
 // The barcode on the back of a license (AAMVA), with this date of birth and expiration (MMDDYYYY).
 QString license(const QString &dob, const QString &expires)

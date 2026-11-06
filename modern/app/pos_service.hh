@@ -749,6 +749,11 @@ public:
     // its page shows it), else says nothing has it. Items: the screen rings
     // them in itself (findItem finds them by barcode).
     QString scanCode(const QString &code);
+    // The item a scanned or typed code is: its number, or one of its barcodes (an 11-digit code also as
+    // the UPC-A with its check digit); only its number when `numberOnly`. {id, name}, or empty. Read
+    // straight from the menu (not the screens' item list), so a 30,000-item price book answers at once,
+    // and a tablet asks the main computer instead of holding the whole list.
+    QVariantMap itemForCode(const QString &code, bool numberOnly = false) const;
     // Names of the promotions running now (not coupons).
     QVariantList promotionsNow() const;
     // A coupon (a promotion with a code) typed or scanned onto the current

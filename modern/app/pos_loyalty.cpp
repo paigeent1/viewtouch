@@ -245,6 +245,27 @@ QString PosService::scanCode(const QString &code)
     return u"unrecognized"_s;
 }
 
+QVariantMap PosService::itemForCode(const QString &code, bool numberOnly) const
+{
+    const std::string c = ss(code.trimmed());
+    if (c.empty() || !user())
+        return {};
+    std::string c12;
+    if (c.size() == 11 && std::ranges::all_of(c, [](char ch) { return ch >= '0' && ch <= '9'; })) {
+        int sum = 0;
+        for (int i = 0; i < 11; ++i)
+            sum += (c[10 - i] - '0') * (i % 2 == 0 ? 3 : 1);
+        c12 = c + char('0' + (10 - sum % 10) % 10);
+    }
+    for (const MenuItem &m : s_->menu) {
+        const bool hit = m.number == c
+            || (!numberOnly && std::ranges::any_of(m.barcodes, [&](const std::string &b) { return b == c || (!c12.empty() && b == c12); }));
+        if (hit)
+            return {{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}};
+    }
+    return {};
+}
+
 void PosService::countCouponUses(const Check &c, int by)
 {
     if (c.training)

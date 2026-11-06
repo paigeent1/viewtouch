@@ -678,6 +678,10 @@ QString labelGroup(const MenuItem &m, const QString &category)
 
 QString labelBrand(const MenuItem &m)
 {
+    // The price book's maker, unless it's no brand (GENERAL, or a number).
+    if (const QString maker = qs(m.manufacturer).trimmed().toUpper();
+        !maker.isEmpty() && maker != u"GENERAL"_s && !std::ranges::all_of(maker, [](QChar ch) { return ch.isDigit(); }))
+        return maker;
     const QString name = qs(m.name).trimmed().toUpper();
     for (const char *p : {"ALEC BRADLEY", "AJ FERNANDEZ", "CASA FERNANDEZ", "BAHAMA MAMA", "ARMANDO RAMOS", "BUENA VISTA",
                           "CROWNED HEADS", "ROMEO Y", "MONTECRISTO", "ARTURO FUENTE", "DREW ESTATE", "LA AROMA",
@@ -835,9 +839,11 @@ QVariantMap PosService::retailLabels() const
     const auto withUpc = std::ranges::count_if(s_->menu, [](const MenuItem &m) { return !m.barcodes.empty(); });
     const std::vector<LabelItem> &book = std::size_t(withUpc) >= kOwnPriceBookItems ? noBook : pricebookItems();
     if (book.empty()) {
-        std::map<QString, QString> categoryNames;
-        for (const MenuCategory &c : s_->categories())
+        std::map<QString, QString> categoryNames, categoryGroups;
+        for (const MenuCategory &c : s_->categories()) {
             categoryNames[qs(c.id)] = qs(c.name);
+            categoryGroups[qs(c.id)] = qs(c.group).trimmed().toUpper();
+        }
         for (const MenuItem &m : s_->menu) {
             LabelItem it;
             for (const std::string &b : m.barcodes) {
@@ -860,7 +866,15 @@ QVariantMap PosService::retailLabels() const
             it.id = qs(m.id);
             it.name = qs(m.name);
             it.price = format(m.price);
-            it.at = {labelGroup(m, category), category, labelBrand(m)};
+            // The department group (the price book's, else Cigars / Retail / Food & drink), category, maker,
+            // then the price book's product group and sub group when it has them (a sub group only under one).
+            const QString group = categoryGroups[qs(m.family)];
+            it.at = {group.isEmpty() ? labelGroup(m, category) : group, category, labelBrand(m)};
+            if (const QString p = qs(m.productGroup).trimmed().toUpper(); !p.isEmpty()) {
+                it.at << p;
+                if (const QString s = qs(m.subGroup).trimmed().toUpper(); !s.isEmpty())
+                    it.at << s;
+            }
             fromMenu.push_back(std::move(it));
         }
     }

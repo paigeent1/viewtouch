@@ -612,6 +612,37 @@ TEST_CASE("Handhelds get the closed checks only while a list shows them", "[net]
     CHECK(office.remote->closedChecks().isEmpty());
 }
 
+TEST_CASE("Tablets get the item list only while a screen lists it; scans ask the main computer", "[net][remote][want]")
+{
+    Store store;
+    store.shared.menu.front().barcodes = {"016165009116"};   // a retail UPC-A
+    Screen office(store.terminal(u"Office"_s));
+    office.pin("1234");
+    waitFor([] { return false; }, 300);
+    CHECK(office.remote->menuItems().isEmpty());            // not asked for: a price book stays on the Pi
+
+    // The 11 digits a UPC loses its leading 0 to, the 12 a scanner sends, and the item's number.
+    for (const QString &code : {u"016165009116"_s, u"16165009116"_s, u"101"_s}) {
+        QVariant found;
+        office.remote->invoke(u"itemForCode"_s, {code}, [&](const QVariant &v) { found = v; });
+        REQUIRE(waitFor([&] { return found.isValid(); }));
+        CHECK(found.toMap().value(u"id"_s).toString() == u"classic-burger"_s);
+    }
+    QVariant none;
+    office.remote->invoke(u"itemForCode"_s, {u"999999999999"_s}, [&](const QVariant &v) { none = v; });
+    REQUIRE(waitFor([&] { return none.isValid(); }));
+    CHECK(none.toMap().isEmpty());
+    QVariant numberOnly;
+    office.remote->invoke(u"itemForCode"_s, {u"016165009116"_s, true}, [&](const QVariant &v) { numberOnly = v; });
+    REQUIRE(waitFor([&] { return numberOnly.isValid(); }));
+    CHECK(numberOnly.toMap().isEmpty());                    // a typed number is only a number
+
+    office.remote->want(u"menuItems"_s, true);              // Menu Builder is shown
+    REQUIRE(waitFor([&] { return !office.remote->menuItems().isEmpty(); }));
+    office.remote->want(u"menuItems"_s, false);
+    CHECK(office.remote->menuItems().isEmpty());
+}
+
 TEST_CASE("Handhelds put the open checks together from the shared part and their own", "[net][remote][want]")
 {
     Store store;

@@ -69,6 +69,11 @@ struct MenuItem {
     std::string number;
     // The barcodes on its package (UPC, EAN...): scanning one rings it in.
     std::vector<std::string> barcodes;
+    // Retail: its maker (brand), and the price book's product group and sub group under it (ILSA's
+    // MANUF, PROD_GRP and SUBGROUP): the Labels screen's tree. Empty: none.
+    std::string manufacturer;
+    std::string productGroup;
+    std::string subGroup;
     // How long it should take the kitchen (minutes); 0: what it usually
     // takes (learned, PosSettings::prepSeconds).
     int prepMinutes = 0;
@@ -153,6 +158,8 @@ struct MenuCategory {
     std::string printer;                // their kitchen ticket ("kitchen", "bar")
     std::string station;                // made at (kitchen screen)
     std::string taxClass;               // "food", "alcohol"...; empty: food
+    // Retail: the department group it's in ("CIGARS", ILSA's Dept_Grp): the top of the Labels screen's tree.
+    std::string group;
     // Its items' buttons on the order screen: their size ("small", "medium",
     // "large"; empty: as many as fit, as big as they can be), with photos,
     // without prices.

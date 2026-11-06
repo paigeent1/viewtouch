@@ -354,6 +354,7 @@ signals:
     void commandRequested(const QString &name, const QVariantMap &args);
 
 private:
+    void notOnFile(const QString &code);   // after scanned(): no item has it
     using Done = std::function<void(bool ok)>;
 
     void runChain(QList<vt::layout::Action> actions, int index, QString startPage);
