@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 19:40 ET — Bob (Claude) — Test fix: itemForCode's 11-digit case
+- **What:** The new tablet scan test used the 11 digits ILSA keeps (leading 0 lost, check digit kept); itemForCode, like the old scan code, reads 11 digits as a UPC-A without its check digit. Test now uses that; the lost-0 form is handled by vt-ilsa-items adding the 12-digit code.
+- **Why:** CI: test_net.cpp:629 was the only new failure; catalog run: scan 0 ms, 33,000-item import 0.4 s, next 8,000-item part 2.5 s, makers filled in 3.2 s, Labels search 0.13 s.
+- **Files:** `modern/tests/test_net.cpp`
+
 ### 2026-11-05 19:26 ET — Bob (Claude) — Label utility: ViewTouch prices read in dollars (whole dollars were divided by 100)
 - **What:** parse_vt_menu_dict guessed cents when a price was an int or 100 or more, so a ViewTouch price of 150 (saved as JSON 150, meaning $150.00) printed as $1.50 and $10.00 as $0.10. Now "price" is always dollars and "priceCents" always cents.
 - **Why:** Found while testing the switch to ViewTouch's own price book; until now the label utility read only Neil's temp file (priceCents), so the bug didn't show. Owner told not to print labels after tonight's import until this ships.

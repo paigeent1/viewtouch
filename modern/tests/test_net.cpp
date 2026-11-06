@@ -621,8 +621,8 @@ TEST_CASE("Tablets get the item list only while a screen lists it; scans ask the
     waitFor([] { return false; }, 300);
     CHECK(office.remote->menuItems().isEmpty());            // not asked for: a price book stays on the Pi
 
-    // The 11 digits a UPC loses its leading 0 to, the 12 a scanner sends, and the item's number.
-    for (const QString &code : {u"016165009116"_s, u"16165009116"_s, u"101"_s}) {
+    // The 12 digits a scanner sends, the 11 of a UPC-A without its check digit, and the item's number.
+    for (const QString &code : {u"016165009116"_s, u"01616500911"_s, u"101"_s}) {
         QVariant found;
         office.remote->invoke(u"itemForCode"_s, {code}, [&](const QVariant &v) { found = v; });
         REQUIRE(waitFor([&] { return found.isValid(); }));
