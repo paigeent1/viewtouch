@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 20:14 ET — Bob (Claude) — Test fix: item sheet test names app:: types
+- **What:** test_menu_builder.cpp's new item sheet test used MenuImport / ImportedItem without app::; CI didn't compile.
+- **Why:** Modern checks run 42141177016 failed to build.
+- **Files:** `modern/tests/test_menu_builder.cpp`
+
 ### 2026-11-05 20:12 ET — Bob (Claude) — Price book import ticks ILSA's ID-check departments
 - **What:** vt-ilsa-items marks a department idCheck when any of its items has an ILSA age requirement (Pos_Flag AGE_REQ); importMenuFile adds those categories to Site Setup's tobacco ID-check list (settings.tobaccoCategories), also on a re-import of an existing department.
 - **Why:** Owner scanned an Al Capone (tobacco accessory) after tonight's import and no ID check came up: the new departments weren't on the ID-check list.

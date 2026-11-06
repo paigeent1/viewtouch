@@ -293,7 +293,7 @@ TEST_CASE("Menu import: the usual spreadsheet shapes", "[menubuilder][import]")
 TEST_CASE("Menu import: the store's item sheet (cost, UPCs, item #, tax, maker, groups, prints to)", "[menubuilder][import]")
 {
     // The template sent to the owner: Cost before Price must never become the price.
-    const MenuImport r = readMenuCsv(
+    const app::MenuImport r = app::readMenuCsv(
         u"Name,Cost,Price,Category,UPC,More UPCs,Item #,Tax,Maker,Product group,Sub group,Prints to,Notes\n"
         "EXAMPLE BOURBON 1.5OZ,2.40,11.00,Whiskey,,,310,Alcohol,Example Distillery,Bourbon,,Bar,a note\n"
         "EXAMPLE SODA 12OZ,0.95,3.50,Beverages,16165009116,036000291452,,Food,Example Soda Co,Soda,Root Beer,Bar,\n"
@@ -309,7 +309,7 @@ TEST_CASE("Menu import: the store's item sheet (cost, UPCs, item #, tax, maker, 
     PosService pos(test::seedPosData(), nullptr);
     REQUIRE(pos.loginWithPin(u"1234"_s));
     QVariantList rows;
-    for (const ImportedItem &i : r.items) {
+    for (const app::ImportedItem &i : r.items) {
         QVariantMap row{{u"name"_s, i.name}, {u"price"_s, i.price}, {u"category"_s, i.category},
                         {u"barcodes"_s, (i.barcode + u' ' + i.moreBarcodes).trimmed()}, {u"cost"_s, i.cost},
                         {u"number"_s, i.number}, {u"tax"_s, i.tax}, {u"maker"_s, i.maker},
