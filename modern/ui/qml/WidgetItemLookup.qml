@@ -37,11 +37,19 @@ Item {
         Component.onDestruction: if (asked) asked.want("retailLabels", false)
     }
 
-    // The list: the matches (a search, or a level's items), else the next level's names.
+    // The list: the matches (a search, or a level's items; the main computer sends them by name), else the
+    // next level's names. Made again only when the main computer's answer is a new one (info.rev): the
+    // screen asks again after every change of any kind, and remaking the list redraws every row.
     readonly property bool showingItems: query !== "" || (info.showingItems ?? false)
-    readonly property var rows: showingItems
-        ? (info.matches ?? []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)))
-        : (info.children ?? [])
+    property var rows: []
+    property var rowsRev: undefined
+    function refreshRows() {
+        const r = info.rev
+        if (r !== undefined && r === rowsRev) return
+        rowsRev = r
+        rows = ((info.query ?? "") !== "" || (info.showingItems ?? false)) ? (info.matches ?? []) : (info.children ?? [])
+    }
+    onInfoChanged: refreshRows()
 
     function browseTo(p) { picked = null; pos.browseRetailLabels(p) }
     function showItems() { picked = null; pos.showRetailLabelItems(path) }
@@ -88,6 +96,7 @@ Item {
             if (r) returnTo = String(r)
         }
         if (pos) browseTo([])
+        refreshRows()
     }
     // A scan here (the main computer's scanner): found like a typed UPC.
     Timer {

@@ -635,19 +635,42 @@ namespace {
 
 const QString kLabelLauncher = u"/usr/local/bin/vt-label-utility"_s;
 
-// The label utility's templates on this computer (the same file it uses).
-QJsonObject labelTemplates()
+// The label utility's templates on this computer (the same file it uses). Read again only when one of its
+// files changes (every Look Up answer used to read and parse it); `generation` changes when it's read again.
+const QJsonObject &labelTemplates(std::uint64_t *generation = nullptr)
 {
+    struct Kept {
+        QStringList stamps;
+        QJsonObject templates;
+        std::uint64_t generation = 0;
+    };
+    static Kept kept;
     const QString dir = QDir::homePath() + u"/.local/share/ViewTouch/"_s;
-    for (const QString &name : {u"label_templates.json"_s, u"claude_label_templates.json"_s}) {
-        QFile f(dir + name);
-        if (f.open(QIODevice::ReadOnly)) {
-            const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
-            if (!o.isEmpty())
-                return o;
-        }
+    const QStringList names{u"label_templates.json"_s, u"claude_label_templates.json"_s};
+    QStringList stamps;
+    for (const QString &name : names) {
+        const QFileInfo fi(dir + name);
+        stamps << fi.absoluteFilePath() + u'|'
+                      + (fi.exists() ? QString::number(fi.lastModified().toMSecsSinceEpoch()) + u'|' + QString::number(fi.size()) : u"-"_s);
     }
-    return {};
+    if (kept.generation == 0 || stamps != kept.stamps) {
+        kept.stamps = stamps;
+        kept.templates = {};
+        for (const QString &name : names) {
+            QFile f(dir + name);
+            if (f.open(QIODevice::ReadOnly)) {
+                const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+                if (!o.isEmpty()) {
+                    kept.templates = o;
+                    break;
+                }
+            }
+        }
+        ++kept.generation;
+    }
+    if (generation)
+        *generation = kept.generation;
+    return kept.templates;
 }
 
 QString digitsOnly(const QString &s)
@@ -715,7 +738,22 @@ struct LabelItem {
     QStringList at;        // group, category, brand (the price book: then product group, sub group)
     QVariantList upcs;     // [{label, code}]
     QStringList codes;     // the same codes, for scanning
+    // Made once with the list (not again for every item on every search):
+    QString lowerName;     // the name in small letters, for searching by name
+    QStringList plainCodes;   // the codes without leading zeros, for searching by UPC
 };
+
+void finishLabelItem(LabelItem &it)
+{
+    it.lowerName = it.name.toLower();
+    it.plainCodes.clear();
+    for (const QString &c : it.codes)
+        it.plainCodes << noLeadingZeros(c);
+}
+
+// Changes whenever a list of label items is made again (ViewTouch's menu, or the price book read again), so a
+// kept Look Up answer is known to be from an older list.
+std::uint64_t gLabelItemsGeneration = 1;
 
 // Once the ILSA price book has been imported into ViewTouch (at least this many items with a UPC), the Labels
 // screen lists ViewTouch's own items and Neil's file is no longer read (tools/vt_label_utility.py
@@ -736,6 +774,8 @@ const std::vector<LabelItem> &pricebookItems()
     static QDateTime stamp;
     const QFileInfo fi(pricebookPath());
     if (!fi.exists()) {
+        if (!items.empty() || stamp.isValid())
+            ++gLabelItemsGeneration;
         items.clear();
         stamp = {};
         return items;
@@ -744,6 +784,7 @@ const std::vector<LabelItem> &pricebookItems()
         return items;
     stamp = fi.lastModified();
     items.clear();
+    ++gLabelItemsGeneration;
     const QString conn = u"vt_label_pricebook"_s;
     {
         QSqlDatabase db = QSqlDatabase::contains(conn) ? QSqlDatabase::database(conn, false) : QSqlDatabase::addDatabase(u"QSQLITE"_s, conn);
@@ -802,6 +843,7 @@ const std::vector<LabelItem> &pricebookItems()
                     bool ok = false;
                     const double price = q.value(4).toDouble(&ok);
                     it.price = u"$"_s + QString::number(ok ? price : 0.0, 'f', 2);
+                    finishLabelItem(it);
                     items.push_back(std::move(it));
                 }
             }
@@ -815,22 +857,29 @@ const std::vector<LabelItem> &pricebookItems()
 
 } // namespace
 
+// What retailLabels() last answered and what it came from, and the last search by name.
+struct PosService::LabelLookup {
+    bool valid = false;
+    const void *items = nullptr;
+    std::uint64_t itemsGeneration = 0, templatesGeneration = 0;
+    QString query, language, preview, previewName, previewError;
+    QStringList path;
+    bool browsing = false, showItems = false, ready = false, previewBusy = false;
+    QVariantMap answer;
+    // The last search by name: every item it found among the first `scanned` (in list order). A search that
+    // starts with it (one more letter typed) can only find some of those, so it looks at them, then on from there.
+    bool searched = false;
+    const void *searchItems = nullptr;
+    std::uint64_t searchGeneration = 0;
+    QString searchLower;
+    std::vector<std::uint32_t> hits;
+    std::size_t scanned = 0;
+};
+
 QVariantMap PosService::retailLabels() const
 {
     static const QStringList productFields{u"name"_s, u"upc"_s, u"barcode_img"_s, u"barcode_upca"_s, u"barcode_upce"_s,
                                            u"barcode_code39"_s, u"price_fmt"_s, u"manufacturer"_s};
-    QVariantList templates;
-    const QJsonObject all = labelTemplates();
-    for (auto it = all.begin(); it != all.end(); ++it) {
-        const QJsonObject t = it.value().toObject();
-        bool product = false;
-        for (const QJsonValue &e : t.value(u"elements").toArray())
-            product = product || productFields.contains(e.toObject().value(u"field").toString());
-        templates.append(QVariantMap{{u"name"_s, it.key()},
-                                     {u"size"_s, tr("%1 x %2 in").arg(t.value(u"width_in").toDouble(2.0)).arg(t.value(u"height_in").toDouble(1.0))},
-                                     {u"product"_s, product}});
-    }
-    QVariantList matches;
     const QString q = labelQuery_.trimmed();
     // The items: ViewTouch's menu once the price book is in it; until then Neil's ILSA price book while it's
     // there (the label utility prints from it).
@@ -852,6 +901,7 @@ QVariantMap PosService::retailLabels() const
         cache.revision = s_->adminRevision;
         cache.size = s_->menu.size();
         fromMenu.clear();
+        ++gLabelItemsGeneration;
         std::map<QString, QString> categoryNames, categoryGroups;
         for (const MenuCategory &c : s_->categories()) {
             categoryNames[qs(c.id)] = qs(c.name);
@@ -888,12 +938,52 @@ QVariantMap PosService::retailLabels() const
                 if (const QString s = qs(m.subGroup).trimmed().toUpper(); !s.isEmpty())
                     it.at << s;
             }
+            finishLabelItem(it);
             fromMenu.push_back(std::move(it));
         }
     }
     const std::vector<LabelItem> &items = book.empty() ? fromMenu : book;
+
+    // Nothing it comes from has changed (the screen asks again after every change of any kind): the same
+    // answer, the very same data (so a tablet isn't sent it again either).
+    std::uint64_t templatesGeneration = 0;
+    const QJsonObject &all = labelTemplates(&templatesGeneration);
+    const bool ready = QFile::exists(kLabelLauncher);
+    const QString language = tr("Department groups");   // the words in the answer follow the screen's language
+    if (!labelLookup_)
+        labelLookup_ = std::make_shared<LabelLookup>();
+    LabelLookup &kept = *labelLookup_;
+    if (kept.valid && kept.items == &items && kept.itemsGeneration == gLabelItemsGeneration
+        && kept.templatesGeneration == templatesGeneration && kept.query == q && kept.path == labelPath_
+        && kept.browsing == labelBrowsing_ && kept.showItems == labelShowItems_ && kept.ready == ready
+        && kept.language == language && kept.previewBusy == labelPreviewBusy_ && kept.preview == labelPreview_
+        && kept.previewName == labelPreviewName_ && kept.previewError == labelPreviewError_)
+        return kept.answer;
+
+    QVariantList templates;
+    for (auto it = all.begin(); it != all.end(); ++it) {
+        const QJsonObject t = it.value().toObject();
+        bool product = false;
+        for (const QJsonValue &e : t.value(u"elements").toArray())
+            product = product || productFields.contains(e.toObject().value(u"field").toString());
+        templates.append(QVariantMap{{u"name"_s, it.key()},
+                                     {u"size"_s, tr("%1 x %2 in").arg(t.value(u"width_in").toDouble(2.0)).arg(t.value(u"height_in").toDouble(1.0))},
+                                     {u"product"_s, product}});
+    }
+    QVariantList matches;
     const auto entry = [](const LabelItem &it) {
         return QVariantMap{{u"id"_s, it.id}, {u"name"_s, it.name}, {u"price"_s, it.price}, {u"upcs"_s, it.upcs}};
+    };
+    // The items shown, by name (as the screens used to sort them; among the same names, the one found first first).
+    const auto byName = [&](std::vector<std::uint32_t> &found) {
+        std::ranges::stable_sort(found, [&](std::uint32_t a, std::uint32_t b) {
+            return QString::localeAwareCompare(items[a].name, items[b].name) < 0;
+        });
+        for (std::uint32_t i : found)
+            matches.append(entry(items[i]));
+    };
+    const auto under = [this](const LabelItem &it) {
+        return it.at.size() >= labelPath_.size() && std::equal(labelPath_.cbegin(), labelPath_.cend(), it.at.cbegin());
     };
     // Browsing the tree: the names one level down from the path (with how many items under each),
     // and, when asked (Show Items) or at the bottom of the tree, every item under the path.
@@ -903,7 +993,7 @@ QVariantMap PosService::retailLabels() const
     if (q.isEmpty() && labelBrowsing_) {
         std::map<QString, int> counts;
         for (const LabelItem &it : items) {
-            if (it.at.mid(0, labelPath_.size()) != labelPath_)
+            if (!under(it))
                 continue;
             ++itemCount;
             if (it.at.size() > labelPath_.size())
@@ -912,32 +1002,67 @@ QVariantMap PosService::retailLabels() const
         for (const auto &[name, n] : counts)
             children.append(QVariantMap{{u"name"_s, name}, {u"count"_s, n}});
         showingItems = labelShowItems_ || (children.isEmpty() && !labelPath_.isEmpty());
-        if (showingItems)
-            for (const LabelItem &it : items)
-                if (it.at.mid(0, labelPath_.size()) == labelPath_ && matches.size() < 300)
-                    matches.append(entry(it));
+        if (showingItems) {
+            std::vector<std::uint32_t> found;   // the first 300 under the path
+            for (std::size_t i = 0; i < items.size() && found.size() < 300; ++i)
+                if (under(items[i]))
+                    found.push_back(std::uint32_t(i));
+            byName(found);
+        }
     }
     if (!q.isEmpty()) {
         const QString code = digitsOnly(q);
         const bool byCode = code.size() >= 4 && code.size() == q.size();
-        const QStringList words = q.toLower().split(u' ', Qt::SkipEmptyParts);
-        for (const LabelItem &it : items) {
-            bool hit = false;
-            if (byCode) {
-                hit = std::ranges::any_of(it.codes, [&](const QString &c) { return noLeadingZeros(c) == noLeadingZeros(code); });
-            } else {
-                const QString name = it.name.toLower();
-                hit = !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return name.contains(w); });
+        std::vector<std::uint32_t> found;   // the first 40 found, in list order
+        if (byCode) {
+            const QString plain = noLeadingZeros(code);
+            for (std::size_t i = 0; i < items.size() && found.size() < 40; ++i)
+                if (items[i].plainCodes.contains(plain))
+                    found.push_back(std::uint32_t(i));
+        } else {
+            const QString lower = q.toLower();
+            const QStringList words = lower.split(u' ', Qt::SkipEmptyParts);
+            const auto hit = [&](const LabelItem &it) {
+                return !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return it.lowerName.contains(w); });
+            };
+            std::vector<std::uint32_t> hits;
+            std::size_t from = 0;
+            if (kept.searched && kept.searchItems == &items && kept.searchGeneration == gLabelItemsGeneration
+                && lower.startsWith(kept.searchLower)) {
+                for (std::uint32_t i : kept.hits)
+                    if (hit(items[i]))
+                        hits.push_back(i);
+                from = kept.scanned;
             }
-            if (!hit)
-                continue;
-            matches.append(entry(it));
-            if (matches.size() >= 40)
-                break;
+            for (; from < items.size() && hits.size() < 40; ++from)
+                if (hit(items[from]))
+                    hits.push_back(std::uint32_t(from));
+            found.assign(hits.begin(), hits.begin() + std::ptrdiff_t(std::min<std::size_t>(hits.size(), 40)));
+            kept.searched = true;
+            kept.searchItems = &items;
+            kept.searchGeneration = gLabelItemsGeneration;
+            kept.searchLower = lower;
+            kept.hits = std::move(hits);
+            kept.scanned = from;
         }
+        byName(found);
     }
-    return {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
-            {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, QFile::exists(kLabelLauncher)},
+    kept.valid = true;
+    kept.items = &items;
+    kept.itemsGeneration = gLabelItemsGeneration;
+    kept.templatesGeneration = templatesGeneration;
+    kept.query = q;
+    kept.path = labelPath_;
+    kept.browsing = labelBrowsing_;
+    kept.showItems = labelShowItems_;
+    kept.ready = ready;
+    kept.language = language;
+    kept.previewBusy = labelPreviewBusy_;
+    kept.preview = labelPreview_;
+    kept.previewName = labelPreviewName_;
+    kept.previewError = labelPreviewError_;
+    kept.answer = {{u"templates"_s, templates}, {u"query"_s, q}, {u"matches"_s, matches},
+            {u"path"_s, labelPath_}, {u"children"_s, children}, {u"ready"_s, ready},
             {u"itemCount"_s, itemCount}, {u"showingItems"_s, showingItems}, {u"showItemsAsked"_s, labelShowItems_},
             // What the next level's buttons are, as on the main computer's label utility.
             {u"levelTitle"_s, [&] {
@@ -946,7 +1071,13 @@ QVariantMap PosService::retailLabels() const
                 return labelPath_.size() < titles.size() ? titles.at(labelPath_.size()) : QString();
             }()},
             {u"preview"_s, labelPreview_}, {u"previewName"_s, labelPreviewName_}, {u"previewBusy"_s, labelPreviewBusy_},
-            {u"previewError"_s, labelPreviewError_}};
+            {u"previewError"_s, labelPreviewError_},
+            // Changes with every new answer (on every session, and after a restart): a screen redraws its list only then.
+            {u"rev"_s, [] {
+                static qint64 next = QDateTime::currentMSecsSinceEpoch();
+                return ++next;
+            }()}};
+    return kept.answer;
 }
 
 bool PosService::browseRetailLabels(const QStringList &path)

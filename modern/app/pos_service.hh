@@ -1360,6 +1360,10 @@ private:
     QString labelPreviewError_;
     int labelPreviewRun_ = 0;      // a newer preview wins over one still being drawn
     bool labelPreviewBusy_ = false;
+    // The Labels screen / Item Look Up answer last given, and the last search by name (pos_inventory.cpp):
+    // given again as it is while nothing it comes from has changed; a longer search starts from the last.
+    struct LabelLookup;
+    mutable std::shared_ptr<LabelLookup> labelLookup_;
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;

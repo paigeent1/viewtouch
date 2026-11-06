@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 17:35 ET — Bob (Claude) — Item Look Up (ALPHA LOOK UP) quick with the 31,700-item price book
+- **What:** The main computer now keeps what Item Look Up and the Labels screen were last told and gives the very same answer again while nothing it comes from has changed (the screen asked again after every change of any kind, and each time re-read the label templates file, lower-cased every item name and rebuilt the list). Item names in small letters and UPCs without leading zeros are made once with the item list. One more letter typed only looks again at what the last search found, then carries on from where it stopped. The main computer sorts the items by name (the screen used to, every time); Item Look Up remakes its list only when the answer is new (rev). Label templates are read again only when their file changes. Test: typing on the 41,000-item catalog gives the same items in the same order as before, under 50 ms a search.
+- **Why:** Owner 2026-11-06: ALPHA LOOK UP in retail mode is still slow with the 31,700-item price book.
+- **Files:** `modern/app/pos_inventory.cpp`, `modern/app/pos_service.hh`, `modern/tests/test_stress.cpp`, `modern/ui/qml/WidgetItemLookup.qml`
+- **Next person must know:** Same matches, same order, same 40 / 300 limits as before. The answer has a new field rev (changes with every new answer). Tablets: the list order is now the main computer's name order (it was the tablet's); only names that differ just by punctuation could come out in another order.
+
 ### 2026-11-06 17:24 ET — Bob (Claude) — Menu Builder: a new item's card turns into the saved item (Save, not Add)
 - **What:** saveItem: for a new item, opens the item's own category before saving, so the slim builder list (builderItems: open category only for price-book departments) contains the new item and the card switches to it.
 - **Why:** Owner 2026-11-06 17:22 (video): added 'Mill's Favorite Cigar' to PREMIUM CIGARS while another category was open; the card stayed 'Not saved yet' with 'Add to the Menu', and a second tap said it's already on the menu.

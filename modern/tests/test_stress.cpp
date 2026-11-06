@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
+#include <algorithm>
 #include <cstdio>
 #include <QElapsedTimer>
 #include <QTemporaryDir>
@@ -153,6 +154,80 @@ TEST_CASE("Big catalog: 33,000 retail items import, list, scan, save, load", "[c
     const QVariantMap labels = pos.retailLabels();
     const qint64 labelsMs = t.elapsed();
     CHECK(labels[u"matches"_s].toList().size() == 1);
+
+    // ALPHA LOOK UP (Item Look Up) typing on it: the same answers as the way it was first written (every item
+    // with a UPC, in menu order, the first 40 whose name has every word / whose UPC is the one typed, leading
+    // zeros or not; then by name), and quick, one more letter at a time.
+    const auto oldWay = [&](const QString &typed) {
+        const auto digits = [](const QString &s) {
+            QString out;
+            for (QChar ch : s)
+                if (ch.isDigit())
+                    out += ch;
+            return out;
+        };
+        const auto noZeros = [](const QString &s) {
+            qsizetype i = 0;
+            while (i < s.size() - 1 && s.at(i) == u'0')
+                ++i;
+            return s.mid(i);
+        };
+        const QString query = typed.trimmed(), code = digits(query);
+        const bool byCode = code.size() >= 4 && code.size() == query.size();
+        const QStringList words = query.toLower().split(u' ', Qt::SkipEmptyParts);
+        QList<std::pair<QString, QString>> found;   // name, id
+        for (const core::MenuItem &m : pos.shared()->menu) {
+            QStringList codes;
+            for (const std::string &b : m.barcodes)
+                if (const QString c = digits(QString::fromStdString(b)); !c.isEmpty())
+                    codes << c;
+            for (const core::RecipeLine &r : m.recipe)
+                if (r.ingredientId.starts_with("__parent__:"))
+                    if (const QString c = digits(QString::fromStdString(r.ingredientId.substr(11))); !c.isEmpty())
+                        codes << c;
+            if (codes.isEmpty())
+                continue;
+            const QString name = QString::fromStdString(m.name);
+            const bool hit = byCode ? std::ranges::any_of(codes, [&](const QString &c) { return noZeros(c) == noZeros(code); })
+                                    : !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return name.toLower().contains(w); });
+            if (hit)
+                found.append({name, QString::fromStdString(m.id)});
+            if (found.size() >= 40)
+                break;
+        }
+        std::stable_sort(found.begin(), found.end(), [](const auto &a, const auto &b) { return QString::localeAwareCompare(a.first, b.first) < 0; });
+        QStringList ids;
+        for (const auto &f : found)
+            ids << f.second;
+        return ids;
+    };
+    const auto lookUp = [&](const QString &typed) {
+        REQUIRE(pos.findRetailLabels(typed));
+        QStringList ids;
+        for (const QVariant &v : pos.retailLabels()[u"matches"_s].toList())
+            ids << v.toMap()[u"id"_s].toString();
+        return ids;
+    };
+    REQUIRE(pos.browseRetailLabels({}));   // the screen opens on the tree
+    (void)pos.retailLabels();
+    qint64 slowestMs = 0;
+    for (const QString &typed : {u"r"_s, u"ro"_s, u"rob"_s, u"robusto 3"_s, u"robusto 32"_s, u"robusto 329"_s, u"q"_s, u"qz"_s, u"qzx"_s}) {
+        t.restart();
+        const QStringList ids = lookUp(typed);
+        slowestMs = std::max(slowestMs, t.elapsed());
+        CHECK(ids == oldWay(typed));
+    }
+    for (const QString &typed : {u"brand 12 "_s, u"BRAND 1"_s, u"robusto 32999"_s, u"800000123"_s, u"0800000123"_s,
+                                 u"0700000005"_s, u"123"_s, u"pipe tobacco 79"_s, u"zzzz"_s})
+        CHECK(lookUp(typed) == oldWay(typed));
+    CHECK(lookUp(u"brand 12"_s).size() == 40);   // still the first 40
+    t.restart();
+    for (int n = 0; n < 200; ++n)   // asked again with nothing changed (every change of any kind asks): kept
+        (void)pos.retailLabels();
+    const qint64 againMs = t.elapsed();
+    std::printf("\n[catalog] Item Look Up: slowest search while typing %lld ms; 200 reads unchanged %lld ms\n", slowestMs, againMs);
+    CHECK(slowestMs < 50);
+    CHECK(againMs < 50);
 
     // Saved and loaded back (a restart).
     QTemporaryDir dir;
