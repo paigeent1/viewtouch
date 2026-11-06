@@ -603,7 +603,8 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
     PosService pos(test::seedPosData(), nullptr);
     REQUIRE(pos.loginWithPin(u"1234"_s));
     const auto file = [](bool withGroups) {
-        QVariantMap cat{{u"id"_s, u"ilsa-tobacco-acc"_s}, {u"name"_s, u"TOBACCO ACC"_s}, {u"taxClass"_s, u"merchandise"_s}};
+        QVariantMap cat{{u"id"_s, u"ilsa-tobacco-acc"_s}, {u"name"_s, u"TOBACCO ACC"_s}, {u"taxClass"_s, u"merchandise"_s},
+                        {u"idCheck"_s, true}};
         QVariantMap zen{{u"id"_s, u"ilsa-16165009116"_s}, {u"name"_s, u"ZEN TUBE"_s}, {u"price"_s, 9.99}, {u"taxClass"_s, u"merchandise"_s},
                         {u"family"_s, u"ilsa-tobacco-acc"_s}, {u"barcodes"_s, QVariantList{u"016165009116"_s}}};
         QVariantMap other{{u"id"_s, u"ilsa-12345678901"_s}, {u"name"_s, u"ZEN TUBE"_s}, {u"price"_s, 8.99}, {u"taxClass"_s, u"merchandise"_s},
@@ -636,6 +637,13 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
         if (c.toMap()[u"name"_s] == u"TOBACCO ACC"_s)
             retailOnly = c.toMap()[u"retailOnly"_s].toBool();
     CHECK(retailOnly);
+    // ILSA's age flag: its items ask for an ID.
+    bool idChecked = false;
+    for (const QVariant &c : pos.menuCategories())
+        if (c.toMap()[u"name"_s] == u"TOBACCO ACC"_s)
+            idChecked = std::ranges::find(pos.shared()->settings.tobaccoCategories, c.toMap()[u"id"_s].toString().toStdString())
+                        != pos.shared()->settings.tobaccoCategories.end();
+    CHECK(idChecked);
     CHECK(pos.orderItems().size() == pos.menuItems().size() - 2);
     CHECK_FALSE(names(pos.orderItems()).contains(u"ZEN TUBE"_s));
     CHECK(names(pos.menuItems()).contains(u"ZEN TUBE"_s));

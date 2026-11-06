@@ -1442,6 +1442,17 @@ int PosService::importMenuFile(const QVariantMap &file)
                 categoryOf[c.id] = x.id;
     }
 
+    // A price book's departments with ID-check items (ILSA's age flag): on Site Setup's ID-check list.
+    for (const QVariant &v : file.value(u"categories"_s).toList()) {
+        const QVariantMap c = v.toMap();
+        if (!c.value(u"idCheck"_s).toBool())
+            continue;
+        const std::string here = categoryOf.value(ss(c.value(u"id"_s).toString()));
+        auto &list = s_->settings.tobaccoCategories;
+        if (!here.empty() && std::ranges::find(list, here) == list.end())
+            list.push_back(here);
+    }
+
     const QVariantMap pictures = file.value(u"pictures"_s).toMap();
     // Items: the one by that name here, or a new id.
     std::vector<MenuItem> items;

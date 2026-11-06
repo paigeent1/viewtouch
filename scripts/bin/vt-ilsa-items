@@ -113,6 +113,7 @@ for (d, _), g in sorted(groups.items()):
         items.append(item)
         if x["age"] not in ("", "0"):
             tobacco_cats.add(cname)
+            cats[cid]["idCheck"] = True   # ViewTouch asks for an ID on its items (Site Setup's tobacco list)
         if x["upc"].startswith(INHOUSE):
             makers = [y["upc"] for y in g if not y["upc"].startswith(INHOUSE)]
             inhouse.append([x["upc"], cname, x["name"], f"{x['price']:.2f}", last_sold.get(x["upc"], "never"),

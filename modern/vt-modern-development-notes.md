@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 20:12 ET — Bob (Claude) — Price book import ticks ILSA's ID-check departments
+- **What:** vt-ilsa-items marks a department idCheck when any of its items has an ILSA age requirement (Pos_Flag AGE_REQ); importMenuFile adds those categories to Site Setup's tobacco ID-check list (settings.tobaccoCategories), also on a re-import of an existing department.
+- **Why:** Owner scanned an Al Capone (tobacco accessory) after tonight's import and no ID check came up: the new departments weren't on the ID-check list.
+- **Files:** `scripts/bin/vt-ilsa-items, modern/app/pos_menu_builder.cpp, modern/tests/test_customers.cpp`
+
 ### 2026-11-05 20:03 ET — Bob (Claude) — Retail-only departments, Pi item-list cache, the store's item sheet import
 - **What:** (1) MenuCategory.retailOnly (Menu Builder switch '🏷 Retail screen only'; set by the price book import on departments with an ILSA department group, also when a re-import fills the group in). The order screens (WidgetMenuCategories, WidgetMenuGrid) leave those categories off, and use a new orderItems list (menuItems less retail-only items; sent to tablets always, small), so a tablet's order screen no longer pulls the whole price book; Find Item (menuGrid with search) still asks for menuItems. (2) PosService caches menuItems for this computer's own screens, made again after any change signal, meal period or language change (the Pi sat at 100% CPU for 10+ minutes after the 8,000-item part 1 tonight). (3) Spreadsheet import (readMenuCsv / importMenuRows): Cost is the store's cost, never the price (it used to be read as the price); new columns More UPCs, Item #, Tax, Maker, Product group, Sub group, Prints to (blank = no printer); an 11-digit UPC also gets its 12-digit form; the import preview shows the cost beside the price. Template sent to the owner: Name, Price, Cost, Category, UPC, More UPCs, Item #, Tax, Maker, Product group, Sub group, Prints to, Notes.
 - **Why:** BH beta price book import 2026-11-05: the ILSA departments showed on HCA's Dinner menu; the Pi froze after part 1; owner wants to load drinks and vendor items from his pricing sheet (item + cost).
