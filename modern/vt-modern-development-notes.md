@@ -117,6 +117,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 08:59 ET — Bob (Claude) — Menu Builder: Import…, Starter… and + Category open and close with each touch
+- **What:** A second touch on Import… closes the file chooser / import window, on Starter… closes the Starter window, on + Category closes the new category's card (asking about unsaved changes as usual). The 2-second guard stays only on the actions themselves (Import, choosing a starter menu) so one can't run twice.
+- **Why:** Owner 2026-11-06: wanted touching to toggle the option open and closed, not ignore the second touch.
+- **Files:** `modern/ui/qml/WidgetMenuBuilder.qml`
+
 ### 2026-11-06 08:57 ET — Bob (Claude) — Menu Builder: Starter… guarded against a second touch too
 - **What:** Starter… and choosing a starter menu use the same 2-second once() guard as Import and + Category.
 - **Why:** Owner: Starter behaves the same way.

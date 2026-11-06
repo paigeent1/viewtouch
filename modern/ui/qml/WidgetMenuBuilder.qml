@@ -483,8 +483,9 @@ Item {
             editItem(added)
         }
     }
-    // A second touch on Import… or + Category while the screen is still busy with the first (a big
-    // price book makes it slow) does nothing: the touches wait while it works, then all arrive at once.
+    // Import…, Starter… and + Category open and close with each touch (a second touch closes what the
+    // first opened). Import and choosing a starter menu, once started, ignore a second touch for 2
+    // seconds: with a big price book the screen is slow, and touches made meanwhile arrive all at once.
     property var lastTaps: ({})
     function once(key) {
         const now = Date.now()
@@ -822,7 +823,14 @@ Item {
                         objectName: "builderAddCategory"
                         Layout.fillWidth: true
                         text: qsTr("+ Category")
-                        onClicked: if (w.once("category")) w.leave(() => w.editCategory(null))
+                        // Open: a new category's card; touched again (that card still open): closed.
+                        onClicked: {
+                            if (w.editingCategory && w.draft && !w.draft.id) {
+                                w.leave(() => { w.editingCategory = false; w.stage = "items" })
+                                return
+                            }
+                            w.leave(() => w.editCategory(null))
+                        }
                     }
                     TouchButton {
                         objectName: "builderThemes"
@@ -858,7 +866,14 @@ Item {
                         text: qsTr("Import…")
                         ToolTip.visible: hovered
                         ToolTip.text: qsTr("A spreadsheet saved as CSV, or another store's menu")
-                        onClicked: if (w.once("import")) importFile.open()
+                        onClicked: {   // open; touched again: closed
+                            if (importFile.visible || importDialog.visible) {
+                                importFile.close()
+                                importDialog.close()
+                            } else {
+                                importFile.open()
+                            }
+                        }
                     }
                     TouchButton {
                         id: exportKey
@@ -882,7 +897,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredWidth: implicitWidth
                         text: qsTr("Starter…")
-                        onClicked: if (w.once("starter")) templateDialog.open()
+                        onClicked: templateDialog.visible ? templateDialog.close() : templateDialog.open()   // open / closed
                     }
                     TouchButton {
                         id: printKey
