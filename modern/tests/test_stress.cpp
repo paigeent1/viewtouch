@@ -247,7 +247,7 @@ TEST_CASE("Big catalog: 33,000 retail items import, list, scan, save, load", "[c
     CHECK(pos.itemSearch()[u"items"_s].toList().size() == 1);
     REQUIRE(pos.findItems(u"0800000123"_s));   // a UPC, leading zero or not
     REQUIRE(pos.itemSearch()[u"items"_s].toList().size() == 1);
-    CHECK(pos.itemSearch()[u"items"_s].toList().first().toMap()[u"id"_s].toString() == u"ilsa-700000123"_s);
+    CHECK(pos.itemSearch()[u"items"_s].toList().first().toMap()[u"name"_s].toString() == u"CIGAR BRAND 4 ROBUSTO 123"_s);   // the import gives ids of its own
     std::printf("[catalog] Find: names made ready %lld ms, slowest search while typing %lld ms\n", findReadyMs, findSlowestMs);
     std::fflush(stdout);
     CHECK(findReadyMs < 5000);

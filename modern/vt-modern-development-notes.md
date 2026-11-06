@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 18:11 ET — Bob (Claude) — Catalog test: Find by UPC checks the item's name
+- **What:** test_stress: the UPC search's item is checked by its name (CIGAR BRAND 4 ROBUSTO 123); the menu import gives items ids of its own.
+- **Why:** CI 42308155098: Find returned the right single item but the test expected the file's id (ilsa-700000123). Same run: Item Look Up 1 ms and Find 2 ms per keystroke on the 33,000-item catalog.
+- **Files:** `modern/tests/test_stress.cpp`
+
 ### 2026-11-06 17:54 ET — Bob (Claude) — vt-server installs what Qt Multimedia still needs (video on the guest screen)
 - **What:** vt-server: when qt6-multimedia-dev is installed but qt6-base-private-dev or a playback backend (qt6-ffmpeg-multimedia-plugin, or gstreamer) isn't, installs them once and makes the build look for Qt Multimedia again.
 - **Why:** HCA Pi 2026-11-06 17:36: qt6-multimedia-dev 6.8.2 installed, yet the build said 'Qt Multimedia not found: no video on the customer display' and no playback plugin was installed.
