@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:19 ET — Bob (Claude) — Price book review: before/after sheet with ¢ names
+- **What:** vt-pricebook-cleanup also writes ~/pricebook-cleanup/names-before-after.csv: UPC, item number, Before, After, Why, Check for every name that would change, plus every name with a ¢ (no change, listed for review).
+- **Why:** Owner 2026-11-06: a CSV of the fraction and ¢ changes, before and after, to review.
+- **Files:** `scripts/bin/vt-pricebook-cleanup`
+
 ### 2026-11-06 14:18 ET — Bob (Claude) — Register monitor at 48 Hz: each monitor at its own best mode
 - **What:** vt-guest-display (X11): register output --primary --auto, guest output --auto --right-of it, instead of forcing the register's current size by name. vt-screens / Screen check flag any monitor running under 55 Hz.
 - **Why:** Pi report 2026-11-06 14:13: HDMI-1 (register, supports 1920x1080) ran 1280x720 at 48 Hz, because --mode 1280x720 takes the first mode of that name; the owner saw the register 'giggling'. HDMI-2 (guest) tops out at 1366x768.

@@ -281,9 +281,13 @@ def main(argv):
     out_dir = os.path.expanduser(argv[argv.index("--out") + 1]) if "--out" in argv else OUT_DIR
     if not os.path.exists(db):
         sys.exit(f"Can't find ViewTouch's database: {db}")
-    rows, total = [], 0
+    rows, total, cents = [], 0, []
     for item in load_items(db):
         total += 1
+        if "¢" in (item.get("name") or ""):
+            barcodes = item.get("barcodes") or []
+            cents.append({"item_number": item.get("number") or "", "upc": barcodes[0] if barcodes else "",
+                          "name": item.get("name") or ""})
         r = review(item)
         if r:
             barcodes = item.get("barcodes") or []
@@ -297,6 +301,20 @@ def main(argv):
         w = csv.DictWriter(f, fieldnames=cols)
         w.writeheader()
         w.writerows(rows)
+
+    # The owner's review sheet: just before -> after, one row per name that would change, and every
+    # name with a ¢ (shown as it is; ILSA's ¢ comes through since the Windows-1252 fix).
+    sheet = os.path.join(out_dir, "names-before-after.csv")
+    with open(sheet, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(["UPC", "Item number", "Before", "After", "Why", "Check"])
+        for r in rows:
+            if r["suggested_name"]:
+                w.writerow([r["upc"], r["item_number"], r["name_now"], r["suggested_name"], r["why"], r["flag"]])
+        changed = {r["name_now"] for r in rows if r["suggested_name"]}
+        for c in cents:
+            if c["name"] not in changed:
+                w.writerow([c["upc"], c["item_number"], c["name"], c["name"], "has ¢ (no change)", ""])
 
     per_rule = Counter(rule for r in rows for rule in r["why"].split("; ") if rule)
     renamed = [r for r in rows if r["suggested_name"]]
@@ -321,7 +339,9 @@ def main(argv):
         print(f"\nOdd cases, left alone ({'all' if '--all' in argv or len(odd) <= 40 else f'first 40 of {len(odd):,}'}):")
         for r in (odd if "--all" in argv else odd[:40]):
             print(f"  {cut(r['upc'] or r['item_number'], 14):14}  {cut(r['name_now'], 34):34}  {r['flag']}")
-    print(f"\nFull list: {out}")
+    print(f"\nNames with ¢: {len(cents):,}")
+    print(f"Before/after sheet: {sheet}")
+    print(f"Full list: {out}")
     return 0
 
 
