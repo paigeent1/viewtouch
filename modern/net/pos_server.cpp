@@ -53,6 +53,10 @@ struct PosServer::Connection {
     int build = 0;            // what it runs (hello); 0: older than build numbers
     QString version, platform;
     bool answersPings = false;   // a terminal that says "pong" (older ones don't)
+    // A billboard (Manager -> Terminals: Billboard): a TV showing the store's slides. It gets only
+    // the billboard's pieces (forBillboard), no pages, no events, and may only fetch its pictures
+    // and videos and check a manager's PIN. Never a check or a customer.
+    bool billboard = false;
 };
 
 namespace {
@@ -80,6 +84,27 @@ bool onRequest(const QString &key)
     // Find's answer (itemSearch) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems" || key == u"itemSearch";
 }
+
+// All a billboard is ever sent (the owner: signage only, never any customer or sale): who it is,
+// the store's name and language, its own screen setting, and the slides, pictures and logo.
+bool forBillboard(const QString &key)
+{
+    static const QSet<QString> keys = {u"terminalName"_s, u"storeName"_s, u"storeLanguage"_s, u"language"_s,
+                                       u"screenMode"_s, u"adminRevision"_s, u"storeImages"_s, u"storeLogo"_s,
+                                       u"billboard"_s};
+    return keys.contains(key);
+}
+
+// What a billboard may ask the store for: its pictures (storeImage, only the slides' and the
+// logo: see allowedForBillboard) and the manager's PIN that closes it.
+bool billboardCall(const QString &method)
+{
+    return method == u"storeImage" || method == u"leaveBillboard";
+}
+
+// Videos are sent to billboards a part at a time, each asked for (memory stays small on both
+// sides, however long the video).
+constexpr qint64 kVideoChunk = 512 * 1024;
 
 // Screens that ask for things (this version) get the open checks in two
 // parts (the shared part made and sent once a round); older ones the list.
@@ -356,7 +381,7 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
     connect(layouts_, &LayoutHub::layoutChanged, this, [this](const layout::Layout &layout, const void *origin) {
         const QJsonObject msg{{u"t"_s, u"layout"_s}, {u"layout"_s, layout.toJson()}};
         for (auto &c : connections_) {
-            if ((c->session && c.get() != origin) || (c->standby && c->synced))
+            if ((c->session && !c->billboard && c.get() != origin) || (c->standby && c->synced))
                 c->channel->send(msg);
         }
     });
@@ -488,7 +513,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         // Set up as a self-order kiosk or a time clock (vtmodern-setup): taken
         // when Manager -> Terminals has no screen for it yet.
         const std::string wanted = m.value(u"screen").toString().toStdString();
-        if (paired->screen.empty() && (wanted == "selfOrder" || wanted == "timeClock"))
+        if (paired->screen.empty() && (wanted == "selfOrder" || wanted == "timeClock" || wanted == "billboard"))
             for (core::TerminalConfig &t : shared_->settings.terminals)
                 if (t.id == paired->id) {
                     t.screen = wanted;
@@ -501,6 +526,11 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         c->platform = m.value(u"platform").toString();
         c->session = std::make_unique<app::PosService>(shared_, name);
         app::PosService *s = c->session.get();
+        c->billboard = paired->screen == "billboard";
+        if (c->billboard) {   // a TV with the store's slides: nothing else, ever
+            welcomeBillboard(c);
+            return;
+        }
         if (paired->screen == "selfOrder")   // Manager -> Terminals: a kiosk for guests
             s->enableSelfOrder();
         // Any change to this session's state is sent out on the next flush
@@ -541,6 +571,10 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
     }
     if (!c->session) {
         c->channel->send({{u"t"_s, u"error"_s}, {u"text"_s, u"say hello first"_s}});
+        return;
+    }
+    if (c->billboard) {
+        handleBillboard(c, m);
         return;
     }
     if (type == u"want") {
@@ -601,6 +635,140 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
     }
 }
 
+// --- billboards: TVs around the store with the guest-screen slides (signage only) -------------
+
+void PosServer::welcomeBillboard(Connection *c)
+{
+    app::PosService *s = c->session.get();
+    // Slides, pictures and the logo are the store's settings: they change with adminChanged (and
+    // every 30 s anyway, for the billboard's hours). No check, kitchen or day signals at all.
+    const quint32 bit = bitOfSignal(QMetaMethod::fromSignal(&app::PosSession::adminChanged));
+    connect(s, &app::PosSession::adminChanged, this, [this, c, bit] {
+        c->dirty |= bit;
+        scheduleFlushAll();
+    });
+    connect(s, &app::PosSession::notice, this, [c](const QString &text) { c->notices << text; });
+    c->subscribes = true;
+    c->sent.clear();
+    {
+        const i18n::Scope language([s] { return s->language(); });
+        for (const StatePiece &p : statePieces())
+            if (forBillboard(p.key))
+                c->sent.insert(p.key, p.property.read(s));
+    }
+    c->dirty = 0;
+    // No pages (a billboard shows none) and no update offer (billboards are updated from the Pi).
+    const AppBuild me = appBuild();
+    c->channel->send(QJsonObject{{u"t"_s, u"welcome"_s}, {u"protocol"_s, ProtocolVersion},
+                                 {u"version"_s, me.version}, {u"build"_s, me.number},
+                                 {u"layout"_s, QJsonObject()}, {u"state"_s, QJsonObject::fromVariantMap(c->sent)}});
+    qCInfo(lcServer) << "billboard connected:" << s->terminalName();
+    emit terminalsChanged();
+}
+
+bool PosServer::allowedForBillboard(const QString &ref) const
+{
+    if (ref.isEmpty())
+        return false;
+    if (ref.toStdString() == shared_->settings.displayLogo)
+        return true;
+    return std::ranges::any_of(shared_->settings.displaySlides,
+                               [&](const std::string &sl) { return QString::fromStdString(sl) == u"image:"_s + ref; });
+}
+
+void PosServer::handleBillboard(Connection *c, const QJsonObject &m)
+{
+    const QString type = m.value(u"t").toString();
+    if (type == u"getVideo") {
+        sendVideoPart(c, m.value(u"name").toString(), m.value(u"at").toInteger());
+        return;
+    }
+    if (type == u"call") {
+        const qint64 id = m.value(u"id").toInteger();
+        const QString method = m.value(u"m").toString();
+        const QVariantList args = m.value(u"a").toArray().toVariantList();
+        QVariant result = false;
+        if (!billboardCall(method) || (method == u"storeImage" && !allowedForBillboard(args.value(0).toString())))
+            qCInfo(lcServer).noquote() << "a billboard may not" << method << "- refused";
+        else
+            c->session->invoke(method, args, [&result](const QVariant &r) { result = r; });
+        flush(c);
+        c->channel->send({{u"t"_s, u"reply"_s}, {u"id"_s, id}, {u"r"_s, QJsonValue::fromVariant(result)}});
+        for (const QString &n : std::exchange(c->notices, {}))
+            c->channel->send({{u"t"_s, u"notice"_s}, {u"text"_s, n}});
+        return;
+    }
+    if (type == u"saveLayout")
+        c->channel->send({{u"t"_s, u"reply"_s}, {u"id"_s, m.value(u"id").toInteger()},
+                          {u"r"_s, QJsonObject{{u"ok"_s, false}, {u"error"_s, tr("A billboard has no pages.")}}}});
+    // Anything else (want, getUpdate...): nothing for a billboard.
+}
+
+bool PosServer::sentToBillboard(const QString &key)
+{
+    return forBillboard(key);
+}
+
+QString PosServer::guestVideoFile(const QString &dir, const QString &name)
+{
+    // A plain file name: no folders, nothing hidden, no way up or out.
+    if (dir.isEmpty() || name.isEmpty() || name.size() > 255 || name.contains(u'/') || name.contains(u'\\')
+        || name.startsWith(u'.') || name.contains(QChar(0)))
+        return {};
+    const QString root = QFileInfo(dir).canonicalFilePath();
+    if (root.isEmpty())
+        return {};
+    // The real file (links followed): it must be a video right in the folder itself.
+    const QFileInfo f(QDir(root).filePath(name));
+    const QString real = f.canonicalFilePath();
+    if (real.isEmpty())
+        return {};
+    const QFileInfo r(real);
+    const QString suffix = r.suffix().toLower();
+    if (!r.isFile() || r.absolutePath() != root || !(suffix == u"mp4" || suffix == u"m4v" || suffix == u"mov"))
+        return {};
+    return real;
+}
+
+QString PosServer::billboardVideo(const QString &name) const
+{
+    const QString file = guestVideoFile(guestVideoDir_, name);
+    if (file.isEmpty())
+        return {};
+    // Only a video the store has on its slides now.
+    for (const std::string &sl : shared_->settings.displaySlides) {
+        QString line = QString::fromStdString(sl);
+        if (!line.startsWith(u"video:"))
+            continue;
+        line = line.mid(6);
+        if (line.endsWith(u"#sound"))
+            line.chop(6);
+        if (QFileInfo(line).canonicalFilePath() == file)
+            return file;
+    }
+    return {};
+}
+
+void PosServer::sendVideoPart(Connection *c, const QString &name, qint64 at)
+{
+    const auto refuse = [c, &name](const QString &why) {
+        c->channel->send({{u"t"_s, u"videoError"_s}, {u"name"_s, name}, {u"text"_s, why}});
+    };
+    const QString file = billboardVideo(name);
+    if (file.isEmpty())
+        return refuse(tr("%1 is not a video on the guest screen.").arg(name));
+    QFile f(file);
+    if (!f.open(QIODevice::ReadOnly))
+        return refuse(tr("Can't read %1: %2").arg(name, f.errorString()));
+    const qint64 size = f.size();
+    if (at < 0 || at > size || !f.seek(at))
+        return refuse(tr("Can't read %1: %2").arg(name, tr("no such part")));
+    const QByteArray data = f.read(kVideoChunk);
+    c->channel->send({{u"t"_s, u"videoPart"_s}, {u"name"_s, name}, {u"at"_s, at}, {u"size"_s, size},
+                      {u"modified"_s, QFileInfo(file).lastModified().toMSecsSinceEpoch()},
+                      {u"data"_s, QString::fromLatin1(data.toBase64())}});
+}
+
 void PosServer::pair(Connection *c, const QJsonObject &m)
 {
     // The code must still be the open one: used once, and not after it expired.
@@ -634,6 +802,9 @@ void PosServer::pair(Connection *c, const QJsonObject &m)
     const QByteArray key = newDeviceKey();
     it->key = key.toBase64().toStdString();
     it->pairedAt = shared_->now();
+    // Paired as a billboard (vt-add-billboard: --pair with --screen billboard): one from the start.
+    if (!asStandby && m.value(u"screen").toString() == u"billboard")
+        it->screen = "billboard";
     const QString id = QString::fromStdString(it->id);
     shared_->pairing.reset();   // one device per code
     pairingKeys_.clear();
@@ -670,7 +841,7 @@ QVariantList PosServer::connections() const
         const int mine = appBuild().number;
         out.append(QVariantMap{{u"name"_s, c->standby ? tr("Standby server") : c->session->terminalName()},
                                {u"address"_s, c->socket->peerAddress().toString().remove(u"::ffff:"_s)},
-                               {u"since"_s, c->since}, {u"standby"_s, c->standby},
+                               {u"since"_s, c->since}, {u"standby"_s, c->standby}, {u"billboard"_s, c->billboard},
                                {u"user"_s, c->session ? c->session->userName() : QString()},
                                {u"build"_s, c->build}, {u"version"_s, c->version}, {u"platform"_s, c->platform},
                                {u"behind"_s, !c->standby && mine > 0 && c->build < mine},
@@ -761,9 +932,16 @@ void PosServer::dropRevoked()
     // abort() can drop the connection at once: pick them out first.
     QList<QPointer<QSslSocket>> revoked;
     for (auto &c : connections_) {
-        if (!c->terminalId.isEmpty() && !shared_->settings.pairedTerminal(c->terminalId.toStdString())) {
+        const core::TerminalConfig *t = c->terminalId.isEmpty() ? nullptr
+                                                                : shared_->settings.pairedTerminal(c->terminalId.toStdString());
+        if (!c->terminalId.isEmpty() && !t) {
             qCInfo(lcServer).noquote() << "device unpaired; disconnecting"
                                        << (c->session ? c->session->terminalName() : c->terminalId);
+            revoked << c->socket;
+        } else if (t && c->session && c->billboard != (t->screen == "billboard")) {
+            // Made a billboard, or a billboard no longer (Manager -> Terminals): it connects again
+            // and gets the session for what it is now (a billboard never keeps a full session).
+            qCInfo(lcServer).noquote() << "screen changed to or from a billboard; reconnecting" << c->session->terminalName();
             revoked << c->socket;
         }
     }
@@ -785,6 +963,8 @@ void PosServer::flush(Connection *c)
     for (const StatePiece &p : statePieces()) {
         if (!(p.bit & dirty))
             continue;
+        if (c->billboard && !forBillboard(p.key))
+            continue;   // a billboard: the slides, pictures and logo only (never read, never sent)
         if ((c->subscribes && onRequest(p.key) && !c->wanted.contains(p.key)) || notFor(c->subscribes, p.key))
             continue;   // not shown there, or not this way
         const QVariant value = p.property.read(s);

@@ -70,6 +70,8 @@ public:
     void start(const QString &host, quint16 port, const QString &code, const QString &terminalName);
     // Pair as the store's standby server (gets the store's server key too).
     void setStandby(bool standby) { standby_ = standby; }
+    // Pair as this kind of screen ("billboard": a TV with the guest-screen slides).
+    void setScreen(const QString &screen) { screen_ = screen; }
     bool busy() const { return socket_ != nullptr; }
 
 signals:
@@ -85,6 +87,7 @@ private:
     QString name_;
     bool encrypted_ = false;
     bool standby_ = false;
+    QString screen_;
 };
 
 } // namespace vt::net

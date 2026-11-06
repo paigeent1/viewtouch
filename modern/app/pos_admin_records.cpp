@@ -30,6 +30,8 @@ QVariantList PosService::mealPeriods() const
 
 QVariantList PosService::adminRecords(const QString &panel)
 {
+    if (panel == u"billboards")   // Hardware Configuration > Billboards (pos_kiosk.cpp)
+        return billboards();
     QVariantList out;
     auto add = [&](QVariantMap r, const QString &title, const QString &detail) {
         r.insert(u"_title"_s, title);

@@ -113,6 +113,8 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"addItem"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.addItem(a.value(0).toString())); }},
         {u"setSelfOrder"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setSelfOrder(a.value(0, true).toBool())); }},
         {u"leaveSelfOrder"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.leaveSelfOrder(a.value(0).toString())); }},
+        {u"leaveBillboard"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.leaveBillboard(a.value(0).toString())); }},
+        {u"setBillboard"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setBillboard(a.value(0).toString(), a.value(1).toMap())); }},
         {u"kioskStart"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.kioskStart(a.value(0).toBool())); }},
         {u"kioskAdd"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.kioskAdd(a.value(0).toString())); }},
         {u"kioskRemove"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.kioskRemove(a.value(0).toLongLong())); }},
