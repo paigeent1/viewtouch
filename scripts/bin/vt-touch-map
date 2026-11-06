@@ -20,6 +20,9 @@ if [ "$1" = --watch ]; then
 fi
 outs=$(xrandr 2>/dev/null | awk '/ connected/{print $1}')
 first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+# The register's monitor, when the store said which (vt-guest-display on HDMI-2): first, whatever the order.
+pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)
+if [ -n "$pos" ] && echo "$outs" | grep -qx "$pos"; then first="$pos"; second=$(echo "$outs" | grep -vx "$pos" | sed -n 1p); fi
 [ -z "$first" ] && exit 0
 # The port only (a hub port is "usb-0:1.2"; the interface part, ":1.0", isn't kept).
 guest_port=$(sed 's/\(usb-[0-9]*:[0-9.]*\):[0-9]*\.[0-9]*$/\1/' "$HOME/.vt-guest-touch" 2>/dev/null)

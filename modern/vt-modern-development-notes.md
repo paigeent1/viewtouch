@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:43 ET — Bob (Claude) — Choose which monitor is the register
+- **What:** vt-guest-display on HDMI-X saves the register's output in ~/.vt-pos-output; vt-guest-display and vt-touch-map put the POS (and its touchscreen) on that output whatever order xrandr lists them.
+- **Why:** Both BH monitors report the same size and name order, so the first-listed output was the small one; the owner wants the big monitor as the register.
+- **Files:** `scripts/bin/vt-guest-display, scripts/bin/vt-touch-map`
+
 ### 2026-11-06 10:30 ET — Bob (Claude) — vt-start / vt-server keep ViewTouch's messages in ~/.vt-run.log
 - **What:** Both start vtmodern with its output in ~/.vt-run.log (the previous run's kept as ~/.vt-run.log.1) instead of /dev/null.
 - **Why:** 2026-11-06 the Pi's ViewTouch stopped on its own and nothing it said was kept.

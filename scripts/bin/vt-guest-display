@@ -1,6 +1,8 @@
 #!/bin/bash
 # The customer display (the guest's order, total, tip choices, price checks) on the Pi's second HDMI.
 #   vt-guest-display on    second monitor = customer display (stops mirroring; kept after reboots)
+#   vt-guest-display on HDMI-2   the same, and HDMI-2 is the register's monitor (the other the guest's),
+#                          whatever order the Pi lists them in (kept in ~/.vt-pos-output)
 #   vt-guest-display off   back to mirroring the first monitor on the second
 #   vt-guest-display touch the guest monitor is a touchscreen too: touch it once so the Pi learns which
 #                          touchscreen is which (both report the same name); remembered by USB port
@@ -8,6 +10,8 @@
 #                          (Hardware Configuration's "Learn guest touchscreen" button)
 # Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
 MODE="${1:-on}"
+# vt-guest-display on HDMI-2: that monitor is the register (the other one the guest's), kept for good.
+if [ "$MODE" = on ] && [ -n "$2" ]; then echo "$2" > "$HOME/.vt-pos-output"; fi
 STATE="$HOME/.vt-customer-display"
 export DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 AUTOSTART="$HOME/.config/autostart/vt-guest-display.desktop"
@@ -62,6 +66,9 @@ done
 if command -v wlr-randr >/dev/null && wlr-randr >/dev/null 2>&1; then
     outs=$(wlr-randr | awk '/^[A-Za-z]/{print $1}')
     first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    # The register's monitor, when the store said which (vt-guest-display on HDMI-2): first, whatever the order.
+    pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)
+    if [ -n "$pos" ] && echo "$outs" | grep -qx "$pos"; then first="$pos"; second=$(echo "$outs" | grep -vx "$pos" | sed -n 1p); fi
     [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
     w=$(wlr-randr | awk -v o="$first" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f && /current/{split($1,a,"x"); print a[1]; exit}')
     cmd="wlr-randr --output $second --on --preferred --pos ${w:-1920},0"
@@ -71,6 +78,9 @@ if command -v wlr-randr >/dev/null && wlr-randr >/dev/null 2>&1; then
 elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
     outs=$(xrandr | awk '/ connected/{print $1}')
     first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
+    # The register's monitor, when the store said which (vt-guest-display on HDMI-2): first, whatever the order.
+    pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)
+    if [ -n "$pos" ] && echo "$outs" | grep -qx "$pos"; then first="$pos"; second=$(echo "$outs" | grep -vx "$pos" | sed -n 1p); fi
     [ -z "$second" ] && { echo "Only one screen found ($first). Is the second monitor plugged in and on?"; exit 1; }
     # The POS monitor at its resolution, progressive (an interlaced "1920x1080i" can flicker):
     # --mode by name takes the first (progressive) mode of that size.
