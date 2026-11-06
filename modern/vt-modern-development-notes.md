@@ -117,6 +117,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 08:42 ET — Bob (Claude) — Pi desktop: tried Wayland (labwc) for remote screen sharing, going back to X11
+- **What:** 2026-11-05 night: installed Raspberry Pi Connect on the Pi (rpi-connect 2.14; linger on; signed in; remote shell works). Screen sharing needs a Wayland desktop, so the Pi was switched to labwc (raspi-config do_wayland W2; rpd-wayland-core had to be installed for the rpd-labwc session; desktop autologin B4). It worked for remote screen sharing, but in the morning the register and guest screens were swapped (Qt's first screen on Wayland is not the X11 'first' monitor), and the guest touchscreen mapping is X11-only (xinput; the two touchscreens report the same name). Owner chose to go back to X11 (do_wayland W1). Pi Connect's remote shell keeps working on X11; screen sharing does not.
+- **Why:** Owner wanted to run the Pi from home; the switch broke the guest screen setup.
+- **Files:** `(Pi settings only)`
+- **Next person must know:** Before trying Wayland again: put the POS window on the leftmost screen by position (not Qt's primary), the guest window on the other; find a Wayland way to tie the guest touchscreen to its monitor (labwc maps by device name, and both report the same name: maybe a udev rule by USB port); test on a spare Pi first. Remote screen alternatives on X11: RealVNC (already running; sign in to a RealVNC account, paid for business) or Tailscale + VNC.
+
 ### 2026-11-05 22:50 ET — Bob (Claude) — Backlog: fill cigar size from ILSA names
 - **What:** Added to the '6+' cleanup backlog item: read length and ring gauge(s) from names like '6+ X 52' or '6 1/8 X 52/60' into the new fields on import; fill empty fields only; review list first.
 - **Why:** Owner 2026-11-05: 'that was my next suggestion! automation is key!'
