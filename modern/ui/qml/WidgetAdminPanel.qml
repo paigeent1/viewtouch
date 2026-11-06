@@ -510,6 +510,7 @@ Item {
                                                w.zone.controller.looks().map(l => ({ value: l.id, text: qsTranslate("Looks", l.name) })))
                                        })
                                 pos: w.pos
+                                controller: w.zone ? w.zone.controller : null
                                 touch: true
                                 pages: modelData.type === "page" && w.zone ? w.pageChoices(modelData) : []
                                 // This screen's own lines (About): from this screen, not the store.

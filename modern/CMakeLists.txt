@@ -136,6 +136,7 @@ if(Qt6_FOUND)
             ui/qml/StationWindow.qml
             ui/qml/StationIcon.qml
             ui/qml/PicturePicker.qml
+            ui/qml/GuestPicturePicker.qml
             ui/qml/HandoffSheet.qml
             ui/qml/StressPanel.qml
             ui/qml/PageView.qml

@@ -114,8 +114,9 @@ Rectangle {
             visible: (!d.thanking || d.hasCheck) && !d.usePage
             readonly property var slides: d.prompt.slides ?? []
             property int index: 0
+            // Each message 7 seconds, each picture 10.
             Timer {
-                interval: 7000
+                interval: slide.picture ? 10000 : 7000
                 running: idle.visible && idle.slides.length > 1
                 repeat: true
                 onTriggered: { fade.restart() }

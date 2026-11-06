@@ -3,7 +3,8 @@ import QtQuick.Layouts
 
 // Customer Display page: the store's messages and pictures in turn (Store Settings > Customer
 // display: between guests), with running promotions. props.title: the line above each message
-// (default "Welcome!"; "" for none); props.seconds: how long each shows (default 7).
+// (default "Welcome!"; "" for none); props.seconds: how long each message shows (default 7;
+// pictures 10).
 Item {
     id: w
     property ZoneItem zone
@@ -20,7 +21,7 @@ Item {
     clip: true
 
     Timer {
-        interval: Math.max(2, w.props.seconds ?? 7) * 1000
+        interval: slide.picture ? 10000 : Math.max(2, w.props.seconds ?? 7) * 1000   // a picture: 10 seconds
         running: w.visible && w.slides.length > 1 && !(w.zone && w.zone.editing)
         repeat: true
         onTriggered: fade.restart()

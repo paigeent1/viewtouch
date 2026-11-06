@@ -296,7 +296,7 @@ Store Settings → *Dim the screen after (minutes)* (10 to start; 0 = never). A 
 
 A second monitor facing the guest:
 
-- **Between guests:** the logo (or store name) in the store's color, then its messages and pictures in turn (Store Settings → *Customer display: between guests*, one per line; `image:/path/photo.jpg` for a picture), plus any promotion running now.
+- **Between guests:** the logo (or store name) in the store's color, then its messages and pictures in turn (Store Settings → *Customer display: between guests*, one per line; **+ Add a picture** picks one from Dropbox → *POS project/Guest Screen* via `scripts/bin/vt-guest-pictures` and rclone, kept by the store as `store:guest-<name>.jpg`, at most 1920×1080), plus any promotion running now. Each message shows 7 seconds, each picture 10.
 - **While ordering:** the table or check number, each item with its choices (add-on prices shown as +$1.00), voids struck through, discounts and promotions, the total. With loyalty on, *Earn rewards*: the guest types their phone number on the screen's keypad and is found or signed up. It shows their first name (never the number), their points and what this visit earns.
 - **Tips:** on Settle, **Ask Guest for Tip** offers the tip choices, a custom amount on the keypad, or no tip; the choice goes on their card payment.
 - **After paying:** "Thank you", their change and the points they earned, and *Print receipt*, *Text me* (when texting is set up) or *No receipt*.

@@ -12,6 +12,8 @@ ColumnLayout {
     property EditorController editor
     // For pictures: the store's picture library.
     property PosService pos
+    // The screen's controller: the guest screen's pictures from Dropbox (rows with field.addPicture).
+    property LayoutController controller: null
     property var pages: []   // page choices when there's no editor: [{value, text}]
     // At least this tall (a phone: a finger's size); 0: as the style makes them.
     property real minHeight: 0
@@ -614,6 +616,9 @@ ColumnLayout {
     // field.pattern (a regex, one group a column) and written with field.format
     // ("%1 = %2"); lines split by field.split (a regex, default a new line) and
     // joined with field.join. field.max rows; field.addText on the add button.
+    // field.addPicture: a second button's text, for a guest screen picture from
+    // Dropbox (controller.addGuestPicture); a row "image:..." then shows the
+    // picture and its name.
     Component {
         id: rowsField
         ColumnLayout {
@@ -684,7 +689,43 @@ ColumnLayout {
                             }
                             Layout.fillWidth: !modelData.width
                             Layout.preferredWidth: modelData.width ?? -1
-                            sourceComponent: modelData.type === "enum" ? cellCombo : cellText
+                            sourceComponent: modelData.type === "enum" ? cellCombo
+                                           : fe.field.addPicture && cell.cellValue.startsWith("image:") ? cellPicture : cellText
+                            // A picture: small, with its name ("image:store:guest-sale.jpg" -> guest-sale.jpg).
+                            Component {
+                                id: cellPicture
+                                RowLayout {
+                                    id: picRow
+                                    objectName: "rowPicture"
+                                    spacing: 8
+                                    readonly property string ref: cell.cellValue.slice(6)
+                                    Rectangle {
+                                        implicitWidth: 78
+                                        implicitHeight: 44
+                                        color: "#10141a"
+                                        border.color: EditorStyle.muted
+                                        radius: 4
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 2
+                                            fillMode: Image.PreserveAspectFit
+                                            asynchronous: true
+                                            sourceSize.width: 156
+                                            sourceSize.height: 88
+                                            source: {
+                                                const ref = picRow.ref
+                                                return fe.pos ? (fe.pos.imageRevision < 0 ? undefined : fe.pos.imageUrl(ref)) : ref
+                                            }
+                                        }
+                                    }
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: picRow.ref.replace(/^store:/, "").split("/").pop()
+                                        elide: Text.ElideMiddle
+                                        color: EditorStyle.text
+                                    }
+                                }
+                            }
                             Component {
                                 id: cellText
                                 TextField {
@@ -746,6 +787,36 @@ ColumnLayout {
                                               : null
                         return String((free ?? c.options[0]).value)
                     })])
+                }
+            }
+            // A picture for the guest screen, from Dropbox: kept by the store and saved on the list
+            // at once (addGuestPicture); here too, so this form's Save keeps it.
+            Button {
+                Layout.minimumHeight: fe.minHeight
+                objectName: "rowAddPicture"
+                visible: !!fe.field.addPicture && !!fe.controller && !fe.readOnly
+                         && (!fe.field.max || rowsBox.rows.length < fe.field.max)
+                text: fe.field.addPicture ?? ""
+                implicitHeight: 44
+                onClicked: if (guestPictures.item) guestPictures.item.picker.open()
+            }
+            // Only made for the list that has the button (closed until it's touched).
+            Loader {
+                id: guestPictures
+                active: !!fe.field.addPicture && !!fe.controller
+                sourceComponent: Item {
+                    property alias picker: guestPicker
+                    GuestPicturePicker {
+                        id: guestPicker
+                        controller: fe.controller
+                        onPicked: (path) => {
+                            const line = fe.controller ? fe.controller.addGuestPicture(path) : ""
+                            if (line === "" || rowsBox.rows.some(r => r[0] === line))
+                                return
+                            rowsBox.rows = rowsBox.rows.concat([[line]])
+                            rowsBox.save()
+                        }
+                    }
                 }
             }
         }

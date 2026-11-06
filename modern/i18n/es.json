@@ -379,6 +379,7 @@
  "+ Add a job": "+ Agregar un puesto",
  "+ Add a meal period price": "+ Agregar un precio por horario",
  "+ Add a message": "+ Agregar un mensaje",
+ "+ Add a picture": "+ Agregar una imagen",
  "+ Add a reason": "+ Agregar un motivo",
  "+ Add a reward": "+ Agregar una recompensa",
  "+ Add a station": "+ Agregar una estación",
@@ -482,6 +483,7 @@
  "A label printer (Manager → Printers: format ZPL or TSPL), or a receipt printer for slips. Each screen can say otherwise (Terminals).": "Una impresora de etiquetas (Gerente → Impresoras: formato ZPL o TSPL), o una impresora de recibos para tiras. Cada pantalla puede elegir otra (Terminales).",
  "A line guests read, e.g. Grilled steak, onion, cilantro": "Una línea que leen los clientes, p. ej. Carne asada, cebolla, cilantro",
  "A line guests see under the name, e.g. \"Two patties, cheddar, house sauce\".": "Una línea que los clientes ven bajo el nombre, p. ej. \"Dos carnes, cheddar, salsa de la casa\".",
+ "A manager adds pictures to the guest screen.": "Un gerente agrega las imágenes de la pantalla del cliente.",
  "A manager can update it here.": "Un gerente puede actualizarla aquí.",
  "A manager gets it on the store's screen: Manager → Terminals → Pair a Device.": "Un gerente lo obtiene en la pantalla de la tienda: Gerente → Terminales → Vincular un dispositivo.",
  "A manager is logged in": "Hay un gerente conectado",
@@ -1177,6 +1179,7 @@
  "Cool": "Fríos",
  "Copy": "Copiar",
  "Copying the menu": "Copiar el menú",
+ "Copying the pictures from Dropbox…": "Copiando las imágenes de Dropbox…",
  "Corner radius": "Redondeo de esquinas",
  "Cost": "Costo",
  "Cost each": "Costo c/u",
@@ -1196,7 +1199,9 @@
  "Couldn't change the time zone": "No se pudo cambiar la zona horaria",
  "Couldn't connect": "No se pudo conectar",
  "Couldn't look for a new ViewTouch": "No se pudo buscar un ViewTouch nuevo",
+ "Couldn't make %1 into a picture for the guest screen.": "No se pudo convertir %1 en una imagen para la pantalla del cliente.",
  "Couldn't reach the standby: %1": "No se pudo llegar al respaldo: %1",
+ "Couldn't read the list of pictures.": "No se pudo leer la lista de imágenes.",
  "Couldn't restart": "No se pudo reiniciar",
  "Couldn't save the update: %1": "No se pudo guardar la actualización: %1",
  "Couldn't save to the database (it kept trying): %1": "No se pudo guardar en la base de datos (siguió intentando): %1",
@@ -1913,6 +1918,7 @@
  "Look": "Estilo",
  "Look Again": "Buscar de nuevo",
  "Look Up": "Buscar",
+ "Look again": "Buscar de nuevo",
  "Look up a card to see its balance.": "Busque una tarjeta para ver su saldo.",
  "Look up the card first.": "Busque la tarjeta primero.",
  "Look when disabled": "Estilo desactivado",
@@ -2153,6 +2159,7 @@
  "No pay rates are set (Manager -> Employees -> Pay rate).": "No hay tarifas de pago (Gerente -> Empleados -> Pago por hora).",
  "No payment to remove.": "No hay pago que quitar.",
  "No pictures found. Put them in Pictures, Documents or Downloads on this computer, or on a USB stick (touch USB Stick).": "No se encontraron imágenes. Póngalas en Imágenes, Documentos o Descargas de esta computadora, o en una memoria USB (toque Memoria USB).",
+ "No pictures yet. Put JPEG pictures in Dropbox > POS project > Guest Screen (from a computer or the iPhone), then touch Look again.": "Todavía no hay imágenes. Ponga imágenes JPEG en Dropbox > POS project > Guest Screen (desde una computadora o el iPhone) y toque Buscar de nuevo.",
  "No prices to change.": "No hay precios que cambiar.",
  "No printer is set up (Manager → Printers).": "No hay impresoras configuradas (Gerente → Impresoras).",
  "No printer is set up.": "No hay impresora configurada.",
@@ -2567,6 +2574,9 @@
  "Pictures (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.svg)": "Imágenes (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.svg)",
  "Pictures can be PNG, JPEG, WebP, GIF, BMP or SVG files.": "Las imágenes pueden ser archivos PNG, JPEG, WebP, GIF, BMP o SVG.",
  "Pictures can be PNG, JPEG, WebP, GIF, BMP or SVG files; fonts TTF or OTF.": "Las imágenes pueden ser archivos PNG, JPEG, WebP, GIF, BMP o SVG; las fuentes, TTF u OTF.",
+ "Pictures for the guest screen are added on the Pi.": "Las imágenes de la pantalla del cliente se agregan en la Pi.",
+ "Pictures for the guest screen come from Dropbox > POS project > Guest Screen.": "Las imágenes de la pantalla del cliente vienen de Dropbox > POS project > Guest Screen.",
+ "Pictures in Dropbox > POS project > Guest Screen": "Imágenes en Dropbox > POS project > Guest Screen",
  "Piece": "Pieza",
  "Pillar": "Columna",
  "Pizza": "Pizza",
@@ -3014,6 +3024,7 @@
  "Show the forecast first.": "Muestre el pronóstico primero.",
  "Show this slip at the counter": "Muestre este papel en el mostrador",
  "Show what should be there while counting stock": "Mostrar lo que debería haber al contar el inventario",
+ "Shown in turn on the guest screen: each message 7 seconds, each picture 10. + Add a picture shows the pictures in Dropbox > POS project > Guest Screen (put them there from a computer or the iPhone). Running promotions are added by themselves.": "Se muestran por turno en la pantalla del cliente: cada mensaje 7 segundos, cada imagen 10. + Agregar una imagen muestra las imágenes de Dropbox > POS project > Guest Screen (póngalas allí desde una computadora o el iPhone). Las promociones vigentes se agregan solas.",
  "Shown in turn; \"image:/path/to/photo.jpg\" for a picture. Running promotions are added by themselves.": "Se muestran por turno; \"image:/ruta/a/foto.jpg\" para una imagen. Las promociones vigentes se agregan solas.",
  "Shown on the customer display, up to 6.": "Se muestran en la pantalla del cliente, hasta 6.",
  "Shown on the table, checks and kitchen tickets. Each table needs its own name.": "Se ve en la mesa, las cuentas y los tickets de cocina. Cada mesa necesita su propio nombre.",
@@ -3422,6 +3433,7 @@
  "The guest chose a %1 tip": "El cliente eligió una propina de %1",
  "The guest chose no tip": "El cliente eligió sin propina",
  "The guest is choosing a tip": "El cliente está eligiendo la propina",
+ "The guest screen shows JPEG, PNG or WebP pictures of 25 MB at most.": "La pantalla del cliente muestra imágenes JPEG, PNG o WebP de 25 MB como máximo.",
  "The held card couldn't be charged: %1. Take another payment.": "No se pudo cobrar la tarjeta retenida: %1. Tome otro pago.",
  "The held card is being charged…": "Se está cobrando la tarjeta retenida…",
  "The held card was charged %1 (%2) but isn't on the check: add it by hand or refund it in Stripe.": "Se cobró %1 a la tarjeta retenida (%2) pero no está en la cuenta: agréguelo a mano o reembólselo en Stripe.",
@@ -3664,6 +3676,10 @@
  "Toggle on/off": "Encender / apagar",
  "Tomorrow": "Mañana",
  "Tomorrow %1": "Mañana %1",
+ "Too many wrong PINs. Try again in %n second(s).": {
+  "one": "Demasiados PIN incorrectos. Inténtelo de nuevo en %n segundo.",
+  "other": "Demasiados PIN incorrectos. Inténtelo de nuevo en %n segundos."
+ },
  "Too many wrong PINs: try again in %n second(s).": {
   "one": "Demasiados PIN incorrectos: intente de nuevo en %n segundo.",
   "other": "Demasiados PIN incorrectos: intente de nuevo en %n segundos."
@@ -4147,6 +4163,7 @@
  "used by %n": "usado por %n",
  "void": "anulado",
  "vs Last Year": "vs año pasado",
+ "vt-guest-pictures isn't installed on this computer.": "vt-guest-pictures no está instalado en esta computadora.",
  "waiting for a manager": "esperando a un gerente",
  "with %1": "con %1",
  "words": "texto",
@@ -4200,9 +4217,5 @@
  "👁 Preview": "👁 Vista previa",
  "🔍 Find an item": "🔍 Buscar un artículo",
  "🔍 Find an item (name or number)": "🔍 Buscar (nombre o número)",
- "🖨 Printed Menu…": "🖨 Menú impreso…",
- "Too many wrong PINs. Try again in %n second(s).": {
-  "one": "Demasiados PIN incorrectos. Inténtelo de nuevo en %n segundo.",
-  "other": "Demasiados PIN incorrectos. Inténtelo de nuevo en %n segundos."
- }
+ "🖨 Printed Menu…": "🖨 Menú impreso…"
 }
