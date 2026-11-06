@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 12:30 ET — Bob (Claude) — Release 2026-11-06 (b): Screen check, vt-share, upstream group 2, price book review
+- **What:** bob/release-1106b = bob/screen-check (Screen check page, vt-screens, register made primary, vt-share) + bob/upstream-group2 (7833c83 8d98a74 9514708 f510043 df89b9f ed80209-scanner 78ec1b3) + bob/pricebook-fractions (vt-pricebook-cleanup, read-only) + bob/seed-jump-targets (notes only). Each branch passed CI on its own with only main's 28 known failing test cases (screen-check 42257012418, upstream-group2 42259921064).
+- **Why:** One update for the Pi and one tablet app build instead of several.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** After the Pi update: vt-guest-display on HDMI-1 again (it now also makes HDMI-1 primary), then Screen check should say All good.
+
 ### 2026-11-06 11:56 ET — Bob (Claude) — vt-share: Pi output shared with Bob through Google Drive
 - **What:** New scripts/bin/vt-share <command>: runs it, shows the output as usual, saves it in ~/vt-output/ (last 200 kept, latest.txt) and copies it to Google Drive 'POS project tmp/pi-output/' with the Pi's rclone remote gdrive (also as latest.txt). Keeps the command's exit status. Upload only: it never downloads or runs anything from Drive.
 - **Why:** Owner 2026-11-06: Bob should read what the Pi did instead of the owner copying and pasting results.
