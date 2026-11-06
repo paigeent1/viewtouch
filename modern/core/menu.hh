@@ -74,6 +74,11 @@ struct MenuItem {
     std::string manufacturer;
     std::string productGroup;
     std::string subGroup;
+    // A cigar's size: its length in inches (6.125 = 6 1/8) and ring gauge in 64ths of an inch (52); a
+    // second ring gauge for a shape that changes along its length (a diadema: 52/60). 0: not given.
+    double length = 0;
+    int ringGauge = 0;
+    int ringGauge2 = 0;
     // How long it should take the kitchen (minutes); 0: what it usually
     // takes (learned, PosSettings::prepSeconds).
     int prepMinutes = 0;

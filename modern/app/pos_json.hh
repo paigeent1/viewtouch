@@ -48,6 +48,11 @@ core::Change changeFromJson(const QJsonObject &o);
 std::optional<core::Check> checkFromJson(const QJsonObject &o);
 
 QJsonObject toJson(const core::MenuItem &item);
+// A cigar's length as typed: "6.125", "6 1/8", "6-1/8", "6⅛", or the price book's "6+" (an eighth);
+// in inches, to the nearest 1/16. -1: not a length. "" is 0 (none).
+double cigarLengthFrom(QString text);
+// As shown and printed: 6.125 -> "6 1/8", 7 -> "7", 0 -> "".
+QString cigarLengthText(double inches);
 core::MenuItem menuItemFromJson(const QJsonObject &o);
 std::vector<core::MenuItem> menuFromJson(const QJsonArray &a);
 

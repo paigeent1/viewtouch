@@ -211,6 +211,7 @@ Item {
                      groups: i.groups.slice(), onIt: i.onIt.join(", "), available: i.availableSet,
                      kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
                      allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode,
+                     length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
                      buttonColor: i.buttonColor, prepMinutes: i.prepMinutes ? String(i.prepMinutes) : "",
                      takeoutPrice: i.takeoutPrice, periodPrices: Object.assign({}, i.periodPrices),
                      taxClass: i.taxClass, printer: i.printer, station: i.station,
@@ -218,7 +219,8 @@ Item {
                  : { id: "", name: "", price: "", family: categoryId, image: "", groups: [], onIt: "",
                      available: true, kioskHide: false, description: "", favorite: false, allergens: [],
                      noDiscount: category ? category.noDiscount === true : false,
-                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode, buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
+                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode,
+                     length: "", ringGauge: "", ringGauge2: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
                      section: "", breakBefore: "",
                      // what its category's items start with
                      taxClass: w.retailMode ? "merchandise" : (category ? (category.taxClass || "food") : "food"),
@@ -1514,6 +1516,42 @@ Item {
                                             }
                                         }
                                     }
+                                }
+                                // A cigar's size: length and ring gauge (a second gauge for a diadema, 52/60).
+                                Label { text: qsTr("Cigar size"); visible: w.draft.isRetail === true }
+                                RowLayout {
+                                    visible: w.draft.isRetail === true
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Label { text: qsTr("Length") }
+                                    TextField {
+                                        objectName: "builderLength"
+                                        Layout.preferredWidth: 110
+                                        text: w.draft.length ?? ""
+                                        placeholderText: qsTr("6 1/8")
+                                        onTextEdited: w.set("length", text)
+                                    }
+                                    Label { text: qsTr("in.  Ring gauge") }
+                                    TextField {
+                                        objectName: "builderRingGauge"
+                                        Layout.preferredWidth: 70
+                                        text: w.draft.ringGauge ?? ""
+                                        placeholderText: "52"
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        onTextEdited: w.set("ringGauge", text)
+                                    }
+                                    Label { text: "/" }
+                                    TextField {
+                                        objectName: "builderRingGauge2"
+                                        Layout.preferredWidth: 70
+                                        text: w.draft.ringGauge2 ?? ""
+                                        placeholderText: qsTr("2nd")
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        onTextEdited: w.set("ringGauge2", text)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("A second ring gauge, for a shape that changes along its length (a diadema: 52/60). Usually empty.")
+                                    }
+                                    Item { Layout.fillWidth: true }
                                 }
                                 // Sizes (Small, Large…): asked first when it's ordered.
                                 Label { text: qsTr("Sizes") }

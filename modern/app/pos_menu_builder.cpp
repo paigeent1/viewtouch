@@ -705,6 +705,22 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         item.productGroup = ss(card.value(u"productGroup"_s).toString().trimmed());
     if (card.contains(u"subGroup"_s))
         item.subGroup = ss(card.value(u"subGroup"_s).toString().trimmed());
+    // A cigar's size: length (6 1/8, 6.125, 6⅛, 6+) and ring gauges.
+    if (card.contains(u"length"_s)) {
+        const double len = cigarLengthFrom(card.value(u"length"_s).toString());
+        if (len < 0)
+            return fail(tr("Type the length in inches, like 6 1/8 or 6.125, or leave it empty."));
+        item.length = len;
+    }
+    for (const auto &[key, field] : {std::pair{u"ringGauge"_s, &MenuItem::ringGauge}, {u"ringGauge2"_s, &MenuItem::ringGauge2}})
+        if (card.contains(key)) {
+            const QString t = card.value(key).toString().trimmed();
+            bool ok = t.isEmpty();
+            const int rg = t.isEmpty() ? 0 : t.toInt(&ok);
+            if (!ok || rg < 0 || rg > 200)
+                return fail(tr("The ring gauge is a whole number, like 52, or empty."));
+            item.*field = rg;
+        }
     if (card.contains(u"printer"_s))
         item.printer = ss(card.value(u"printer"_s).toString());
     if (card.contains(u"station"_s))
@@ -1286,6 +1302,9 @@ QVariantMap sheetExtras(const QVariantMap &r)
         card.insert(u"subGroup"_s, g);
     if (r.contains(u"printer"_s))
         card.insert(u"printer"_s, r.value(u"printer"_s).toString().trimmed().toLower());
+    for (const QString &k : {u"length"_s, u"ringGauge"_s, u"ringGauge2"_s})
+        if (const QString v = r.value(k).toString().trimmed(); !v.isEmpty())
+            card.insert(k, v);
     return card;
 }
 } // namespace

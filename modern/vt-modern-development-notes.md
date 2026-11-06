@@ -117,6 +117,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 22:48 ET — Bob (Claude) — Cigar size: length, ring gauge, second ring gauge on items
+- **What:** MenuItem has length (inches, to 1/16), ringGauge and ringGauge2 (diademas, e.g. 52/60). Saved in the item JSON; Menu Builder's card (retail items) has Length, Ring gauge and a second gauge; length accepts 6 1/8, 6-1/8, 6.125, 6⅛ and the ILSA names' 6+ (app::cigarLengthFrom), shown as '6 1/8' (cigarLengthText). Spreadsheet import columns Length, Ring gauge / RG, Ring gauge 2 / RG2. Label utility fields: cigar_size ('6 1/8 x 52' or '6 1/8 x 52/60'), length, ring_gauge, ring_gauge2.
+- **Why:** Owner 2026-11-05: three fields for cigar dimensions; ring gauge 2 for certain diademas.
+- **Files:** `modern/core/menu.hh, app/pos_json.cpp/.hh, app/pos_menu.cpp, app/pos_menu_builder.cpp, app/menu_import.cpp/.hh, ui/cpp/layoutcontroller.cpp, ui/qml/WidgetMenuBuilder.qml, tools/vt_label_utility.py, tests/test_menu_builder.cpp`
+- **Next person must know:** Idea for later: fill length and ring gauge from ILSA names that spell them ('6+ X 52'), with the 6+ cleanup.
+
 ### 2026-11-05 22:44 ET — Bob (Claude) — Backlog: '6+' means 6⅛ in ILSA names
 - **What:** Added to section 5: an import rule in vt-ilsa-items turning a number followed by + into an eighth, with owner-marked exceptions and a review list first; open question 6⅛ vs 6 1/8.
 - **Why:** Owner asked to put it on the to-do list (2026-11-05).

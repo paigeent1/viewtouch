@@ -339,6 +339,43 @@ TEST_CASE("Menu import: the store's item sheet (cost, UPCs, item #, tax, maker, 
     CHECK(cigar.printer.empty());                                // Prints to blank: no ticket
 }
 
+TEST_CASE("Cigar size: length as typed (6 1/8, 6.125, 6⅛, 6+), ring gauges, saved and shown", "[menubuilder][cigar]")
+{
+    CHECK(app::cigarLengthFrom(u"6 1/8"_s) == 6.125);
+    CHECK(app::cigarLengthFrom(u"6-1/8"_s) == 6.125);
+    CHECK(app::cigarLengthFrom(u"6.125"_s) == 6.125);
+    CHECK(app::cigarLengthFrom(u"6\u215B"_s) == 6.125);
+    CHECK(app::cigarLengthFrom(u"6+"_s) == 6.125);           // the ILSA names' eighth
+    CHECK(app::cigarLengthFrom(u"5\u00BD"_s) == 5.5);
+    CHECK(app::cigarLengthFrom(u"7"_s) == 7.0);
+    CHECK(app::cigarLengthFrom(u""_s) == 0.0);
+    CHECK(app::cigarLengthFrom(u"long"_s) < 0);
+    CHECK(app::cigarLengthText(6.125) == u"6 1/8"_s);
+    CHECK(app::cigarLengthText(4.5) == u"4 1/2"_s);
+    CHECK(app::cigarLengthText(7) == u"7"_s);
+    CHECK(app::cigarLengthText(0).isEmpty());
+
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"EXAMPLE DIADEMA"_s}, {u"price"_s, u"14.00"_s}, {u"family"_s, u"burgers"_s},
+                                  {u"length"_s, u"6 1/8"_s}, {u"ringGauge"_s, u"52"_s}, {u"ringGauge2"_s, u"60"_s}}));
+    const auto it = std::ranges::find_if(pos.shared()->menu, [](const core::MenuItem &m) { return m.name == "EXAMPLE DIADEMA"; });
+    REQUIRE(it != pos.shared()->menu.end());
+    CHECK(it->length == 6.125);
+    CHECK(it->ringGauge == 52);
+    CHECK(it->ringGauge2 == 60);
+    const core::MenuItem back = app::menuItemFromJson(app::toJson(*it));   // kept as saved
+    CHECK(back.length == 6.125);
+    CHECK(back.ringGauge2 == 60);
+    for (const QVariant &v : pos.menuItems())
+        if (v.toMap()[u"name"_s] == u"EXAMPLE DIADEMA"_s) {
+            CHECK(v.toMap()[u"length"_s] == u"6 1/8"_s);
+            CHECK(v.toMap()[u"ringGauge2"_s] == u"60"_s);
+        }
+    CHECK_FALSE(pos.saveMenuItemCard({{u"id"_s, QString::fromStdString(it->id)}, {u"name"_s, u"EXAMPLE DIADEMA"_s},
+                                      {u"length"_s, u"long"_s}}));
+}
+
 TEST_CASE("Menu import: into the menu, categories made, prices updated if asked", "[menubuilder][import]")
 {
     PosService pos(test::seedPosData(), nullptr);

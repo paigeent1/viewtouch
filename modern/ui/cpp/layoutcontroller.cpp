@@ -1001,7 +1001,8 @@ QVariantMap LayoutController::readMenuFile(const QUrl &file) const
         // The rest only when the sheet has them (an older one's rows stay as they were).
         for (const auto &[key, value] : {std::pair{u"cost"_s, i.cost}, {u"number"_s, i.number}, {u"tax"_s, i.tax},
                                          {u"maker"_s, i.maker}, {u"productGroup"_s, i.productGroup},
-                                         {u"subGroup"_s, i.subGroup}})
+                                         {u"subGroup"_s, i.subGroup}, {u"length"_s, i.length},
+                                         {u"ringGauge"_s, i.ringGauge}, {u"ringGauge2"_s, i.ringGauge2}})
             if (!value.isEmpty())
                 row.insert(key, value);
         if (read.columns.contains(u"printer"_s))   // a "Prints to" column: blank is no printer (retail)

@@ -3,6 +3,7 @@
 
 #include <QCryptographicHash>
 #include <QRandomGenerator>
+#include <QHash>
 #include <QRegularExpression>
 
 #include <algorithm>
@@ -361,6 +362,58 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
 
 // --- menu ------------------------------------------------------------------------
 
+double cigarLengthFrom(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty())
+        return 0;
+    static const QHash<QChar, double> fractions{{QChar(0x215B), 0.125}, {QChar(0x00BC), 0.25}, {QChar(0x215C), 0.375},
+                                                {QChar(0x00BD), 0.5},   {QChar(0x215D), 0.625}, {QChar(0x00BE), 0.75},
+                                                {QChar(0x215E), 0.875}, {u'+', 0.125}};
+    double extra = 0;
+    if (const QChar last = text.back(); fractions.contains(last)) {   // 6⅛, 6½, 6+
+        extra = fractions.value(last);
+        text.chop(1);
+        text = text.trimmed();
+    }
+    static const QRegularExpression mixed(u"^(\\d+)?[\\s-]*(?:(\\d+)\\s*/\\s*(\\d+))?$"_s);
+    double inches = -1;
+    bool ok = false;
+    if (const double v = text.toDouble(&ok); ok) {
+        inches = v;
+    } else if (const auto m = mixed.match(text); m.hasMatch() && (!m.captured(1).isEmpty() || !m.captured(2).isEmpty())) {
+        const double whole = m.captured(1).toDouble();
+        const double den = m.captured(3).toDouble();
+        if (!m.captured(2).isEmpty() && den <= 0)
+            return -1;
+        inches = whole + (m.captured(2).isEmpty() ? 0 : m.captured(2).toDouble() / den);
+    } else if (text.isEmpty() && extra > 0) {
+        inches = 0;
+    }
+    if (inches < 0)
+        return -1;
+    inches += extra;
+    if (inches <= 0 || inches > 99)
+        return -1;
+    return std::round(inches * 16) / 16;   // to the nearest 1/16
+}
+
+QString cigarLengthText(double inches)
+{
+    if (inches <= 0)
+        return {};
+    const int sixteenths = int(std::lround(inches * 16));
+    const int whole = sixteenths / 16;
+    int num = sixteenths % 16, den = 16;
+    while (num > 0 && num % 2 == 0) {
+        num /= 2;
+        den /= 2;
+    }
+    if (num == 0)
+        return QString::number(whole);
+    return (whole > 0 ? QString::number(whole) + u' ' : QString()) + QString::number(num) + u'/' + QString::number(den);
+}
+
 QJsonObject toJson(const MenuItem &m)
 {
     QJsonObject o{
@@ -371,6 +424,9 @@ QJsonObject toJson(const MenuItem &m)
     if (!m.number.empty()) o.insert(u"number"_s, qs(m.number));
     if (!m.barcodes.empty()) o.insert(u"barcodes"_s, strings(m.barcodes));
     if (!m.manufacturer.empty()) o.insert(u"manufacturer"_s, qs(m.manufacturer));
+    if (m.length > 0) o.insert(u"length"_s, m.length);
+    if (m.ringGauge > 0) o.insert(u"ringGauge"_s, m.ringGauge);
+    if (m.ringGauge2 > 0) o.insert(u"ringGauge2"_s, m.ringGauge2);
     if (!m.productGroup.empty()) o.insert(u"productGroup"_s, qs(m.productGroup));
     if (!m.subGroup.empty()) o.insert(u"subGroup"_s, qs(m.subGroup));
     if (m.prepMinutes > 0) o.insert(u"prepMinutes"_s, m.prepMinutes);
@@ -454,6 +510,9 @@ MenuItem menuItemFromJson(const QJsonObject &o)
     m.number = ss(o.value(u"number").toVariant().toString().trimmed());
     m.barcodes = strings(o.value(u"barcodes").toArray());
     m.manufacturer = ss(o.value(u"manufacturer").toString().trimmed());
+    m.length = std::clamp(o.value(u"length").toDouble(), 0.0, 99.0);
+    m.ringGauge = std::clamp(o.value(u"ringGauge").toInt(), 0, 200);
+    m.ringGauge2 = std::clamp(o.value(u"ringGauge2").toInt(), 0, 200);
     m.productGroup = ss(o.value(u"productGroup").toString().trimmed());
     m.subGroup = ss(o.value(u"subGroup").toString().trimmed());
     m.prepMinutes = std::clamp(o.value(u"prepMinutes").toVariant().toInt(), 0, 240);

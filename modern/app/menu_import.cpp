@@ -69,6 +69,9 @@ QString what(const QString &header)
         {u"productGroup"_s, {u"product group"_s}},
         {u"subGroup"_s, {u"sub group"_s, u"subgroup"_s}},
         {u"printer"_s, {u"prints to"_s, u"printer"_s}},
+        {u"length"_s, {u"length"_s, u"len"_s, u"length in"_s, u"length inches"_s}},
+        {u"ringGauge"_s, {u"ring gauge"_s, u"ring gauge 1"_s, u"ring gauge1"_s, u"rg"_s, u"rg 1"_s, u"rg1"_s, u"ring"_s, u"gauge"_s}},
+        {u"ringGauge2"_s, {u"ring gauge 2"_s, u"ring gauge2"_s, u"rg 2"_s, u"rg2"_s}},
         {u"description"_s, {u"description"_s, u"desc"_s, u"details"_s, u"descripcion"_s}},
         {u"onIt"_s, {u"ingredients"_s, u"on it"_s, u"toppings"_s, u"whats on it"_s, u"comes with"_s, u"ingredientes"_s}},
         {u"photo"_s, {u"photo"_s, u"photos"_s, u"picture"_s, u"image"_s, u"photo file"_s, u"picture file"_s, u"image file"_s,
@@ -125,7 +128,7 @@ MenuImport readMenuCsv(const QString &text)
     }
     for (const QString &key : {u"name"_s, u"price"_s, u"category"_s, u"description"_s, u"onIt"_s, u"photo"_s, u"barcode"_s,
                                u"moreBarcodes"_s, u"cost"_s, u"number"_s, u"tax"_s, u"maker"_s, u"productGroup"_s,
-                               u"subGroup"_s, u"printer"_s})
+                               u"subGroup"_s, u"printer"_s, u"length"_s, u"ringGauge"_s, u"ringGauge2"_s})
         if (at.contains(key))
             out.columns << key;
     const auto cell = [&](const QStringList &r, const QString &key) {
@@ -151,6 +154,9 @@ MenuImport readMenuCsv(const QString &text)
         item.productGroup = cell(row, u"productGroup"_s);
         item.subGroup = cell(row, u"subGroup"_s);
         item.printer = cell(row, u"printer"_s);
+        item.length = cell(row, u"length"_s);
+        item.ringGauge = cell(row, u"ringGauge"_s);
+        item.ringGauge2 = cell(row, u"ringGauge2"_s);
         if (const QString c = cell(row, u"cost"_s); !c.isEmpty()) {
             double v = 0;
             if (!price(c, &v)) {

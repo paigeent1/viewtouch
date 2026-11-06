@@ -472,6 +472,30 @@ def set_item_upc(item, code, label=None):
     item["upc"] = code
     item["upc_label"] = label or next((l for l, c in item.get("upc_choices", []) if c == code), "UPC")
 
+def cigar_length_text(value):
+    """6.125 -> "6 1/8"; 7 -> "7"; empty or 0 -> "" (the same as ViewTouch shows it)."""
+    try:
+        inches = float(value or 0)
+    except (TypeError, ValueError):
+        return str(value or "")
+    if inches <= 0:
+        return ""
+    sixteenths = int(round(inches * 16))
+    whole, num, den = sixteenths // 16, sixteenths % 16, 16
+    while num and num % 2 == 0:
+        num, den = num // 2, den // 2
+    if not num:
+        return str(whole)
+    return (f"{whole} " if whole else "") + f"{num}/{den}"
+
+
+def cigar_size_text(length, rg, rg2):
+    """"6 1/8 x 52", or "6 1/8 x 52/60" for a diadema; "" when nothing is given."""
+    ln = cigar_length_text(length)
+    gauge = str(rg or "") + (f"/{rg2}" if rg2 else "")
+    return " x ".join(x for x in (ln, gauge) if x)
+
+
 def parse_vt_menu_dict(m, seen, items):
     if not isinstance(m, dict):
         return
@@ -540,7 +564,12 @@ def parse_vt_menu_dict(m, seen, items):
             "category": cat,
             "manufacturer": mfg,
             "price": price,
-            "is_retail": is_retail
+            "is_retail": is_retail,
+            # A cigar's size (ViewTouch's length and ring gauges): "6 1/8", "52", "60", "6 1/8 x 52/60".
+            "length": cigar_length_text(m.get("length")),
+            "ring_gauge": str(m.get("ringGauge") or ""),
+            "ring_gauge2": str(m.get("ringGauge2") or ""),
+            "cigar_size": cigar_size_text(m.get("length"), m.get("ringGauge"), m.get("ringGauge2")),
         })
 
 # Once the ILSA price book has been imported into ViewTouch (at least this many retail items), labels come
@@ -678,6 +707,10 @@ GLOBAL_FIELD_CATALOG = [
     ("price_fmt", "DBText — Retail Price ($0.00)"),
     ("manufacturer", "DBText — Manufacturer / Brand"),
     ("category", "DBText — Category / Department"),
+    ("cigar_size", "DBText — Cigar size (6 1/8 x 52, or 6 1/8 x 52/60)"),
+    ("length", "DBText — Cigar length (6 1/8)"),
+    ("ring_gauge", "DBText — Ring gauge (52)"),
+    ("ring_gauge2", "DBText — Second ring gauge (diademas: 60)"),
     ("upc", "DBText — UPC / PLU Number"),
     ("db_calc", "DBCalc — Pack / Box Calculation"),
     # The UPC/EAN fields print the code exactly as stored: its own symbol (UPC-A / EAN-13 / UPC-E) when

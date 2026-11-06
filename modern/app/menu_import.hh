@@ -31,6 +31,9 @@ struct ImportedItem {
     QString productGroup;
     QString subGroup;
     QString printer;           // "Prints to": Bar, Kitchen, or blank (none)
+    QString length;            // a cigar's length: "6 1/8", "6.125"
+    QString ringGauge;         // "52"
+    QString ringGauge2;        // a diadema's second gauge: "60"
 };
 
 struct MenuImport {
