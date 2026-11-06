@@ -179,6 +179,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** Ported upstream 7833c83 (backup.cpp only). The data set aside before a restore always gets a name nobody else has, and if the database, its -wal or its -shm can't be moved aside, the ones already moved are put back.
 - **Why:** Two restores in the same second clashed, and a half-finished move could leave the store with no database, so the next start would begin an empty one.
 - **Files:** `modern/storage/backup.cpp`
+### 2026-11-06 11:24 ET — Bob (Claude) — vt-pricebook-cleanup: review list of names with + eighths and written fractions
+- **What:** New script scripts/bin/vt-pricebook-cleanup (review only). Reads ViewTouch's items from viewtouch.db (menu_items, opened read-only) and writes ~/pricebook-cleanup/fractions.csv: item number, UPC, name now, suggested name (6+ -> 6⅛, 6++ -> 6¼ and 6½+ -> 6⅝ marked to check, 6 1/8 / 6-1/2 / 1/2 -> 6⅛ / 6½ / ½), length, ring gauge, ring gauge 2 read from sizes like 6+ X 52, 5X50, 6+X52/60 (only for empty fields), the rule, and odd cases left alone (2+1 deals, + LIGHTER, 6+ PK, 21+, 2X50 PK, 5X pack counts). Prints counts per rule, the first 40 suggestions and the odd cases (--all prints every one). --self-test checks 27 example names. Changes nothing.
+- **Why:** Owner's backlog item 1 (Price book cleanup): he wants to see which names would be fixed before anything changes.
+- **Files:** `scripts/bin/vt-pricebook-cleanup`
+- **Next person must know:** Owner runs it on the Pi and marks exceptions; then the Price book cleanup screen in ViewTouch applies them (approve all / edit one / skip). Item JSON keys used: name, number, barcodes, length, ringGauge, ringGauge2.
 
 ### 2026-11-06 11:04 ET — Bob (Claude) — Release: main moved up to bob/big-catalog
 - **What:** main fast-forwarded from 9f879118 to the bob/big-catalog head (DOB reprint choices, ID line and 'ID expired' on receipts, exception pictures with DOB, gift receipts *****, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X). CI run 42246143289 (ff8d33a1): the same 28 failing test cases / 31 failing lines as main's run 42234138120, nothing new. The tablet APK is built from this commit so its build number matches the server's.
