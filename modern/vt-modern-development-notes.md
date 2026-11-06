@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:26 ET — Bob (Claude) — Register window: placed on the main monitor by its exact place; no refit loop
+- **What:** main.cpp present(): the register window gets setScreen(primary) and setGeometry(primary's geometry) before showFullScreen, at start and on every refit. Refit: one 800 ms timer for several screen changes at once; skipped when the window is already full screen on the primary; screen changes it causes itself (1.5 s) ignored; after 4 tries in a minute it stops and logs 'Couldn't keep the register full screen on <monitor>'.
+- **Why:** Owner 2026-11-06 14:24: register on the small (guest) monitor 'giggling', desktop on the big one, though HDMI-1 (big) was primary. The refit (screenChanged -> setScreen(main) -> showNormal -> showFullScreen) restored the window's old place on the other monitor, the desktop fullscreened it there, screenChanged fired again: an endless loop.
+- **Files:** `modern/main.cpp`
+
 ### 2026-11-06 14:22 ET — Bob (Claude) — Screen check: resolution and refresh rate, fixed by the operator; self-check every 10 minutes
 - **What:** Screen check shows each monitor's size and rate; 'Best mode' (its preferred size, xrandr --auto) and 'Change…' (a list of the sizes and rates it offers) per monitor, kept after reboots. New scripts/bin/vt-screen-mode OUT best|WxH [rate] (checks the monitor offers it, saves ~/.vt-screen-modes, sets it, lays the monitors out again via the new vt-guest-display layout, which doesn't restart ViewTouch). vt-guest-display uses ~/.vt-screen-modes (else --auto). vt-screens lists each monitor's modes (interlaced left out) and flags the register below its best size and any monitor under 55 Hz. ViewTouch checks the screens 20 s after start and every 10 minutes (Pi only, when vt-screens is there; not offscreen); a new problem goes on the status line once: 'Screen check: N thing(s) to fix (Manager > Hardware Configuration > Screen check)'. siteAction best:<out> and mode:<out>:<WxH>:<rate> accept only a monitor, size and rate the last look found.
 - **Why:** Owner 2026-11-06: the register ran at 1280x720 48 Hz and flickered; he wants ViewTouch to check resolution and refresh by itself so an operator can diagnose and correct it without a call.

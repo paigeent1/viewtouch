@@ -343,18 +343,49 @@ void present(QQuickWindow *window, const Args &cli, const Options &o)
     const bool inWindow = !cli.isSet(o.kiosk)
                           && (cli.isSet(o.windowed) || cli.isSet(o.size) || cli.isSet(o.screenshot));
     if (!inWindow) {
-        window->showFullScreen();
+        // Full screen on the main (primary) monitor: put there by its exact place first, so the desktop
+        // can't open it on the other monitor (2026-11-06: the register opened on the guest monitor).
+        const auto fill = [window] {
+            QScreen *main = QGuiApplication::primaryScreen();
+            if (main && window->screen() != main)
+                window->setScreen(main);
+            if (main)
+                window->setGeometry(main->geometry());
+            window->showFullScreen();
+        };
+        fill();
         // A monitor swapped or its resolution changed: fill the (new) screen again. Full screen is only
-        // worked out when it's turned on, so it's turned off and on again on the main screen.
-        const auto refit = [window] {
-            QTimer::singleShot(800, window, [window] {
-                if (window->visibility() == QWindow::Hidden)
-                    return;
-                if (QScreen *main = QGuiApplication::primaryScreen(); main && window->screen() != main)
-                    window->setScreen(main);
-                window->showNormal();
-                window->showFullScreen();
-            });
+        // worked out when it's turned on, so it's turned off and on again on the main screen. The screen
+        // changes this causes itself are ignored, and after 4 tries in a minute it stops: a desktop that
+        // keeps moving the window back made it jump between the monitors without end.
+        struct Fit { bool busy = false; QList<qint64> tries; QTimer *timer = nullptr; };
+        auto fit = std::make_shared<Fit>();
+        fit->timer = new QTimer(window);
+        fit->timer->setSingleShot(true);
+        fit->timer->setInterval(800);
+        QObject::connect(fit->timer, &QTimer::timeout, window, [window, fill, fit] {
+            if (window->visibility() == QWindow::Hidden)
+                return;
+            QScreen *main = QGuiApplication::primaryScreen();
+            if (main && window->screen() == main && window->geometry() == main->geometry()
+                && window->visibility() == QWindow::FullScreen)
+                return;   // already right
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            fit->tries.removeIf([now](qint64 t) { return now - t > 60 * 1000; });
+            if (fit->tries.size() >= 4) {
+                qWarning().noquote() << "Couldn't keep the register full screen on"
+                                     << (main ? main->name() : u"(no screen)"_s) << "- stopped trying (Screen check shows why).";
+                return;
+            }
+            fit->tries << now;
+            fit->busy = true;
+            window->showNormal();
+            fill();
+            QTimer::singleShot(1500, window, [fit] { fit->busy = false; });
+        });
+        const auto refit = [fit] {
+            if (!fit->busy)
+                fit->timer->start();   // several changes at once: one refit
         };
         auto watched = std::make_shared<QSet<QScreen *>>();
         const auto watch = [window, refit, watched](QScreen *screen) {
