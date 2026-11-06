@@ -254,11 +254,14 @@ Document giftReceipt(const Check &check, const TicketContext &ctx)
     for (const OrderLine &l : check.lines) {
         if (l.voided || l.corrected || l.isComment())
             continue;
-        d.text((l.quantity > 1 ? std::to_string(l.quantity) + " x " : std::string()) + l.displayName());
+        // Laid out like the receipt, the price hidden: "*****".
+        d.columns((l.quantity > 1 ? std::to_string(l.quantity) + " x " : std::string()) + l.displayName(), "*****");
         for (const Modifier &m : l.modifiers)
             d.text("  " + m.displayName());
     }
     d.rule();
+    d.columns(upper(ctx.tr("Total")), "*****", true);
+    d.blank();
     const std::vector<std::string> footer = splitLines(ctx.settings.receiptFooter);
     if (footer.empty())
         d.center(ctx.tr("Thank you!"));

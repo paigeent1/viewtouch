@@ -306,6 +306,7 @@ TEST_CASE("Receipts: a gift receipt lists the items with no prices", "[receipts]
     CHECK(gift.find("Cigar") == std::string::npos);
     CHECK(gift.find("2.99") == std::string::npos);
     CHECK(gift.find("5.98") == std::string::npos);
+    CHECK(gift.find("*****") != std::string::npos);   // where the prices go
     const std::string full = print::renderText(print::receipt(c, ctx), 42);
     CHECK(full.find("5.98") != std::string::npos);
 }

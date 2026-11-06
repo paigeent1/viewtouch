@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:28 ET — Bob (Claude) — Gift receipts: prices shown as *****
+- **What:** giftReceipt lays each item out like the receipt with '*****' where the price goes, and a TOTAL line of '*****' (still no prices, payments or ID line). Reprint… > Gift receipt prints it (anyone who can settle).
+- **Why:** Owner 2026-11-06: gift receipt option with sale prices redacted as '*****'.
+- **Files:** `modern/print/tickets.cpp, modern/tests/test_receipts.cpp`
+
 ### 2026-11-06 10:26 ET — Bob (Claude) — Receipt says 'ID expired' for an expired ID
 - **What:** An expired ID is still accepted (as before); the receipt line now reads 'ID expired' (was 'Expired ID accepted'), and the cashier's screen says '· ID expired'.
 - **Why:** Owner 2026-11-06: accept expired IDs, note 'ID expired' on the receipt.
