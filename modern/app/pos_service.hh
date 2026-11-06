@@ -478,6 +478,8 @@ public:
     void setClock(std::function<std::int64_t()> now) { s_->setClock(std::move(now)); }
 
     void invoke(const QString &method, const QVariantList &args = {}, Reply reply = {}) override;
+    // Every operation invoke() takes by name (for the tests that try them all).
+    static QStringList commandNames();
 
     const core::PosSettings &settings() const { return s_->settings; }
     const core::Check *currentCheck() const;
@@ -488,6 +490,10 @@ public:
     // they can't be item `itemId`'s (empty: they can).
     static QStringList barcodeList(const QString &text);
     QString barcodeProblem(const QStringList &codes, const std::string &itemId) const;
+    // A scanned code is this stored barcode: the same, or the same UPC-A read
+    // another way (13 digits with a 0 in front: a scanner reading it as an
+    // EAN-13; 11 digits: the check digit left off).
+    static bool sameBarcode(const std::string &stored, const std::string &scanned);
     QString format(Money amount) const;
 
     // --- session -----------------------------------------------------------
@@ -1441,6 +1447,9 @@ private:
     bool deletePunchRecord(int index, const QString &why);
     // End of Day: a manager clocks out someone still on the clock (logged as a change).
     bool clockOutPunch(qint64 punchId);
+    // invoke()'s operations by name (a member: they reach the private ones).
+    using Command = std::function<QVariant(PosService &, const QVariantList &)>;
+    static const QHash<QString, Command> &commandTable();
     void logPunchChange(const core::TimePunch &p, const QString &what, const QString &why);
     bool toggleBreakFor(const core::Employee &e);
     QString expenseCategory_;
