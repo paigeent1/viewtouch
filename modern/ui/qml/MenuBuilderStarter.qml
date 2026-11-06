@@ -32,6 +32,8 @@ Dialog {
                 text: modelData.name + "  ·  " + qsTr("%1 categories, %2 items").arg(modelData.categories).arg(modelData.items)
                       + "\n" + modelData.description
                 onClicked: {
+                    if (!menu.once("starterGo"))   // a second touch while the first is still going
+                        return
                     menu.pos.applyMenuTemplate(modelData.id)
                     templateDialog.close()
                 }

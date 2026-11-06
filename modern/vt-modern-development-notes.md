@@ -117,6 +117,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 08:57 ET — Bob (Claude) — Menu Builder: Starter… guarded against a second touch too
+- **What:** Starter… and choosing a starter menu use the same 2-second once() guard as Import and + Category.
+- **Why:** Owner: Starter behaves the same way.
+- **Files:** `modern/ui/qml/WidgetMenuBuilder.qml, modern/ui/qml/MenuBuilderStarter.qml`
+
 ### 2026-11-06 08:56 ET — Bob (Claude) — Menu Builder: a second touch on Import / + Category within 2 s does nothing
 - **What:** WidgetMenuBuilder.once(key): + Category, Import… and the import dialog's Import button ignore a repeat within 2 seconds (touches made while the screen is busy arrive together when it catches up).
 - **Why:** Owner 2026-11-06: with the 31,700-item price book Menu Builder lags, and extra touches imported twice / opened + Category twice.

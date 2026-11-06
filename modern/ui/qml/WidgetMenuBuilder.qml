@@ -882,7 +882,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredWidth: implicitWidth
                         text: qsTr("Starter…")
-                        onClicked: templateDialog.open()
+                        onClicked: if (w.once("starter")) templateDialog.open()
                     }
                     TouchButton {
                         id: printKey
