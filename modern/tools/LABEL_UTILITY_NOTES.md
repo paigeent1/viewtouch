@@ -10,7 +10,17 @@ The version is `__version__` at the top of `vt_label_utility.py` (shown in the w
 changes what the operator sees or does, raise it, add a line here, and tag the commit `label-utility-vX.Y`.
 - **1.2** (2026-11-06): only managers change templates (Lookup/Rename/Delete/Restore, Edit/Create Report; others get a
   manager-PIN box); Rename Template on screen 1; Save As… in the designer; Test Print… in the designer (one label of
-  the unsaved edits, printer chosen first, via `send_label_job`; nothing saved).
+  the unsaved edits, printer chosen first, via `send_label_job`; nothing saved); Quick Label on screen 1 (everyone).
+
+## Quick Label (2026-11-06)
+- Screen 1's **Quick Label** button (`open_quick_label`): 1–3 typed lines, label roll + printer + copies, Enter prints.
+- Built-in template `QUICK LABEL` made in memory each time (`build_quick_label_template`): one full-width band per
+  line, `static_label`, bold, centred, `auto_font`. Never written to label_templates.json, so it can't be deleted.
+- Label rolls come from the saved templates (`quick_label_rolls`, one per size + printer, the 2x1 Zebra at
+  192.168.1.24 first); size, dpi, offsets, darkness and printer language are copied from that template.
+- Prints through `send_label_job` like every label (one bitmap, ^GFA / PDF). Only the last roll (template name) and
+  printer are kept, in `~/.local/share/ViewTouch/quick_label.json`; the typed text is never stored or logged.
+- UI text: no emoji outside the BMP (🖨 🔒 🏷 removed again 2026-11-06; Tk on the Pi shows boxes).
 - **1.1** (2026-11-02): Delete Template and Restore Standard Labels on screen 1; windows and dialogs fit the
   Pi's 1360x768 screen; no missing-emoji boxes; `update_label_utility.sh`; manual with Pi screenshots.
 - **1.0** (2026-11-02, tag at `9f1c09f`): bitmap-only printing, ILSA templates, any UPC per label, `--upc`,

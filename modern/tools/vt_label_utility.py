@@ -2028,7 +2028,7 @@ class ReportDesignerWindow(tk.Toplevel):
 
         make_vt_btn(tbar1, text="Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
         make_vt_btn(tbar1, text="Save As…", bg="#15803d", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_as).pack(side="left", padx=2, pady=2)
-        make_vt_btn(tbar1, text="🖨 Test Print…", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=11, pady=6, radius=12,
+        make_vt_btn(tbar1, text="Test Print…", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=11, pady=6, radius=12,
                     command=lambda: ask_printer_and_test_print(self, self.tpl_name, self.tpl, self.sample_item)).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.undo).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.redo).pack(side="left", padx=2, pady=2)
@@ -2812,7 +2812,7 @@ def ask_printer_and_test_print(parent, tpl_name, tpl, item):
     dlg.configure(bg="#1e293b")
     dlg.transient(parent)
     dlg.attributes("-topmost", True)
-    tk.Label(dlg, text="🖨 Test Print — 1 label of what you see now (not saved)", bg="#1e293b", fg="#38bdf8",
+    tk.Label(dlg, text="Test Print — 1 label of what you see now (not saved)", bg="#1e293b", fg="#38bdf8",
              font=("Sans", 12, "bold")).pack(padx=16, pady=(14, 4))
     tk.Label(dlg, text=f"{tpl_name}  ·  {tpl.get('width_in', 2.0)} x {tpl.get('height_in', 1.0)} in  ·  item: {item.get('name', '')}",
              bg="#1e293b", fg="#cbd5e1", font=("Sans", 9, "bold"), wraplength=520).pack(padx=16, pady=(0, 6))
@@ -2844,10 +2844,79 @@ def ask_printer_and_test_print(parent, tpl_name, tpl, item):
     lb.bind("<Return>", do_print)
     bf = tk.Frame(dlg, bg="#1e293b")
     bf.pack(pady=(6, 14))
-    make_vt_btn(bf, text="🖨 Print 1 Test Label", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), command=do_print).pack(side="left", padx=8)
+    make_vt_btn(bf, text="Print 1 Test Label", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), command=do_print).pack(side="left", padx=8)
     make_vt_btn(bf, text="Close", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=8, command=dlg.destroy).pack(side="left", padx=8)
     dlg.after_idle(lambda: fit_dialog(dlg, 560, 380))
     dlg.update_idletasks(); dlg.lift(); lb.focus_force()
+
+
+# --- Quick Label (like a P-touch): 1-3 lines of typed text, centred, as big as fits, bold ---
+# Built in, not kept in label_templates.json, so it can't be deleted or renamed. Only the last roll and printer
+# used are remembered (QUICK_LABEL_PREFS); what was typed is never saved.
+QUICK_LABEL_NAME = "QUICK LABEL"
+QUICK_LABEL_PREFS = os.path.join(SANDBOX_DIR, "quick_label.json")
+QUICK_LABEL_DEFAULT_IP = "192.168.1.24"   # the 2x1 Zebra
+# Settings carried over from the template whose label roll is used, so the printer's position, darkness,
+# resolution and language tuning apply to quick labels too.
+_QUICK_LABEL_COPY_KEYS = ("width_in", "height_in", "printer_dpi", "v_offset_dots", "h_offset_dots", "darkness",
+                          "tear_off", "printer_language", "media_stock", "media_type", "default_printer")
+
+def quick_label_rolls(templates):
+    """The label rolls Quick Label offers: one per saved template size + printer, as
+    [(choice text, template name)]. The 2x1 Zebra (192.168.1.24) roll comes first."""
+    seen, out = set(), []
+    for name, t in templates.items():
+        w, h = float(t.get("width_in", 2.0)), float(t.get("height_in", 1.0))
+        raw_p = str(t.get("default_printer", "") or "PDF Preview")
+        prn = re.sub(r"\s*\[[^\]]*\]$", "", re.sub(r"^(VT TCP|VT CUPS|VT File|CUPS):\s*", "", raw_p)).strip()
+        key = (round(w, 3), round(h, 3), _printer_display_name(raw_p))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((f"{w:g} x {h:g} in  ·  {prn}  (like {name})", name))
+    def rank(entry):
+        t = templates[entry[1]]
+        on_zebra = QUICK_LABEL_DEFAULT_IP in str(t.get("default_printer", ""))
+        two_by_one = abs(float(t.get("height_in", 1.0)) - 1.0) < 0.01 and 1.9 <= float(t.get("width_in", 2.0)) <= 2.4
+        named_zebra = "zebra" in str(t.get("default_printer", "")).lower()
+        return (not (on_zebra and two_by_one), not named_zebra, not on_zebra)
+    out.sort(key=rank)   # stable: otherwise in the templates' own order
+    return out
+
+def build_quick_label_template(lines, roll_tpl):
+    """The built-in QUICK LABEL template for these lines on this roll: each line in its own full-width band,
+    centred, bold, auto-fitted as large as the band allows. Printed as one bitmap like every label."""
+    tpl = {k: json.loads(json.dumps(roll_tpl[k])) for k in _QUICK_LABEL_COPY_KEYS if k in roll_tpl}
+    w_in, h_in = float(tpl.get("width_in", 2.0)), float(tpl.get("height_in", 1.0))
+    tpl.setdefault("v_offset_dots", 0)
+    lines = [str(ln).strip() for ln in lines if str(ln).strip()][:3]
+    mx, my = 0.04 * w_in, 0.05 * h_in
+    band = (h_in - 2 * my) / max(1, len(lines))
+    tpl["elements"] = [{"id": f"quick{i + 1}", "field": "static_label", "text": ln,
+                        "x": mx, "y": my + i * band, "w": w_in - 2 * mx, "h": band,
+                        "bold": True, "italic": False, "align": "center", "font_family": "Sans",
+                        "auto_font": True, "word_wrap": False, "size": 72}
+                       for i, ln in enumerate(lines)]
+    return tpl
+
+def load_quick_label_prefs():
+    try:
+        with open(QUICK_LABEL_PREFS, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return {k: str(d[k]) for k in ("roll", "printer") if isinstance(d, dict) and k in d}
+    except Exception:
+        return {}
+
+def save_quick_label_prefs(roll, printer):
+    """Remembers only the roll (template name) and printer last used, never the text."""
+    try:
+        os.makedirs(SANDBOX_DIR, exist_ok=True)
+        tmp = QUICK_LABEL_PREFS + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"roll": roll, "printer": printer}, f)
+        os.replace(tmp, QUICK_LABEL_PREFS)
+    except Exception as e:
+        logging.error("Could not save the Quick Label settings: %s", e)
 
 
 def ask_template_name(parent, title, prompt, initial, existing, current=None):
@@ -2902,7 +2971,7 @@ def ask_manager_pin(parent, what, on_ok):
     dlg.configure(bg="#1e293b")
     dlg.transient(parent)
     dlg.attributes("-topmost", True)
-    tk.Label(dlg, text="🔒 Manager needed", bg="#1e293b", fg="#fbbf24", font=("Sans", 13, "bold")).pack(pady=(14, 4))
+    tk.Label(dlg, text="Manager needed", bg="#1e293b", fg="#fbbf24", font=("Sans", 13, "bold")).pack(pady=(14, 4))
     tk.Label(dlg, text=f"Only a manager can {what}.\nPicking a template and printing labels works for everyone.\n\n"
                       "A manager can type their ViewTouch PIN to allow it this once:",
              bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold"), wraplength=400, justify="center").pack(padx=16, pady=(0, 8))
@@ -3038,6 +3107,165 @@ class VTLabelUtility(tk.Tk):
             else:
                 ask_manager_pin(self, what, action)
         return run
+
+    def open_quick_label(self):
+        """Quick Label (open to everyone): type 1-3 lines, pick the roll / printer and copies, print.
+        The text is centred, bold and as large as fits, drawn as one bitmap like every other label."""
+        rolls = quick_label_rolls(self.templates)
+        if not rolls:
+            messagebox.showinfo("Quick Label", "There are no label templates to take the label size and printer from.\n"
+                                "A manager can press Restore Standard Labels.", parent=self); return
+        printers = discover_all_printers()
+        prefs = load_quick_label_prefs()
+        roll_texts = [r[0] for r in rolls]
+        roll_idx = next((i for i, r in enumerate(rolls) if r[1] == prefs.get("roll")), 0)
+
+        dlg = tk.Toplevel(self)
+        dlg.title("Quick Label")
+        dlg.configure(bg="#1e293b")
+        dlg.transient(self)
+        dlg.attributes("-topmost", True)
+        tk.Label(dlg, text="Quick Label — type up to 3 lines, then Print (or press Enter)", bg="#1e293b", fg="#fbbf24",
+                 font=("Sans", 13, "bold")).pack(padx=16, pady=(12, 6))
+
+        top = tk.Frame(dlg, bg="#1e293b")
+        top.pack(fill="x", padx=16)
+        left = tk.Frame(top, bg="#1e293b")
+        left.pack(side="left", fill="y")
+        line_vars, entries = [], []
+        for i in range(3):
+            tk.Label(left, text=f"Line {i + 1}:", bg="#1e293b", fg="#38bdf8", font=("Sans", 11, "bold")).grid(row=i, column=0, sticky="w", pady=4)
+            v = tk.StringVar(value="")
+            e = tk.Entry(left, textvariable=v, font=("Sans", 16, "bold"), width=22, justify="center")
+            e.grid(row=i, column=1, padx=(6, 0), pady=4, ipady=3)
+            line_vars.append(v); entries.append(e)
+        focus = {"entry": entries[0]}
+        for e in entries:
+            e.bind("<FocusIn>", lambda _ev, w=e: focus.__setitem__("entry", w))
+        prev_canvas = tk.Canvas(top, bg="#0f172a", width=380, height=150, bd=0, highlightthickness=0)
+        prev_canvas.pack(side="left", padx=(16, 0))
+
+        opts = tk.Frame(dlg, bg="#1e293b")
+        opts.pack(fill="x", padx=16, pady=(8, 2))
+        tk.Label(opts, text="Label roll:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=0, column=0, sticky="w")
+        roll_var = tk.StringVar(value=roll_texts[roll_idx])
+        roll_cb = ttk.Combobox(opts, textvariable=roll_var, values=roll_texts, state="readonly", width=52, font=("Sans", 10, "bold"))
+        roll_cb.grid(row=0, column=1, columnspan=3, sticky="w", padx=6, pady=3)
+        tk.Label(opts, text="Printer:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=1, column=0, sticky="w")
+        def roll_tpl():
+            i = roll_texts.index(roll_var.get()) if roll_var.get() in roll_texts else 0
+            return rolls[i][1], self.templates[rolls[i][1]]
+        start_p = prefs.get("printer") if prefs.get("printer") in printers else resolve_template_printer(roll_tpl()[1].get("default_printer", ""), printers)
+        prn_var = tk.StringVar(value=start_p)
+        ttk.Combobox(opts, textvariable=prn_var, values=printers, state="readonly", width=40, font=("Sans", 10, "bold")).grid(row=1, column=1, sticky="w", padx=6, pady=3)
+        tk.Label(opts, text="Copies:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).grid(row=1, column=2, sticky="e", padx=(12, 4))
+        qty_var = tk.StringVar(value="1")
+        qf = tk.Frame(opts, bg="#1e293b")
+        qf.grid(row=1, column=3, sticky="w")
+        def bump(d):
+            try:
+                n = int(qty_var.get() or 1)
+            except ValueError:
+                n = 1
+            qty_var.set(str(max(1, min(100, n + d))))
+        make_vt_btn(qf, text="−", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=2, command=lambda: bump(-1)).pack(side="left")
+        tk.Entry(qf, textvariable=qty_var, font=("Sans", 13, "bold"), width=4, justify="center").pack(side="left", padx=4, ipady=2)
+        make_vt_btn(qf, text="+", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=2, command=lambda: bump(1)).pack(side="left")
+
+        def on_roll(_e=None):
+            prn_var.set(resolve_template_printer(roll_tpl()[1].get("default_printer", ""), printers))
+            refresh()
+        roll_cb.bind("<<ComboboxSelected>>", on_roll)
+
+        status = tk.Label(dlg, text="", bg="#1e293b", fg="#94a3b8", font=("Sans", 10, "bold"), wraplength=820, justify="center")
+
+        def current_tpl():
+            return build_quick_label_template([v.get() for v in line_vars], roll_tpl()[1])
+
+        def refresh(*_a):
+            tpl = current_tpl()
+            prev_canvas.delete("all")
+            if not tpl["elements"]:
+                prev_canvas.create_text(190, 75, text="(type the label's text)", fill="#64748b", font=("Sans", 11, "italic"))
+                return
+            try:
+                photo, pw, ph = label_preview_photo(tpl, {}, 370, 140)
+                prev_canvas._photo = photo   # keep a reference or Tk drops the image
+                prev_canvas.create_image(190 - pw // 2, 75 - ph // 2, image=photo, anchor="nw")
+            except Exception as e:
+                logging.error("Quick Label preview: %s", e)
+        pending = {"id": None}
+        def refresh_soon(*_a):
+            if pending["id"]:
+                dlg.after_cancel(pending["id"])
+            pending["id"] = dlg.after(150, refresh)
+        for v in line_vars:
+            v.trace_add("write", refresh_soon)
+
+        # On-screen keyboard (the Pi's touch screen); typing goes to the line last tapped.
+        def key(ch):
+            e = focus["entry"]
+            if ch == "⌫":
+                pos = e.index("insert")
+                if pos > 0:
+                    e.delete(pos - 1)
+            elif ch == "Next line":
+                i = entries.index(e)
+                nxt = entries[min(2, i + 1)]
+                nxt.focus_set(); focus["entry"] = nxt
+                return
+            elif ch == "Clear":
+                for v in line_vars:
+                    v.set("")
+                entries[0].focus_set(); focus["entry"] = entries[0]
+                return
+            else:
+                e.insert("insert", " " if ch == "Space" else ch)
+            e.focus_set()
+        kb = tk.Frame(dlg, bg="#1e293b")
+        kb.pack(padx=16, pady=(8, 2))
+        for r, row in enumerate(["1234567890", "QWERTYUIOP", "ASDFGHJKL#", "ZXCVBNM-/.", "$&'\"()+:,"]):
+            for c, ch in enumerate(row):
+                make_vt_btn(kb, text=ch, bg="#334155", fg="#ffffff", font=("Sans", 12, "bold"), width=3, pady=5,
+                            command=lambda x=ch: key(x)).grid(row=r, column=c, padx=2, pady=2)
+        make_vt_btn(kb, text="⌫", bg="#7f1d1d", fg="#ffffff", font=("Sans", 12, "bold"), width=3, pady=5,
+                    command=lambda: key("⌫")).grid(row=4, column=9, padx=2, pady=2)
+        bottom = tk.Frame(kb, bg="#1e293b")
+        bottom.grid(row=5, column=0, columnspan=10, pady=(2, 0))
+        make_vt_btn(bottom, text="Clear", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=7, pady=5, command=lambda: key("Clear")).pack(side="left", padx=3)
+        make_vt_btn(bottom, text="Space", bg="#334155", fg="#ffffff", font=("Sans", 11, "bold"), width=20, pady=5, command=lambda: key("Space")).pack(side="left", padx=3)
+        make_vt_btn(bottom, text="Next line", bg="#0f766e", fg="#ffffff", font=("Sans", 11, "bold"), width=9, pady=5, command=lambda: key("Next line")).pack(side="left", padx=3)
+
+        status.pack(padx=16, pady=(6, 2))
+
+        def do_print(*_a):
+            tpl = current_tpl()
+            if not tpl["elements"]:
+                status.config(text="Type the label's text first.", fg="#fca5a5"); return
+            try:
+                copies = max(1, min(100, int(qty_var.get() or 1)))
+            except ValueError:
+                copies = 1
+            chosen = prn_var.get() or printers[-1]
+            save_quick_label_prefs(roll_tpl()[0], chosen)
+            status.config(text=f"Printing {copies} quick label(s) on {chosen}…", fg="#38bdf8")
+            def done(ok, msg):
+                try:
+                    status.config(text=msg, fg="#86efac" if ok else "#fca5a5")
+                except tk.TclError:
+                    pass
+            send_label_in_background(dlg, QUICK_LABEL_NAME, tpl, [{"name": "", "upc": "", "price": 0.0, "qty": 1}], copies, chosen, done)
+
+        for e in entries:
+            e.bind("<Return>", do_print)
+            e.bind("<KP_Enter>", do_print)
+        bf = tk.Frame(dlg, bg="#1e293b")
+        bf.pack(pady=(4, 12))
+        make_vt_btn(bf, text="Print", bg="#16a34a", fg="#ffffff", font=("Sans", 13, "bold"), width=12, pady=8, command=do_print).pack(side="left", padx=8)
+        make_vt_btn(bf, text="Close", bg="#475569", fg="#ffffff", font=("Sans", 12, "bold"), width=8, pady=8, command=dlg.destroy).pack(side="left", padx=8)
+        refresh()
+        dlg.after_idle(lambda: fit_dialog(dlg, 860, 640))
+        dlg.update_idletasks(); dlg.lift(); entries[0].focus_force()
 
     def reload_vt_db(self):
         self.all_items = load_from_viewtouch_db()
@@ -3233,8 +3461,11 @@ class VTLabelUtility(tk.Tk):
         )
         top_frame.grid(row=0, column=0, columnspan=12, sticky="nsew", padx=4, pady=(0, 6))
 
-        for c in range(4):
+        for c in range(5):
             top_frame.columnconfigure(c, weight=1, uniform="top_btn")
+        # Quick Label: typed text only, for everyone (cashiers too)
+        make_vt_btn(top_frame, text="Quick Label\n\nType & Print Text", font=("Sans", 10, "bold"), bg="#b45309", fg="#ffffff",
+                    radius=12, command=self.open_quick_label).grid(row=0, column=4, sticky="nsew", padx=4, pady=3)
         top_frame.rowconfigure(0, weight=1)
 
         cur_mode = getattr(self, "mode_var_val", "tree")

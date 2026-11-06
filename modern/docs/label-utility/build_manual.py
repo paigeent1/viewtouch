@@ -255,13 +255,15 @@ story.append(PageBreak())
 story.append(P("3. Screen 1 — Start", h1))
 story.append(shot("screen1_start.png", 6.9, "Screen 1 — choose items or a saved template"))
 story.append(P("Select ViewTouch data (top row)", h2))
-story.append(P("Each big button chooses which items you will work with and moves you on immediately."))
+story.append(P("Each big button chooses which items you will work with and moves you on immediately; "
+               "<b>Quick Label</b> prints typed text instead."))
 story.append(table([
     ["Button", "Shows", "Goes to"],
     ["Tree View — Categories &amp; Brands", "All items, organised by group, category and brand so you can pick a section.", "Screen 2"],
     ["Retail Items — Cigars &amp; Goods Only", "Only retail items (items with a real barcode, merchandise, or cigar/tobacco/retail categories).", "Screen 3"],
     ["Receiving Orders", "Items sold in packs or cartons, plus retail items — handy after a delivery.", "Screen 3"],
     ["All Catalog — Full Inventory", "Every item.", "Screen 3"],
+    ["Quick Label — Type &amp; Print Text", "No items: type 1–3 lines of text and print them (section 7.4). For everyone.", "Quick Label window"],
 ], [2.1, 3.8, 1.0]))
 story.append(P("Select saved label template (left)", h2))
 story.append(P("Lists every label template. To go straight to a label's preview:"))
@@ -410,6 +412,23 @@ story.append(table([
     ["Cancel", "Closes without saving."],
 ], [1.8, 5.1]))
 story.append(box("Note:", "Test Print and Calibrate Gap only work with network printers (ones with an IP address)."))
+
+story.append(P("7.4 Quick Label — print any text", h2))
+story.append(P("For a label with just words on it, like a label maker: for example <b>660 MAD</b> on an unmarked box of "
+               "cigars on a back-room shelf. Everyone can use it, cashiers too."))
+for i, t in enumerate([
+    "On screen 1 press <b>Quick Label</b> (orange, top right).",
+    "Type up to 3 lines with the keyboard or the on-screen keys. Tap a line to type in it; <b>Next line</b> moves down, "
+    "<b>Clear</b> empties all three. The picture on the right shows the label as it will print.",
+    "Check the <b>Label roll</b> (size and printer; the 2 x 1 in Zebra roll at first, then whatever was used last) and the "
+    "<b>Printer</b>. Choose <b>PDF Preview (Desktop)</b> to see it on screen instead.",
+    "Set <b>Copies</b> with − / + (1 to start), then press <b>Print</b> or Enter.",
+], 1):
+    story.append(N(i, t))
+story.append(B("Each line is centred, bold and as large as fits. One short line prints biggest; split long text over 2 or 3 lines."))
+story.append(B("The label uses the chosen roll's printer settings (position, darkness, resolution) from its template."))
+story.append(B("Only the roll and printer used last are remembered; the text is not saved anywhere. "
+               "Quick Label is built in, so it is not in the template list and can't be deleted."))
 
 # ---------------------------------------------------------------- 8
 story.append(PageBreak())
@@ -623,6 +642,7 @@ story.append(table([
     ["Bring in an ILSA label", "Screen 1: Lookup Template &gt; choose the .rtm file"],
     ["See exact printer dots", "Screen 4: double-click the preview"],
     ["Save a changed label under a new name", "Designer: Save As… &gt; type the name &gt; OK"],
+    ["Print a label with just text (e.g. 660 MAD)", "Screen 1: Quick Label &gt; type &gt; Print"],
     ["Try a layout change on paper before saving", "Designer: Test Print… &gt; pick the printer &gt; Print 1 Test Label"],
     ["Rename a template", "Screen 1: select it &gt; Rename Template (manager)"],
     ["Delete a template", "Screen 1: select it &gt; Delete Template (manager)"],
