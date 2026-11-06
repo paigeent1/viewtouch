@@ -10,6 +10,8 @@
 #                          (Hardware Configuration's "Learn guest touchscreen" button)
 #   vt-guest-display layout   set the monitors up again (sizes from ~/.vt-screen-modes, see
 #                          vt-screen-mode) without restarting ViewTouch
+# on and layout also send the Pi's sound to the guest monitor's speakers (vt-guest-audio, for the
+# guest screen's videos), now and after every reboot.
 # Then ViewTouch restarts (vt-server) so it opens the guest window on the second monitor.
 MODE="${1:-on}"
 # layout: only when the guest display is on (else the second monitor mirrors, nothing to lay out).
@@ -113,10 +115,15 @@ else
     labwc --reconfigure >/dev/null 2>&1 || true
 fi
 eval "$cmd" || { echo "Couldn't put $second beside $first"; exit 1; }
+# Sound (the guest screen's videos) out the guest monitor's own speakers, by its HDMI cable.
+AUDIO="$(dirname "$(readlink -f "$0")")/vt-guest-audio"
+[ -x "$AUDIO" ] && { "$AUDIO" "$second" || echo "(The guest screen's video sound isn't set up: see above.)"; }
 mkdir -p "$(dirname "$AUTOSTART")"
-# After every reboot: the monitors side by side and the touchscreen on the POS monitor.
+# After every reboot: the monitors side by side, the touchscreen on the POS monitor, the sound on the guest's.
 BOOT="$HOME/.config/vt-guest-display.sh"
-printf '#!/bin/sh\nsleep 3\nexport DISPLAY=:0\n%s\n' "$cmd" > "$BOOT"; chmod +x "$BOOT"
+audio=""
+[ -x "$AUDIO" ] && audio="(\"$AUDIO\" \"$second\" >/dev/null 2>&1 &)"
+printf '#!/bin/sh\nsleep 3\nexport DISPLAY=:0\n%s\n%s\n' "$cmd" "$audio" > "$BOOT"; chmod +x "$BOOT"
 printf '[Desktop Entry]\nType=Application\nName=vt-guest-display\nExec=%s\n' "$BOOT" > "$AUTOSTART"
 echo window > "$STATE"
 echo "Customer display on $second (the POS stays on $first)."

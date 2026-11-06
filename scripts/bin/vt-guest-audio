@@ -1,0 +1,111 @@
+#!/bin/bash
+# Sound for the guest screen's videos (Store Settings > Customer display, a video's Sound switch):
+# out the guest monitor's own speakers, through its HDMI cable.
+#   vt-guest-audio          make the guest monitor's HDMI the Pi's sound output (kept after reboots)
+#   vt-guest-audio test     the same, then a short tone on it: it should come from the guest monitor
+#   vt-guest-audio HDMI-1   the guest monitor is on HDMI-1 (else: the one that isn't the register's,
+#                           ~/.vt-pos-output from vt-guest-display, and HDMI-2 when that isn't set)
+# On a Pi 5 the first HDMI port (HDMI0, "HDMI-1" / "HDMI-A-1") is sound card vc4hdmi0 and the second
+# (HDMI1, "HDMI-2") is vc4hdmi1. It finds that card's PipeWire/PulseAudio output (pactl) and makes it
+# the default one; WirePlumber keeps that choice, and vt-guest-display runs this at every start too.
+# It changes nothing else (the register monitor's sound is left as it is).
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+MODE=set
+OUT=""
+for a in "$@"; do
+    case "$a" in
+        test) MODE=test ;;
+        HDMI*|hdmi*) OUT="$a" ;;
+        -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "Unknown: $a (vt-guest-audio [test] [HDMI-1|HDMI-2])"; exit 2 ;;
+    esac
+done
+command -v pactl >/dev/null || { echo "pactl is missing: sudo apt install pulseaudio-utils"; exit 1; }
+
+# Which HDMI port the guest monitor is on: 1 or 2.
+if [ -z "$OUT" ]; then
+    pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)
+    case "$pos" in
+        *1) OUT=HDMI-2 ;;
+        *2) OUT=HDMI-1 ;;
+        *) OUT=HDMI-2 ;;
+    esac
+fi
+case "$OUT" in
+    *1) PORT=0; ADDR=107c701400 ;;
+    *2) PORT=1; ADDR=107c706400 ;;
+    *) echo "Which HDMI? $OUT (HDMI-1 or HDMI-2)"; exit 2 ;;
+esac
+
+# The sound server may still be starting (just after a reboot): up to 30 seconds.
+for _ in $(seq 1 30); do pactl info >/dev/null 2>&1 && break; sleep 1; done
+pactl info >/dev/null 2>&1 || { echo "The Pi's sound server (PipeWire) isn't running for $(id -un)."; exit 1; }
+
+# The ALSA card number of vc4hdmi0 / vc4hdmi1 (/proc/asound/cards: " 1 [vc4hdmi1       ]: ...").
+cardnum() {
+    awk -v want="$1" '$1 ~ /^[0-9]+$/ && index($0, "[") {
+        id = $0; sub(/^[ \t]*[0-9]+[ \t]*\[/, "", id); sub(/[ \t]*\].*/, "", id)
+        if (id == want) { print $1; exit } }' "${2:-/proc/asound/cards}" 2>/dev/null
+}
+card=$(cardnum "vc4hdmi$PORT")
+
+find_sink() {
+    local s=""
+    # By the card's number (alsa.card = "1"), then by the port's address in the name, then by its card name.
+    if [ -n "$card" ]; then
+        s=$(pactl list sinks 2>/dev/null | awk -v c="$card" '
+            /^Sink #/ { name = "" }
+            /^[ \t]*Name: / { name = $2 }
+            /alsa\.card = / { v = $0; sub(/.*alsa\.card = "/, "", v); sub(/".*/, "", v); if (v == c && name != "") { print name; exit } }')
+    fi
+    [ -z "$s" ] && s=$(pactl list short sinks 2>/dev/null | awk -v a="$ADDR" 'index($2, a) && index($2, "hdmi") { print $2; exit }')
+    [ -z "$s" ] && s=$(pactl list sinks 2>/dev/null | awk -v want="vc4-hdmi-$PORT" '
+            /^Sink #/ { name = "" }
+            /^[ \t]*Name: / { name = $2 }
+            /alsa\.card_name = / && index($0, "\"" want "\"") && name != "" { print name; exit }')
+    echo "$s"
+}
+
+sink=$(find_sink)
+if [ -z "$sink" ]; then
+    # The card is there but its output is off (no profile): turn on its HDMI stereo output.
+    pcard=$(pactl list short cards 2>/dev/null | awk -v a="$ADDR" 'index($2, a) { print $2; exit }')
+    if [ -n "$pcard" ]; then
+        pactl set-card-profile "$pcard" output:hdmi-stereo >/dev/null 2>&1 && echo "Turned on $pcard's HDMI sound."
+        sleep 1
+        sink=$(find_sink)
+    fi
+fi
+if [ -z "$sink" ]; then
+    echo "No sound output found for $OUT (card vc4hdmi$PORT). Is the guest monitor plugged in and on? Outputs there are:"
+    pactl list short sinks 2>/dev/null | awk '{ print "  " $2 }'
+    exit 1
+fi
+
+before=$(pactl get-default-sink 2>/dev/null)
+pactl set-default-sink "$sink" || { echo "Couldn't make $sink the sound output."; exit 1; }
+# Not muted, at full volume (the monitor's own buttons set how loud).
+pactl set-sink-mute "$sink" 0 >/dev/null 2>&1
+pactl set-sink-volume "$sink" 100% >/dev/null 2>&1
+# Playing sounds (a video already going) moved there too.
+pactl list short sink-inputs 2>/dev/null | awk '{ print $1 }' | while read -r i; do pactl move-sink-input "$i" "$sink" >/dev/null 2>&1; done
+echo "$OUT" > "$HOME/.vt-guest-audio"
+if [ "$before" = "$sink" ]; then
+    echo "Sound goes to the guest monitor on $OUT ($sink), as it did."
+else
+    echo "Sound now goes to the guest monitor on $OUT ($sink; before: ${before:-none})."
+fi
+
+if [ "$MODE" = test ]; then
+    echo "Playing a short tone on the guest monitor..."
+    wav=/usr/share/sounds/alsa/Front_Center.wav
+    if command -v paplay >/dev/null && [ -f "$wav" ]; then
+        paplay --device="$sink" "$wav"
+    elif command -v speaker-test >/dev/null; then
+        PULSE_SINK="$sink" timeout 8 speaker-test -D pulse -t sine -f 660 -c 2 -l 1 >/dev/null 2>&1
+    else
+        echo "Nothing here plays a sound (paplay or speaker-test): sudo apt install pulseaudio-utils alsa-utils"; exit 1
+    fi
+    echo "Heard it from the guest monitor? If not: its volume buttons, or vt-guest-audio test HDMI-1"
+fi
+exit 0
