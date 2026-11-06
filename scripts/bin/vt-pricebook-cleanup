@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""Price book cleanup, review only: which item names have ILSA's "+" eighths or written-out fractions, what
+each would become, and the cigar size (length / ring gauge / ring gauge 2) the name spells out.
+Nothing is changed: it reads ViewTouch's item list (viewtouch.db, opened read-only) and writes a list.
+
+  vt-pricebook-cleanup                 write ~/pricebook-cleanup/fractions.csv and print a summary
+  vt-pricebook-cleanup --all           also print every suggestion, not just the first 40
+  vt-pricebook-cleanup --db FILE       read another copy of viewtouch.db
+  vt-pricebook-cleanup --out DIR       write fractions.csv there instead
+  vt-pricebook-cleanup --self-test     check the name rules against a table of examples
+
+Rules (owner's spec, "Price book name cleanup" in modern/vt-modern-development-notes.md):
+  6+  -> 6⅛     (ILSA had no ⅛; the owner typed + for an eighth)
+  6++ -> 6¼     (read as two eighths: marked to check)
+  6½+ -> 6⅝     (half plus an eighth: marked to check)
+  6 1/8, 6-1/2, 1/2 -> 6⅛, 6½, ½   (written-out eighths, quarters, halves)
+  2+1, + LIGHTER, 6+ PK, 21+ ... -> left alone and marked as odd cases
+  Size: length (whole + ⅛…⅞ / ½ ¼ ¾ / +), X, ring gauge, optional /second gauge (diadema 52/60).
+  Sizes are only suggested for fields that are empty on the item.
+Only item names and numbers are read; nothing about customers.
+"""
+import csv, json, os, re, sqlite3, sys
+from collections import Counter
+
+VT_DB = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+OUT_DIR = os.path.expanduser("~/pricebook-cleanup")
+
+GLYPH = {1: "⅛", 2: "¼", 3: "⅜", 4: "½", 5: "⅝", 6: "¾", 7: "⅞"}       # eighths -> glyph
+EIGHTHS = {g: n for n, g in GLYPH.items()}                                  # glyph -> eighths
+GLYPHS = "".join(GLYPH.values())
+LENGTH_TEXT = {0: "", 1: " 1/8", 2: " 1/4", 3: " 3/8", 4: " 1/2", 5: " 5/8", 6: " 3/4", 7: " 7/8"}
+
+R_MIXED = "written fraction (6 1/8 -> 6⅛)"
+R_ALONE = "written fraction alone (1/2 -> ½)"
+R_PLUS = "+ = an eighth (6+ -> 6⅛)"
+R_PLUS2 = "++ read as two eighths (6++ -> 6¼)"
+R_GPLUS = "fraction then + (6½+ -> 6⅝)"
+R_SIZE = "size from name"
+
+PACK_WORD = r"(?:PK|PKS|PACK|PAK|CT|CNT|COUNT|PC|PCS)\b"
+AND_WORD = r"(?:LIGHTER|CUTTER|FREE|GIFT|ASH|CASE)"
+
+
+def _eighths(num, den):
+    """num/den in eighths (1/2 -> 4), or None if not a whole number of eighths below 1."""
+    if den not in (2, 4, 8) or not 0 < num < den:
+        return None
+    return num * 8 // den
+
+
+def fix_fractions(name):
+    """(suggested name, rules used, odd cases) for one item name."""
+    rules, flags = [], []
+
+    # Written-out mixed fraction: 6 1/8, 6-1/2 (not a ring gauge like 52/60, not a deal like 2/$5).
+    def mixed(m):
+        e = _eighths(int(m.group(2)), int(m.group(3)))
+        if e is None:
+            return m.group(0)
+        rules.append(R_MIXED)
+        return m.group(1) + GLYPH[e]
+    s = re.sub(r"(?<![\d/.])(\d{1,2})(?: +|-)(\d)/(\d{1,2})(?![\d/])", mixed, name)
+
+    # A fraction alone: 1/2 OZ, 3/4.
+    def alone(m):
+        e = _eighths(int(m.group(1)), int(m.group(2)))
+        if e is None:
+            return m.group(0)
+        rules.append(R_ALONE)
+        return GLYPH[e]
+    s = re.sub(r"(?<![\w/.$])(\d)/(\d{1,2})(?![\w/])", alone, s)
+
+    # Plus signs.
+    out, last = "", 0
+    for m in re.finditer(r"\++", s):
+        seg, after, n = s[last:m.start()], s[m.end():], len(m.group(0))
+        last = m.end()
+        keep = seg + m.group(0)
+        mb = re.search(r"(^|.)(\d+)([" + GLYPHS + r"]?)$", seg)
+        if not mb:
+            word = re.match(r"\s*([A-Za-z]+)", after)
+            flags.append(f"stray + (+ {word.group(1).upper()})" if word else "stray +")
+            out += keep
+            continue
+        lead, digits, glyph = mb.group(1), mb.group(2), mb.group(3)
+        if re.match(r"\d", after):
+            flags.append(f"{digits}+{re.match(r'\d+', after).group(0)}: a deal? (left alone)")
+            out += keep
+            continue
+        if lead and re.match(r"[A-Za-z./$]", lead):
+            flags.append(f"+ after '{lead}{digits}{glyph}' (not a size? left alone)")
+            out += keep
+            continue
+        whole = int(digits)
+        if not 1 <= whole <= 12:
+            flags.append(f"{digits}{glyph}+ is too big for inches (age 21+? left alone)")
+            out += keep
+            continue
+        if re.match(r"\s*" + PACK_WORD, after, re.I):
+            flags.append(f"{digits}{glyph}+ then a pack word (left alone)")
+            out += keep
+            continue
+        if re.match(r"\s+" + AND_WORD, after, re.I):
+            flags.append(f"{digits}{glyph}+ {after.split()[0].upper()}: + meaning 'and'? (left alone)")
+            out += keep
+            continue
+        total = EIGHTHS.get(glyph, 0) + n
+        if n > 2 or total >= 8:
+            flags.append(f"{digits}{glyph}{m.group(0)}: can't tell (left alone)")
+            out += keep
+            continue
+        if glyph:
+            rules.append(R_GPLUS)
+            flags.append(f"{digits}{glyph}+ read as {digits}{GLYPH[total]}: check")
+        elif n == 2:
+            rules.append(R_PLUS2)
+            flags.append(f"{digits}++ read as {digits}{GLYPH[total]}: check")
+        else:
+            rules.append(R_PLUS)
+        out += seg[:len(seg) - len(glyph)] + GLYPH[total]
+    s = out + s[last:]
+    return s, rules, flags
+
+
+SIZE = re.compile(r"(?<![\w./$])(\d{1,2}(?:\.\d{1,3})?)\s*([" + GLYPHS + r"])?\s*[xX×]\s*(\d{2,3})"
+                  r"(?:\s*/\s*(\d{2,3}))?(?![\d.])")
+
+
+def parse_size(name):
+    """((length inches, ring gauge, ring gauge 2) or None, odd cases) from a cleaned name."""
+    flags, found = [], []
+    for m in SIZE.finditer(name):
+        length = float(m.group(1)) + EIGHTHS.get(m.group(2) or "", 0) / 8
+        g1, g2 = int(m.group(3)), int(m.group(4) or 0)
+        after = name[m.end():]
+        text = m.group(0).strip()
+        if re.match(r"\s*" + PACK_WORD, after, re.I):
+            flags.append(f"'{text}' then a pack word: a pack count? (no size)")
+        elif length < 3:
+            flags.append(f"'{text}': {m.group(1)} is short for a cigar, a pack count? (no size)")
+        elif length > 12 or not 20 <= g1 <= 80 or (g2 and not 20 <= g2 <= 80):
+            flags.append(f"'{text}': odd size (no size)")
+        else:
+            found.append((round(length * 16) / 16, g1, g2))
+    for m in re.finditer(r"(?<![\w.])(\d{1,2})\s*[xX](?![\w])(?!\s*\d)", name):   # "5X" with no gauge
+        flags.append(f"'{m.group(0).strip()}' with no gauge: a pack count? (no size)")
+    if len(set(found)) > 1:
+        flags.append("more than one size in the name (no size)")
+        return None, flags
+    return (found[0] if found else None), flags
+
+
+def length_text(inches):
+    whole, e = int(inches), round((inches - int(inches)) * 8)
+    if e == 8:
+        whole, e = whole + 1, 0
+    if abs(whole + e / 8 - inches) > 1e-6:
+        return f"{inches:g}"
+    return f"{whole}{LENGTH_TEXT[e]}"
+
+
+def review(item):
+    """One item (dict with name, length, ringGauge, ringGauge2) -> review row, or None if nothing to say."""
+    name = item.get("name") or ""
+    new, rules, flags = fix_fractions(name)
+    size, sflags = parse_size(new)
+    flags += sflags
+    fill = {"length": "", "length_in": "", "ring_gauge": "", "ring_gauge2": ""}
+    if size:
+        length, g1, g2 = size
+        have = (float(item.get("length") or 0), int(item.get("ringGauge") or 0), int(item.get("ringGauge2") or 0))
+        filled = False
+        if not have[0]:
+            fill["length"], fill["length_in"], filled = length_text(length), f"{length:g}", True
+        elif abs(have[0] - length) > 1e-6:
+            flags.append(f"length already {length_text(have[0])}, name says {length_text(length)} (kept)")
+        if not have[1]:
+            fill["ring_gauge"], filled = str(g1), True
+        elif have[1] != g1:
+            flags.append(f"ring gauge already {have[1]}, name says {g1} (kept)")
+        if g2 and not have[2]:
+            fill["ring_gauge2"], filled = str(g2), True
+        elif g2 and have[2] != g2:
+            flags.append(f"ring gauge 2 already {have[2]}, name says {g2} (kept)")
+        if filled:
+            rules.append(R_SIZE)
+    if new == name and not rules and not flags:
+        return None
+    return {"name_now": name, "suggested_name": new if new != name else "", **fill,
+            "why": "; ".join(dict.fromkeys(rules)), "flag": "; ".join(dict.fromkeys(flags))}
+
+
+# --- self-test ------------------------------------------------------------------------------------------
+# name -> (suggested name ("" = unchanged), length, gauge, gauge 2, flagged?)
+EXAMPLES = [
+    ("ARTURO FUENTE 6+ X 52", "ARTURO FUENTE 6⅛ X 52", "6 1/8", "52", "", False),
+    ("PADRON 5X50 NAT", "", "5", "50", "", False),
+    ("DIADEMA 6+X52/60", "DIADEMA 6⅛X52/60", "6 1/8", "52", "60", False),
+    ("TORO 6 1/8 X 52", "TORO 6⅛ X 52", "6 1/8", "52", "", False),
+    ("ROBUSTO 4-3/4X50", "ROBUSTO 4¾X50", "4 3/4", "50", "", False),
+    ("CHURCHILL 7++ X 48", "CHURCHILL 7¼ X 48", "7 1/4", "48", "", True),
+    ("LANCERO 7 1/2+ X 38", "LANCERO 7⅝ X 38", "7 5/8", "38", "", True),
+    ("CORONA 5½ X 42", "", "5 1/2", "42", "", False),
+    ("ROBUSTO 5 X 50", "", "5", "50", "", False),
+    ("GORDO 6X60 BOX OF 20", "", "6", "60", "", False),
+    ("PETITE 4.5X42", "", "4 1/2", "42", "", False),
+    ("PERFECTO 6+", "PERFECTO 6⅛", "", "", "", False),
+    ("TOBACCO 1/2 OZ", "TOBACCO ½ OZ", "", "", "", False),
+    ("PIPE BLEND 1 1/2 OZ POUCH", "PIPE BLEND 1½ OZ POUCH", "", "", "", False),
+    ("SWISHER 2+1 DEAL", "", "", "", "", True),
+    ("CIGAR + LIGHTER", "", "", "", "", True),
+    ("SAMPLER 6+ PK", "", "", "", "", True),
+    ("ROBUSTO 5+ LIGHTER", "", "", "", "", True),
+    ("WHITE OWL 2X50 PK", "", "", "", "", True),
+    ("MINI 5X 10 PACK", "", "", "", "", True),
+    ("BLACK & MILD 5X", "", "", "", "", True),
+    ("2/$5 SPECIAL", "", "", "", "", False),
+    ("21+ ONLY", "", "", "", "", True),
+    ("B7G1+ BONUS", "", "", "", "", True),
+    ("FRUIT CIGARILLO 4X28", "", "4", "28", "", False),
+    ("NO SIZE HERE", None, "", "", "", False),
+]
+
+
+def self_test():
+    bad = 0
+    for name, want_name, want_len, want_g1, want_g2, want_flag in EXAMPLES:
+        row = review({"name": name})
+        if want_name is None:
+            ok = row is None
+            got = "nothing" if row is None else row
+        else:
+            row = row or {"suggested_name": "", "length": "", "ring_gauge": "", "ring_gauge2": "", "flag": ""}
+            got = (row["suggested_name"], row["length"], row["ring_gauge"], row["ring_gauge2"], bool(row["flag"]))
+            ok = got == (want_name, want_len, want_g1, want_g2, want_flag)
+        bad += not ok
+        print(f"{'ok  ' if ok else 'FAIL'} {name!r:34} -> {got}")
+    # A size already typed in ViewTouch is never overwritten.
+    row = review({"name": "TORO 6+ X 52", "length": 6.0, "ringGauge": 52})
+    ok = row["length"] == "" and row["ring_gauge"] == "" and "length already 6" in row["flag"]
+    bad += not ok
+    print(f"{'ok  ' if ok else 'FAIL'} existing size kept -> {row['flag']!r}")
+    print(f"\n{len(EXAMPLES) + 1 - bad} of {len(EXAMPLES) + 1} passed")
+    return 0 if bad == 0 else 1
+
+
+# --- the review list -----------------------------------------------------------------------------------
+def load_items(db):
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=3.0)
+    try:
+        for (raw,) in con.execute("SELECT json FROM menu_items ORDER BY position"):
+            try:
+                yield json.loads(raw)
+            except ValueError:
+                continue
+    finally:
+        con.close()
+
+
+def cut(text, n):
+    return text if len(text) <= n else text[:n - 1] + "…"
+
+
+def main(argv):
+    if "--self-test" in argv:
+        return self_test()
+    db = VT_DB
+    if "--db" in argv:
+        db = os.path.expanduser(argv[argv.index("--db") + 1])
+    out_dir = os.path.expanduser(argv[argv.index("--out") + 1]) if "--out" in argv else OUT_DIR
+    if not os.path.exists(db):
+        sys.exit(f"Can't find ViewTouch's database: {db}")
+    rows, total = [], 0
+    for item in load_items(db):
+        total += 1
+        r = review(item)
+        if r:
+            barcodes = item.get("barcodes") or []
+            rows.append({"item_number": item.get("number") or "", "upc": barcodes[0] if barcodes else "",
+                         "item_id": item.get("id") or "", **r})
+    os.makedirs(out_dir, exist_ok=True)
+    out = os.path.join(out_dir, "fractions.csv")
+    cols = ["item_number", "upc", "item_id", "name_now", "suggested_name", "length", "length_in",
+            "ring_gauge", "ring_gauge2", "why", "flag"]
+    with open(out, "w", newline="", encoding="utf-8-sig") as f:   # -sig: LibreOffice/Excel show ⅛ right
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(rows)
+
+    per_rule = Counter(rule for r in rows for rule in r["why"].split("; ") if rule)
+    renamed = [r for r in rows if r["suggested_name"]]
+    sized = [r for r in rows if r["length"] or r["ring_gauge"] or r["ring_gauge2"]]
+    odd = [r for r in rows if r["flag"]]
+    print(f"Read {total:,} items from {db} (read-only; nothing was changed).")
+    print(f"  {len(renamed):,} names would change, {len(sized):,} items would get a size, {len(odd):,} odd cases to look at.")
+    for rule, n in per_rule.most_common():
+        print(f"  {n:6,}  {rule}")
+
+    show = renamed if "--all" in argv else renamed[:40]
+    if show:
+        print(f"\nSuggested names ({'all' if len(show) == len(renamed) else f'first {len(show)} of {len(renamed):,}'}):")
+        print(f"  {'UPC / number':14}  {'Name now':34}  {'Would become':34}  Size")
+        for r in show:
+            size = f"{r['length']} x {r['ring_gauge']}" if r["length"] and r["ring_gauge"] else (r["length"] or r["ring_gauge"])
+            if r["ring_gauge2"]:
+                size += f"/{r['ring_gauge2']}"
+            print(f"  {cut(r['upc'] or r['item_number'], 14):14}  {cut(r['name_now'], 34):34}  "
+                  f"{cut(r['suggested_name'], 34):34}  {size}")
+    if odd:
+        print(f"\nOdd cases, left alone ({'all' if '--all' in argv or len(odd) <= 40 else f'first 40 of {len(odd):,}'}):")
+        for r in (odd if "--all" in argv else odd[:40]):
+            print(f"  {cut(r['upc'] or r['item_number'], 14):14}  {cut(r['name_now'], 34):34}  {r['flag']}")
+    print(f"\nFull list: {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
