@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:46 ET — Bob (Claude) — DOB reprint setting under Receipts
+- **What:** Reprint with date of birth: manager only is listed in Store Settings' Receipts section (it fell into More).
+- **Why:** CI test: every setting is in a section; the owner asked for it under receipt settings.
+- **Files:** `modern/app/pos_admin_shared.hh`
+
 ### 2026-11-06 10:43 ET — Bob (Claude) — Choose which monitor is the register
 - **What:** vt-guest-display on HDMI-X saves the register's output in ~/.vt-pos-output; vt-guest-display and vt-touch-map put the POS (and its touchscreen) on that output whatever order xrandr lists them.
 - **Why:** Both BH monitors report the same size and name order, so the first-listed output was the small one; the owner wants the big monitor as the register.
