@@ -245,6 +245,18 @@ Item {
             maximumLineCount: 2
             elide: Text.ElideRight
         }
+        // The ID check: the age passed and the date of birth (the cashier's screen only).
+        Text {
+            objectName: "idCheckInfo"
+            visible: w.pos && w.pos.hasCheck && !!w.check.idCheck
+            text: "🪪 " + (w.check.idCheck ?? "")
+            color: "#9be7a8"
+            font.family: w.face
+            font.pixelSize: w.unit * 0.75
+            font.bold: true
+            Layout.fillWidth: true
+            elide: Text.ElideRight
+        }
         // A regular: their last order again, in one touch (before anything else is on).
         WidgetKey {
             objectName: "sameAsLastTime"

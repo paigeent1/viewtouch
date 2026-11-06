@@ -258,9 +258,12 @@ QVariantMap PosService::checkSearch() const
             {u"lines"_s, lines}, {u"payments"_s, payments}, {u"events"_s, events}, {u"refunds"_s, refunds},
             {u"subtotal"_s, format(t.subtotal)}, {u"tax"_s, format(t.tax)}, {u"total"_s, format(t.total)},
             {u"tips"_s, t.tips.cents() ? format(t.tips) : QString()},
-            {u"hasDob"_s, !c.ageDob.empty()},   // a reprint with the date of birth can be made (never the date itself here)
+            {u"hasDob"_s, !c.ageDob.empty()},   // a reprint with the date of birth can be made
             // The receipt as printed (Look Up Checks shows it beside the list).
-            {u"receiptText"_s, s_->printer ? s_->printer->receiptText(s_->settings, c, false) : QString()}});
+            // With the buyer's date of birth when an ID was scanned (the cashier's screen; the customer's
+            // printed copy leaves it out).
+            {u"receiptText"_s, s_->printer ? s_->printer->receiptText(s_->settings, [&c] { Check k = c; k.printDob = true; return k; }(), false)
+                                           : QString()}});
     }
     return out;
 }

@@ -2244,6 +2244,16 @@ QVariantMap PosService::checkInfo() const
         {u"promised"_s, c->promisedAt ? timeOfDay(c->promisedAt) : QString()},
         {u"needsWho"_s, !missingWho(*c).isEmpty()},
         {u"driver"_s, qs(c->driverName)},
+        // The ID check, for the cashier's screen: the age passed and the date of birth (the customer's
+        // receipt says only "ID checked 21+").
+        {u"idCheck"_s, c->ageVerified <= 0 ? QString() : [c] {
+             QString t = tr("ID checked %1+").arg(c->ageVerified);
+             if (c->ageDob.size() == 10)
+                 t += tr("  ·  DOB %1").arg(qs(c->ageDob.substr(5, 2) + "/" + c->ageDob.substr(8, 2) + "/" + c->ageDob.substr(0, 4)));
+             if (c->ageIdExpired)
+                 t += tr("  ·  expired ID");
+             return t;
+         }()},
     };
 }
 

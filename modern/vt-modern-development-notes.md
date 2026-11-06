@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 10:24 ET — Bob (Claude) — Cashier's screen shows the ID check and DOB; Reprint asks which copy
+- **What:** checkInfo has idCheck ('ID checked 21+ · DOB MM/DD/YYYY · expired ID'), shown on the order list (WidgetOrderList idCheckInfo; also on the Retail screen). Reprint Receipt's preview shows the date of birth. The Reprint Receipt screen's bottom row is now Cancel, ▲, ▼ and one 'Reprint…' button that asks: Customer copy (no date of birth), Gift receipt (no prices), With date of birth (store's copy; only when an ID was scanned; manager-only per Store Settings).
+- **Why:** Owner 2026-11-06: the cashier screen always shows the DOB, the customer copy never; reprint asks gift, customer or with DOB; the DOB reprint needs a manager when the setting restricts it.
+- **Files:** `modern/app/pos_service.cpp, modern/app/pos_search.cpp, modern/ui/qml/WidgetOrderList.qml, modern/ui/qml/WidgetReceiptLookup.qml`
+
 ### 2026-11-06 10:19 ET — Bob (Claude) — Receipts: 'ID checked 21+' on the customer's copy; Reprint with DOB; tablet pushes time out
 - **What:** Check.ageDob (YYYY-MM-DD) kept from the ID check (scan or typed), saved in the check's ageCheck JSON ('dob'); Check.printDob is a this-printing-only flag, never saved. Receipts print 'ID checked 21+' (and 'Expired ID accepted') whenever an ID was checked; 'Date of birth: MM/DD/YYYY' only when printDob. Reprint Receipt (WidgetReceiptLookup) gets a 'Reprint with DOB' button (shown when the check has one; checkSearch's selected check says hasDob, never the date): reprintCheck(id, gift, withDob) prints a copy with printDob, records 'Reprinted with the date of birth' (who, when) on the check's history and saves it (closed checks). Store Settings > 'Reprint with date of birth: manager only' (dobReprintNeedsManager, default on). Gift receipts as before (anyone who can settle). vt-tablets: each tablet's install gives up after 3 minutes with a note to run it again.
 - **Why:** Owner 2026-11-06: customer copies say only ID checked 21+, so no DOB ends up in the trash; the DOB comes out only on a reprint from Reprint Receipt, manager-only as a setting. Bar 2 stalled a push today.

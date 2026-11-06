@@ -144,35 +144,64 @@ Item {
                     palette.button: "#b42318"; palette.buttonText: "white"
                     onClicked: w.zone.controller.goBack()
                 }
-                Button {
-                    objectName: "lookupGift"
-                    text: qsTr("Print Gift\nReceipt")
-                    implicitWidth: w.unit * 6; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 0.85
-                    palette.button: "#1f8a4c"; palette.buttonText: "white"
-                    enabled: w.check !== null
-                    onClicked: w.pos.reprintCheck(w.check.id, true)
-                }
-                Button {
-                    // The store's copy with the buyer's date of birth (from the ID scan); a manager's, if
-                    // Store Settings says so. Customers' receipts never show it.
-                    objectName: "lookupDob"
-                    visible: w.check !== null && w.check.hasDob === true
-                    text: qsTr("Reprint\nwith DOB")
-                    implicitWidth: w.unit * 6; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 0.85
-                    palette.button: "#7c2d12"; palette.buttonText: "white"
-                    onClicked: w.pos.reprintCheck(w.check.id, false, true)
-                }
                 Button { text: "▲"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 1.4; onClicked: w.choose(w.index - 1) }
                 Button { text: "▼"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 1.4; onClicked: w.choose(w.index + 1) }
                 Item { Layout.fillWidth: true }
                 Button {
+                    // Reprint: which copy (the customer's, a gift receipt, or the store's with the date of birth).
                     objectName: "lookupPrint"
-                    text: qsTr("Print Receipt")
+                    text: qsTr("Reprint…")
                     implicitWidth: w.unit * 9; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit * 1.05
                     palette.button: "#1f8a4c"; palette.buttonText: "white"
                     enabled: w.check !== null
-                    onClicked: w.pos.reprintCheck(w.check.id, false)
+                    onClicked: whichCopy.open()
                 }
+            }
+        }
+    }
+
+    // Which copy to reprint.
+    Popup {
+        id: whichCopy
+        objectName: "lookupWhichCopy"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        padding: w.unit
+        width: Math.min(w.width * 0.8, w.unit * 26)
+        contentItem: ColumnLayout {
+            spacing: w.unit * 0.6
+            Label {
+                text: w.check ? qsTr("Reprint receipt #%1").arg(w.check.id) : ""
+                font.pixelSize: w.unit * 1.1; font.bold: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Button {
+                objectName: "lookupCustomerCopy"
+                Layout.fillWidth: true; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit
+                text: qsTr("Customer copy  (no date of birth)")
+                palette.button: "#1f8a4c"; palette.buttonText: "white"
+                onClicked: { whichCopy.close(); w.pos.reprintCheck(w.check.id, false, false) }
+            }
+            Button {
+                objectName: "lookupGift"
+                Layout.fillWidth: true; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit
+                text: qsTr("Gift receipt  (no prices)")
+                palette.button: "#2b62b0"; palette.buttonText: "white"
+                onClicked: { whichCopy.close(); w.pos.reprintCheck(w.check.id, true, false) }
+            }
+            Button {
+                objectName: "lookupDob"
+                visible: w.check !== null && w.check.hasDob === true
+                Layout.fillWidth: true; implicitHeight: w.unit * 3.4; font.pixelSize: w.unit
+                text: qsTr("With date of birth  (store's copy)")
+                palette.button: "#7c2d12"; palette.buttonText: "white"
+                onClicked: { whichCopy.close(); w.pos.reprintCheck(w.check.id, false, true) }
+            }
+            Button {
+                Layout.fillWidth: true; implicitHeight: w.unit * 2.6; font.pixelSize: w.unit * 0.9
+                text: qsTr("Cancel")
+                onClicked: whichCopy.close()
             }
         }
     }
