@@ -684,7 +684,8 @@ QVariantList PosService::adminFields(const QString &panel)
                        tr("Phone pages: big buttons in portrait, for phones and small handhelds.")),
                  u"options"_s, options({{"", "Automatic (phone pages on phones)"}, {"standard", "Standard pages"},
                                         {"phone", "Phone pages"}, {"selfOrder", "Self-order kiosk (guests order on their own)"},
-                                        {"timeClock", "Time Clock (clock in / out and schedules only)"}})),
+                                        {"timeClock", "Time Clock (clock in / out and schedules only)"},
+                                        {"billboard", "Billboard (a TV showing the guest-screen pictures and videos; no sales)"}})),
             // Choices filled in by the screen (its looks).
             field(u"look"_s, tr("Look"), u"look"_s, tr("This screen's colors; the store's look elsewhere.")),
             with(field(u"textSize"_s, tr("Text size"), u"enum"_s,

@@ -181,7 +181,7 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         t.receiptPrinter = ss(record.value(u"receiptPrinter"_s).toString());
         t.drawer = ss(drawer);
         const QString screen = record.value(u"screen"_s).toString();
-        if (!QStringList{QString(), u"standard"_s, u"phone"_s, u"selfOrder"_s, u"timeClock"_s}.contains(screen))
+        if (!QStringList{QString(), u"standard"_s, u"phone"_s, u"selfOrder"_s, u"timeClock"_s, u"billboard"_s}.contains(screen))
             return fail(tr("Choose the terminal's screen layout."));
         t.screen = ss(screen);
         t.look = ss(record.value(u"look"_s).toString().left(40));

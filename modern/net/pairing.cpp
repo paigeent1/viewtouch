@@ -192,6 +192,8 @@ void Pairer::start(const QString &host, quint16 port, const QString &code, const
         QJsonObject hello{{u"t"_s, u"pair"_s}, {u"name"_s, name_}, {u"protocol"_s, ProtocolVersion}};
         if (standby_)
             hello.insert(u"role"_s, u"standby"_s);
+        if (!screen_.isEmpty())
+            hello.insert(u"screen"_s, screen_);
         channel_->send(hello);
     });
     connect(socket_.get(), &QSslSocket::readyRead, this, [this] {

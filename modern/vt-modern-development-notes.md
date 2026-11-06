@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 17:34 ET — Bob (Claude) — Billboards on the store's server: slides only, videos from the guest-screen folder, hours and mute
+- **What:** New screen kind 'billboard' (Manager > Terminals: Screen layout Billboard, or paired as one): a TV around the store that shows the guest-screen slides. The server gives a billboard session only its slides, pictures, logo, the store's name and language; never checks, customers, sales, staff or pages, and refuses every request except its slide pictures and a manager's PIN check (leaveBillboard). Videos on the slides are sent to billboards a part at a time over the encrypted connection (getVideo/videoPart), only files right in ~/Pictures/Guest Screen that are on the slides; the TV keeps a copy until the file changes. Per billboard: on/off, mute all videos, hours per weekday (store's clock), kept with the terminal on the server and pushed to it (setBillboard, adminRecords 'billboards'). Pairing can say screen billboard. Spanish phrases.
+- **Why:** Owner 2026-11-06 17:12 and 17:18: the guest-screen rotation on extra TVs around the store, signage only (never any customer or sale info), with hours, mute and on/off set in ViewTouch.
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/app/pos_admin_records.cpp`, `modern/app/pos_admin_save.cpp`, `modern/app/pos_commands.cpp`, `modern/app/pos_json.cpp`, `modern/app/pos_kiosk.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.cpp`, `modern/app/pos_session.hh`, `modern/core/settings.hh`, `modern/i18n/es.json`, `modern/net/pairing.cpp`, `modern/net/pairing.hh`, `modern/net/pos_server.cpp`, `modern/net/pos_server.hh`, `modern/net/remote_session.cpp`, `modern/net/remote_session.hh`
+- **Next person must know:** Owner wants signage only: never add a check, customer or sale piece to forBillboard() in net/pos_server.cpp; test_billboard.cpp checks the list. The screens and Android side come in the next commit.
+
 ### 2026-11-06 17:01 ET — Bob (Claude) — Site Setup: 'Messages and pictures' opens Store Settings at Customer display
 - **What:** WidgetSiteSetup's button sets the remembered Store Settings section (widget state adminSection:store = display) before jumping to admin-store.
 - **Why:** Owner 2026-11-06 17:00: the button opened Store Settings at 'The store' instead of Customer display.

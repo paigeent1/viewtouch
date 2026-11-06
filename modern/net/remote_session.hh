@@ -144,6 +144,16 @@ public:
     QVariantList storeImages() const override;
     QString storeLogo() const override { return v(u"storeLogo").toString(); }
     QVariantMap kioskMenu() const override { return v(u"kioskMenu").toMap(); }
+    QVariantMap billboard() const override { return v(u"billboard").toMap(); }
+    // A billboard's video (a slide's path on the server): this device's copy, fetched once a part
+    // at a time and kept until the file changes. Empty while it's on its way (or the server can't
+    // send it); videosChanged when one arrives. Copies no slide uses any more are deleted.
+    QString billboardVideo(const QString &serverPath);
+    int videoRevision() const { return videoRevision_; }
+    // How much of the video being fetched has arrived (0-100), or -1.
+    int videoProgress() const;
+    // Where the videos are kept (tests set it).
+    void setVideoCache(const QString &dir) { videoCache_ = dir; }
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
     QVariantMap customerDuplicate() const override { return v(u"customerDuplicate").toMap(); }
     QVariantMap ageAsk() const override { return v(u"ageAsk").toMap(); }
@@ -206,6 +216,8 @@ signals:
     void layoutSaved(bool ok, const QString &error);
     // The server does not accept this device's key (unpaired, or another store).
     void rejected();
+    // A billboard video arrived (billboardVideo has it now), or one is on its way.
+    void videosChanged();
     // The server was found at a new address (its id answered from there);
     // save the credentials so the next start goes straight there.
     void credentialsChanged(const vt::net::Credentials &credentials);
@@ -278,6 +290,24 @@ private:
     mutable QHash<QString, QString> images_;   // server path -> local file ("" while fetching)
     int imageRevision_ = 0;                     // pictures that have arrived
     int queryRevision_ = 0;
+
+    // Billboard videos: one fetched at a time, each part asked for when the last has arrived.
+    struct VideoFetch {
+        QString name;        // the file's name on the server (in its guest-screen folder)
+        QString file;        // where it goes here
+        qint64 size = 0;
+        qint64 modified = 0;
+    };
+    QString videoDir() const;
+    QString videoFileFor(const QVariantMap &info) const;
+    void fetchNextVideo();
+    void onVideoPart(const QJsonObject &m);
+    void pruneVideos();
+    QString videoCache_;
+    QList<VideoFetch> videoQueue_;       // the first is under way when videoAt_ >= 0
+    qint64 videoAt_ = -1;
+    QHash<QString, qint64> videoFailed_; // name -> when (tried again 10 minutes later)
+    int videoRevision_ = 0;
 };
 
 } // namespace vt::net

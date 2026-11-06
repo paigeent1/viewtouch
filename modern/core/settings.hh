@@ -67,7 +67,8 @@ struct TerminalConfig {
     std::string key;
     std::int64_t pairedAt = 0;
     // Pages to show: "phone" (phone versions), "standard", "selfOrder" (a
-    // self-order kiosk for guests), or empty to decide from the screen size.
+    // self-order kiosk for guests), "timeClock", "billboard" (signage only: the
+    // guest-screen slides, never a check), or empty to decide from the screen size.
     std::string screen;
     // Its kitchen screen shows this station (a Station id or a printer id; empty = the page's).
     std::string station;
@@ -98,6 +99,13 @@ struct TerminalConfig {
     std::string cardReader;
     // A customer display on its second monitor (the Pi's HDMI 2): "window", or empty = none.
     std::string customerDisplay;
+    // A billboard (screen "billboard": a TV showing the guest-screen slides; Hardware
+    // Configuration > Billboards): shown at all, its videos' sound off whatever each video says,
+    // and its hours by weekday (Monday first; "09:00-21:00", "closed", or "" all day; none set:
+    // always on), in the store's time (the server's clock).
+    bool billboardOn = true;
+    bool billboardMute = false;
+    std::vector<std::string> billboardHours;
 
     bool operator==(const TerminalConfig &) const = default;
 };

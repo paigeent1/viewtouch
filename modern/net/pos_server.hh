@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDir>
 #include <QHostAddress>
 #include <QHash>
 #include <QObject>
@@ -45,6 +46,16 @@ public:
     QList<UpdateFile> updateFiles() const;
     // The newest for that platform, newer than `build` (none: an empty path).
     UpdateFile updateFor(const QString &platform, int build) const;
+    // Billboards (Manager -> Terminals: Billboard) play the guest screen's videos: files in this
+    // folder only (~/Pictures/Guest Screen; tests: their own), sent a part at a time on request.
+    void setGuestVideoDir(const QString &dir) { guestVideoDir_ = dir; }
+    QString guestVideoDir() const { return guestVideoDir_; }
+    // The video `name` in `dir`: its real path when it's a video file right in that folder (a plain
+    // name; no other folder, no link out of it), else empty. Nothing else is ever sent.
+    static QString guestVideoFile(const QString &dir, const QString &name);
+    // Whether a piece of a screen's state is ever sent to a billboard (the slides, pictures, logo,
+    // the store's name and language: never a check, a customer, a sale or the staff).
+    static bool sentToBillboard(const QString &key);
     // Ping every `pingMs`; drop a terminal silent `silentMs` (tests: short).
     void setHeartbeat(int pingMs, qint64 silentMs) { pingTimer_.setInterval(pingMs); silentMs_ = silentMs; }
     bool listen(const QHostAddress &address, quint16 port);
@@ -74,6 +85,12 @@ private:
     void onNewConnection();
     void onPreSharedKey(QSslSocket *socket, class QSslPreSharedKeyAuthenticator *auth);
     void pair(Connection *c, const QJsonObject &message);
+    // Billboards: their welcome, what they may ask, and their videos.
+    void welcomeBillboard(Connection *c);
+    void handleBillboard(Connection *c, const QJsonObject &message);
+    bool allowedForBillboard(const QString &ref) const;
+    QString billboardVideo(const QString &name) const;   // a video on the slides, in the folder
+    void sendVideoPart(Connection *c, const QString &name, qint64 at);
     // Drop connections of devices that are no longer paired.
     void dropRevoked();
     void onReadyRead(Connection *c);
@@ -102,6 +119,7 @@ private:
     QTimer pingTimer_;   // the standby knows the main is alive; terminals, the store
     qint64 silentMs_ = 15'000;
     QString updatesDir_;
+    QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
     void sendUpdate(Connection *c);   // a terminal that answered pings, silent this long: gone
     std::function<QByteArray()> snapshot_;
 };

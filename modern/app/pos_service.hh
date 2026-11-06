@@ -1106,6 +1106,23 @@ public:
     void kioskCancel();
     QVariantMap selfOrderInfo() const override;
     QVariantMap kioskMenu() const override;
+    // A billboard screen (Manager -> Terminals: Billboard): the store's slides and logo, nothing
+    // else (pos_kiosk.cpp). Its video slides are files in the server's guest-screen folder.
+    QVariantMap billboard() const override;
+    // A manager's PIN closes a billboard's app (nobody is ever logged in there).
+    bool leaveBillboard(const QString &managerPin);
+    // Whether a billboard with these hours (Monday first: "09:00-21:00", "closed", "" all day; none:
+    // always) shows at `minute` (0-1439) of `weekday` (1 Monday .. 7 Sunday). Hours past midnight
+    // ("18:00-02:00") run into the next day.
+    static bool billboardOpenAt(const std::vector<std::string> &hours, int weekday, int minute);
+    // "09:00-21:00", "closed" or "" as they're kept (a time typed as 9:00 is 09:00); nullopt if it isn't one.
+    static std::optional<std::string> billboardDayHours(const QString &typed);
+    // Hardware Configuration > Billboards (managers): the paired billboard screens,
+    // [{name, enabled, mute, hours: [7], showing}], and a change to one of them
+    // ({enabled, mute, hours: [7 strings]}). The billboards follow at once. (On every screen:
+    // adminRecords("billboards"), PosSession::setBillboard.)
+    QVariantList billboards() const;
+    bool setBillboard(const QString &name, const QVariantMap &settings);
     // A picture the store uses (a menu item's photo, the display logo or a
     // slide), base64, for screens on other computers; empty for anything else.
     QString storeImage(const QString &path) const;

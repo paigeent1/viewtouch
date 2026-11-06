@@ -1059,7 +1059,13 @@ QJsonObject toJson(const PosSettings &s)
                                      {u"requireName"_s, qs(t.requireName)}, {u"cardReader"_s, qs(t.cardReader)},
                                      {u"afterPaying"_s, qs(t.afterPaying)}, {u"startCategory"_s, qs(t.startCategory)}, {u"startPage"_s, qs(t.startPage)},
                                      {u"labelPrinter"_s, qs(t.labelPrinter)}, {u"textSize"_s, t.textSize},
-                                     {u"customerDisplay"_s, qs(t.customerDisplay)}});
+                                     {u"customerDisplay"_s, qs(t.customerDisplay)},
+                                     {u"billboardOn"_s, t.billboardOn}, {u"billboardMute"_s, t.billboardMute},
+                                     {u"billboardHours"_s, [&t] {
+                                          QJsonArray a;
+                                          for (const std::string &h : t.billboardHours) a.append(qs(h));
+                                          return a;
+                                      }()}});
     QJsonArray printers;
     for (const PrinterConfig &p : s.printers)
         printers.append(toJson(p));
@@ -1377,6 +1383,10 @@ PosSettings settingsFromJson(const QJsonObject &o)
         c.startPage = ss(t.value(u"startPage").toString());
         c.labelPrinter = ss(t.value(u"labelPrinter").toString());
         c.textSize = t.value(u"textSize").toInt();
+        c.billboardOn = t.value(u"billboardOn").toBool(true);
+        c.billboardMute = t.value(u"billboardMute").toBool(false);
+        for (const QJsonValue &h : t.value(u"billboardHours").toArray())
+            c.billboardHours.push_back(ss(h.toString()));
         s.terminals.push_back(std::move(c));
     }
     s.cashMode = cashModeFromString(ss(o.value(u"cashMode").toString()));

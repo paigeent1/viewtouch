@@ -139,6 +139,10 @@ class PosSession : public QObject {
     // family, price, description, image, available, choices}]}.
     Q_PROPERTY(QVariantMap selfOrder READ selfOrderInfo NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap kioskMenu READ kioskMenu NOTIFY adminChanged)
+    // A billboard (a TV around the store showing the guest-screen turn; signage only):
+    // {slides: [the store's displaySlides lines], videos: {"<slide's path>": {name, size, modified}},
+    //  logo, accent, storeName}. Never anything about a check or a customer.
+    Q_PROPERTY(QVariantMap billboard READ billboard NOTIFY adminChanged)
     // Clocking in with more than one job: {who, jobs: [{role, name}]}, else empty.
     Q_PROPERTY(QVariantMap clockInJobs READ clockInJobs NOTIFY sessionChanged)
     Q_PROPERTY(QVariantMap cashTipsAsk READ cashTipsAsk NOTIFY sessionChanged)
@@ -373,6 +377,7 @@ public:
     virtual QString storeLanguage() const = 0;
     virtual QVariantMap selfOrderInfo() const = 0;
     virtual QVariantMap kioskMenu() const = 0;
+    virtual QVariantMap billboard() const = 0;
     virtual QVariantMap clockInJobs() const = 0;
     // Just clocked out here: the cash tips they kept? ({who, punchId}; {} none)
     virtual QVariantMap cashTipsAsk() const = 0;
@@ -582,6 +587,8 @@ public:
     Q_INVOKABLE void cancelChoosing() { invoke(QStringLiteral("cancelChoosing")); }
     Q_INVOKABLE void backupNow() { invoke(QStringLiteral("backupNow")); }
     Q_INVOKABLE void leaveSelfOrder(const QString &pin) { invoke(QStringLiteral("leaveSelfOrder"), {pin}); }
+    // Hardware Configuration > Billboards: {enabled, mute, hours: [7, Monday first]} for one (managers).
+    Q_INVOKABLE void setBillboard(const QString &name, const QVariantMap &settings) { invoke(QStringLiteral("setBillboard"), {name, settings}); }
     Q_INVOKABLE void clockInAs(const QString &role) { invoke(QStringLiteral("clockInAs"), {role}); }
     Q_INVOKABLE void setExpenseCategory(const QString &category) { invoke(QStringLiteral("setExpenseCategory"), {category}); }
     Q_INVOKABLE void receiveDelivery(const QVariantMap &delivery) { invoke(QStringLiteral("receiveDelivery"), {delivery}); }

@@ -17,11 +17,15 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QSaveFile>
+#include <QSet>
 #include <QStandardPaths>
+#include <QStorageInfo>
 #include <QUrl>
 #include <QJsonArray>
 #include <QSslPreSharedKeyAuthenticator>
 #include <QLoggingCategory>
+
+#include <algorithm>
 
 using namespace Qt::StringLiterals;
 
@@ -53,7 +57,7 @@ Group groupOf(const QString &key)
         {u"closedChecks"_s, Group::Day}, {u"staff"_s, Group::Session}, {u"checkHistory"_s, Group::Check},
         {u"choosing"_s, Group::Check}, {u"weighing"_s, Group::Check}, {u"setup"_s, Group::Admin}, {u"onBreakSince"_s, Group::Session},
         {u"customers"_s, Group::Check}, {u"customer"_s, Group::Check}, {u"giftCard"_s, Group::Check}, {u"waitlist"_s, Group::Day}, {u"customerPrompt"_s, Group::Check}, {u"customerDuplicate"_s, Group::Check}, {u"ageAsk"_s, Group::Check}, {u"idChecks"_s, Group::Admin},
-        {u"schedule"_s, Group::Session}, {u"nextShift"_s, Group::Session}, {u"rangeReport"_s, Group::Session}, {u"expoTickets"_s, Group::Kitchen}, {u"approval"_s, Group::Session}, {u"training"_s, Group::Session}, {u"autoLogoutMinutes"_s, Group::Admin}, {u"phoneLockSeconds"_s, Group::Admin}, {u"screenSaverMinutes"_s, Group::Admin}, {u"scanAddPermission"_s, Group::Admin}, {u"topRibbonEnabled"_s, Group::Admin}, {u"topRibbonShowTime"_s, Group::Admin}, {u"topRibbonShowBattery"_s, Group::Admin}, {u"topRibbonShowWifi"_s, Group::Admin}, {u"topRibbonShowCustomerCount"_s, Group::Admin}, {u"storeImages"_s, Group::Admin}, {u"storeLogo"_s, Group::Admin}, {u"kitchenStations"_s, Group::Admin}, {u"kitchenStation"_s, Group::Admin}, {u"messages"_s, Group::Day}, {u"handoff"_s, Group::Session}, {u"network"_s, Group::Day}, {u"printerAlerts"_s, Group::Day}, {u"language"_s, Group::Session}, {u"userPrefs"_s, Group::Session}, {u"storeLanguage"_s, Group::Admin}, {u"selfOrder"_s, Group::Check}, {u"kioskMenu"_s, Group::Admin}, {u"clockInJobs"_s, Group::Session}, {u"cashTipsAsk"_s, Group::Session}, {u"priceCheck"_s, Group::Session}, {u"reasonAsk"_s, Group::Session}, {u"timeClock"_s, Group::Session}, {u"receiving"_s, Group::Admin}, {u"stockCounting"_s, Group::Admin}, {u"wasteLog"_s, Group::Admin}, {u"storeCheck"_s, Group::Day}, {u"prepLabels"_s, Group::Admin}, {u"retailLabels"_s, Group::Session}, {u"checkSearch"_s, Group::Session}, {u"soldOut"_s, Group::Admin}, {u"menuItems"_s, Group::Admin}, {u"orderItems"_s, Group::Admin}, {u"builderItems"_s, Group::Admin}, {u"builderRevision"_s, Group::Admin}, {u"menuCategories"_s, Group::Admin}, {u"choiceGroups"_s, Group::Admin}, {u"menuTemplates"_s, Group::Admin}, {u"menuProblems"_s, Group::Admin}, {u"menuUndoText"_s, Group::Admin}, {u"cardAlerts"_s, Group::Admin},
+        {u"schedule"_s, Group::Session}, {u"nextShift"_s, Group::Session}, {u"rangeReport"_s, Group::Session}, {u"expoTickets"_s, Group::Kitchen}, {u"approval"_s, Group::Session}, {u"training"_s, Group::Session}, {u"autoLogoutMinutes"_s, Group::Admin}, {u"phoneLockSeconds"_s, Group::Admin}, {u"screenSaverMinutes"_s, Group::Admin}, {u"scanAddPermission"_s, Group::Admin}, {u"topRibbonEnabled"_s, Group::Admin}, {u"topRibbonShowTime"_s, Group::Admin}, {u"topRibbonShowBattery"_s, Group::Admin}, {u"topRibbonShowWifi"_s, Group::Admin}, {u"topRibbonShowCustomerCount"_s, Group::Admin}, {u"storeImages"_s, Group::Admin}, {u"storeLogo"_s, Group::Admin}, {u"kitchenStations"_s, Group::Admin}, {u"kitchenStation"_s, Group::Admin}, {u"messages"_s, Group::Day}, {u"handoff"_s, Group::Session}, {u"network"_s, Group::Day}, {u"printerAlerts"_s, Group::Day}, {u"language"_s, Group::Session}, {u"userPrefs"_s, Group::Session}, {u"storeLanguage"_s, Group::Admin}, {u"selfOrder"_s, Group::Check}, {u"kioskMenu"_s, Group::Admin}, {u"clockInJobs"_s, Group::Session}, {u"cashTipsAsk"_s, Group::Session}, {u"priceCheck"_s, Group::Session}, {u"reasonAsk"_s, Group::Session}, {u"timeClock"_s, Group::Session}, {u"receiving"_s, Group::Admin}, {u"stockCounting"_s, Group::Admin}, {u"wasteLog"_s, Group::Admin}, {u"storeCheck"_s, Group::Day}, {u"prepLabels"_s, Group::Admin}, {u"retailLabels"_s, Group::Session}, {u"checkSearch"_s, Group::Session}, {u"billboard"_s, Group::Admin}, {u"soldOut"_s, Group::Admin}, {u"menuItems"_s, Group::Admin}, {u"orderItems"_s, Group::Admin}, {u"builderItems"_s, Group::Admin}, {u"builderRevision"_s, Group::Admin}, {u"menuCategories"_s, Group::Admin}, {u"choiceGroups"_s, Group::Admin}, {u"menuTemplates"_s, Group::Admin}, {u"menuProblems"_s, Group::Admin}, {u"menuUndoText"_s, Group::Admin}, {u"cardAlerts"_s, Group::Admin},
         {u"pinLength"_s, Group::Entry}, {u"entry"_s, Group::Entry}, {u"entryAmount"_s, Group::Entry},
         {u"entryGuests"_s, Group::Entry}, {u"textEntry"_s, Group::Entry},
         {u"pendingQualifier"_s, Group::Qualifier},
@@ -221,6 +225,138 @@ QString RemoteSession::imageUrl(const QString &ref) const
     return local.isEmpty() ? QString() : QUrl::fromLocalFile(local).toString();
 }
 
+// --- billboard videos ------------------------------------------------------------------------
+
+QString RemoteSession::videoDir() const
+{
+    return videoCache_.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + u"/videos"_s
+                                 : videoCache_;
+}
+
+QString RemoteSession::videoFileFor(const QVariantMap &info) const
+{
+    const QString name = info.value(u"name"_s).toString();
+    // By its name, size and date: a changed video is a new file here.
+    const QString key = u"%1|%2|%3"_s.arg(name).arg(info.value(u"size"_s).toLongLong()).arg(info.value(u"modified"_s).toLongLong());
+    return QDir(videoDir()).filePath(QString::fromLatin1(QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1).toHex())
+                                     + u'.' + QFileInfo(name).suffix().toLower());
+}
+
+QString RemoteSession::billboardVideo(const QString &serverPath)
+{
+    const QVariantMap info = billboard().value(u"videos"_s).toMap().value(serverPath).toMap();
+    const QString name = info.value(u"name"_s).toString();
+    if (name.isEmpty() || info.value(u"size"_s).toLongLong() <= 0)
+        return {};   // not on the server (yet)
+    const QString file = videoFileFor(info);
+    if (QFileInfo::exists(file))
+        return file;
+    const auto failed = videoFailed_.constFind(name);
+    if (failed != videoFailed_.cend() && QDateTime::currentMSecsSinceEpoch() - *failed < 10 * 60 * 1000)
+        return {};
+    if (std::ranges::none_of(videoQueue_, [&](const VideoFetch &f) { return f.file == file; })) {
+        videoQueue_.append({name, file, info.value(u"size"_s).toLongLong(), info.value(u"modified"_s).toLongLong()});
+        fetchNextVideo();
+    }
+    return {};
+}
+
+int RemoteSession::videoProgress() const
+{
+    if (videoQueue_.isEmpty() || videoAt_ < 0 || videoQueue_.first().size <= 0)
+        return -1;
+    return int(std::min<qint64>(100, videoAt_ * 100 / videoQueue_.first().size));
+}
+
+void RemoteSession::fetchNextVideo()
+{
+    if (!welcomed_ || videoAt_ >= 0 || videoQueue_.isEmpty())
+        return;
+    const VideoFetch &v = videoQueue_.first();
+    QDir().mkpath(videoDir());
+    // Room for it (a TV stick has little): the copies no slide uses go first.
+    pruneVideos();
+    const QStorageInfo disk(videoDir());
+    const qint64 have = QFileInfo(v.file + u".part"_s).size();
+    if (disk.isValid() && disk.bytesAvailable() > 0 && disk.bytesAvailable() < v.size - have + 100 * 1024 * 1024) {
+        qCWarning(lcRemote).noquote() << "no room on this device for the video" << v.name;
+        emit notice(tr("No room on this screen for the video %1.").arg(v.name));
+        videoFailed_.insert(v.name, QDateTime::currentMSecsSinceEpoch());
+        videoQueue_.removeFirst();
+        fetchNextVideo();
+        return;
+    }
+    // Carry on from what came before the connection dropped.
+    videoAt_ = have <= v.size ? have : 0;
+    if (have > v.size)
+        QFile::remove(v.file + u".part"_s);
+    send({{u"t"_s, u"getVideo"_s}, {u"name"_s, v.name}, {u"at"_s, videoAt_}});
+}
+
+void RemoteSession::onVideoPart(const QJsonObject &m)
+{
+    if (videoQueue_.isEmpty() || videoAt_ < 0 || m.value(u"name").toString() != videoQueue_.first().name)
+        return;
+    VideoFetch v = videoQueue_.first();
+    const qint64 at = m.value(u"at").toInteger();
+    const QString part = v.file + u".part"_s;
+    if (m.value(u"size").toInteger() != v.size || m.value(u"modified").toInteger() != v.modified || at != videoAt_) {
+        // The video changed on the server meanwhile: the new one comes with the next slides.
+        QFile::remove(part);
+        videoQueue_.removeFirst();
+        videoAt_ = -1;
+        fetchNextVideo();
+        return;
+    }
+    const QByteArray data = QByteArray::fromBase64(m.value(u"data").toString().toLatin1());
+    QFile f(part);
+    if (!f.open(at == 0 ? QIODevice::WriteOnly | QIODevice::Truncate : QIODevice::WriteOnly | QIODevice::Append)
+        || f.write(data) != data.size()) {
+        qCWarning(lcRemote).noquote() << "couldn't save the video" << v.name << ":" << f.errorString();
+        f.close();
+        QFile::remove(part);
+        videoFailed_.insert(v.name, QDateTime::currentMSecsSinceEpoch());
+        videoQueue_.removeFirst();
+        videoAt_ = -1;
+        fetchNextVideo();
+        return;
+    }
+    f.close();
+    videoAt_ = at + data.size();
+    if (videoAt_ < v.size && !data.isEmpty()) {
+        send({{u"t"_s, u"getVideo"_s}, {u"name"_s, v.name}, {u"at"_s, videoAt_}});
+        emit videosChanged();   // the progress
+        return;
+    }
+    videoQueue_.removeFirst();
+    videoAt_ = -1;
+    QFile::remove(v.file);
+    if (QFileInfo(part).size() == v.size && QFile::rename(part, v.file)) {
+        qCInfo(lcRemote).noquote() << "the video" << v.name << "is here";
+        ++videoRevision_;
+    } else {
+        QFile::remove(part);
+        videoFailed_.insert(v.name, QDateTime::currentMSecsSinceEpoch());
+    }
+    emit videosChanged();
+    fetchNextVideo();
+}
+
+void RemoteSession::pruneVideos()
+{
+    QSet<QString> keep;
+    const QVariantMap videos = billboard().value(u"videos"_s).toMap();
+    for (auto it = videos.cbegin(); it != videos.cend(); ++it)
+        keep.insert(QFileInfo(videoFileFor(it.value().toMap())).fileName());
+    for (const VideoFetch &f : std::as_const(videoQueue_))
+        keep.insert(QFileInfo(f.file).fileName() + u".part"_s);
+    if (videos.isEmpty() && videoQueue_.isEmpty() && state_.isEmpty())
+        return;   // nothing heard from the store yet: keep what's here
+    for (const QFileInfo &f : QDir(videoDir()).entryInfoList(QDir::Files))
+        if (!keep.contains(f.fileName()))
+            QFile::remove(f.absoluteFilePath());
+}
+
 QVariantList RemoteSession::storeImages() const
 {
     QVariantList out = v(u"storeImages").toList();
@@ -334,6 +470,7 @@ void RemoteSession::onDisconnected()
         emit notice(tr("Lost the connection to the server. Reconnecting…"));
     }
     encrypted_ = false;
+    videoAt_ = -1;   // a video on its way: asked for again from where it got to, once back
     if (!rejected_)
         reconnect_.start();
 }
@@ -371,6 +508,7 @@ void RemoteSession::handle(const QJsonObject &m)
         failures_ = 0;
         connectingSince_ = 0;
         emit onlineChanged();
+        fetchNextVideo();   // a billboard's video that was on its way
     } else if (type == u"state") {
         applyState(m.value(u"set").toObject(), false);
     } else if (type == u"updatePart") {
@@ -383,6 +521,20 @@ void RemoteSession::handle(const QJsonObject &m)
         if (const QJsonObject done = m.value(u"done").toObject(); !done.isEmpty())
             finishUpdate(done);
         emit updateChanged();
+    } else if (type == u"videoPart") {
+        onVideoPart(m);
+    } else if (type == u"videoError") {
+        // That one can't come now (gone from the slides, unreadable): the rest go on.
+        const QString name = m.value(u"name").toString();
+        qCInfo(lcRemote).noquote() << "the store can't send the video" << name << ":" << m.value(u"text").toString();
+        videoFailed_.insert(name, QDateTime::currentMSecsSinceEpoch());
+        if (!videoQueue_.isEmpty() && videoQueue_.first().name == name) {
+            QFile::remove(videoQueue_.first().file + u".part"_s);
+            videoQueue_.removeFirst();
+            videoAt_ = -1;
+        }
+        fetchNextVideo();
+        emit videosChanged();
     } else if (type == u"updateError") {
         updateProgress_ = -1;
         updateError_ = m.value(u"text").toString();
