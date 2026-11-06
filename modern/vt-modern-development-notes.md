@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:24 ET — Bob (Claude) — Seed jump-target backlog item: already fixed, nothing to change
+- **What:** Checked the backlog item 'retail-entry missing jump targets' (from the 2026-11-02 17:29 entry). Ran a Python copy of Layout::validate() plus the test_seed.cpp checks over every page in modern/seed/pages and every jump in modern/seed/layouts. Today's seed passes: no jump goes to a missing page, and every phone page shows or hides each zone of its main page. The same checker on the seed before commit 9c19380 finds exactly the old failures: retail-entry rtl-discounts (page 'discounts'), rtl-clock ('timeclock'), rtl-return ('reasons'), rtl-lighter / rtl-emptybox / rtl-misc ('order'), and check-list-phone, tables-phone (Retail Mode button not placed or hidden) and settle-phone ('items'). 9c19380 (2026-11-03) fixed all of them, and later commits kept them working (DISCOUNTS now opens retail-discounts). No seed pages or tests changed.
+- **Why:** Close the backlog item, so nobody fixes it twice.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** Seed fixes don't reach a store whose retail-entry or check-list-phone page was edited: that store keeps the dead jumps. To fix those, add one ZonePatch per zone in main.cpp (next to rtl-duty), each changing a zone only while it still jumps to its old page: rtl-discounts discounts->retail-discounts, rtl-clock timeclock->time-clock, rtl-return reasons->no action, and rtl-lighter/rtl-emptybox/rtl-misc order->addItem by name. Also a once-only step that adds retail-mode-btn to hiddenZones on check-list-phone and tables-phone. Not built.
+
 ### 2026-11-06 11:04 ET — Bob (Claude) — Release: main moved up to bob/big-catalog
 - **What:** main fast-forwarded from 9f879118 to the bob/big-catalog head (DOB reprint choices, ID line and 'ID expired' on receipts, exception pictures with DOB, gift receipts *****, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X). CI run 42246143289 (ff8d33a1): the same 28 failing test cases / 31 failing lines as main's run 42234138120, nothing new. The tablet APK is built from this commit so its build number matches the server's.
 - **Why:** Part Two step 2: put the branch on the Pi and the tablets; the register monitor choice needs vt-guest-display on HDMI-X.
