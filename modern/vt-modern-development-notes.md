@@ -116,6 +116,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 22:42 ET — Bob (Claude) — Receipts: ⅛ ⅜ ⅝ ⅞ ⅓ ⅔ and other fraction characters print as 1/8, 3/8...
+- **What:** print/document.cpp printable(): Unicode vulgar fractions U+2150..U+215E print as plain text (1/8, 3/8, 5/8, 7/8, 1/3, 2/3...) instead of '?'. ½ ¼ ¾ ¢ already print (as themselves on PC858 printers, else 1/2, 1/4, 3/4, c).
+- **Why:** Owner asked about 1/8 in item names (cigar sizes). ILSA's Windows character set has no 1/8 character, so ILSA names spell it 1/8; an item typed in ViewTouch could have the character.
+- **Files:** `modern/print/document.cpp`
+
 ### 2026-11-05 22:35 ET — Bob (Claude) — Menu Builder '602 to fix': price book duplicates and $0 items as two summary lines; ILSA names read as Windows-1252
 - **What:** menuProblems: items in retail-only categories no longer add one line each for 'There are two X' and 'X has no price'; instead two summary lines (how many $0.00 items, how many same-name items to review). vt-ilsa-items reads the ILSA CSVs as UTF-8, else Windows-1252 (the Jet text export writes the Windows character set; a ½ or similar came out as a replacement character, e.g. 'BLK/MLD P/T CASIN 89?PP'). importMenuFile now finds an item already here by its first UPC before its name (no duplicate items with the same UPC on a re-import), and mends a name that has the replacement character when the file's spelling doesn't.
 - **Why:** Owner after loading the price book: Menu Builder showed '602 to fix', almost all same-name ILSA items (unmerged on purpose) and $0 items; one name showed a broken character.

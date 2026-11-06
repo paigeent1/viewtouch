@@ -171,6 +171,11 @@ std::string printable(const std::string &s, bool accents)
             out += "1/4";
         else if (cp == 0xBE)
             out += "3/4";
+        else if (cp >= 0x2150 && cp <= 0x215E) {   // ⅛ ⅜ ⅝ ⅞ ⅓ ⅔ ⅕…: as 1/8 (no printer has them)
+            static const char *const fractions[] = {"1/7", "1/9", "1/10", "1/3", "2/3", "1/5", "2/5", "3/5", "4/5",
+                                                    "1/6", "5/6", "1/8", "3/8", "5/8", "7/8"};
+            out += fractions[cp - 0x2150];
+        }
         else if (cp == 0xB0)
             out += " deg";
         else if (cp == 0xAE)
