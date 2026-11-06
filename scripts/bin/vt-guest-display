@@ -89,7 +89,9 @@ elif command -v xrandr >/dev/null && xrandr >/dev/null 2>&1; then
     cmd="xrandr --output $second --auto --right-of $first"
     [ -n "$res" ] && xrandr | awk -v o="$second" '$1==o{f=1;next} /^[A-Za-z]/{f=0} f{print $1}' | grep -qx "$res" \
         && cmd="xrandr --output $second --mode $res --right-of $first"
-    [ -n "$res" ] && cmd="xrandr --output $first --mode $res; $cmd"
+    # The register's monitor is the Pi's primary one: ViewTouch opens the register on the primary
+    # monitor and the guest's screen on the other, whatever their order.
+    cmd="xrandr --output $first --primary${res:+ --mode $res}; $cmd"
 else
     echo "Couldn't reach the Pi's screen. Run this on the Pi's desktop session."; exit 1
 fi
