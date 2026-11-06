@@ -49,7 +49,7 @@ Item {
         font.bold: true
     }
     component Caption: Label { font.pixelSize: 14; font.bold: false; opacity: 0.75; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-    component Tool: Button { implicitHeight: 46; font.pixelSize: 15; font.bold: false }
+    component Tool: Button { implicitHeight: 64; Layout.minimumHeight: 64; Layout.minimumWidth: 200; font.pixelSize: 16; font.bold: false }
 
     Label {
         anchors.centerIn: parent
@@ -59,15 +59,10 @@ Item {
         opacity: 0.7
     }
 
-    ScrollView {
+    TouchScrollColumn {
         anchors.fill: parent
         visible: !(w.info.android ?? false)
-        contentWidth: availableWidth
-        clip: true
-
-        ColumnLayout {
-            width: parent.width
-            spacing: 12
+        spacing: 12
 
             // --- the verdict, then look again ---
             Rectangle {
@@ -215,7 +210,6 @@ Item {
                     }
                 }
             }
-        }
     }
 
     // Each monitor's name in big letters on that monitor, for a few seconds.

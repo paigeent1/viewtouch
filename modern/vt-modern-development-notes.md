@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:56 ET — Bob (Claude) — Screen check: finger-sized buttons and scrolling
+- **What:** WidgetScreenCheck scrolls with TouchScrollColumn (finger-wide bar) instead of ScrollView, and its buttons are 64 high and at least 200 wide.
+- **Why:** CI 42251518875: 'every control on every page is big enough for a finger' flagged Look again, Show each monitor's name and the thin scroll bars (the only new failure).
+- **Files:** `modern/ui/qml/WidgetScreenCheck.qml`
+
 ### 2026-11-06 11:20 ET — Bob (Claude) — Screen check page on Hardware Configuration
 - **What:** New page screen-check (Hardware Configuration > Screen check, button given once to edited Hardware pages) with widget screenCheck (WidgetScreenCheck.qml): a verdict line (All good / things to fix), each monitor (port, register or guest, resolution, rate, size, maker, primary, which ViewTouch window is on it, which physical HDMI port), each touchscreen (USB port, guest's or not, which monitor its touches land on and which they should), 'Show each monitor's name on it' (big label on every monitor for 6 s), and fixes as buttons for admins: Make this the register (vt-guest-display on <port>, restarts), Tie touchscreens again (vt-touch-map), Learn guest touchscreen. New script scripts/bin/vt-screens (read-only; plain report, or --json for the page) from xrandr --verbose, xinput and udevadm; LayoutController::screenCheck()/refreshScreens(); siteAction register:<port> (only a port the last look found) and touch-map. vt-touch-map --verbose says where each touchscreen went. vt-server links any vt-* command not yet in /usr/local/bin; site tools fall back to ~/viewtouch-main/scripts/bin.
 - **Why:** Owner 2026-11-06: a screen detection widget on Hardware Configuration so future users can check (and fix) which monitor is the register without calling anyone.
