@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:22 ET — Bob (Claude) — Forget Customer no longer freezes the screen
+- **What:** Ported upstream 8d98a74. Forget Customer removes the record and today's checks at once; the earlier days' checks are searched in the background and cleaned up afterwards, then it says how many checks it cleared. Test updated to wait for that message.
+- **Why:** Searching every check the store ever kept on the screen's thread held the screen for seconds on a Pi with years of sales.
+- **Files:** `modern/app/pos_customers.cpp`, `modern/tests/test_safety.cpp`
+
 ### 2026-11-06 11:21 ET — Bob (Claude) — Backup restore: never leaves the store without a database
 - **What:** Ported upstream 7833c83 (backup.cpp only). The data set aside before a restore always gets a name nobody else has, and if the database, its -wal or its -shm can't be moved aside, the ones already moved are put back.
 - **Why:** Two restores in the same second clashed, and a half-finished move could leave the store with no database, so the next start would begin an empty one.
