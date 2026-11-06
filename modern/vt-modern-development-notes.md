@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 16:16 ET — Bob (Claude) — Release 2026-11-06 (d): guest-screen pictures from Dropbox, emoji font, price book --apply
+- **What:** bob/release-1106d = main 5384166 + vt-pricebook-cleanup --apply (already run on the Pi at 15:10: 745 names, 17,969 sizes) + vt-server installs fonts-noto-color-emoji + guest-screen pictures (Dropbox POS project/Guest Screen, + Add a picture, 10 s each). CI 42293035626: main's 28 known failing test cases only; the new picture test passes. Linear (cherry-picked, no merges).
+- **Why:** One Pi update and one tablet build for this afternoon's work.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** Next: guest-screen videos with per-video sound (bob/guest-videos, helper), Price book cleanup screen (bob/pricebook-screen, helper), then safe UPC swaps and the automatic ILSA sync.
+
 ### 2026-11-06 15:07 ET — Bob (Claude) — Price book cleanup: --apply (owner approved the before/after sheet)
 - **What:** vt-pricebook-cleanup --apply: stops ViewTouch (SIGTERM, waits), copies viewtouch.db with SQLite's backup to ~/pricebook-cleanup/viewtouch-before-cleanup-<time>.db, in one transaction sets every suggested name and fills only empty length / ringGauge / ringGauge2 in menu_items' JSON, writes applied-<time>.csv (item id, before, after), starts ViewTouch again (vt-server). Rolls back and restarts on any error. Undo: stop ViewTouch, copy the backup over viewtouch.db, vt-server.
 - **Why:** Owner 2026-11-06 14:58 approved names-before-after.csv (745 names; 17,969 sizes from names) and said push it; the cleanup screen (bob/pricebook-screen) isn't ready, so this applies the same rules from the terminal.
