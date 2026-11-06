@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 12:15 ET — Bob (Claude) — Upstream group 2: two test expectations corrected
+- **What:** test_customers: the EAN-13 and 11-digit scans are checked by the item's name (ZEN TUBE), like the exact scan above them; test_safety: Forget Customer's notice is matched on 'off 2 check' (untranslated Qt prints '2 check(s)').
+- **Why:** CI 42257067376: the code matched correctly but the tests expected an item id the price book import doesn't give and the translated plural.
+- **Files:** `modern/tests/test_customers.cpp`, `modern/tests/test_safety.cpp`
+
 ### 2026-11-06 11:27 ET — Bob (Claude) — Damaged saved amounts and tax rates can't break totals
 - **What:** Ported upstream 78ec1b3 (pos_json.cpp merged by hand, money.hh and its test_money.cpp test; its fuzz test left out). When a saved check is read back, amounts are held within ten billion dollars, discount and gratuity shares and tax rates to 0-100%, quantity to +/-9999, weight and cash rounding to sensible ranges, and a decimal that isn't a number becomes 0. A percent of a huge amount no longer overflows. The fork has no surcharge or tax-exempt fields, so those parts were skipped. Upstream sync ledger updated with group 2.
 - **Why:** A damaged database or copied file could hold numbers that made totals overflow or come out wrong.

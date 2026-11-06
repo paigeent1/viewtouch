@@ -731,7 +731,7 @@ TEST_CASE("Forgetting a customer: their details come off every check and party, 
     for (int i = 0; i < 1000 && !forgotten(); ++i)
         QTest::qWait(10);
     REQUIRE(forgotten());
-    CHECK(std::ranges::any_of(said, [](const QList<QVariant> &n) { return n[0].toString().contains(u"2 checks"_s); }));
+    CHECK(std::ranges::any_of(said, [](const QList<QVariant> &n) { return n[0].toString().contains(u"off 2 check"_s); }));
     writer.flush();
 
     CHECK(pos.shared()->customers.empty());
