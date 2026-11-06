@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 17:24 ET — Bob (Claude) — Menu Builder: a new item's card turns into the saved item (Save, not Add)
+- **What:** saveItem: for a new item, opens the item's own category before saving, so the slim builder list (builderItems: open category only for price-book departments) contains the new item and the card switches to it.
+- **Why:** Owner 2026-11-06 17:22 (video): added 'Mill's Favorite Cigar' to PREMIUM CIGARS while another category was open; the card stayed 'Not saved yet' with 'Add to the Menu', and a second tap said it's already on the menu.
+- **Files:** `modern/ui/qml/WidgetMenuBuilder.qml`
+
 ### 2026-11-06 17:18 ET — Bob (Claude) — Release 2026-11-06 (e): guest-screen videos with sound, label utility 1.2
 - **What:** bob/release-1106e = main 0419676 + guest-screen videos (Dropbox, auto-prepared to H.264 with blurred sides for upright phone videos, Sound switch per video, muted during an open check, rotation keeps going) + vt-guest-audio (sound out the guest monitor's HDMI) + vt-server installs ffmpeg + Site Setup 'Messages and pictures' opens Customer display + label utility 1.2 (managers only change templates, Rename, Save As, Test Print, Quick Label for everyone; Printer Offset open to all). CI 42301483618: main's 28 known failing test cases only. Linear.
 - **Why:** One Pi update and one tablet build.

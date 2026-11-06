@@ -512,8 +512,15 @@ Item {
     }
     function saveItem() {
         const card = copy(draft)
-        if (card.id === "")
+        if (card.id === "") {
             waitingFor = card.name.trim()
+            // The screen's list holds the open category only (a price book is too big for all of it):
+            // open the new item's own category, so the new item comes into the list and the card
+            // turns into it (Save, not Add). 2026-11-06: added to PREMIUM CIGARS while another
+            // category was open, the card kept saying "Add" and a second tap said it's on the menu.
+            if (card.family && card.family !== categoryId)
+                categoryId = card.family
+        }
         pos.saveMenuItemCard(card)
     }
 
