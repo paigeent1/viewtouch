@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 14:17 ET — Bob (Claude) — Ignore helpers' scratch worktrees
+- **What:** .gitignore: .claude/worktrees/ (the temporary copies Bob's helper agents work in).
+- **Why:** They showed up as untracked files and must never be committed to the public repo.
+- **Files:** `.gitignore`
+
 ### 2026-11-06 14:06 ET — Bob (Claude) — Price book cleanup: owner's rulings on the review list
 - **What:** vt-pricebook-cleanup: 5½+ / 6¼+ / 6¾+ read as 5⅝ / 6⅜ / 6⅞ without a 'check' flag; a size stuck to a word (PRIS5½+X46) gets a space and is read as a size (PRIS 5⅝X46); ring gauges up to 100 count as sizes (ASYLUM 9 9X90). Self-test 32 of 32.
 - **Why:** Owner 2026-11-06 after reviewing the first list (31,702 items: 733 names, 17,956 sizes, 453 odd cases): a half plus + is a half and an eighth; add the space in PRIS; 9x90 is a real cigar.
