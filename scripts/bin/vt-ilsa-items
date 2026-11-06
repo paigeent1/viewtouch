@@ -11,7 +11,7 @@ Writes ~/ilsa-items/viewtouch-menu.json (and viewtouch-menu-part1.json... to imp
                            with a maker's UPC (a candidate to free the in-house code)
   summary.txt
 """
-import csv, json, os, re, sys
+import csv, io, json, os, re, sys
 from collections import Counter, defaultdict
 
 csv.field_size_limit(1 << 30)
@@ -23,10 +23,16 @@ LOTTERY = {"270", "275", "280", "300", "320", "340", "345", "360", "365", "370",
 RETIRED = {"55": "vapor", "56": "vapor"}   # departments no longer sold: history only (owner 2026-11-05)
 
 def rows(d, t):
+    # UTF-8, else Windows-1252: the ILSA computer's Jet text export writes the Windows character set,
+    # so a ½ or ° in a name came out as � when read as UTF-8 ("CASIN 89�PP").
     for f in os.listdir(d):
         if f.lower() == (t + ".csv").lower():
-            with open(os.path.join(d, f), newline="", encoding="utf-8-sig", errors="replace") as fh:
-                yield from csv.DictReader(fh)
+            data = open(os.path.join(d, f), "rb").read()
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = data.decode("cp1252", errors="replace")
+            yield from csv.DictReader(io.StringIO(text, newline=""))
             return
 
 def num(s):

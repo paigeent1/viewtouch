@@ -447,10 +447,25 @@ QVariantList PosService::menuProblems() const
     // or nowhere without one (a store with no printers at all uses screens).
     QMap<QString, QStringList> unrouted;
     QHash<QString, QString> firstOf;
+    // A price book's departments (Retail screen only): the same name twice is a merge to review, not a
+    // menu problem (scans find the exact UPC), and $0.00 items are counted, not listed one by one.
+    std::unordered_set<std::string> retail;
+    for (const MenuCategory &c : categories)
+        if (c.retailOnly)
+            retail.insert(c.id);
+    int retailSameName = 0, retailNoPrice = 0;
     for (const MenuItem &m : s_->menu) {
         if (m.isModifier)
             continue;
         const QString id = qs(m.id), name = qs(m.name);
+        if (retail.contains(m.family)) {
+            retailNoPrice += m.price.cents() == 0 && !m.byWeight ? 1 : 0;
+            if (const QString key = name.toLower(); seen.contains(key))
+                ++retailSameName;
+            else
+                seen.insert(key, id);
+            continue;
+        }
         if (m.price.cents() == 0 && !m.byWeight)
             problem(tr("%1 has no price.").arg(name), id, {}, {}, false);
         if (m.family.empty())
@@ -467,6 +482,11 @@ QVariantList PosService::menuProblems() const
         else
             seen.insert(key, id);
     }
+    if (retailNoPrice > 0)
+        problem(tr("Retail price book: %n item(s) at $0.00 (they ring up free until priced).", nullptr, retailNoPrice), {}, {}, {}, false);
+    if (retailSameName > 0)
+        problem(tr("Retail price book: %n item(s) have the same name as another (possible duplicates to review; scans still find each by its UPC).",
+                   nullptr, retailSameName), {}, {}, {}, false);
     const bool kitchen = s_->settings.printer("kitchen");
     for (auto it = unrouted.cbegin(); it != unrouted.cend(); ++it) {
         QStringList names = it.value();
@@ -1476,16 +1496,30 @@ int PosService::importMenuFile(const QVariantMap &file)
     for (const MenuItem &x : s_->menu)
         ids.insert(x.id);
     for (MenuItem &m : items) {
-        if (const auto it = byName.constFind(qs(m.name).toCaseFolded()); it != byName.cend()) {
-            itemOf[m.id] = s_->menu[*it].id;
+        // The same item already here by its first UPC (a re-import whose name was spelled differently,
+        // like a price book name that lost a ½ to a bad character the first time): that one, and its
+        // name mended when it has the bad character and the file's doesn't.
+        if (!m.barcodes.empty())
+            if (const auto b = byCode.find(m.barcodes.front()); b != byCode.end()) {
+                MenuItem &here = s_->menu[b->second];
+                if (qs(here.name) != qs(m.name) && qs(here.name).contains(QChar::ReplacementCharacter)
+                    && !qs(m.name).contains(QChar::ReplacementCharacter)) {
+                    here.name = m.name;
+                    if (s_->sink)
+                        s_->sink->saveMenuItem(here, int(b->second));
+                    ++filled;
+                }
+            }
+        if (auto it = byName.constFind(qs(m.name).toCaseFolded()); it != byName.cend()
+            || (!m.barcodes.empty() && byCode.contains(m.barcodes.front()))) {
+            const std::size_t at = it != byName.cend() && (m.barcodes.empty() || !byCode.contains(m.barcodes.front()))
+                                       ? *it : byCode.at(m.barcodes.front());
+            itemOf[m.id] = s_->menu[at].id;
             skipped << qs(m.name);
             // Kept as it is, except what it doesn't have yet that the file knows: the price book's maker
             // and groups (added to ViewTouch after the first import). Found by its UPC when it has one,
             // so same-name items each get their own.
-            auto here = s_->menu.begin() + std::ptrdiff_t(*it);
-            if (!m.barcodes.empty())
-                if (const auto b = byCode.find(m.barcodes.front()); b != byCode.end())
-                    here = s_->menu.begin() + std::ptrdiff_t(b->second);
+            auto here = s_->menu.begin() + std::ptrdiff_t(at);
             bool fill = false;
             for (auto field : {&MenuItem::manufacturer, &MenuItem::productGroup, &MenuItem::subGroup})
                 if ((*here).*field != m.*field && ((*here).*field).empty()) {

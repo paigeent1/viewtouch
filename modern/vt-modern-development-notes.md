@@ -116,6 +116,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 22:35 ET — Bob (Claude) — Menu Builder '602 to fix': price book duplicates and $0 items as two summary lines; ILSA names read as Windows-1252
+- **What:** menuProblems: items in retail-only categories no longer add one line each for 'There are two X' and 'X has no price'; instead two summary lines (how many $0.00 items, how many same-name items to review). vt-ilsa-items reads the ILSA CSVs as UTF-8, else Windows-1252 (the Jet text export writes the Windows character set; a ½ or similar came out as a replacement character, e.g. 'BLK/MLD P/T CASIN 89?PP'). importMenuFile now finds an item already here by its first UPC before its name (no duplicate items with the same UPC on a re-import), and mends a name that has the replacement character when the file's spelling doesn't.
+- **Why:** Owner after loading the price book: Menu Builder showed '602 to fix', almost all same-name ILSA items (unmerged on purpose) and $0 items; one name showed a broken character.
+- **Files:** `modern/app/pos_menu_builder.cpp, scripts/bin/vt-ilsa-items`
+- **Next person must know:** Owner re-runs vt-ilsa-items and re-imports the parts after this ships: names with the broken character get fixed. A proper 'Possible duplicates' review screen (UPC, price, last sale side by side, merge) is still to build.
+
 ### 2026-11-05 22:28 ET — Bob (Claude) — Backlog: customer accounts (key fob number, cell phone, ID link)
 - **What:** Added to section 5 (Pending Roadmap & Backlog): customer number on a key fob, cell phone entry at the guest screen, tying an ID scan to the customer (behind a setting, off until the owner's lawyer approves, CGS § 53-344), and an ID-check record keeping the four fields the law allows. Open questions listed there.
 - **Why:** Owner asked to put it on the development list (2026-11-05).
