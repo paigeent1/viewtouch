@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 16:27 ET — Bob (Claude) — Guest-screen videos made ready on the Pi (phone videos just work)
+- **What:** New scripts/bin/vt-guest-video-prep IN OUT.mp4: H.264 + AAC MP4 at most 1920x1080; a phone's HEVC converted; an upright video fills the wide screen with a darkened blurred copy of itself on the sides; an MP4 that's already right only re-packed. addGuestVideo keeps '<name>.mp4' in ~/Pictures/Guest Screen made by it in the background (falls back to a plain copy without ffmpeg or when it fails). vt-server installs ffmpeg once when missing. Tested here on the owner's iPhone video (HEVC 1080x1920, 28 s): 49 s, 1920x1080 H.264 with blurred sides.
+- **Why:** Owner 2026-11-06 16:24: uploaded the original iPhone video (vertical HEVC) from his phone to Dropbox; asked for the Pi to prepare phone videos automatically.
+- **Files:** `modern/ui/cpp/sitesetup.cpp`, `scripts/bin/vt-guest-video-prep`, `scripts/bin/vt-server`
+
 ### 2026-11-06 16:16 ET — Bob (Claude) — Release 2026-11-06 (d): guest-screen pictures from Dropbox, emoji font, price book --apply
 - **What:** bob/release-1106d = main 5384166 + vt-pricebook-cleanup --apply (already run on the Pi at 15:10: 745 names, 17,969 sizes) + vt-server installs fonts-noto-color-emoji + guest-screen pictures (Dropbox POS project/Guest Screen, + Add a picture, 10 s each). CI 42293035626: main's 28 known failing test cases only; the new picture test passes. Linear (cherry-picked, no merges).
 - **Why:** One Pi update and one tablet build for this afternoon's work.

@@ -11,6 +11,11 @@ if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; t
         && touch modern/CMakeLists.txt \
         || echo "Couldn't install Qt Multimedia; ViewTouch builds without video (pictures and GIFs still work)."
 fi
+# Guest-screen videos are made ready with ffmpeg (vt-guest-video-prep): installed once when missing.
+if command -v dpkg >/dev/null && ! command -v ffmpeg >/dev/null; then
+    echo "Installing ffmpeg (guest-screen videos)..."
+    sudo apt-get install -y ffmpeg >/dev/null 2>&1 || echo "Couldn't install ffmpeg; guest-screen videos are copied as they are."
+fi
 # The top bar's icons (battery, Wi-Fi, customer count) are emoji: installed once when the font is missing.
 if command -v dpkg >/dev/null && ! dpkg -s fonts-noto-color-emoji >/dev/null 2>&1; then
     echo "Installing the emoji font (the top bar's icons)..."

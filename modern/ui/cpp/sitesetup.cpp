@@ -630,32 +630,44 @@ QString LayoutController::addGuestVideo(const QString &fileOrUrl)
         setStatus(tr("The guest screen plays MP4, MOV or M4V videos of 500 MB at most."));
         return {};
     }
-    // Kept in ~/Pictures/Guest Screen as it is (never made over), by its own name: without a '#'
-    // ("#sound" marks a video with its sound) and without spaces at the ends (lines are trimmed).
+    // Kept in ~/Pictures/Guest Screen as an MP4 made ready for the guest screen (vt-guest-video-prep:
+    // a phone's HEVC converted to H.264, an upright video given blurred sides to fill the wide screen;
+    // owner 2026-11-06), by its own name: without a '#' ("#sound" marks a video with its sound) and
+    // without spaces at the ends (lines are trimmed). The Dropbox original is never changed.
     QDir keep(guestPictureFolders().last());
     if (!keep.mkpath(u"."_s)) {
         setStatus(tr("Can't make the folder %1.").arg(keep.path()));
         return {};
     }
-    const QString name = info.fileName().replace(u'#', u'-').trimmed();
+    const QString name = info.completeBaseName().replace(u'#', u'-').trimmed() + u".mp4"_s;
     const QString source = info.canonicalFilePath();
     const QString target = QFileInfo(keep.absolutePath()).canonicalFilePath() + u'/' + name;
-    const QFileInfo kept(target);
-    if (target != source && !(kept.exists() && kept.size() == info.size())) {
-        // A big file: copied off the screen's thread, under another name until it's all there (the
-        // guest screen skips a video it can't open yet, and tries again later).
-        setStatus(tr("Copying %1 to Pictures/Guest Screen; it plays once it's there.").arg(name));
+    if (target != source && !QFileInfo::exists(target)) {
+        // Off the screen's thread (a minute or two on the Pi), under another name until it's all
+        // there: the guest screen skips a video it can't open yet, and tries again later. Without
+        // ffmpeg, or when it can't convert this one, the video is copied as it is.
+        setStatus(tr("Preparing %1 for the guest screen (a minute or two); it plays once it's ready.").arg(name));
         QPointer<LayoutController> self(this);
-        QThreadPool::globalInstance()->start([self, source, target, name] {
-            const QString part = target + u".part"_s;
-            QFile::remove(part);
-            bool ok = QFile::copy(source, part);
-            if (ok) {
-                QFile::remove(target);
-                ok = QFile::rename(part, target);
+        const QString prep = toolPath(u"vt-guest-video-prep"_s);
+        QThreadPool::globalInstance()->start([self, source, target, name, prep] {
+            bool ok = false;
+            if (QFile::exists(prep)) {
+                QProcess p;
+                p.start(u"bash"_s, {prep, source, target});
+                ok = p.waitForFinished(30 * 60 * 1000) && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0
+                     && QFileInfo::exists(target);
             }
-            if (!ok)
+            if (!ok) {
+                const QString part = target + u".part"_s;
                 QFile::remove(part);
+                ok = QFile::copy(source, part);
+                if (ok) {
+                    QFile::remove(target);
+                    ok = QFile::rename(part, target);
+                }
+                if (!ok)
+                    QFile::remove(part);
+            }
             QMetaObject::invokeMethod(self, [self, name, ok] {
                 if (self)
                     self->setStatus(ok ? tr("%1 is ready for the guest screen.").arg(name)
