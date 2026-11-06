@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 18:28 ET — Bob (Claude) — Release 2026-11-06 (f): billboards, fast Item Look Up and Find, Menu Builder new-item fix
+- **What:** bob/release-1106f = main 23a50e0 + Menu Builder new-item card fix + Item Look Up speed (1 ms per keystroke on 33,000 items) + order-screen Find as word search on the server, shown as bars with up/down (2 ms) + billboards (signage only, Fire TV / Android TV app, 32-bit APK, Billboards page with hours and mute) + vt-server installs Qt Multimedia's companions. CI 42310230378: main's 28 known failing test cases only. Linear.
+- **Why:** One Pi update and one app build for the evening's work.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** Video on the HCA Pi: Qt Multimedia 6.8.2 is installed but CMake still reports it not found (even with qt6-base-private-dev); next step is a minimal project with find_package(Qt6 REQUIRED COMPONENTS Multimedia) to print the real reason (command given to the owner 2026-11-06 18:12). Price book cleanup screen (bob/pricebook-screen) is unfinished: only the C++ rules port (f16ee66).
+
 ### 2026-11-06 18:11 ET — Bob (Claude) — Catalog test: Find by UPC checks the item's name
 - **What:** test_stress: the UPC search's item is checked by its name (CIGAR BRAND 4 ROBUSTO 123); the menu import gives items ids of its own.
 - **Why:** CI 42308155098: Find returned the right single item but the test expected the file's id (ilsa-700000123). Same run: Item Look Up 1 ms and Find 2 ms per keystroke on the 33,000-item catalog.
