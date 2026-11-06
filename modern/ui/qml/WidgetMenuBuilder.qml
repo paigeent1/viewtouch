@@ -483,6 +483,16 @@ Item {
             editItem(added)
         }
     }
+    // A second touch on Import… or + Category while the screen is still busy with the first (a big
+    // price book makes it slow) does nothing: the touches wait while it works, then all arrive at once.
+    property var lastTaps: ({})
+    function once(key) {
+        const now = Date.now()
+        if (now - (lastTaps[key] ?? 0) < 2000)
+            return false
+        lastTaps[key] = now
+        return true
+    }
     function saveItem() {
         const card = copy(draft)
         if (card.id === "")
@@ -812,7 +822,7 @@ Item {
                         objectName: "builderAddCategory"
                         Layout.fillWidth: true
                         text: qsTr("+ Category")
-                        onClicked: w.leave(() => w.editCategory(null))
+                        onClicked: if (w.once("category")) w.leave(() => w.editCategory(null))
                     }
                     TouchButton {
                         objectName: "builderThemes"
@@ -848,7 +858,7 @@ Item {
                         text: qsTr("Import…")
                         ToolTip.visible: hovered
                         ToolTip.text: qsTr("A spreadsheet saved as CSV, or another store's menu")
-                        onClicked: importFile.open()
+                        onClicked: if (w.once("import")) importFile.open()
                     }
                     TouchButton {
                         id: exportKey

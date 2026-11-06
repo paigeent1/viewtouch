@@ -71,6 +71,8 @@ Dialog {
                 enabled: importDialog.items.length > 0
                 text: qsTr("Import")
                 onClicked: {
+                    if (!menu.once("importGo"))   // a second touch while the first is still going
+                        return
                     if (importDialog.read.menuFile)
                         menu.pos.importMenuFile(importDialog.read.menuFile)
                     else

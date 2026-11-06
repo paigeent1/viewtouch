@@ -117,6 +117,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 08:56 ET — Bob (Claude) — Menu Builder: a second touch on Import / + Category within 2 s does nothing
+- **What:** WidgetMenuBuilder.once(key): + Category, Import… and the import dialog's Import button ignore a repeat within 2 seconds (touches made while the screen is busy arrive together when it catches up).
+- **Why:** Owner 2026-11-06: with the 31,700-item price book Menu Builder lags, and extra touches imported twice / opened + Category twice.
+- **Files:** `modern/ui/qml/WidgetMenuBuilder.qml, modern/ui/qml/MenuBuilderImport.qml`
+
 ### 2026-11-06 08:42 ET — Bob (Claude) — Pi desktop: tried Wayland (labwc) for remote screen sharing, going back to X11
 - **What:** 2026-11-05 night: installed Raspberry Pi Connect on the Pi (rpi-connect 2.14; linger on; signed in; remote shell works). Screen sharing needs a Wayland desktop, so the Pi was switched to labwc (raspi-config do_wayland W2; rpd-wayland-core had to be installed for the rpd-labwc session; desktop autologin B4). It worked for remote screen sharing, but in the morning the register and guest screens were swapped (Qt's first screen on Wayland is not the X11 'first' monitor), and the guest touchscreen mapping is X11-only (xinput; the two touchscreens report the same name). Owner chose to go back to X11 (do_wayland W1). Pi Connect's remote shell keeps working on X11; screen sharing does not.
 - **Why:** Owner wanted to run the Pi from home; the switch broke the guest screen setup.
