@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 15:55 ET — Bob (Claude) — vt-server installs the emoji font when it's missing
+- **What:** vt-server: if fonts-noto-color-emoji isn't installed, apt-get installs it once and refreshes the font cache (like Qt Multimedia).
+- **Why:** Owner 2026-11-06: the top bar's icons (battery, Wi-Fi, customer count) showed as boxes; the Pi had no emoji font at all (fc-list: 0), so on X11 nothing could draw them.
+- **Files:** `scripts/bin/vt-server`
+
 ### 2026-11-06 14:26 ET — Bob (Claude) — Register window: placed on the main monitor by its exact place; no refit loop
 - **What:** main.cpp present(): the register window gets setScreen(primary) and setGeometry(primary's geometry) before showFullScreen, at start and on every refit. Refit: one 800 ms timer for several screen changes at once; skipped when the window is already full screen on the primary; screen changes it causes itself (1.5 s) ignored; after 4 tries in a minute it stops and logs 'Couldn't keep the register full screen on <monitor>'.
 - **Why:** Owner 2026-11-06 14:24: register on the small (guest) monitor 'giggling', desktop on the big one, though HDMI-1 (big) was primary. The refit (screenChanged -> setScreen(main) -> showNormal -> showFullScreen) restored the window's old place on the other monitor, the desktop fullscreened it there, screenChanged fired again: an endless loop.
