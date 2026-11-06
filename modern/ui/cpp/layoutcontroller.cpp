@@ -1626,7 +1626,12 @@ void LayoutController::scanned(const QString &code)
 {
     const QString c = code.trimmed();
     if (!c.isEmpty()) {   // for Site Setup's scanner test (the start of it only)
-        lastScan_ = vt::core::looksLikeIdCard(c.toStdString()) ? tr("A driver's license / ID (read OK)") : c.left(48);
+        // A code with letters is never a product here (UPCs are numbers): a license's small barcode is
+        // its number, so it isn't shown.
+        const bool letters = std::ranges::any_of(c, [](QChar ch) { return ch.isLetter(); });
+        lastScan_ = vt::core::looksLikeIdCard(c.toStdString()) ? tr("A driver's license / ID (read OK)")
+                    : letters ? tr("A code with letters (%n character(s): not shown)", nullptr, int(c.size()))
+                              : c.left(48);
         lastScanAt_ = QDateTime::currentMSecsSinceEpoch();
         ++siteRevision_;
         emit siteChanged();
@@ -1719,8 +1724,13 @@ void LayoutController::notOnFile(const QString &c)
             const bool giftCards = here && (here->id == u"gift-card"
                                             || std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) {
                                                    return pz.zone->kind == u"giftCard"; }));
+            const bool letters = std::ranges::any_of(c, [](QChar ch) { return ch.isLetter(); });
             if (QDateTime::currentMSecsSinceEpoch() - lastIdScanAt_ < 3000) {
                 // A license's small barcode, answered after the license itself: nothing to add.
+            } else if (letters) {
+                // Never a product (the store's codes are all numbers); likely a license's small barcode,
+                // which is the license number: not shown, and no "add this item?".
+                setStatus(tr("That code isn't a product barcode."));
             } else if (giftCards) {
                 setStatus(tr("%1 isn't a valid gift card.").arg(c));   // a gift card screen: no "add an item"
             } else if (adds) {

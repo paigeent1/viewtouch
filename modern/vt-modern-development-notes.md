@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 19:59 ET — Bob (Claude) — Scans with letters: no 'add this item', code not shown
+- **What:** LayoutController: a scanned code with letters that's no coupon or gift card says "That code isn't a product barcode." instead of the Item Not on File prompt, and Site Setup's last-scan test shows 'a code with letters (N characters)' instead of the code.
+- **Why:** Owner's MS1690 sent his driver's license number (the license's small 1D barcode is the license number) and the prompt showed it on screen. The store's product codes never have letters (owner confirmed). Listening test on the Pi: the scanner itself sent the 17-character code, so the cause is the scanner (a license in view, or stored in its settings), not ViewTouch.
+- **Files:** `modern/ui/cpp/layoutcontroller.cpp`
+
 ### 2026-11-05 19:40 ET — Bob (Claude) — Test fix: itemForCode's 11-digit case
 - **What:** The new tablet scan test used the 11 digits ILSA keeps (leading 0 lost, check digit kept); itemForCode, like the old scan code, reads 11 digits as a UPC-A without its check digit. Test now uses that; the lost-0 form is handled by vt-ilsa-items adding the 12-digit code.
 - **Why:** CI: test_net.cpp:629 was the only new failure; catalog run: scan 0 ms, 33,000-item import 0.4 s, next 8,000-item part 2.5 s, makers filled in 3.2 s, Labels search 0.13 s.
