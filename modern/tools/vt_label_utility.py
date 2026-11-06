@@ -485,10 +485,13 @@ def parse_vt_menu_dict(m, seen, items):
     fallback_id = str(m.get("number") or m.get("id") or "")
     upc = normalize_upc(raw_upc, fallback_id)
 
-    p_raw = m.get("price", m.get("priceCents", 0))
+    # ViewTouch saves "price" in dollars (150 is $150.00: whole dollars come back from JSON as an int);
+    # "priceCents" is cents (the ILSA temp price book). Never guess from the size of the number.
     try:
-        p_num = float(p_raw or 0)
-        price = p_num / 100.0 if isinstance(p_raw, int) or p_num >= 100 else p_num
+        if m.get("price") is not None:
+            price = float(m.get("price") or 0)
+        else:
+            price = int(round(float(m.get("priceCents") or 0))) / 100.0
     except Exception:
         price = 0.0
 

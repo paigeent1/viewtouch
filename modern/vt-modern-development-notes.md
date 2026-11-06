@@ -115,6 +115,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-05 19:26 ET — Bob (Claude) — Label utility: ViewTouch prices read in dollars (whole dollars were divided by 100)
+- **What:** parse_vt_menu_dict guessed cents when a price was an int or 100 or more, so a ViewTouch price of 150 (saved as JSON 150, meaning $150.00) printed as $1.50 and $10.00 as $0.10. Now "price" is always dollars and "priceCents" always cents.
+- **Why:** Found while testing the switch to ViewTouch's own price book; until now the label utility read only Neil's temp file (priceCents), so the bug didn't show. Owner told not to print labels after tonight's import until this ships.
+- **Files:** `modern/tools/vt_label_utility.py`
+
 ### 2026-11-05 19:25 ET — Bob (Claude) — Big price book: quick scans, slim tablets, maker and groups on items
 - **What:** (1) Scans and typed item numbers ask the menu itself through a new itemForCode command (pos_loyalty.cpp; a tablet asks the Pi) instead of walking the screens' item list. (2) The item list (menuItems) now goes to a tablet only while a screen lists it (PosServer onRequest; Menu Builder, Menu Grid, Sold Out ask with want). (3) MenuItem has manufacturer, productGroup and subGroup, and MenuCategory has group (department group). They are saved, imported, used by the Labels screen tree and the label utility, and written by vt-ilsa-items (MANUF, PROD_GRP, SUBGROUP, Dept_Grp). Importing a menu file looks up names and first UPCs by hash, not item by item, and an item already on the menu gets the maker and groups filled in when it has none (matched by its first UPC). vt-ilsa-items also writes viewtouch-menu-partN.json files, keeping same-name items together. The import message lists at most 20 skipped names. Catalog speed test now on this branch, with the new scan, a second part and a refill timed.
 - **Why:** The 33,000-item test showed scans of about 0.36 s (about 1 s on the Pi) and a 27 MB item list sent to every tablet; the owner asked for the 3 fixes after the BH beta price book upload (2026-11-05).
