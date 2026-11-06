@@ -2028,6 +2028,8 @@ class ReportDesignerWindow(tk.Toplevel):
 
         make_vt_btn(tbar1, text="Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
         make_vt_btn(tbar1, text="Save As…", bg="#15803d", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_as).pack(side="left", padx=2, pady=2)
+        make_vt_btn(tbar1, text="🖨 Test Print…", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=11, pady=6, radius=12,
+                    command=lambda: ask_printer_and_test_print(self, self.tpl_name, self.tpl, self.sample_item)).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.undo).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.redo).pack(side="left", padx=2, pady=2)
 
@@ -2782,6 +2784,70 @@ def make_vt_btn(parent, text, command=None, bg="#1d4ed8", fg="#ffffff", font=("S
         radius=radius,
         shadow_offset=4,
     )
+
+
+def send_label_in_background(widget, tpl_name, tpl, items, copies, chosen, done):
+    """send_label_job (the normal print path: one 1-bit picture per label) on a worker thread, so the
+    window stays responsive; done(ok, message) runs back on the Tk thread. A PDF choice opens the PDF."""
+    import threading
+    tpl = json.loads(json.dumps(tpl))   # a snapshot: later edits can't change what is being printed
+    def worker():
+        try:
+            ok, msg, pdf = send_label_job(tpl_name, tpl, items, copies, chosen)
+            if pdf:
+                subprocess.Popen(["xdg-open", pdf])
+        except Exception as e:
+            ok, msg = False, f"Print failed: {e}"
+        widget.after(0, lambda: done(ok, msg))
+    threading.Thread(target=worker, daemon=True).start()
+
+
+def ask_printer_and_test_print(parent, tpl_name, tpl, item):
+    """Test Print… in the designer: choose a printer (the template's own is selected), then print ONE
+    label of the template as it is now, unsaved edits included. Nothing is saved."""
+    printers = discover_all_printers()
+    default = resolve_template_printer(tpl.get("default_printer", ""), printers)
+    dlg = tk.Toplevel(parent)
+    dlg.title("Test Print")
+    dlg.configure(bg="#1e293b")
+    dlg.transient(parent)
+    dlg.attributes("-topmost", True)
+    tk.Label(dlg, text="🖨 Test Print — 1 label of what you see now (not saved)", bg="#1e293b", fg="#38bdf8",
+             font=("Sans", 12, "bold")).pack(padx=16, pady=(14, 4))
+    tk.Label(dlg, text=f"{tpl_name}  ·  {tpl.get('width_in', 2.0)} x {tpl.get('height_in', 1.0)} in  ·  item: {item.get('name', '')}",
+             bg="#1e293b", fg="#cbd5e1", font=("Sans", 9, "bold"), wraplength=520).pack(padx=16, pady=(0, 6))
+    tk.Label(dlg, text="Print on:", bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold")).pack(anchor="w", padx=18)
+    lb = tk.Listbox(dlg, font=("Sans", 12, "bold"), height=min(8, max(3, len(printers))), width=52, activestyle="none",
+                    bg="#0f172a", fg="#f8fafc", selectbackground="#0284c7", exportselection=False)
+    for p in printers:
+        lb.insert("end", p)
+    idx = printers.index(default) if default in printers else 0
+    lb.selection_set(idx); lb.see(idx)
+    lb.pack(padx=18, pady=4, fill="x")
+    status = tk.Label(dlg, text="", bg="#1e293b", fg="#94a3b8", font=("Sans", 10, "bold"), wraplength=520, justify="center")
+    status.pack(padx=16, pady=(4, 2))
+
+    def do_print(*_a):
+        sel = lb.curselection()
+        if not sel:
+            status.config(text="Choose a printer first.", fg="#fca5a5"); return
+        chosen = printers[sel[0]]
+        status.config(text=f"Sending 1 test label to {chosen}…", fg="#38bdf8")
+        def done(ok, msg):
+            try:
+                status.config(text=msg, fg="#86efac" if ok else "#fca5a5")
+            except tk.TclError:
+                pass   # the dialog was closed meanwhile
+        send_label_in_background(dlg, tpl_name, tpl, [dict(item, qty=1)], 1, chosen, done)
+
+    lb.bind("<Double-Button-1>", do_print)
+    lb.bind("<Return>", do_print)
+    bf = tk.Frame(dlg, bg="#1e293b")
+    bf.pack(pady=(6, 14))
+    make_vt_btn(bf, text="🖨 Print 1 Test Label", bg="#16a34a", fg="#ffffff", font=("Sans", 11, "bold"), command=do_print).pack(side="left", padx=8)
+    make_vt_btn(bf, text="Close", bg="#475569", fg="#ffffff", font=("Sans", 11, "bold"), width=8, command=dlg.destroy).pack(side="left", padx=8)
+    dlg.after_idle(lambda: fit_dialog(dlg, 560, 380))
+    dlg.update_idletasks(); dlg.lift(); lb.focus_force()
 
 
 def ask_template_name(parent, title, prompt, initial, existing, current=None):

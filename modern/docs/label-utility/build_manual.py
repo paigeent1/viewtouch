@@ -444,6 +444,8 @@ story.append(table([
     ["Save", "Saves your changes to this template. The designer stays open; press Close when finished."],
     ["Save As…", "Saves your changes as a <b>new</b> template under a name you type (an empty or already-used name is refused). "
      "The template you opened stays as it was last saved; the designer then goes on with the new one."],
+    ["Test Print…", "Prints <b>one</b> label of what you see now, unsaved changes included, with the item the designer shows. "
+     "It asks which printer first (the template's own is selected; <b>PDF Preview (Desktop)</b> shows it on screen). Nothing is saved."],
     ["Undo / Redo", "Steps back or forward through your changes."],
     ["Object", "Picks a piece by name (useful when pieces overlap)."],
     ["Field", "Changes what the selected piece shows (see the field list in 8.5)."],
@@ -621,6 +623,7 @@ story.append(table([
     ["Bring in an ILSA label", "Screen 1: Lookup Template &gt; choose the .rtm file"],
     ["See exact printer dots", "Screen 4: double-click the preview"],
     ["Save a changed label under a new name", "Designer: Save As… &gt; type the name &gt; OK"],
+    ["Try a layout change on paper before saving", "Designer: Test Print… &gt; pick the printer &gt; Print 1 Test Label"],
     ["Rename a template", "Screen 1: select it &gt; Rename Template (manager)"],
     ["Delete a template", "Screen 1: select it &gt; Delete Template (manager)"],
     ["Undo changes to the standard labels", "Screen 1: Restore Standard Labels"],
