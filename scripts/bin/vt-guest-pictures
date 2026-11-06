@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Pictures for the guest screen (Store Settings > Customer display > + Add a picture).
+"""Pictures and videos for the guest screen (Store Settings > Customer display > + Add a picture).
 
-  vt-guest-pictures list         copy the pictures from Dropbox (POS project/Guest Screen) to this Pi,
-                                 then print them as JSON: {folder, pictures: [{name, path, bytes,
-                                 modified, where}], error}
+  vt-guest-pictures list         copy the pictures and videos from Dropbox (POS project/Guest Screen)
+                                 to this Pi, then print them as JSON: {folder, pictures: [{name, path,
+                                 bytes, modified, where, kind}], error}; kind: "picture" or "video"
   vt-guest-pictures list --local the same, without asking Dropbox (only what's already here)
 
-Only picture files (JPEG, PNG, WebP; 25 MB at most) are copied, into ~/.cache/vt-guest-pictures.
-Pictures put by hand in ~/Pictures/Guest Screen (from a USB stick) are listed too.
+Only pictures (JPEG, PNG, WebP; 25 MB at most) and videos (MP4, MOV, M4V; 500 MB at most) are
+copied, into ~/.cache/vt-guest-pictures. Those put by hand in ~/Pictures/Guest Screen (from a USB
+stick) are listed too.
 Without Dropbox (no internet, rclone not set up) "error" says why and what's already here is listed.
 Runs nothing but rclone (mkdir, lsjson and copy of that one folder).
 """
@@ -24,6 +25,15 @@ CACHE = os.path.expanduser("~/.cache/vt-guest-pictures")
 BY_HAND = os.path.expanduser("~/Pictures/Guest Screen")
 KINDS = (".jpg", ".jpeg", ".png", ".webp")
 MAX_BYTES = 25 * 1024 * 1024
+VIDEO_KINDS = (".mp4", ".mov", ".m4v")
+MAX_VIDEO_BYTES = 500 * 1024 * 1024
+
+
+def fits(name, size):
+    """A picture of 25 MB at most or a video of 500 MB at most (by its name's ending), not empty."""
+    low = name.lower()
+    limit = MAX_BYTES if low.endswith(KINDS) else MAX_VIDEO_BYTES if low.endswith(VIDEO_KINDS) else 0
+    return 0 < size <= limit
 
 
 def rclone(*args, timeout=600):
@@ -53,13 +63,18 @@ def from_dropbox():
         entries = json.loads(out or "[]")
     except ValueError:
         return None, "Couldn't read the Dropbox folder's list."
-    names = {e.get("Name", "") for e in entries
-             if e.get("Name", "").lower().endswith(KINDS) and 0 < int(e.get("Size", 0) or 0) <= MAX_BYTES}
+    names = {e.get("Name", "") for e in entries if fits(e.get("Name", ""), int(e.get("Size", 0) or 0))}
     os.makedirs(CACHE, exist_ok=True)
     ok, _, why = rclone("copy", REMOTE, CACHE, "--max-depth", "1", "--max-size", "25M", "--ignore-case",
                         "--include", "*.{jpg,jpeg,png,webp}")
     if not ok:
         return names, "Some pictures couldn't be copied from Dropbox: " + why
+    # Then the videos (bigger, so more time). One still on its way has another name until it's all
+    # here (rclone's ".partial"), so it isn't listed half copied.
+    ok, _, why = rclone("copy", REMOTE, CACHE, "--max-depth", "1", "--max-size", "500M", "--ignore-case",
+                        "--include", "*.{mp4,mov,m4v}", timeout=15 * 60)
+    if not ok:
+        return names, "Some videos couldn't be copied from Dropbox: " + why
     return names, ""
 
 
@@ -71,14 +86,15 @@ def pictures(folder, where, only=None):
         return out
     for name in files:
         path = os.path.join(folder, name)
-        if not name.lower().endswith(KINDS) or name.startswith(".") or not os.path.isfile(path):
+        if not name.lower().endswith(KINDS + VIDEO_KINDS) or name.startswith(".") or not os.path.isfile(path):
             continue
         if only is not None and name not in only:
             continue   # taken out of Dropbox since it was copied
         st = os.stat(path)
-        if st.st_size == 0 or st.st_size > MAX_BYTES:
+        if not fits(name, st.st_size):
             continue
-        out.append({"name": name, "path": path, "bytes": st.st_size, "where": where,
+        kind = "video" if name.lower().endswith(VIDEO_KINDS) else "picture"
+        out.append({"name": name, "path": path, "bytes": st.st_size, "where": where, "kind": kind,
                     "modified": datetime.datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})
     return out
 

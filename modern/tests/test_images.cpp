@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "app/pos_service.hh"
+#include "guestslides.hh"
 #include "layout_fixture.hh"
 #include "layoutcontroller.hh"
 #include "pos_fixture.hh"
@@ -12,8 +13,10 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QUrl>
 
 #include <algorithm>
@@ -203,4 +206,86 @@ TEST_CASE("Guest screen pictures: one from the Dropbox folder is made to fit, ke
     CHECK(std::ranges::any_of(pos.changesToday(), [](const core::Change &ch) {
         return ch.after.find("guest-fall-sale.jpg") != std::string::npos;
     }));
+}
+
+TEST_CASE("Guest screen videos: one from the Dropbox folder is copied to Pictures and played in turn", "[images][guest][video]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    QDir(home.path()).mkpath(u".cache/vt-guest-pictures"_s);
+    QDir(home.path()).mkpath(u"Elsewhere"_s);
+    // A video copied from Dropbox (a name with a '#'), the same somewhere else, one of another kind.
+    const QByteArray bytes(64 * 1024, 'v');
+    auto write = [](const QString &path, const QByteArray &data) {
+        QFile f(path);
+        return f.open(QIODevice::WriteOnly) && f.write(data) == data.size();
+    };
+    const QString cached = home.filePath(u".cache/vt-guest-pictures/Fall Sale #1.mp4"_s);
+    REQUIRE(write(cached, bytes));
+    const QString elsewhere = home.filePath(u"Elsewhere/sale.mp4"_s);
+    REQUIRE(write(elsewhere, bytes));
+    const QString notVideo = home.filePath(u".cache/vt-guest-pictures/notes.avi"_s);
+    REQUIRE(write(notVideo, bytes));
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    PosService pos(test::seedPosData(), nullptr);
+    pos.shared()->settings.displaySlides = {"Welcome to the store"};
+    LayoutController c(*l);
+    c.setPos(&pos);
+
+    REQUIRE(pos.loginWithPin(u"1111"_s));                      // a server can't
+    CHECK(c.addGuestVideo(cached).isEmpty());
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.addGuestVideo(elsewhere).isEmpty());               // only from the guest screen's folders
+    CHECK(c.addGuestPicture(elsewhere).isEmpty());             // (the picture button's way too)
+    CHECK(c.addGuestVideo(home.filePath(u".cache/vt-guest-pictures/../../Elsewhere/sale.mp4"_s)).isEmpty());
+    CHECK(c.addGuestVideo(notVideo).isEmpty());                // MP4, MOV or M4V
+    // Through the picture button (the picker hands every file to it), as a file: link.
+    const QString line = c.addGuestPicture(QUrl::fromLocalFile(cached).toString());
+    const QString kept = QFileInfo(home.path()).canonicalFilePath() + u"/Pictures/Guest Screen/Fall Sale -1.mp4"_s;
+    for (int i = 0; i < 250 && !QFile::exists(kept); ++i)   // copied in the background
+        QTest::qWait(20);
+    // Again: still once on the list.
+    CHECK(c.addGuestVideo(cached) == line);
+    qputenv("HOME", oldHome);
+
+    CHECK(line == u"video:"_s + kept);                         // its sound off
+    CHECK(pos.shared()->settings.displaySlides == std::vector<std::string>{"Welcome to the store", line.toStdString()});
+    REQUIRE(QFile::exists(kept));
+    QFile copy(kept);
+    REQUIRE(copy.open(QIODevice::ReadOnly));
+    CHECK(copy.readAll() == bytes);                            // as it was, not made over
+    CHECK(pos.shared()->images.empty());                       // not in the store's pictures
+    CHECK_FALSE(QFile::exists(kept + u".part"_s));
+}
+
+TEST_CASE("Guest screen videos: the sound mark on a slide", "[guest][video]")
+{
+    using namespace vt::guest;
+    const QString path = u"/home/pi/Pictures/Guest Screen/sale.mp4"_s;
+    CHECK(videoSlide(path, false) == u"video:/home/pi/Pictures/Guest Screen/sale.mp4"_s);
+    CHECK(videoSlide(path, true) == u"video:/home/pi/Pictures/Guest Screen/sale.mp4#sound"_s);
+    const VideoSlide quiet = parseVideoSlide(videoSlide(path, false));
+    CHECK(quiet.path == path);
+    CHECK_FALSE(quiet.sound);
+    const VideoSlide loud = parseVideoSlide(videoSlide(path, true));
+    CHECK(loud.path == path);
+    CHECK(loud.sound);
+    CHECK(parseVideoSlide(u"Welcome!"_s).path.isEmpty());
+    CHECK(parseVideoSlide(u"image:store:guest-sale.jpg"_s).path.isEmpty());
+    // On, on again, off: one mark at most; other lines as they are.
+    CHECK(withSound(videoSlide(path, false), true) == videoSlide(path, true));
+    CHECK(withSound(videoSlide(path, true), true) == videoSlide(path, true));
+    CHECK(withSound(videoSlide(path, true), false) == videoSlide(path, false));
+    CHECK(withSound(u"Fall sale!"_s, true) == u"Fall sale!"_s);
+
+    // Store Settings' Sound switch.
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    LayoutController c(*l);
+    CHECK(c.guestVideoSound(videoSlide(path, false), true) == videoSlide(path, true));
+    CHECK(c.guestVideoSound(u"image:store:x.jpg"_s, true) == u"image:store:x.jpg"_s);
 }

@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** One Pi update and one tablet build for this afternoon's work.
 - **Files:** `modern/vt-modern-development-notes.md`
 - **Next person must know:** Next: guest-screen videos with per-video sound (bob/guest-videos, helper), Price book cleanup screen (bob/pricebook-screen, helper), then safe UPC swaps and the automatic ILSA sync.
+### 2026-11-06 16:16 ET — Bob (Claude) — Guest screen videos from Dropbox: listed, copied to Pictures, added to the slides
+- **What:** vt-guest-pictures now also copies videos (MP4, MOV, M4V, 500 MB at most) from Dropbox POS project/Guest Screen and lists them with kind video. LayoutController::addGuestVideo (addGuestPicture hands videos to it) copies the file unchanged into ~/Pictures/Guest Screen (in the background, under a .part name until done) and adds the slide video:<path>, sound off. guestslides.hh: the slide format (video:<path>, video:<path>#sound) with parse/format helpers; guestVideoSound() for the Sound switch. Catch2 tests.
+- **Why:** Owner (2026-11-06 16:01): videos in the guest screen's turn, with sound chosen per video.
+- **Files:** `modern/tests/test_images.cpp`, `modern/ui/cpp/guestslides.hh`, `modern/ui/cpp/layoutcontroller.hh`, `modern/ui/cpp/sitesetup.cpp`, `scripts/bin/vt-guest-pictures`
+- **Next person must know:** Videos are too big for the database's picture store, so they live as files in ~/Pictures/Guest Screen on the Pi only; tablets can't play them (no Qt Multimedia) and skip them. A '#' in a video's name becomes '-' (the #sound marker).
 
 ### 2026-11-06 15:07 ET — Bob (Claude) — Price book cleanup: --apply (owner approved the before/after sheet)
 - **What:** vt-pricebook-cleanup --apply: stops ViewTouch (SIGTERM, waits), copies viewtouch.db with SQLite's backup to ~/pricebook-cleanup/viewtouch-before-cleanup-<time>.db, in one transaction sets every suggested name and fills only empty length / ringGauge / ringGauge2 in menu_items' JSON, writes applied-<time>.csv (item id, before, after), starts ViewTouch again (vt-server). Rolls back and restarts on any error. Undo: stop ViewTouch, copy the backup over viewtouch.db, vt-server.

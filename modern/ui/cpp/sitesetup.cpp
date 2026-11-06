@@ -5,6 +5,7 @@
 //   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
 // Per Pi, never in Git and not in the database: the store-wide settings (printers, receipts, taxes)
 // stay in Store Settings.
+#include "guestslides.hh"
 #include "layoutcontroller.hh"
 
 #include <QBuffer>
@@ -25,6 +26,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QScreen>
+#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 #include <QWindow>
@@ -490,6 +492,14 @@ bool inGuestPictureFolder(const QString &path)
     return false;
 }
 
+const QStringList &guestVideoKinds()
+{
+    static const QStringList kinds{u"mp4"_s, u"mov"_s, u"m4v"_s};
+    return kinds;
+}
+
+constexpr qint64 kGuestVideoMaxBytes = 500LL * 1024 * 1024;
+
 } // namespace
 
 void LayoutController::refreshGuestPictures()
@@ -519,7 +529,7 @@ void LayoutController::refreshGuestPictures()
         emit siteChanged();
         proc->deleteLater();
     });
-    QTimer::singleShot(10 * 60 * 1000, proc, [proc] { proc->kill(); });
+    QTimer::singleShot(30 * 60 * 1000, proc, [proc] { proc->kill(); });   // videos from Dropbox take longer
     proc->start(u"python3"_s, {program, u"list"_s});
     ++siteRevision_;
     emit siteChanged();
@@ -543,6 +553,8 @@ QString LayoutController::addGuestPicture(const QString &fileOrUrl)
     }
     const QString path = fileOrUrl.startsWith(u"file:") ? QUrl(fileOrUrl).toLocalFile() : fileOrUrl;
     const QFileInfo info(path);
+    if (guestVideoKinds().contains(info.suffix().toLower()))
+        return addGuestVideo(path);
     if (!inGuestPictureFolder(path)) {
         setStatus(tr("Pictures for the guest screen come from Dropbox > POS project > Guest Screen."));
         return {};
@@ -598,4 +610,76 @@ QString LayoutController::addGuestPicture(const QString &fileOrUrl)
         self->pos_->adminSave(u"store"_s, 0, record);
     });
     return *refused ? QString() : line;
+}
+
+QString LayoutController::addGuestVideo(const QString &fileOrUrl)
+{
+    if (!pos_)
+        return {};
+    if (!pos_->can(u"manager"_s)) {
+        setStatus(tr("A manager adds videos to the guest screen."));
+        return {};
+    }
+    const QString path = fileOrUrl.startsWith(u"file:") ? QUrl(fileOrUrl).toLocalFile() : fileOrUrl;
+    const QFileInfo info(path);
+    if (!inGuestPictureFolder(path)) {
+        setStatus(tr("Videos for the guest screen come from Dropbox > POS project > Guest Screen."));
+        return {};
+    }
+    if (!guestVideoKinds().contains(info.suffix().toLower()) || info.size() <= 0 || info.size() > kGuestVideoMaxBytes) {
+        setStatus(tr("The guest screen plays MP4, MOV or M4V videos of 500 MB at most."));
+        return {};
+    }
+    // Kept in ~/Pictures/Guest Screen as it is (never made over), by its own name: without a '#'
+    // ("#sound" marks a video with its sound) and without spaces at the ends (lines are trimmed).
+    QDir keep(guestPictureFolders().last());
+    if (!keep.mkpath(u"."_s)) {
+        setStatus(tr("Can't make the folder %1.").arg(keep.path()));
+        return {};
+    }
+    const QString name = info.fileName().replace(u'#', u'-').trimmed();
+    const QString source = info.canonicalFilePath();
+    const QString target = QFileInfo(keep.absolutePath()).canonicalFilePath() + u'/' + name;
+    const QFileInfo kept(target);
+    if (target != source && !(kept.exists() && kept.size() == info.size())) {
+        // A big file: copied off the screen's thread, under another name until it's all there (the
+        // guest screen skips a video it can't open yet, and tries again later).
+        setStatus(tr("Copying %1 to Pictures/Guest Screen; it plays once it's there.").arg(name));
+        QPointer<LayoutController> self(this);
+        QThreadPool::globalInstance()->start([self, source, target, name] {
+            const QString part = target + u".part"_s;
+            QFile::remove(part);
+            bool ok = QFile::copy(source, part);
+            if (ok) {
+                QFile::remove(target);
+                ok = QFile::rename(part, target);
+            }
+            if (!ok)
+                QFile::remove(part);
+            QMetaObject::invokeMethod(self, [self, name, ok] {
+                if (self)
+                    self->setStatus(ok ? tr("%1 is ready for the guest screen.").arg(name)
+                                       : tr("Couldn't copy %1 to Pictures/Guest Screen. Is the Pi's card full?").arg(name));
+            }, Qt::QueuedConnection);
+        });
+    }
+    // On the list of slides (sound off), saved as a manager's change; one there already stays as it is.
+    const QVariantList records = pos_->adminRecords(u"store"_s);
+    if (records.isEmpty())
+        return {};
+    QVariantMap record = records.first().toMap();
+    QStringList slides = record.value(u"displaySlides"_s).toString().split(u'\n', Qt::SkipEmptyParts);
+    for (const QString &slide : slides)
+        if (vt::guest::parseVideoSlide(slide.trimmed()).path == target)
+            return slide.trimmed();
+    const QString line = vt::guest::videoSlide(target, false);
+    slides << line;
+    record.insert(u"displaySlides"_s, slides.join(u'\n'));
+    pos_->adminSave(u"store"_s, 0, record);
+    return line;
+}
+
+QString LayoutController::guestVideoSound(const QString &slide, bool sound) const
+{
+    return vt::guest::withSound(slide, sound);
 }

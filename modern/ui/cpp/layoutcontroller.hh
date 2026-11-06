@@ -120,14 +120,21 @@ public:
     // Guest screen pictures (Store Settings > Customer display > + Add a picture, sitesetup.cpp):
     // refreshGuestPictures() copies them from Dropbox > POS project > Guest Screen (vt-guest-pictures
     // list, in the background; siteChanged when done); guestPictures() is what it last found:
-    // {folder, pictures: [{name, path, bytes, modified, where}], error, busy}.
+    // {folder, pictures: [{name, path, bytes, modified, where, kind: picture | video}], error, busy}.
     Q_INVOKABLE void refreshGuestPictures();
     Q_INVOKABLE QVariantMap guestPictures() const;
     // One of those pictures (a file in ~/.cache/vt-guest-pictures or ~/Pictures/Guest Screen, nowhere
     // else): made to fit 1920x1080, kept by the store as "guest-<name>.jpg" and added to the guest
     // screen's slides (Store Settings, saved as a manager's change). Returns its slide line
     // ("image:store:guest-<name>.jpg"), or "" (the status line says why). Managers.
+    // A video (MP4, MOV, M4V) goes to addGuestVideo.
     Q_INVOKABLE QString addGuestPicture(const QString &fileOrUrl);
+    // A video from those folders (500 MB at most): copied as it is into ~/Pictures/Guest Screen (too
+    // big for the store's pictures; in the background when it comes from the Dropbox copy) and added
+    // to the slides as "video:<that path>", its sound off (guestslides.hh). Returns the line, or "".
+    Q_INVOKABLE QString addGuestVideo(const QString &fileOrUrl);
+    // A video slide's line with its sound on or off (Store Settings' Sound switch); others as they are.
+    Q_INVOKABLE QString guestVideoSound(const QString &slide, bool sound) const;
     int siteRevision() const { return siteRevision_; }
 
     // Persists a layout; false (with a message) when it could not.
