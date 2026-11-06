@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:21 ET — Bob (Claude) — Backup restore: never leaves the store without a database
+- **What:** Ported upstream 7833c83 (backup.cpp only). The data set aside before a restore always gets a name nobody else has, and if the database, its -wal or its -shm can't be moved aside, the ones already moved are put back.
+- **Why:** Two restores in the same second clashed, and a half-finished move could leave the store with no database, so the next start would begin an empty one.
+- **Files:** `modern/storage/backup.cpp`
+
 ### 2026-11-06 11:04 ET — Bob (Claude) — Release: main moved up to bob/big-catalog
 - **What:** main fast-forwarded from 9f879118 to the bob/big-catalog head (DOB reprint choices, ID line and 'ID expired' on receipts, exception pictures with DOB, gift receipts *****, ~/.vt-run.log, vt-tablets 3-minute timeout, vt-guest-display on HDMI-X). CI run 42246143289 (ff8d33a1): the same 28 failing test cases / 31 failing lines as main's run 42234138120, nothing new. The tablet APK is built from this commit so its build number matches the server's.
 - **Why:** Part Two step 2: put the branch on the Pi and the tablets; the register monitor choice needs vt-guest-display on HDMI-X.
