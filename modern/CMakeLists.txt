@@ -259,6 +259,7 @@ if(Qt6_FOUND)
             ui/cpp/cardreader.hh ui/cpp/cardreader.cpp
             ui/cpp/serialscanner.hh ui/cpp/serialscanner.cpp
             ui/cpp/posforeign.hh
+            ui/cpp/guestslides.hh
     )
     target_include_directories(vtm_ui PUBLIC ui/cpp)
     target_link_libraries(vtm_ui PUBLIC vtm_layout vtm_editor vtm_storage vtm_pos vtm_print vtm_net Qt6::Gui Qt6::Quick Qt6::QuickControls2)
@@ -266,7 +267,7 @@ if(Qt6_FOUND)
     #   Raspberry Pi OS / Debian: sudo apt install qt6-multimedia-dev qml6-module-qtmultimedia
     if(TARGET Qt6::Multimedia)
         message(STATUS "Qt Multimedia found: the customer display can play video")
-        qt_target_qml_sources(vtm_ui QML_FILES ui/qml/VideoPanel.qml)
+        qt_target_qml_sources(vtm_ui QML_FILES ui/qml/VideoPanel.qml ui/qml/GuestVideoSlide.qml)
         target_link_libraries(vtm_ui PUBLIC Qt6::Multimedia)
         target_compile_definitions(vtm_ui PUBLIC VT_HAVE_VIDEO=1)
     else()

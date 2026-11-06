@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls.Fusion
 import QtQuick.Layouts
 
-// The guest screen's pictures, chosen by touch (Store Settings > Customer display > + Add a picture):
+// The guest screen's pictures and videos (a ▶ tile), chosen by touch (Store Settings > Customer display > + Add a picture):
 // the pictures in Dropbox > POS project > Guest Screen, copied to the Pi when this opens
 // (LayoutController.refreshGuestPictures, vt-guest-pictures), and any in ~/Pictures/Guest Screen.
 // Touching one picks it.
@@ -34,7 +34,7 @@ Popup {
         RowLayout {
             spacing: 10
             Label {
-                text: qsTr("Pictures in Dropbox > POS project > Guest Screen")
+                text: qsTr("Pictures and videos in Dropbox > POS project > Guest Screen")
                 font.pixelSize: 22
                 font.bold: true
                 color: "white"
@@ -62,9 +62,9 @@ Popup {
             wrapMode: Text.WordWrap
             color: picker.busy ? "#aab3c2" : "#f5b940"
             font.pixelSize: 16
-            text: picker.busy ? qsTr("Copying the pictures from Dropbox…")
+            text: picker.busy ? qsTr("Copying the pictures and videos from Dropbox…")
                 : (picker.found.error ?? "") !== "" ? picker.found.error
-                : picker.files.length === 0 ? qsTr("No pictures yet. Put JPEG pictures in Dropbox > POS project > Guest Screen (from a computer or the iPhone), then touch Look again.")
+                : picker.files.length === 0 ? qsTr("No pictures or videos yet. Put JPEG pictures or MP4 videos in Dropbox > POS project > Guest Screen (from a computer or the iPhone), then touch Look again.")
                 : ""
         }
         GridView {
@@ -84,15 +84,36 @@ Popup {
                     anchors { fill: parent; margins: 6 }
                     radius: 8
                     color: tap.pressed ? "#2f6fd6" : "#262c35"
+                    readonly property bool video: modelData.kind === "video"
                     Image {
                         id: thumb
                         anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
                         height: Math.round(width * 0.5625)   // as the guest screen: 16:9
-                        source: "file://" + modelData.path
+                        visible: !parent.video
+                        source: parent.video ? "" : "file://" + modelData.path
                         sourceSize.width: 320
                         sourceSize.height: 180
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
+                    }
+                    // A video: a plain tile with ▶ (no picture of it is made).
+                    Rectangle {
+                        anchors.fill: thumb
+                        visible: parent.video
+                        color: "#10141a"
+                        radius: 6
+                        Label {
+                            anchors.centerIn: parent
+                            text: "▶"
+                            color: "white"
+                            font.pixelSize: Math.round(parent.height * 0.45)
+                        }
+                        Label {
+                            anchors { right: parent.right; bottom: parent.bottom; margins: 6 }
+                            text: qsTr("Video")
+                            color: "#aab3c2"
+                            font.pixelSize: 13
+                        }
                     }
                     Label {
                         anchors { left: parent.left; right: parent.right; top: thumb.bottom; margins: 6 }

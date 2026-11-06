@@ -618,7 +618,7 @@ ColumnLayout {
     // joined with field.join. field.max rows; field.addText on the add button.
     // field.addPicture: a second button's text, for a guest screen picture from
     // Dropbox (controller.addGuestPicture); a row "image:..." then shows the
-    // picture and its name.
+    // picture and its name, a row "video:..." its name and a Sound switch.
     Component {
         id: rowsField
         ColumnLayout {
@@ -690,7 +690,51 @@ ColumnLayout {
                             Layout.fillWidth: !modelData.width
                             Layout.preferredWidth: modelData.width ?? -1
                             sourceComponent: modelData.type === "enum" ? cellCombo
-                                           : fe.field.addPicture && cell.cellValue.startsWith("image:") ? cellPicture : cellText
+                                           : fe.field.addPicture && cell.cellValue.startsWith("image:") ? cellPicture
+                                           : fe.field.addPicture && cell.cellValue.startsWith("video:") ? cellVideo : cellText
+                            // A video ("video:/home/pi/Pictures/Guest Screen/sale.mp4", "#sound" at the end
+                            // when it plays with its sound; guestslides.hh): its name and a Sound switch.
+                            Component {
+                                id: cellVideo
+                                RowLayout {
+                                    id: videoRow
+                                    objectName: "rowVideo"
+                                    spacing: 8
+                                    readonly property bool sound: cell.cellValue.endsWith("#sound")
+                                    Rectangle {
+                                        implicitWidth: 78
+                                        implicitHeight: 44
+                                        color: "#10141a"
+                                        border.color: EditorStyle.muted
+                                        radius: 4
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "▶ " + qsTr("Video")
+                                            color: EditorStyle.text
+                                            font.pixelSize: 13
+                                        }
+                                    }
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: cell.cellValue.slice(6).replace(/#sound$/, "").split("/").pop()
+                                        elide: Text.ElideMiddle
+                                        color: EditorStyle.text
+                                    }
+                                    // Its sound on the guest monitor's speakers (muted while a check is open).
+                                    Switch {
+                                        objectName: "rowVideoSound"
+                                        Layout.minimumHeight: Math.max(fe.minHeight, 64)
+                                        implicitHeight: 64
+                                        text: qsTr("Sound")
+                                        checked: videoRow.sound
+                                        enabled: !fe.readOnly && !!fe.controller
+                                        onToggled: {
+                                            cell.put(fe.controller.guestVideoSound(cell.cellValue, checked))
+                                            rowsBox.rows = rowsBox.rows.slice()   // this row's line as it is now
+                                        }
+                                    }
+                                }
+                            }
                             // A picture: small, with its name ("image:store:guest-sale.jpg" -> guest-sale.jpg).
                             Component {
                                 id: cellPicture

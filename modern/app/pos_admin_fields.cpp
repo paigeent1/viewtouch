@@ -502,12 +502,13 @@ QVariantList PosService::adminFields(const QString &panel)
                      "between guests. Screens that can't play video show the picture above.")),
             // "addPicture": a second button, for a picture from Dropbox (FieldEditor's guest picture picker).
             with(asRows(field(u"displaySlides"_s, tr("Customer display: between guests"), u"text"_s,
-                              tr("Shown in turn on the guest screen: each message 7 seconds, each picture 10. "
-                                 "+ Add a picture shows the pictures in Dropbox > POS project > Guest Screen (put "
-                                 "them there from a computer or the iPhone). Running promotions are added by "
-                                 "themselves.")),
+                              tr("Shown in turn on the guest screen: each message 7 seconds, each picture 10, each "
+                                 "video until it ends (with Sound on, on the guest monitor's speakers; muted while "
+                                 "a check is open). + Add a picture or video shows the ones in Dropbox > POS "
+                                 "project > Guest Screen (put them there from a computer or the iPhone). Running "
+                                 "promotions are added by themselves.")),
                         tr("+ Add a message")),
-                 u"addPicture"_s, tr("+ Add a picture")),
+                 u"addPicture"_s, tr("+ Add a picture or video")),
             with(with(with(asRows(field(u"tipPercents"_s, tr("Tip choices for guests (%)"), u"text"_s,
                                         tr("Shown on the customer display, up to 6.")),
                                   tr("+ Add a tip choice"), {column(tr("Percent"), "int", 120, {}, u"18"_s)},

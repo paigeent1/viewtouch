@@ -112,37 +112,103 @@ Rectangle {
             // Between guests: the whole screen; during a sale: the two thirds beside the order.
             anchors { left: d.hasCheck || d.panelShown ? orderPanel.right : parent.left; right: parent.right; top: parent.top; bottom: parent.bottom }
             visible: (!d.thanking || d.hasCheck) && !d.usePage
+            // The slides (guestslides.hh): a message; "image:<ref>" a picture; "video:<path>" a video
+            // played once to its end, muted; "video:<path>#sound" the same with its sound.
             readonly property var slides: d.prompt.slides ?? []
             property int index: 0
-            // Each message 7 seconds, each picture 10.
+            // A video plays on while a check is open (and while the thank-you covers this), only
+            // without its sound: the turn never stops for a sale.
+            readonly property bool quiet: d.hasCheck || !idle.visible
+            // Videos this screen can't play (no Qt Multimedia: all; else the ones that failed, tried
+            // again every 10 minutes) are skipped, so the turn never sticks on one.
+            property bool videoOff: false
+            property var badVideos: ({})
+            function usable(s) { return !s.startsWith("video:") || (!videoOff && !badVideos[s]) }
+            // The next slide that can show (the same one when it's the only one).
+            function next() {
+                const n = slides.length
+                for (let k = 1; k <= n; ++k) {
+                    const j = (index + k) % n
+                    if (usable(slides[j])) { index = j; return }
+                }
+            }
+            function videoFailed() {
+                const bad = Object.assign({}, badVideos)
+                bad[slide.current] = true
+                badVideos = bad
+                fade.restart()
+            }
+            // Each message 7 seconds, each picture 10; a video until it ends.
             Timer {
                 interval: slide.picture ? 10000 : 7000
-                running: idle.visible && idle.slides.length > 1
+                running: !d.usePage && idle.slides.length > 1 && !slide.video
                 repeat: true
                 onTriggered: { fade.restart() }
+            }
+            // A video that never says it ended: on after 10 minutes anyway.
+            Timer {
+                id: videoCap
+                interval: 10 * 60 * 1000
+                running: !d.usePage && slide.video
+                onTriggered: fade.restart()
+            }
+            Timer {
+                interval: 10 * 60 * 1000
+                running: Object.keys(idle.badVideos).length > 0
+                repeat: true
+                onTriggered: idle.badVideos = ({})
             }
             SequentialAnimation {
                 id: fade
                 NumberAnimation { target: slide; property: "opacity"; to: 0; duration: 350 }
-                ScriptAction { script: idle.index = (idle.index + 1) % Math.max(1, idle.slides.length) }
+                ScriptAction {
+                    script: {
+                        idle.next()
+                        videoCap.restart()
+                        // The same video again (the only one that can show): from the start.
+                        if (slide.video && videoSlide.item)
+                            videoSlide.item.play(slide.videoUrl)
+                    }
+                }
                 NumberAnimation { target: slide; property: "opacity"; to: 1; duration: 350 }
             }
             Item {
                 id: slide
                 anchors.fill: parent
                 anchors.margins: d.unit * 2
-                readonly property string current: idle.slides.length ? idle.slides[idle.index % idle.slides.length] : ""
+                readonly property string shown: idle.slides.length ? idle.slides[idle.index % idle.slides.length] : ""
+                // One that can't show (a video this screen can't play): the store's name instead.
+                readonly property string current: idle.usable(shown) ? shown : ""
                 readonly property bool picture: current.startsWith("image:")
+                readonly property bool video: current.startsWith("video:")
+                readonly property bool sound: video && current.endsWith("#sound")
+                // "file://" and the path, each part spelled for a link (a name with a space or a "?").
+                readonly property string videoUrl: !video ? "" : "file://" + current.slice(6, sound ? -6 : undefined).split("/").map(encodeURIComponent).join("/")
                 Image {
                     anchors.fill: parent
                     visible: slide.picture
                     fillMode: Image.PreserveAspectFit
                     source: !slide.picture ? "" : d.img(slide.current.slice(6))
                 }
+                // A video: GuestVideoSlide.qml, where this screen has Qt Multimedia.
+                Loader {
+                    id: videoSlide
+                    anchors.fill: parent
+                    active: slide.video && !idle.videoOff && !d.usePage
+                    source: active ? "GuestVideoSlide.qml" : ""
+                    onStatusChanged: if (status === Loader.Error) { idle.videoOff = true; fade.restart() }
+                    onLoaded: {
+                        item.sound = Qt.binding(() => slide.sound)
+                        item.muted = Qt.binding(() => idle.quiet)
+                        item.finished.connect(() => fade.restart())
+                        item.failed.connect(() => idle.videoFailed())
+                        item.play(slide.videoUrl)
+                    }
+                }
                 ColumnLayout {
                     anchors.centerIn: parent
                     width: parent.width
-                    visible: !slide.picture
+                    visible: !slide.picture && !slide.video
                     spacing: d.unit
                     Text {
                         Layout.fillWidth: true
