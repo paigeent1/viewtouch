@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 15:07 ET — Bob (Claude) — Price book cleanup: --apply (owner approved the before/after sheet)
+- **What:** vt-pricebook-cleanup --apply: stops ViewTouch (SIGTERM, waits), copies viewtouch.db with SQLite's backup to ~/pricebook-cleanup/viewtouch-before-cleanup-<time>.db, in one transaction sets every suggested name and fills only empty length / ringGauge / ringGauge2 in menu_items' JSON, writes applied-<time>.csv (item id, before, after), starts ViewTouch again (vt-server). Rolls back and restarts on any error. Undo: stop ViewTouch, copy the backup over viewtouch.db, vt-server.
+- **Why:** Owner 2026-11-06 14:58 approved names-before-after.csv (745 names; 17,969 sizes from names) and said push it; the cleanup screen (bob/pricebook-screen) isn't ready, so this applies the same rules from the terminal.
+- **Files:** `scripts/bin/vt-pricebook-cleanup`
+- **Next person must know:** The importer only fills empty fields of existing items, so ILSA re-imports keep these names; the automatic ILSA sync (next) must keep them too.
+
 ### 2026-11-06 14:26 ET — Bob (Claude) — Register window: placed on the main monitor by its exact place; no refit loop
 - **What:** main.cpp present(): the register window gets setScreen(primary) and setGeometry(primary's geometry) before showFullScreen, at start and on every refit. Refit: one 800 ms timer for several screen changes at once; skipped when the window is already full screen on the primary; screen changes it causes itself (1.5 s) ignored; after 4 tries in a minute it stops and logs 'Couldn't keep the register full screen on <monitor>'.
 - **Why:** Owner 2026-11-06 14:24: register on the small (guest) monitor 'giggling', desktop on the big one, though HDMI-1 (big) was primary. The refit (screenChanged -> setScreen(main) -> showNormal -> showFullScreen) restored the window's old place on the other monitor, the desktop fullscreened it there, screenChanged fired again: an endless loop.
