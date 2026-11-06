@@ -191,7 +191,7 @@ Item {
                         Tool { objectName: "learnTouch"; text: qsTr("Learn guest touchscreen"); enabled: w.admin && (w.site.guestDisplay ?? false); onClicked: w.run("learn-touch") }
                         Caption { text: w.site.guestTouchPort ? qsTr("Guest touchscreen: USB port %1").arg(w.site.guestTouchPort)
                                                               : qsTr("Guest touchscreen not learned yet.") }
-                        Tool { text: qsTr("Messages and pictures (Store Settings)"); onClicked: w.controller.jumpTo("admin-store") }
+                        Tool { text: qsTr("Messages and pictures (Store Settings)"); onClicked: { w.controller.setWidgetState("adminSection:store", "display"); w.controller.jumpTo("admin-store") } }   // at Customer display
                     }
                 }
 
