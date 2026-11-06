@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.1"
+__version__ = "1.2"
 import re
 """
 ViewTouch Label Utility - label printing with full bitmap rendering.
@@ -745,12 +745,85 @@ def _fmt_flast(full_name, first="", last=""):
         return f"{parts[0][0].upper()} {parts[-1].upper()}"
     return parts[0].upper() if parts else "M MANAGER"
 
+# Written by ViewTouch at each login (app/pos_service.cpp loginWithPin): line 1 the person's name, line 2
+# "manager" or "staff" (older ViewTouch builds wrote only the name).
+ACTIVE_EMPLOYEE_FILES = ("/tmp/vt_active_employee.txt", os.path.expanduser("~/.local/share/ViewTouch/active_employee.txt"))
+
+def _active_employee_lines():
+    for p in ACTIVE_EMPLOYEE_FILES:
+        try:
+            if os.path.exists(p):
+                with open(p, encoding="utf-8") as f:
+                    lines = [ln.strip() for ln in f.read().splitlines()]
+                if lines and lines[0]:
+                    return lines
+        except Exception:
+            pass
+    return []
+
+def logged_in_role():
+    """'manager' or 'staff' for the person logged in to ViewTouch, or '' when it can't be known.
+
+    ViewTouch passes VT_LABEL_ROLE when it opens the utility (ui/cpp/layoutcontroller.cpp, the same
+    can("manager") test as its manager screens); otherwise line 2 of the active-employee file."""
+    role = os.environ.get("VT_LABEL_ROLE", "").strip().lower()
+    if role in ("manager", "staff"):
+        return role
+    lines = _active_employee_lines()
+    if len(lines) >= 2 and lines[1].lower() in ("manager", "staff"):
+        return lines[1].lower()
+    return ""
+
+def _employee_can_manage(d):
+    """The employee's "manager" permission as ViewTouch works it out (core/employee.hh permissions():
+    their role's permissions, plus allow, minus deny)."""
+    perms = {"manager"} if str(d.get("role", "server")) in ("manager", "admin") else set()
+    if "manager" in (d.get("allow") or []):
+        perms.add("manager")
+    if "manager" in (d.get("deny") or []):
+        perms.discard("manager")
+    return "manager" in perms
+
+def manager_pin_ok(pin):
+    """True when an active ViewTouch employee with manager rights has this PIN, False when none has,
+    None when it can't be checked (viewtouch.db unreadable or no manager PINs in it).
+
+    viewtouch.db is opened read-only. ViewTouch keeps only SHA-256(salt + PIN) per employee
+    (app/pos_json.cpp hashPin); the PIN typed here is compared the same way and never kept or logged."""
+    import hashlib, hmac
+    if not pin:
+        return False
+    try:
+        con = sqlite3.connect(f"file:{VT_DB_PATH}?mode=ro", uri=True, timeout=1.5)
+        try:
+            rows = con.execute("SELECT json FROM employees").fetchall()
+        finally:
+            con.close()
+    except Exception:
+        return None
+    checked = False
+    for (raw,) in rows:
+        try:
+            d = json.loads(raw)
+        except Exception:
+            continue
+        salt, want = d.get("pinSalt"), d.get("pinHash")
+        if not (isinstance(salt, str) and isinstance(want, str) and want):
+            continue
+        if not d.get("active", True) or not _employee_can_manage(d):
+            continue
+        checked = True
+        got = hashlib.sha256(salt.encode("utf-8") + str(pin).encode("utf-8")).hexdigest()
+        if hmac.compare_digest(got, want.strip().lower()):
+            return True
+    return False if checked else None
+
 def get_logged_in_initials(default="M MANAGER"):
     try:
-        for p in ("/tmp/vt_active_employee.txt", os.path.expanduser("~/.local/share/ViewTouch/active_employee.txt")):
-            if os.path.exists(p):
-                val = _fmt_flast(open(p, encoding="utf-8").read().strip())
-                if val: return val
+        lines = _active_employee_lines()
+        if lines:
+            val = _fmt_flast(lines[0])
+            if val: return val
         con = sqlite3.connect(f"file:{VT_DB_PATH}?mode=ro", uri=True, timeout=1.5)
         for (raw,) in con.execute("SELECT json FROM employees").fetchall():
             d = json.loads(raw)
@@ -1954,6 +2027,7 @@ class ReportDesignerWindow(tk.Toplevel):
         make_vt_btn(tbar1, text="✖ Close", bg="#dc2626", fg="#ffffff", font=("Sans", 10, "bold"), width=12, pady=6, radius=12, command=self.on_close_request).pack(side="right", padx=8, pady=2)
 
         make_vt_btn(tbar1, text="Save", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_and_close).pack(side="left", padx=4, pady=2)
+        make_vt_btn(tbar1, text="Save As…", bg="#15803d", fg="#ffffff", font=("Sans", 10, "bold"), width=9, pady=6, radius=12, command=self.save_as).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↶ Undo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.undo).pack(side="left", padx=2, pady=2)
         make_vt_btn(tbar1, text="↷ Redo", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), width=7, pady=6, radius=12, command=self.redo).pack(side="left", padx=2, pady=2)
 
@@ -2408,6 +2482,23 @@ class ReportDesignerWindow(tk.Toplevel):
         self.canvas.focus_set()
         self._redraw_canvas()
 
+    def save_as(self):
+        """Save the edits as a new template under a new name; the template opened stays as it was saved.
+        The designer then goes on with the new template (Save saves to it)."""
+        existing = list(getattr(self.master, "templates", {}).keys())
+        new = ask_template_name(self, "Save As…", f"Save these changes as a new template.\n'{self.tpl_name}' stays as it was last saved.",
+                                f"{self.tpl_name} COPY", existing)
+        if not new:
+            return
+        old = self.tpl_name
+        self.tpl_name = new
+        self.on_save_callback(new, self.tpl)
+        self._orig_tpl_json = json.dumps(self.tpl, sort_keys=True)
+        self.title(f"Label Utility — Report Designer - [{new}]")
+        self.status_var.set(f"✓ Saved as '{new}' ('{old}' unchanged). You are now editing '{new}'.")
+        self.canvas.focus_set()
+        self._redraw_canvas()
+
 # --- Main 4-Step ViewTouch Label Utility ---
 class VTRoundedButton(tk.Canvas):
     """ViewTouch-style rounded button with drop shadow, tactile press, and instant touchscreen response."""
@@ -2693,6 +2784,114 @@ def make_vt_btn(parent, text, command=None, bg="#1d4ed8", fg="#ffffff", font=("S
     )
 
 
+def ask_template_name(parent, title, prompt, initial, existing, current=None):
+    """Ask for a template name (upper case, like the others). Refuses an empty name and one already used
+    (any letter case); `current` is the template's own name when renaming. Returns the name or None."""
+    taken = {str(n).strip().upper() for n in existing if n != current}
+    result = {"name": None}
+    dlg = tk.Toplevel(parent)
+    dlg.title(title)
+    dlg.configure(bg="#1e293b")
+    dlg.transient(parent)
+    dlg.attributes("-topmost", True)
+    tk.Label(dlg, text=prompt, bg="#1e293b", fg="#f8fafc", font=("Sans", 11, "bold"), wraplength=460, justify="center").pack(padx=20, pady=(18, 8))
+    name_var = tk.StringVar(value=initial)
+    ent = tk.Entry(dlg, textvariable=name_var, font=("Sans", 12, "bold"), width=34, justify="center")
+    ent.pack(padx=20, pady=4)
+    ent.select_range(0, "end")
+    msg = tk.Label(dlg, text="", bg="#1e293b", fg="#fca5a5", font=("Sans", 10, "bold"), wraplength=460)
+    msg.pack(pady=(4, 0))
+
+    def on_ok(*_a):
+        new = name_var.get().strip().upper()
+        if not new:
+            msg.config(text="Type a name first."); return
+        if current is not None and new == str(current).strip().upper():
+            msg.config(text="That is already its name."); return
+        if new in taken:
+            msg.config(text=f"A template named '{new}' already exists. Choose another name."); return
+        result["name"] = new
+        dlg.destroy()
+
+    ent.bind("<Return>", on_ok)
+    bf = tk.Frame(dlg, bg="#1e293b")
+    bf.pack(pady=14)
+    make_vt_btn(bf, text="OK", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=10, command=on_ok).pack(side="left", padx=8)
+    make_vt_btn(bf, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 10, "bold"), width=10, command=dlg.destroy).pack(side="left", padx=8)
+    dlg.after_idle(lambda: fit_dialog(dlg, 500, 210))
+    dlg.update_idletasks(); dlg.lift(); ent.focus_force()
+    parent.wait_window(dlg)
+    return result["name"]
+
+
+# Wrong manager PINs typed in this run: after 5 in a row the PIN box waits a minute (like ViewTouch's PIN guard).
+_MANAGER_PIN_GUARD = {"wrong": 0, "wait_until": 0.0}
+
+def ask_manager_pin(parent, what, on_ok):
+    """Someone who isn't a manager tapped a manager-only button: say so, and let a manager type their
+    ViewTouch PIN to allow it this once (on_ok runs after a correct PIN). The PIN is never kept or logged."""
+    import time
+    dlg = tk.Toplevel(parent)
+    dlg.title("Manager Needed")
+    dlg.configure(bg="#1e293b")
+    dlg.transient(parent)
+    dlg.attributes("-topmost", True)
+    tk.Label(dlg, text="🔒 Manager needed", bg="#1e293b", fg="#fbbf24", font=("Sans", 13, "bold")).pack(pady=(14, 4))
+    tk.Label(dlg, text=f"Only a manager can {what}.\nPicking a template and printing labels works for everyone.\n\n"
+                      "A manager can type their ViewTouch PIN to allow it this once:",
+             bg="#1e293b", fg="#f8fafc", font=("Sans", 10, "bold"), wraplength=400, justify="center").pack(padx=16, pady=(0, 8))
+    pin_var = tk.StringVar(value="")
+    ent = tk.Entry(dlg, textvariable=pin_var, show="•", font=("Sans", 16, "bold"), width=12, justify="center")
+    ent.pack(pady=4)
+    msg = tk.Label(dlg, text="", bg="#1e293b", fg="#fca5a5", font=("Sans", 10, "bold"), wraplength=400, justify="center")
+    msg.pack(pady=(2, 4))
+
+    def check(*_a):
+        pin = pin_var.get().strip()
+        pin_var.set("")
+        wait = _MANAGER_PIN_GUARD["wait_until"] - time.time()
+        if wait > 0:
+            msg.config(text=f"Too many wrong PINs: try again in {int(wait) + 1} seconds."); return
+        if not pin:
+            msg.config(text="Type the manager's PIN."); return
+        ok = manager_pin_ok(pin)
+        pin = ""
+        if ok is None:
+            msg.config(text="The manager PIN can't be checked on this computer (ViewTouch's staff list can't be read), "
+                            "so this isn't allowed. A manager can log in to ViewTouch and open the Label Utility."); return
+        if not ok:
+            _MANAGER_PIN_GUARD["wrong"] += 1
+            if _MANAGER_PIN_GUARD["wrong"] >= 5:
+                _MANAGER_PIN_GUARD["wrong"] = 0
+                _MANAGER_PIN_GUARD["wait_until"] = time.time() + 60
+                msg.config(text="Too many wrong PINs: try again in a minute.")
+            else:
+                msg.config(text="That is not a manager's PIN.")
+            return
+        _MANAGER_PIN_GUARD["wrong"] = 0
+        dlg.destroy()
+        on_ok()
+
+    pad = tk.Frame(dlg, bg="#1e293b")
+    pad.pack(pady=4)
+    keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"]
+    for i, k in enumerate(keys):
+        if k == "Clear":
+            cmd = lambda: pin_var.set("")
+        elif k == "⌫":
+            cmd = lambda: pin_var.set(pin_var.get()[:-1])
+        else:
+            cmd = lambda d=k: pin_var.set(pin_var.get() + d)
+        make_vt_btn(pad, text=k, bg="#334155", fg="#ffffff", font=("Sans", 12, "bold"), width=5, pady=6, command=cmd).grid(row=i // 3, column=i % 3, padx=3, pady=3)
+    ent.bind("<Return>", check)
+    bf = tk.Frame(dlg, bg="#1e293b")
+    bf.pack(pady=(6, 14))
+    make_vt_btn(bf, text="✓ Allow", bg="#16a34a", fg="#ffffff", font=("Sans", 10, "bold"), width=10, command=check).pack(side="left", padx=8)
+    make_vt_btn(bf, text="Cancel", bg="#475569", fg="#ffffff", font=("Sans", 10, "bold"), width=10, command=dlg.destroy).pack(side="left", padx=8)
+    dlg.after_idle(lambda: fit_dialog(dlg, 440, 560))
+    dlg.update_idletasks(); dlg.lift(); ent.focus_force()
+
+
 class VTLabelUtility(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -2705,6 +2904,9 @@ class VTLabelUtility(tk.Tk):
         self.filtered_items = list(self.all_items)
         self.current_step = 1
         self.preview_idx = 0
+        # Only managers change templates (edit, create, rename, delete, import, restore); everyone can print.
+        self.user_role = logged_in_role()
+        _trace.info("logged-in role: %s", self.user_role or "unknown")
 
         self.header_banner = tk.Label(
             self,
@@ -2754,6 +2956,22 @@ class VTLabelUtility(tk.Tk):
                     return True
         self.header_banner.config(text=f"ViewTouch Label Utility — UPC {code} was not found in viewtouch.db. Choose your option...")
         return False
+
+    def is_manager(self):
+        return self.user_role == "manager"
+
+    def manager_label(self, text):
+        """A manager-only button's text: plain for a manager, with "(manager)" under it for everyone else."""
+        return text if self.is_manager() else f"{text}\n(manager)"
+
+    def manager_only(self, what, action):
+        """A button command that runs `action` for a manager; anyone else gets the manager-PIN box."""
+        def run():
+            if self.is_manager():
+                action()
+            else:
+                ask_manager_pin(self, what, action)
+        return run
 
     def reload_vt_db(self):
         self.all_items = load_from_viewtouch_db()
@@ -2825,6 +3043,28 @@ class VTLabelUtility(tk.Tk):
         save_templates(self.templates)
         if getattr(self, "chosen_template_name", None) == name:
             self.chosen_template_name = next(iter(self.templates))
+        self.show_step(1)
+
+    def rename_selected_template(self):
+        """Give the template selected in the start screen's list a new name. Everything in it (layout,
+        printer, offsets) is kept, it keeps its place in the list and stays selected."""
+        from tkinter import messagebox
+        name = getattr(self, "step1_tpl_var", None) and self.step1_tpl_var.get()
+        if not name or name not in self.templates:
+            messagebox.showinfo("Rename Template", "Select a template in the list first.", parent=self); return
+        new = ask_template_name(self, "Rename Template", f"New name for the template '{name}':", name,
+                                self.templates.keys(), current=name)
+        if not new:
+            return
+        # Same order, same contents, only the key changes (the dict object stays the same for everyone using it).
+        items = [((new if k == name else k), v) for k, v in self.templates.items()]
+        self.templates.clear()
+        self.templates.update(items)
+        save_templates(self.templates)
+        if getattr(self, "chosen_template_name", None) == name:
+            self.chosen_template_name = new
+        self.step1_keep_template = new
+        _trace.info("renamed template %r to %r", name, new)
         self.show_step(1)
 
     def restore_standard_templates(self):
@@ -2982,7 +3222,10 @@ class VTLabelUtility(tk.Tk):
             active_tpl_names.remove("RECEIVING LABEL")
             active_tpl_names.insert(0, "RECEIVING LABEL")
 
-        self.step1_tpl_var = tk.StringVar(value=active_tpl_names[0] if active_tpl_names else "")
+        keep = getattr(self, "step1_keep_template", None)   # e.g. the template just renamed stays selected
+        self.step1_keep_template = None
+        keep_idx = active_tpl_names.index(keep) if keep in active_tpl_names else 0
+        self.step1_tpl_var = tk.StringVar(value=active_tpl_names[keep_idx] if active_tpl_names else "")
         self.option_add("*TCombobox*Listbox.font", ("Sans", 14, "bold"))
 
         top_box = tk.Frame(tpl_sel_frame, bg="#0c1017")
@@ -3026,7 +3269,8 @@ class VTLabelUtility(tk.Tk):
             self.tpl_tree.insert("", "end", iid=str(idx), values=(f" {name}", f"{w} x {h} in", f"{prn}"))
 
         if active_tpl_names:
-            self.tpl_tree.selection_set("0")
+            self.tpl_tree.selection_set(str(keep_idx))
+            self.tpl_tree.see(str(keep_idx))
 
         def on_cb_sel(_e=None):
             c = self.step1_tpl_var.get()
@@ -3075,22 +3319,27 @@ class VTLabelUtility(tk.Tk):
         tools_frame.columnconfigure(1, weight=1)
         tools_frame.rowconfigure(0, weight=1)
         tools_frame.rowconfigure(1, weight=1)
+        tools_frame.rowconfigure(2, weight=1)
 
+        # Lookup | Open Folder, Rename | Delete, Restore. Changing templates is for managers
+        # (manager_only: anyone else is asked for a manager's PIN).
         btn_lookup = make_vt_btn(
             tools_frame,
-            text="Lookup Template",
+            text=self.manager_label("Lookup Template"),
             font=("Sans", 10, "bold"),
             bg="#1d4ed8",
             fg="#ffffff",
             radius=12,
-            command=self.browse_template_file
+            command=self.manager_only("import label templates", self.browse_template_file)
         )
         btn_lookup.grid(row=0, column=0, sticky="nsew", padx=4, pady=3)
 
-        make_vt_btn(tools_frame, text="Delete Template", font=("Sans", 10, "bold"), bg="#b91c1c", fg="#ffffff", radius=12,
-                    command=self.delete_selected_template).grid(row=0, column=1, sticky="nsew", padx=4, pady=3)
-        make_vt_btn(tools_frame, text="Restore Standard Labels", font=("Sans", 10, "bold"), bg="#0f766e", fg="#ffffff", radius=12,
-                    command=self.restore_standard_templates).grid(row=1, column=1, sticky="nsew", padx=4, pady=3)
+        make_vt_btn(tools_frame, text=self.manager_label("Rename Template"), font=("Sans", 10, "bold"), bg="#7c3aed", fg="#ffffff", radius=12,
+                    command=self.manager_only("rename label templates", self.rename_selected_template)).grid(row=1, column=0, sticky="nsew", padx=4, pady=3)
+        make_vt_btn(tools_frame, text=self.manager_label("Delete Template"), font=("Sans", 10, "bold"), bg="#b91c1c", fg="#ffffff", radius=12,
+                    command=self.manager_only("delete label templates", self.delete_selected_template)).grid(row=1, column=1, sticky="nsew", padx=4, pady=3)
+        make_vt_btn(tools_frame, text=self.manager_label("Restore Standard Labels"), font=("Sans", 10, "bold"), bg="#0f766e", fg="#ffffff", radius=12,
+                    command=self.manager_only("restore the standard labels", self.restore_standard_templates)).grid(row=2, column=0, columnspan=2, sticky="nsew", padx=4, pady=3)
 
         btn_folder = make_vt_btn(
             tools_frame,
@@ -3101,7 +3350,7 @@ class VTLabelUtility(tk.Tk):
             radius=12,
             command=self.open_template_folder
         )
-        btn_folder.grid(row=1, column=0, sticky="nsew", padx=4, pady=3)
+        btn_folder.grid(row=0, column=1, sticky="nsew", padx=4, pady=3)
 
     def _build_step2(self):
         left = tk.Frame(self.content, bg="#1e242d", width=290)
@@ -3499,7 +3748,7 @@ class VTLabelUtility(tk.Tk):
         if init_tpl not in self.templates:
             init_tpl = list(self.templates.keys())[0]
         self.tpl_var = tk.StringVar(value=init_tpl)
-        tpl_cb = ttk.Combobox(tbar, textvariable=self.tpl_var, values=list(self.templates.keys()), state="readonly", width=26, font=("Sans", 10, "bold"))
+        tpl_cb = self.tpl_cb = ttk.Combobox(tbar, textvariable=self.tpl_var, values=list(self.templates.keys()), state="readonly", width=26, font=("Sans", 10, "bold"))
         tpl_cb.pack(side="left", padx=6, ipady=4)
         tpl_cb.bind("<<ComboboxSelected>>", lambda _e: self._render_live_preview())
 
@@ -3526,8 +3775,10 @@ class VTLabelUtility(tk.Tk):
                 self._render_live_preview()
         self.step4_upc_cb.bind("<<ComboboxSelected>>", on_pick_step4_upc)
 
-        make_vt_btn(tbar, text="✏️ Edit Report", bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8, command=self.open_report_designer).pack(side="left", padx=6)
-        make_vt_btn(tbar, text="➕ Create Report", bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.clone_report).pack(side="left", padx=4)
+        make_vt_btn(tbar, text=self.manager_label("✏️ Edit Report"), bg="#0f766e", fg="#ffffff", font=("Sans", 10, "bold"), width=13, pady=8,
+                    command=self.manager_only("edit label templates", self.open_report_designer)).pack(side="left", padx=6)
+        make_vt_btn(tbar, text=self.manager_label("➕ Create Report"), bg="#1d4ed8", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8,
+                    command=self.manager_only("create label templates", self.clone_report)).pack(side="left", padx=4)
         make_vt_btn(tbar, text="⚙️ Printer Offset", bg="#0284c7", fg="#ffffff", font=("Sans", 10, "bold"), width=14, pady=8, command=self.open_printer_settings_dialog).pack(side="left", padx=4)
 
         self.route_badge_lbl = tk.Label(tbar, text="", bg="#1e293b", fg="#38bdf8", font=("Sans", 9, "bold"), padx=10, pady=8, bd=0, relief="flat")
@@ -3745,8 +3996,16 @@ class VTLabelUtility(tk.Tk):
         tname = self.tpl_var.get()
         sample = self.selected_for_print[self.preview_idx]
         def on_saved(name, new_tpl):
-            self.templates[name] = new_tpl
+            # A copy: later edits in the designer must not reach a saved template (or the original after Save As…).
+            self.templates[name] = json.loads(json.dumps(new_tpl))
             save_templates(self.templates)
+            self.chosen_template_name = name
+            if self.tpl_var.get() != name:   # Save As…: the preview follows the new template
+                try:
+                    self.tpl_cb.configure(values=list(self.templates.keys()))
+                except Exception:
+                    pass
+                self.tpl_var.set(name)
             self._render_live_preview()
         ReportDesignerWindow(self, tname, self.templates[tname], sample, on_saved)
 
@@ -3784,6 +4043,9 @@ class VTLabelUtility(tk.Tk):
 
         def do_create(*_a):
             new_name = name_var.get().strip().upper() or f"CUSTOM_{len(self.templates)+1}"
+            if new_name in {str(n).strip().upper() for n in self.templates}:
+                messagebox.showinfo("Create Label Template", f"A template named '{new_name}' already exists.\nChoose another name.", parent=cdlg)
+                return
             base_tpl["default_printer"] = p_var.get().strip()
             base_tpl["media_stock"] = m_var.get()
             for lbl, mw, mh, mtype in MEDIA_STOCK_PRESETS:

@@ -2043,6 +2043,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
             env.insert(u"WAYLAND_DISPLAY"_s, u"wayland-0"_s);
         if (!env.contains(u"XDG_RUNTIME_DIR"_s))
             env.insert(u"XDG_RUNTIME_DIR"_s, u"/run/user/1000"_s);
+        // Who opened it, as the manager screens decide it: only a manager may change label templates.
+        env.insert(u"VT_LABEL_ROLE"_s, pos_ && pos_->loggedIn() && pos_->can(u"manager"_s) ? u"manager"_s : u"staff"_s);
         proc.setProcessEnvironment(env);
         proc.setStandardOutputFile(u"/tmp/vt_wiz_runtime.log"_s);
         proc.setStandardErrorFile(u"/tmp/vt_wiz_runtime.log"_s);

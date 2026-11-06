@@ -67,7 +67,7 @@ def cover(canv, doc):
     y = 5.6 * inch
     for line in ["Shelf, price, cigar and receiving labels for ViewTouch POS",
                  "Raspberry Pi label station  ·  Zebra label printers",
-                 "", "Version 1.1  ·  November 2026"]:
+                 "", "Version 1.2  ·  November 2026"]:
         canv.drawString(0.9 * inch, y, line); y -= 0.3 * inch
     img = os.path.join(HERE, "img", "2X1_VINYL_UPC_PRICE.png")
     if os.path.exists(img):
@@ -227,7 +227,7 @@ story.append(B("<b>For one item:</b> if ViewTouch opens the label utility for a 
                "<font face='Courier'>openLabelUtility</font> command and a UPC), it goes straight to that item's label preview. "
                "Any of the item's codes works — primary, alternate or carton UPC."))
 story.append(B("The program opens full-screen. To close it, press <b>Close</b> (red, bottom-left)."))
-story.append(B("The title bar says <i>ViewTouch Label Utility v1.1</i>; the start screen shows how many ViewTouch items it "
+story.append(B("The title bar says <i>ViewTouch Label Utility v1.2</i>; the start screen shows how many ViewTouch items it "
                "loaded."))
 story.append(box("Note:", "Item changes made in ViewTouch (new items, price changes) appear here the next time the program "
                  "opens, or straight away if you press <b>Reload viewtouch.db</b>."))
@@ -275,10 +275,22 @@ story.append(table([
     ["Database status", "Confirms ViewTouch is connected and shows how many items and templates were loaded."],
     ["Lookup Template", "Imports a label template from a file — including ILSA <b>.rtm</b> labels. See section 9."],
     ["Open Template Folder", "Opens the <font face='Courier'>seed/templates</font> folder in the file manager — a handy place to keep files you want to import."],
+    ["Rename Template", "Gives the template selected in the list a new name. Its layout, printer and offsets are kept and it stays "
+     "selected. An empty name, or one another template already has, is refused."],
     ["Delete Template", "Deletes the template selected in the list on the left (it asks first). The last remaining template can't be deleted."],
     ["Restore Standard Labels", "Puts the four standard labels (RECEIVING LABEL and the three ILSA labels) back to their original layout and printer, "
      "replacing any changes made to them. Your other templates are kept. It asks first."],
 ], [1.7, 5.2]))
+story.append(P("Who can change templates", h2))
+story.append(P("Everyone can pick a template and print labels. Only a <b>manager</b> (anyone ViewTouch lets onto the manager "
+               "screens) can change templates: <b>Lookup Template</b>, <b>Rename Template</b>, <b>Delete Template</b>, "
+               "<b>Restore Standard Labels</b>, and on screen 4 <b>Edit Report</b> and <b>Create Report</b>."))
+story.append(B("The program knows who opened it from ViewTouch. For anyone else those buttons say <b>(manager)</b> under their name."))
+story.append(B("Tapping one opens <b>Manager needed</b>: a manager can type their ViewTouch PIN there to allow that one change, "
+               "or press Cancel. After 5 wrong PINs it waits a minute. The PIN is checked against ViewTouch's staff list and is "
+               "never saved."))
+story.append(box("Note:", "If the PIN can't be checked (ViewTouch's staff list can't be read), the change is not allowed. "
+                 "A manager can log in to ViewTouch and open the Label Utility instead."))
 
 # ---------------------------------------------------------------- 4
 story.append(PageBreak())
@@ -337,8 +349,8 @@ story.append(table([
     ["Print Labels", "Opens the print window (section 7)."],
     ["Arrow buttons and 1/5", "Steps through the ticked items. The number shows which item is previewed."],
     ["UPC", "Lists every code for the previewed item (e.g. <i>Alt UPC 1: 04252614</i>). Pick one to print that code on this item's label."],
-    ["Edit Report", "Opens the label designer for the current template (section 8)."],
-    ["Create Report", "Makes a new template as a copy of the current one (section 8.6)."],
+    ["Edit Report", "Opens the label designer for the current template (section 8). Managers only (see section 3)."],
+    ["Create Report", "Makes a new template as a copy of the current one (section 8.6). Managers only."],
     ["Printer Offset", "Printer position, darkness, resolution and calibration for this template (section 7.3)."],
     ["Printer badge", "Shows which printer and label size this template uses."],
     ["Double-click the preview", "Switches between the sharp preview and the exact printer-dot view. The caption under the label says which one you are seeing."],
@@ -429,7 +441,9 @@ story.append(P("8.2 Top toolbar", h2))
 story.append(shot("designer_toolbar1_stacked.png", 5.6, "Top toolbar (shown in two parts)"))
 story.append(table([
     ["Control", "What it does"],
-    ["Save", "Saves the template and closes the designer."],
+    ["Save", "Saves your changes to this template. The designer stays open; press Close when finished."],
+    ["Save As…", "Saves your changes as a <b>new</b> template under a name you type (an empty or already-used name is refused). "
+     "The template you opened stays as it was last saved; the designer then goes on with the new one."],
     ["Undo / Redo", "Steps back or forward through your changes."],
     ["Object", "Picks a piece by name (useful when pieces overlap)."],
     ["Field", "Changes what the selected piece shows (see the field list in 8.5)."],
@@ -489,9 +503,11 @@ for i, t in enumerate([
     "On screen 4 choose the template closest to what you want, then press <b>Create Report</b>.",
     "Enter a <b>Label / Store Name</b> (this becomes the template name).",
     "Choose the <b>Target Printer</b> and the <b>Media Stock / Size</b>.",
-    "Press <b>Create &amp; Open Designer</b>. The new template is a copy of the one you started from, ready to edit.",
+    "Press <b>Create &amp; Open Designer</b>. The new template is a copy of the one you started from, ready to edit. "
+    "A name another template already has is refused.",
 ], 1):
     story.append(N(i, t))
+story.append(box("Tip:", "Already in the designer? <b>Save As…</b> saves what you see as a new template and leaves the original alone."))
 
 # ---------------------------------------------------------------- 9
 story.append(P("9. Importing labels", h1))
@@ -535,7 +551,10 @@ for name, title, desc, w in [
      "RECEIVED, the employee's name and today's date, twice side by side. Needs no item.", 3.0),
 ]:
     story.append(KeepTogether([P(title, h3), P(desc), label_img(name, w), Spacer(1, 8)]))
-story.append(KeepTogether([P("Deleting and restoring templates", h3),
+story.append(KeepTogether([P("Renaming, deleting and restoring templates (managers)", h3),
+    B("<b>Rename a template:</b> on screen 1, select it in the template list and press <b>Rename Template</b>. "
+      "A tablet's Labels screen shows the new name the next time it is opened. Renaming a standard label means "
+      "Restore Standard Labels adds the original back under its old name."),
     B("<b>Delete a template:</b> on screen 1, select it in the template list and press <b>Delete Template</b>."),
     B("<b>Undo changes to a standard label, or bring back one you deleted:</b> on screen 1 press <b>Restore Standard Labels</b>. "
       "RECEIVING LABEL and the three ILSA labels return to their original layout and printer; your other templates stay as they are."),
@@ -601,7 +620,9 @@ story.append(table([
     ["Make a new label from an existing one", "Screen 4: Create Report &gt; name, printer, size &gt; Create &amp; Open Designer"],
     ["Bring in an ILSA label", "Screen 1: Lookup Template &gt; choose the .rtm file"],
     ["See exact printer dots", "Screen 4: double-click the preview"],
-    ["Delete a template", "Screen 1: select it &gt; Delete Template"],
+    ["Save a changed label under a new name", "Designer: Save As… &gt; type the name &gt; OK"],
+    ["Rename a template", "Screen 1: select it &gt; Rename Template (manager)"],
+    ["Delete a template", "Screen 1: select it &gt; Delete Template (manager)"],
     ["Undo changes to the standard labels", "Screen 1: Restore Standard Labels"],
     ["Update the program", "Double-click Update Label Utility on the desktop — or <font face='Courier'>bash ~/viewtouch-main/modern/tools/update_label_utility.sh</font>"],
     ["Send logs for help", "<font face='Courier'>bash ~/viewtouch-main/modern/tools/push_label_log.sh</font>"],

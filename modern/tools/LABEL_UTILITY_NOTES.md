@@ -8,6 +8,8 @@ was retired — both are in Git history only. Make all label changes in `vt_labe
 ## Versions
 The version is `__version__` at the top of `vt_label_utility.py` (shown in the window title). When a release
 changes what the operator sees or does, raise it, add a line here, and tag the commit `label-utility-vX.Y`.
+- **1.2** (2026-11-06): only managers change templates (Lookup/Rename/Delete/Restore, Edit/Create Report; others get a
+  manager-PIN box); Rename Template on screen 1; Save As… in the designer.
 - **1.1** (2026-11-02): Delete Template and Restore Standard Labels on screen 1; windows and dialogs fit the
   Pi's 1360x768 screen; no missing-emoji boxes; `update_label_utility.sh`; manual with Pi screenshots.
 - **1.0** (2026-11-02, tag at `9f1c09f`): bitmap-only printing, ILSA templates, any UPC per label, `--upc`,
@@ -47,6 +49,18 @@ changes what the operator sees or does, raise it, add a line here, and tag the c
 - `valign: "top"` — ReportBuilder-style top-anchored text (used by ILSA imports)
 - Barcodes: `module_mm` (fixed bar width, ILSA `mmBarWidth`), `human_readable` (digits under bars),
   `hri_font`, `hri_size`, `align` (left/center/right; bars may extend past the box like ReportBuilder)
+
+## Who may change templates (2026-11-06, owner's decision)
+- Everyone picks templates and prints. Only managers import, rename, delete, restore, edit (Edit Report) or create
+  (Create Report / designer Save As…) templates. Printer Offset (position/darkness/dpi) stays open to everyone.
+- Role: `VT_LABEL_ROLE=manager|staff`, set by `layoutcontroller.cpp` when ViewTouch opens the utility (`pos_->can("manager")`,
+  the manager screens' test); else line 2 of `/tmp/vt_active_employee.txt` (line 1 = name, written at each login by
+  `PosService::loginWithPin`). Unknown role counts as not a manager.
+- Not a manager: the buttons show "(manager)" and open a manager-PIN box (`ask_manager_pin`) that allows that one action.
+  The PIN is checked read-only against viewtouch.db `employees` (SHA-256 of pinSalt + PIN, as `hashPin`; manager = role
+  manager/admin + allow − deny). Never store or log PINs. If it can't be checked, the action is refused.
+- Templates are referred to by name only in `label_templates.json` itself and live by ViewTouch's Labels screen
+  (`pos_inventory.cpp labelTemplates()`, re-read each time), so a rename needs nothing else updated.
 
 ## Current templates (from the ILSA system)
 RECEIVING LABEL · 2X1 VINYL UPC_PRICE (printer "Shelf Labels") · 2X1 VINYL UPC_DESC ("Zebra Large Labels") ·

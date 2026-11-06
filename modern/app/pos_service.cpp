@@ -780,7 +780,9 @@ bool PosService::loginWithPin(const QString &pin)
     emit loggedInChanged(true);
     if (!hasCheck())
         emit notice(tr("Welcome, %1").arg(nameOf(*e)));
-    { QFile f(u"/tmp/vt_active_employee.txt"_s); if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) f.write(nameOf(*e).toUtf8()); }
+    // For the label utility: line 1 their name (receiving labels' initials), line 2 "manager" or "staff"
+    // (only managers change label templates; the same test as the manager screens, can("manager")).
+    { QFile f(u"/tmp/vt_active_employee.txt"_s); if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) f.write((nameOf(*e) + u'\n' + (permissionsOf(*e).contains(perm::Manager) ? u"manager"_s : u"staff"_s) + u'\n').toUtf8()); }
     return true;
 }
 
