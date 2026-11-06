@@ -315,6 +315,31 @@
       ]
     },
     {
+      "id": "billboards",
+      "kind": "button",
+      "label": "Billboards",
+      "rect": {
+        "x": 1580,
+        "y": 770,
+        "w": 300,
+        "h": 150
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "style": {
+        "normal": {
+          "fill": "#1f6f73"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "billboards"
+        }
+      ]
+    },
+    {
       "id": "back",
       "kind": "button",
       "rect": {

@@ -17,6 +17,18 @@ vt_server_addr() {
     if [ -n "$SERVER_ADDR" ]; then echo "$SERVER_ADDR"; else hostname -I 2>/dev/null | awk '{print $1}'; fi
 }
 
+# The newest app in ~/viewtouch-main/apks for a processor: vt_apk arm64-v8a (the tablets) or
+# vt_apk armeabi-v7a (Fire TV billboards). The tablets never get the 32-bit one: an older APK
+# without the processor in its name counts as arm64-v8a.
+vt_apk() {
+    local abi="$1" f
+    f=$(ls -t "$VT_REPO"/apks/*"$abi"*.apk 2>/dev/null | head -n 1)
+    if [ -z "$f" ] && [ "$abi" = arm64-v8a ]; then
+        f=$(ls -t "$VT_REPO"/apks/*.apk 2>/dev/null | grep -v -e armeabi-v7a -e x86 | head -n 1)
+    fi
+    echo "$f"
+}
+
 # This site's tablets, one "Name|IP" per line (the old ~/.config/viewtouch_tablets.list: "Tablet N").
 vt_tablets() {
     if [ -f "$VT_TABLETS_FILE" ]; then
