@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""One old ILSA receipt, laid out the way ViewTouch's Receipt Lookup would show it once the sales history
+is imported: a preview from the CSV export (nothing is imported or changed).
+  vt-ilsa-receipt                       the newest receipt in the newest export
+  vt-ilsa-receipt 412345                that receipt number
+  vt-ilsa-receipt 2019-07-04            the first receipt that day (2019-07-04 2 = the second...)
+  vt-ilsa-receipt --db "copy bhdan 10-29-2026" 412345
+Never shows card numbers, card holders, license data or birth dates (only whether the age was checked).
+"""
+import csv, os, re, sys
+from collections import defaultdict
+
+csv.field_size_limit(1 << 30)
+EXPORT = os.path.expanduser("~/ilsa-export")
+NEVER = re.compile(r"ACCT|PAN|CARD_?NUM|EXP_DATE|EXPIR|HOLDER|CARDHOLDER|DL|LICEN|DOB|BIRTH|SSN|TRACK|CVV|PIN", re.I)
+
+args = sys.argv[1:]
+db = None
+if args[:1] == ["--db"] and len(args) > 1:
+    db, args = args[1], args[2:]
+if db is None:   # the newest export
+    dirs = [d for d in os.listdir(EXPORT) if os.path.isdir(os.path.join(EXPORT, d))] if os.path.isdir(EXPORT) else []
+    if not dirs:
+        sys.exit("No ILSA export in ~/ilsa-export (vt-ilsa-export makes it).")
+    db = max(dirs, key=lambda d: os.path.getmtime(os.path.join(EXPORT, d)))
+D = db if os.path.isdir(db) else os.path.join(EXPORT, db)
+want = args[0] if args else ""
+
+def table(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            data = open(os.path.join(D, f), "rb").read()
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = data.decode("cp1252", errors="replace")
+            return csv.DictReader(text.splitlines())
+    sys.exit(f"{t}.csv isn't in {D}")
+
+def num(s):
+    try: return float((s or "").replace("$", "").replace(",", ""))
+    except ValueError: return 0.0
+
+def code(s): return (s or "").strip().removesuffix(".0")
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?")
+def when(s):
+    """ILSA's MM/DD/YY HH:MM:SS (or ISO) as (YYYY-MM-DD, HH:MM)."""
+    s = (s or "").strip()
+    m = US.match(s)
+    if m:
+        y = int(m.group(3)); y += 2000 if y < 100 else 0
+        hm = f"{int(m.group(4)):02d}:{m.group(5)}" if m.group(4) else ""
+        return f"{y:04d}-{int(m.group(1)):02d}-{int(m.group(2)):02d}", hm
+    if len(s) >= 10 and s[4] == "-":
+        return s[:10], s[11:16]
+    return s, ""
+
+# --- the receipt -----------------------------------------------------------------------------------
+sales = table("RegSale")
+cols = sales.fieldnames or []
+key_cols = [c for c in ("REG_NUM", "RECEIPT_NUM") if c in cols]
+if "RECEIPT_NUM" not in key_cols:
+    sys.exit("RegSale has no RECEIPT_NUM column; columns: " + ", ".join(c for c in cols if not NEVER.search(c)))
+time_col = next((c for c in ("START_TIME", "TIME_STAMP", "END_TIME", "DATE_TIME") if c in cols), None)
+
+chosen, last = None, None
+day_want, nth = None, 1
+if re.fullmatch(r"\d{4}-\d{2}-\d{2}", want):
+    day_want = want
+    if len(args) > 1 and args[1].isdigit():
+        nth = int(args[1])
+seen_day = 0
+for r in sales:
+    if want and not day_want and code(r.get("RECEIPT_NUM")) == want:
+        chosen = r; break
+    if day_want and time_col and when(r.get(time_col))[0] == day_want:
+        seen_day += 1
+        if seen_day == nth:
+            chosen = r; break
+    last = r
+if chosen is None:
+    if want:
+        sys.exit(f"No receipt {want} in {os.path.basename(D)}.")
+    chosen = last
+key = tuple(code(chosen.get(c)) for c in key_cols)
+
+lines = [r for r in table("PDetail") if all(code(r.get(c)) == k for c, k in zip(key_cols, key) if c in r)]
+tenders = [r for r in table("TendSale") if all(code(r.get(c)) == k for c, k in zip(key_cols, key) if c in r)]
+names = {code(r.get("PLU_NUM")): (r.get("PLU_DESC") or r.get("POS_DESC") or "").strip() for r in table("PLU")}
+depts = {code(r.get("DEPT_NUM")): (r.get("DEPT_NAME") or r.get("POS_DESC") or "").strip() for r in table("Dept")}
+tender_names = {"1": "Cash", "10": "Check", "12": "House charge", "15": "BH Gift Card", "40": "Credit card",
+                "70": "Credit card", "80": "American Express"}
+
+# --- laid out like a ViewTouch receipt (40 columns) ---------------------------------------------------
+W = 40
+def row(left, right=""):
+    left = str(left)
+    room = W - len(right) - 1
+    return (left[:room] + " " * max(1, room - len(left) + 1) + right) if right else left[:W]
+def money(v): return f"{v:,.2f}" if v >= 0 else f"-{-v:,.2f}"
+
+d, t = when(chosen.get(time_col)) if time_col else ("", "")
+out = ["BUTTHEAD'S TOBACCO EMPORIUM".center(W), "Danbury, CT".center(W), "",
+       row(f"Receipt {key[-1]}", f"{d} {t}".strip()),
+       row(f"Register {code(chosen.get('REG_NUM'))}" if "REG_NUM" in cols else "",
+           f"Cashier {code(chosen.get('CSHR_NUM'))}" if "CSHR_NUM" in cols else ""),
+       "-" * W]
+subtotal = 0.0
+for r in lines:
+    cls, typ = code(r.get("DETAIL_CLASS")), code(r.get("DETAIL_TYPE"))
+    if (cls, typ) == ("9", "15"):
+        continue   # stock moves, never on a receipt
+    amt = num(r.get("DETAIL_LINE_AMT"))
+    qty = num(r.get("DETAIL_FOR_QTY")) or 1
+    plu = code(r.get("PLU_NUM"))
+    flags = int(num(r.get("MODE_FLAGS")))
+    name = names.get(plu) or depts.get(code(r.get("DEPT_NUM")) or code(r.get("DEPT")), "") or f"Dept {code(r.get('DEPT_NUM'))}"
+    if cls == "15":
+        name = "  Promotion"
+    elif cls == "16":
+        name = "  Promotion reversed"
+    elif (cls, typ) == ("4", "1"):
+        name = "Paid out"
+    tag = " VOID" if flags & 1 or flags & 128 else (" RETURN" if flags & 256 else "")
+    q = f"{qty:g} " if abs(qty) != 1 and cls == "1" else ""
+    out.append(row(f"{q}{name}{tag}", money(amt)))
+    if plu and cls == "1" and len(plu) >= 8:
+        out.append(f"   UPC {plu}")
+    subtotal += amt
+out.append("-" * W)
+total = num(chosen.get("SALE_TOTAL")) if "SALE_TOTAL" in cols else subtotal
+tax = total - subtotal
+out.append(row("Subtotal", money(subtotal)))
+if abs(tax) >= 0.005:
+    out.append(row("Tax 6.35%", money(tax)))
+out.append(row("TOTAL", money(total)))
+change = 0.0
+for r in tenders:
+    tt = code(r.get("TENDER_TYPE"))
+    out.append(row(tender_names.get(tt, f"Tender {tt}"), money(num(r.get("AMT_TEND")))))
+    change += num(r.get("CHANGE_DUE"))
+if abs(change) >= 0.005:
+    out.append(row("Change", money(change)))
+age = next((v for c, v in chosen.items() if c and "AGE_VER" in c.upper() and (v or "").strip() not in ("", "0")), None)
+if age:
+    out.append(""); out.append(f"Age checked: {code(age)}+")
+mode = code(chosen.get("Z_MODE"))
+if mode not in ("", "0"):
+    out.append(""); out.append(f"(ILSA mode {mode}: not counted as a sale)")
+out += ["", f"From ILSA: {os.path.basename(D)}".center(W)]
+print("\n".join(out))
