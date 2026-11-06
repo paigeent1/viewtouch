@@ -703,7 +703,8 @@ QVariantList PosService::builderItems() const
                   || (!parent.empty() && std::ranges::find(m.barcodes, parent) != m.barcodes.end());
         if (!in && !search.isEmpty() && found < 200) {   // the search: name, number or a UPC
             const std::string q = ss(builderSearch_);
-            in = qs(m.name).toLower().contains(search) || m.number == q || std::ranges::find(m.barcodes, q) != m.barcodes.end();
+            in = qs(m.name).toLower().contains(search) || m.number == q
+                 || std::ranges::any_of(m.barcodes, [&](const std::string &b) { return sameBarcode(b, q); });
             found += in ? 1 : 0;
         }
         if (in)
