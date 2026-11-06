@@ -185,6 +185,8 @@ public:
     QStringList soldOut() const override { return v(u"soldOut").toStringList(); }
     QVariantList menuItems() const override { return v(u"menuItems").toList(); }
     QVariantList orderItems() const override { return v(u"orderItems").toList(); }
+    QVariantList builderItems() const override { return v(u"builderItems").toList(); }
+    QString builderRevision() const override { return v(u"builderRevision").toString(); }
     QVariantList menuCategories() const override { return v(u"menuCategories").toList(); }
     QVariantList choiceGroups() const override { return v(u"choiceGroups").toList(); }
     QVariantList menuTemplates() const override { return v(u"menuTemplates").toList(); }

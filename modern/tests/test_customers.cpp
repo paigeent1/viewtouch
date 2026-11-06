@@ -656,6 +656,23 @@ TEST_CASE("Price book: maker, product group, sub group and department group; fil
                                           {u"barcodes"_s, u"016165009123"_s}}}, QString(), false) == 1);
     REQUIRE(pos.findRetailLabels(u"zen"_s));
     CHECK(pos.retailLabels()[u"matches"_s].toList().size() == 3);
+
+    // Menu Builder's list: the price book's departments only when open, searched, or on the card.
+    const auto builderNames = [&] { return names(pos.builderItems()); };
+    CHECK_FALSE(builderNames().contains(u"ZEN TUBE"_s));
+    const QString before = pos.builderRevision();
+    QString tobaccoAcc;
+    for (const QVariant &c : pos.menuCategories())
+        if (c.toMap()[u"name"_s] == u"TOBACCO ACC"_s)
+            tobaccoAcc = c.toMap()[u"id"_s].toString();
+    REQUIRE(pos.setBuilderView(tobaccoAcc, QString(), QString(), QString()));
+    CHECK(pos.builderRevision() != before);                                    // the screen reads it again
+    CHECK(builderNames().count(u"ZEN TUBE"_s) == 2);
+    REQUIRE(pos.setBuilderView(QString(), u"wide"_s, QString(), QString()));  // a search
+    CHECK(builderNames().contains(u"ZEN WIDE TUBE"_s));
+    CHECK_FALSE(builderNames().contains(u"ZEN TUBE"_s));
+    REQUIRE(pos.setBuilderView(QString(), QString(), QString(), u"016165009116"_s));   // the card's box UPC
+    CHECK(builderNames().contains(u"ZEN TUBE"_s));
     qputenv("HOME", oldHome);
 }
 

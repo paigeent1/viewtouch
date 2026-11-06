@@ -73,27 +73,43 @@ Item {
     component TouchButton: MenuTouchButton {}
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
-    // The item list comes to a tablet only while a screen shows it (PosServer: on request): a
-    // 30,000-item price book would otherwise go to every tablet on every change.
+    // Menu Builder's own item list (builderItems): the bar and kitchen menu, plus the one price book
+    // department open, the item on the card and what the search finds; it comes to a tablet only while
+    // this screen shows (PosServer: on request), and is read again only when it changed
+    // (builderRevision): a 30,000-item price book stays on the main computer.
     Item {
         visible: false
         readonly property var p: w.pos
         property var asked: null
         function ask() {
             if (asked === p) return
-            if (asked) asked.want("menuItems", false)
+            if (asked) asked.want("builderItems", false)
             asked = p
-            if (p) p.want("menuItems", true)
+            if (p) p.want("builderItems", true)
+            w.refreshItems()
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) asked.want("menuItems", false)
+        Component.onDestruction: if (asked) asked.want("builderItems", false)
+    }
+    property var allItems: []
+    function refreshItems() { allItems = pos ? pos.builderItems.filter(i => !i.modifier) : [] }
+    readonly property string builderRevision: pos ? pos.builderRevision : ""
+    onBuilderRevisionChanged: refreshItems()
+    // What this screen shows, told to the main computer (the search a moment after the last key).
+    readonly property var builderView: [categoryId, editingItem ? (draft.id ?? "") : "",
+                                        editingItem ? (draft.parentUpc ?? "") : ""]
+    onBuilderViewChanged: tellView.restart()
+    onSearchChanged: tellView.restart()
+    Timer {
+        id: tellView
+        interval: 250
+        onTriggered: if (w.pos) w.pos.setBuilderView(w.builderView[0], w.search, w.builderView[1], w.builderView[2])
     }
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 340 : 1180) : 1
 
     readonly property var categories: pos ? pos.menuCategories : []
-    readonly property var allItems: pos ? pos.menuItems.filter(i => !i.modifier) : []
     readonly property var groups: pos ? pos.choiceGroups.filter(g => !g.own) : []
     readonly property var periods: pos ? pos.mealPeriods : []
     readonly property var stations: pos ? pos.kitchenStations.filter(s => !s.printer) : []

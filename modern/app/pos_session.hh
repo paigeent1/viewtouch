@@ -191,6 +191,12 @@ class PosSession : public QObject {
     // The items for the order screens' menus: the menu less the retail-only categories (a price book
     // stays on the main computer; scans and lookups find those).
     Q_PROPERTY(QVariantList orderItems READ orderItems NOTIFY adminChanged)
+    // Menu Builder's items: the menu less the retail-only categories' items, plus the one category it
+    // has open, the item on its card (and that item's box or carton), and what its search finds
+    // (setBuilderView). builderRevision changes when that list does: the screen reads the list only
+    // then (a price book's department is thousands of items).
+    Q_PROPERTY(QVariantList builderItems READ builderItems NOTIFY adminChanged)
+    Q_PROPERTY(QString builderRevision READ builderRevision NOTIFY adminChanged)
     // The menu's categories, in order: [{id, name, color, periods, count, now}]
     // (now: on the menu at this hour).
     Q_PROPERTY(QVariantList menuCategories READ menuCategories NOTIFY adminChanged)
@@ -389,6 +395,8 @@ public:
     virtual QStringList soldOut() const = 0;
     virtual QVariantList menuItems() const = 0;
     virtual QVariantList orderItems() const = 0;
+    virtual QVariantList builderItems() const = 0;
+    virtual QString builderRevision() const = 0;
     virtual QVariantList menuCategories() const = 0;
     virtual QVariantList choiceGroups() const = 0;
     virtual QVariantList menuTemplates() const = 0;
@@ -585,6 +593,13 @@ public:
     // {ingredient | name, hours, count, note}.
     Q_INVOKABLE void printPrepLabels(const QVariantMap &labels) { invoke(QStringLiteral("printPrepLabels"), {labels}); }
     Q_INVOKABLE void findRetailLabels(const QString &query) { invoke(QStringLiteral("findRetailLabels"), {query}); }
+    // What Menu Builder shows (builderItems): its open category, its search, the item on its card and
+    // that item's parent UPC (its box or carton).
+    Q_INVOKABLE void setBuilderView(const QString &categoryId, const QString &search, const QString &itemId,
+                                    const QString &parentUpc)
+    {
+        invoke(QStringLiteral("setBuilderView"), {categoryId, search, itemId, parentUpc});
+    }
     Q_INVOKABLE void browseRetailLabels(const QStringList &path) { invoke(QStringLiteral("browseRetailLabels"), {path}); }
     // {template, items: [{upc, qty}]} (no items: qty of a label without product fields).
     Q_INVOKABLE void printRetailLabels(const QVariantMap &job) { invoke(QStringLiteral("printRetailLabels"), {job}); }

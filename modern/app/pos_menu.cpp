@@ -659,6 +659,59 @@ QVariantList PosService::orderItemsNow() const
     return out;
 }
 
+bool PosService::setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc)
+{
+    const QString s = search.trimmed();
+    if (categoryId == builderCategory_ && s == builderSearch_ && itemId == builderItem_ && parentUpc.trimmed() == builderParent_)
+        return true;
+    builderCategory_ = categoryId;
+    builderSearch_ = s;
+    builderItem_ = itemId;
+    builderParent_ = parentUpc.trimmed();
+    builderViewChanging_ = true;
+    emit adminChanged();   // this screen's builderItems / builderRevision (this session only)
+    builderViewChanging_ = false;
+    return true;
+}
+
+QString PosService::builderRevision() const
+{
+    if (!user())
+        return {};
+    return u"%1:%2:%3:%4:%5|%6|%7|%8|%9"_s.arg(s_->serial).arg(s_->adminRevision).arg(s_->menu.size()).arg(adminTicks_)
+        .arg(language(), builderCategory_, builderSearch_, builderItem_, builderParent_);
+}
+
+QVariantList PosService::builderItems() const
+{
+    const QVariantList all = menuItems();
+    if (all.size() != qsizetype(s_->menu.size()))
+        return all;
+    std::unordered_set<std::string> retail;
+    for (const MenuCategory &c : s_->categories())
+        if (c.retailOnly)
+            retail.insert(c.id);
+    if (retail.empty())
+        return all;
+    const std::string open = ss(builderCategory_), item = ss(builderItem_), parent = ss(builderParent_);
+    const QString search = builderSearch_.toLower();
+    QVariantList out;
+    int found = 0;
+    for (qsizetype i = 0; i < all.size(); ++i) {
+        const MenuItem &m = s_->menu[std::size_t(i)];
+        bool in = !retail.contains(m.family) || m.family == open || (!item.empty() && m.id == item)
+                  || (!parent.empty() && std::ranges::find(m.barcodes, parent) != m.barcodes.end());
+        if (!in && !search.isEmpty() && found < 200) {   // the search: name, number or a UPC
+            const std::string q = ss(builderSearch_);
+            in = qs(m.name).toLower().contains(search) || m.number == q || std::ranges::find(m.barcodes, q) != m.barcodes.end();
+            found += in ? 1 : 0;
+        }
+        if (in)
+            out.append(all[i]);
+    }
+    return out;
+}
+
 QVariantList PosService::menuItemsNow() const
 {
     QVariantList out;

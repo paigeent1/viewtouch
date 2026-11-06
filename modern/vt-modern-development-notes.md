@@ -117,6 +117,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 09:00 ET — Bob (Claude) — Menu Builder: its own slim item list (builderItems) instead of every item
+- **What:** New session state builderItems (the menu less retail-only categories' items, plus the open category, the item on the card, its parent UPC's item, and up to 200 search matches by name, number or UPC) and builderRevision (changes when that list does; includes adminRevision, menu size, a per-session admin-change count, language and the view). setBuilderView(category, search, item, parentUpc) sets the view (command setBuilderView; emits adminChanged for this session only, without dropping the item-list cache). WidgetMenuBuilder reads builderItems only when builderRevision changes, tells the view 250 ms after a change, and asks for builderItems on request (tablets) instead of menuItems.
+- **Why:** Owner 2026-11-06: Menu Builder lags with the 31,700-item price book (it copied every item into the screen on open and after every change).
+- **Files:** `modern/app/pos_session.cpp/.hh, pos_service.cpp/.hh, pos_menu.cpp, pos_commands.cpp, net/pos_server.cpp, net/remote_session.cpp/.hh, ui/qml/WidgetMenuBuilder.qml, tests/test_customers.cpp`
+- **Next person must know:** Menu Builder's 'whole menu' price list and Like… only see the bar menu plus the open department when a price book is loaded.
+
 ### 2026-11-06 08:59 ET — Bob (Claude) — Menu Builder: Import…, Starter… and + Category open and close with each touch
 - **What:** A second touch on Import… closes the file chooser / import window, on Starter… closes the Starter window, on + Category closes the new category's card (asking about unsaved changes as usual). The 2-second guard stays only on the actions themselves (Import, choosing a starter menu) so one can't run twice.
 - **Why:** Owner 2026-11-06: wanted touching to toggle the option open and closed, not ignore the second touch.

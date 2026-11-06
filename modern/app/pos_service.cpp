@@ -177,8 +177,15 @@ void PosService::connectShared()
     // Connected first, so the item list is made again before any screen asks for it.
     for (auto signal : {&PosSession::adminChanged, &PosSession::dayChanged, &PosSession::checkChanged,
                         &PosSession::openChecksChanged, &PosSession::sessionChanged})
-        connect(this, signal, this, [this] { menuItemsCache_.reset(); });
+        connect(this, signal, this, [this] {
+            if (!builderViewChanging_)   // Menu Builder's view only: the items are as they were
+                menuItemsCache_.reset();
+        });
     connect(this, &PosSession::loggedInChanged, this, [this] { menuItemsCache_.reset(); });
+    connect(this, &PosSession::adminChanged, this, [this] {
+        if (!builderViewChanging_)
+            ++adminTicks_;
+    });
     connect(s_, &PosShared::staffChanged, this, [this] {
         if (!userId_.empty() && !user()) {   // deactivated or removed elsewhere
             userId_.clear();

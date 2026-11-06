@@ -937,6 +937,9 @@ public:
     QStringList soldOut() const override;
     QVariantList menuItems() const override;
     QVariantList orderItems() const override;
+    QVariantList builderItems() const override;
+    QString builderRevision() const override;
+    bool setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc);
     QVariantList menuCategories() const override;
     QVariantList choiceGroups() const override;
     // The Menu Builder (pos_menu_builder.cpp).
@@ -1004,6 +1007,10 @@ public:
     mutable std::string menuItemsCachePeriod_;
     mutable QString menuItemsCacheLanguage_;
     mutable int menuItemsCacheRevision_ = -1;
+    // Menu Builder's view (setBuilderView): what builderItems adds to the menu less the price book.
+    QString builderCategory_, builderSearch_, builderItem_, builderParent_;
+    bool builderViewChanging_ = false;   // its adminChanged leaves the item list's cache alone
+    int adminTicks_ = 0;                 // menu changes seen here (sold out, availability...): in builderRevision
     mutable std::size_t menuItemsCacheSize_ = 0;
     QVariantList menuCategoriesNow() const;
     QVariantList choiceGroupsNow() const;
