@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:22 ET — Bob (Claude) — Startup reads the store's tables in one go
+- **What:** Ported upstream 9514708. When ViewTouch starts, it reads all of the store's tables (about thirty) inside one read transaction instead of one by one.
+- **Why:** The background writer could save between two of those reads, mixing data from just before with data from just after; one read is also faster.
+- **Files:** `modern/storage/pos_store.cpp`
+
 ### 2026-11-06 11:22 ET — Bob (Claude) — Forget Customer no longer freezes the screen
 - **What:** Ported upstream 8d98a74. Forget Customer removes the record and today's checks at once; the earlier days' checks are searched in the background and cleaned up afterwards, then it says how many checks it cleared. Test updated to wait for that message.
 - **Why:** Searching every check the store ever kept on the screen's thread held the screen for seconds on a Pi with years of sales.
