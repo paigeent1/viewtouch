@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:23 ET — Bob (Claude) — Labor report total equals the sum of its rows
+- **What:** Ported upstream f510043. The Labor report rounds each person's pay to the cent first and the total is those rows added up, plus a test with three half-hour shifts at $10.01.
+- **Why:** The total was rounded once at the end, so it could be a cent or two different from adding up the rows.
+- **Files:** `modern/core/report.cpp`, `modern/tests/test_reports.cpp`
+
 ### 2026-11-06 11:22 ET — Bob (Claude) — Startup reads the store's tables in one go
 - **What:** Ported upstream 9514708. When ViewTouch starts, it reads all of the store's tables (about thirty) inside one read transaction instead of one by one.
 - **Why:** The background writer could save between two of those reads, mixing data from just before with data from just after; one read is also faster.
