@@ -7,23 +7,30 @@
 // stay in Store Settings.
 #include "layoutcontroller.hh"
 
+#include <QBuffer>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QHostAddress>
+#include <QImage>
+#include <QImageReader>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkInterface>
+#include <QPainter>
+#include <QPointer>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QScreen>
 #include <QTimer>
+#include <QUrl>
 #include <QWindow>
 
 #include <algorithm>
+#include <memory>
 
 using namespace Qt::StringLiterals;
 
@@ -457,4 +464,138 @@ void LayoutController::startScreenSelfCheck()
     connect(&screenCheckTimer_, &QTimer::timeout, this, &LayoutController::refreshScreens, Qt::UniqueConnection);
     screenCheckTimer_.start();
 #endif
+}
+
+// --- Guest screen pictures: from Dropbox > POS project > Guest Screen (vt-guest-pictures) ---
+
+namespace {
+
+// Where vt-guest-pictures puts what it copies from Dropbox, and where pictures can be put by hand.
+QStringList guestPictureFolders()
+{
+    return {QDir::home().filePath(u".cache/vt-guest-pictures"_s), QDir::home().filePath(u"Pictures/Guest Screen"_s)};
+}
+
+// A file right in one of those folders (not through a link to somewhere else).
+bool inGuestPictureFolder(const QString &path)
+{
+    const QString file = QFileInfo(path).canonicalFilePath();
+    if (file.isEmpty())
+        return false;
+    for (const QString &folder : guestPictureFolders()) {
+        const QString dir = QFileInfo(folder).canonicalFilePath();
+        if (!dir.isEmpty() && QFileInfo(file).absolutePath() == dir)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+void LayoutController::refreshGuestPictures()
+{
+#ifdef Q_OS_ANDROID
+    guestPictures_ = {{u"error"_s, tr("Pictures for the guest screen are added on the Pi.")}};
+    ++siteRevision_;
+    emit siteChanged();
+#else
+    if (guestPicturesBusy_)
+        return;
+    const QString program = toolPath(u"vt-guest-pictures"_s);
+    if (!QFile::exists(program)) {
+        guestPictures_ = {{u"error"_s, tr("vt-guest-pictures isn't installed on this computer.")}};
+        ++siteRevision_;
+        emit siteChanged();
+        return;
+    }
+    guestPicturesBusy_ = true;
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
+        const QJsonDocument doc = QJsonDocument::fromJson(proc->readAllStandardOutput());
+        guestPictures_ = doc.isObject() ? doc.object().toVariantMap()
+                                        : QVariantMap{{u"error"_s, tr("Couldn't read the list of pictures.")}};
+        guestPicturesBusy_ = false;
+        ++siteRevision_;
+        emit siteChanged();
+        proc->deleteLater();
+    });
+    QTimer::singleShot(10 * 60 * 1000, proc, [proc] { proc->kill(); });
+    proc->start(u"python3"_s, {program, u"list"_s});
+    ++siteRevision_;
+    emit siteChanged();
+#endif
+}
+
+QVariantMap LayoutController::guestPictures() const
+{
+    QVariantMap out = guestPictures_;
+    out.insert(u"busy"_s, guestPicturesBusy_);
+    return out;
+}
+
+QString LayoutController::addGuestPicture(const QString &fileOrUrl)
+{
+    if (!pos_)
+        return {};
+    if (!pos_->can(u"manager"_s)) {
+        setStatus(tr("A manager adds pictures to the guest screen."));
+        return {};
+    }
+    const QString path = fileOrUrl.startsWith(u"file:") ? QUrl(fileOrUrl).toLocalFile() : fileOrUrl;
+    const QFileInfo info(path);
+    if (!inGuestPictureFolder(path)) {
+        setStatus(tr("Pictures for the guest screen come from Dropbox > POS project > Guest Screen."));
+        return {};
+    }
+    static const QStringList kinds{u"jpg"_s, u"jpeg"_s, u"png"_s, u"webp"_s};
+    if (!kinds.contains(info.suffix().toLower()) || info.size() > 25 * 1024 * 1024) {
+        setStatus(tr("The guest screen shows JPEG, PNG or WebP pictures of 25 MB at most."));
+        return {};
+    }
+    // Upright as the phone took it, made to fit the guest screen (never larger than it was).
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+    if (image.isNull()) {
+        setStatus(tr("Can't open %1.").arg(info.fileName()));
+        return {};
+    }
+    if (image.width() > 1920 || image.height() > 1080)
+        image = image.scaled(QSize(1920, 1080), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // A JPEG has no see-through parts: those are black, like the guest screen.
+    QImage flat(image.size(), QImage::Format_RGB32);
+    flat.fill(Qt::black);
+    {
+        QPainter p(&flat);
+        p.drawImage(0, 0, image);
+    }
+    QByteArray jpeg;
+    QBuffer buffer(&jpeg);
+    if (!buffer.open(QIODevice::WriteOnly) || !flat.save(&buffer, "JPEG", 85) || jpeg.isEmpty()) {
+        setStatus(tr("Couldn't make %1 into a picture for the guest screen.").arg(info.fileName()));
+        return {};
+    }
+    const QString ref = vt::app::PosSession::storeImageRef(u"guest-"_s + info.completeBaseName() + u".jpg"_s);
+    const QString line = u"image:"_s + ref;
+    // Kept by the store (so the standby, the backups and paired screens have it), then on the list
+    // of slides: Store Settings saved as they are with that one more, so the change log has it.
+    // (Here the answer comes at once: a refusal returns ""; a remote server's comes later.)
+    QPointer<LayoutController> self(this);
+    auto refused = std::make_shared<bool>(false);
+    pos_->invoke(u"addStoreImage"_s, {ref.mid(6), QString::fromLatin1(jpeg.toBase64())}, [self, line, refused](const QVariant &ok) {
+        *refused = !ok.toBool();
+        if (!self || !self->pos_ || *refused)
+            return;
+        const QVariantList records = self->pos_->adminRecords(u"store"_s);
+        if (records.isEmpty())
+            return;
+        QVariantMap record = records.first().toMap();
+        QStringList slides = record.value(u"displaySlides"_s).toString().split(u'\n', Qt::SkipEmptyParts);
+        if (slides.contains(line))
+            return;   // already showing
+        slides << line;
+        record.insert(u"displaySlides"_s, slides.join(u'\n'));
+        self->pos_->adminSave(u"store"_s, 0, record);
+    });
+    return *refused ? QString() : line;
 }

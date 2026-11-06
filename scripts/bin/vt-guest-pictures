@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Pictures for the guest screen (Store Settings > Customer display > + Add a picture).
+
+  vt-guest-pictures list         copy the pictures from Dropbox (POS project/Guest Screen) to this Pi,
+                                 then print them as JSON: {folder, pictures: [{name, path, bytes,
+                                 modified, where}], error}
+  vt-guest-pictures list --local the same, without asking Dropbox (only what's already here)
+
+Only picture files (JPEG, PNG, WebP; 25 MB at most) are copied, into ~/.cache/vt-guest-pictures.
+Pictures put by hand in ~/Pictures/Guest Screen (from a USB stick) are listed too.
+Without Dropbox (no internet, rclone not set up) "error" says why and what's already here is listed.
+Runs nothing but rclone (mkdir, lsjson and copy of that one folder).
+"""
+import datetime
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+REMOTE = "dropbox:POS project/Guest Screen"
+FOLDER = "Dropbox > POS project > Guest Screen"
+CACHE = os.path.expanduser("~/.cache/vt-guest-pictures")
+BY_HAND = os.path.expanduser("~/Pictures/Guest Screen")
+KINDS = (".jpg", ".jpeg", ".png", ".webp")
+MAX_BYTES = 25 * 1024 * 1024
+
+
+def rclone(*args, timeout=600):
+    """(ok, stdout, the error's last line)."""
+    try:
+        r = subprocess.run(["rclone", *args], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False, "", "Dropbox took too long to answer."
+    except OSError as e:
+        return False, "", str(e)
+    err = [l for l in r.stderr.strip().splitlines() if l.strip()]
+    return r.returncode == 0, r.stdout, (err[-1] if err else "rclone stopped (code %d)." % r.returncode)
+
+
+def from_dropbox():
+    """The pictures' names in Dropbox (copied here), or None and why not."""
+    if not shutil.which("rclone"):
+        return None, "rclone isn't installed on this computer, so Dropbox can't be read."
+    # The folder, made when it isn't there yet (so it shows up on the computers and the iPhone).
+    ok, _, why = rclone("mkdir", REMOTE, timeout=60)
+    if not ok:
+        return None, "Couldn't reach Dropbox: " + why
+    ok, out, why = rclone("lsjson", "--files-only", "--max-depth", "1", REMOTE, timeout=120)
+    if not ok:
+        return None, "Couldn't list the Dropbox folder: " + why
+    try:
+        entries = json.loads(out or "[]")
+    except ValueError:
+        return None, "Couldn't read the Dropbox folder's list."
+    names = {e.get("Name", "") for e in entries
+             if e.get("Name", "").lower().endswith(KINDS) and 0 < int(e.get("Size", 0) or 0) <= MAX_BYTES}
+    os.makedirs(CACHE, exist_ok=True)
+    ok, _, why = rclone("copy", REMOTE, CACHE, "--max-depth", "1", "--max-size", "25M", "--ignore-case",
+                        "--include", "*.{jpg,jpeg,png,webp}")
+    if not ok:
+        return names, "Some pictures couldn't be copied from Dropbox: " + why
+    return names, ""
+
+
+def pictures(folder, where, only=None):
+    out = []
+    try:
+        files = sorted(os.listdir(folder))
+    except OSError:
+        return out
+    for name in files:
+        path = os.path.join(folder, name)
+        if not name.lower().endswith(KINDS) or name.startswith(".") or not os.path.isfile(path):
+            continue
+        if only is not None and name not in only:
+            continue   # taken out of Dropbox since it was copied
+        st = os.stat(path)
+        if st.st_size == 0 or st.st_size > MAX_BYTES:
+            continue
+        out.append({"name": name, "path": path, "bytes": st.st_size, "where": where,
+                    "modified": datetime.datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})
+    return out
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] != "list":
+        print(__doc__.strip())
+        return 2
+    names, error = (None, "") if "--local" in sys.argv else from_dropbox()
+    found = pictures(CACHE, "Dropbox", names) + pictures(BY_HAND, "Pictures/Guest Screen")
+    found.sort(key=lambda p: p["modified"], reverse=True)
+    print(json.dumps({"folder": FOLDER, "pictures": found, "error": error}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

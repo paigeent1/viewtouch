@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "app/pos_service.hh"
+#include "layout_fixture.hh"
+#include "layoutcontroller.hh"
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
 #include "storage/async_writer.hh"
@@ -13,6 +15,8 @@
 #include <QImage>
 #include <QTemporaryDir>
 #include <QUrl>
+
+#include <algorithm>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -148,4 +152,55 @@ TEST_CASE("Pictures: one without a name ending (Android's photo picker) is named
     CHECK(pos.addImageFile(dir.filePath(u"Logo"_s)) == u"store:logo.png"_s);
     CHECK(pos.addImageFile(QUrl::fromLocalFile(dir.filePath(u"menu.dat"_s)).toString()) == u"store:menu.jpg"_s);
     CHECK(pos.addImageFile(dir.filePath(u"notes"_s)).isEmpty());   // not a picture
+}
+
+TEST_CASE("Guest screen pictures: one from the Dropbox folder is made to fit, kept and shown in turn", "[images][guest]")
+{
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    QDir(home.path()).mkpath(u".cache/vt-guest-pictures"_s);
+    QDir(home.path()).mkpath(u"Elsewhere"_s);
+    // A phone's big picture, copied from Dropbox; the same one somewhere else.
+    QImage big(3000, 1000, QImage::Format_RGB32);
+    big.fill(Qt::darkGreen);
+    const QString cached = home.filePath(u".cache/vt-guest-pictures/Fall Sale!.png"_s);
+    REQUIRE(big.save(cached));
+    const QString elsewhere = home.filePath(u"Elsewhere/sale.png"_s);
+    REQUIRE(big.save(elsewhere));
+    QTemporaryDir images;
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    PosService pos(test::seedPosData(), nullptr);
+    pos.shared()->imageCacheDir = images.path();
+    pos.shared()->settings.displaySlides = {"Welcome to the store"};
+    LayoutController c(*l);
+    c.setPos(&pos);
+
+    REQUIRE(pos.loginWithPin(u"1111"_s));                      // a server can't
+    CHECK(c.addGuestPicture(cached).isEmpty());
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.addGuestPicture(elsewhere).isEmpty());             // only from the guest screen's folders
+    CHECK(c.addGuestPicture(home.filePath(u".cache/vt-guest-pictures/../../Elsewhere/sale.png"_s)).isEmpty());
+    const QString line = c.addGuestPicture(QUrl::fromLocalFile(cached).toString());
+    qputenv("HOME", oldHome);
+
+    CHECK(line == u"image:store:guest-fall-sale.jpg"_s);
+    CHECK(pos.shared()->settings.displaySlides
+          == std::vector<std::string>{"Welcome to the store", "image:store:guest-fall-sale.jpg"});
+    CHECK(pos.shared()->images.size() == 1);
+    // A JPEG no bigger than the guest screen (never made larger), kept by the store.
+    const auto it = pos.shared()->images.find("guest-fall-sale.jpg");
+    REQUIRE(it != pos.shared()->images.end());
+    CHECK(it->second.startsWith("\xff\xd8"));
+    const QImage kept = QImage::fromData(it->second);
+    CHECK(kept.width() == 1920);
+    CHECK(kept.height() == 640);
+    // The guest screen shows it by its ref; Store Settings' change log has it.
+    CHECK(pos.imageUrl(u"store:guest-fall-sale.jpg"_s).startsWith(u"file:"_s));
+    CHECK(std::ranges::any_of(pos.changesToday(), [](const core::Change &ch) {
+        return ch.after.find("guest-fall-sale.jpg") != std::string::npos;
+    }));
 }
