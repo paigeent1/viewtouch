@@ -1,8 +1,6 @@
 #pragma once
 // What the barcode on the back of a US or Canadian driver's license or ID card says (AAMVA PDF417):
-// only what an age check needs. A seller may keep no more than the name, date of birth, expiration
-// date and ID number from such a scan (Connecticut CGS 53-344(e)); ViewTouch keeps the age passed and
-// the ID's last 4 characters.
+// only what an age check needs. ViewTouch keeps the age passed and the ID's last 4 characters.
 #include <cctype>
 #include <optional>
 #include <string>

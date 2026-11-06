@@ -297,7 +297,7 @@ struct Check {
     std::string subscriptionCard;         // a subscription (9...) card shown on it: subscription-only promotions apply
     // ID check for age-restricted items (tobacco, alcohol): the age shown (the buyer is at least this
     // old), how ("scan", "hand"), who checked and when, the ID's last 4 characters. Nothing else from
-    // the ID is kept (CT CGS 53-344(e)).
+    // the ID is kept.
     int ageVerified = 0;
     std::string ageHow;
     std::string ageBy;
