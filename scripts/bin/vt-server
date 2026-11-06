@@ -11,6 +11,20 @@ if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; t
         && touch modern/CMakeLists.txt \
         || echo "Couldn't install Qt Multimedia; ViewTouch builds without video (pictures and GIFs still work)."
 fi
+# Qt Multimedia's build files also need Qt's private GUI files, and playing a video needs a backend
+# (FFmpeg): without them the build says "Qt Multimedia not found" even with qt6-multimedia-dev in
+# (2026-11-06 on the HCA Pi). Installed once when missing; the build then looks again.
+if command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
+    need=()
+    dpkg -s qt6-base-private-dev >/dev/null 2>&1 || need+=(qt6-base-private-dev)
+    dpkg -s qt6-ffmpeg-multimedia-plugin >/dev/null 2>&1 || dpkg -s qt6-gstreamer-multimedia-plugin >/dev/null 2>&1 \
+        || need+=(qt6-ffmpeg-multimedia-plugin)
+    if [ ${#need[@]} -gt 0 ]; then
+        echo "Installing ${need[*]} (video on the customer display)..."
+        sudo apt-get install -y "${need[@]}" >/dev/null 2>&1 && touch modern/CMakeLists.txt \
+            || echo "Couldn't install ${need[*]}; ViewTouch builds without video (pictures and GIFs still work)."
+    fi
+fi
 # Guest-screen videos are made ready with ffmpeg (vt-guest-video-prep): installed once when missing.
 if command -v dpkg >/dev/null && ! command -v ffmpeg >/dev/null; then
     echo "Installing ffmpeg (guest-screen videos)..."

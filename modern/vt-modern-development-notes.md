@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 17:54 ET — Bob (Claude) — vt-server installs what Qt Multimedia still needs (video on the guest screen)
+- **What:** vt-server: when qt6-multimedia-dev is installed but qt6-base-private-dev or a playback backend (qt6-ffmpeg-multimedia-plugin, or gstreamer) isn't, installs them once and makes the build look for Qt Multimedia again.
+- **Why:** HCA Pi 2026-11-06 17:36: qt6-multimedia-dev 6.8.2 installed, yet the build said 'Qt Multimedia not found: no video on the customer display' and no playback plugin was installed.
+- **Files:** `scripts/bin/vt-server`
+
 ### 2026-11-06 17:43 ET — Bob (Claude) — Order screen Find: every word, best first, as bars; found on the main computer
 - **What:** Find on the order screens now finds an item when every word typed is somewhere in its name, in any order ("oliva mel" finds OLIVA V MELANIO), the same way ALPHA LOOK UP finds them (one shared search). Best first: the item's own number or a UPC typed, a number that starts so, the name starting with the first word, every word starting a word, then the words anywhere; then A-Z. The main computer does the finding (new findItems / itemSearch, the best 300), so a tablet no longer needs the whole 31,700-item list; it is asked 0.2 s after the last key. The results are full-width bars (name left, price right, at least 64 tall) with big up / down page buttons, instead of the grid of buttons; touching a bar rings the item just as a button did (allergy warnings and SOLD OUT show on the bar). The menu grid away from Find is unchanged. Tests: the ranking, numbers and UPCs, and speed on the 41,000-item catalog.
 - **Why:** Owner 2026-11-06 17:34: Find is slow and not intuitive ("oliva mel" found nothing; results in a 4 x 3 grid).
