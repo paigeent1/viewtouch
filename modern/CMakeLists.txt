@@ -133,6 +133,7 @@ if(Qt6_FOUND)
         QML_FILES
             ui/qml/Main.qml
             ui/qml/JoinWindow.qml
+            ui/qml/Billboard.qml
             ui/qml/StationWindow.qml
             ui/qml/StationIcon.qml
             ui/qml/PicturePicker.qml
@@ -176,6 +177,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetGuestMessages.qml
             ui/qml/WidgetSiteSetup.qml
             ui/qml/WidgetScreenCheck.qml
+            ui/qml/WidgetBillboards.qml
             ui/qml/WidgetReceiptLookup.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml
@@ -253,6 +255,7 @@ if(Qt6_FOUND)
             ui/cpp/language.hh ui/cpp/language.cpp
             ui/cpp/editorcontroller.hh ui/cpp/editorcontroller.cpp
             ui/cpp/joincontroller.hh ui/cpp/joincontroller.cpp
+            ui/cpp/billboard.hh ui/cpp/billboard.cpp
             ui/cpp/stationcontroller.hh ui/cpp/stationcontroller.cpp
             ui/cpp/reportexport.hh ui/cpp/reportexport.cpp
             ui/cpp/menuprint.hh ui/cpp/menuprint.cpp

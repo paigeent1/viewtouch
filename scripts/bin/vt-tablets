@@ -1,6 +1,6 @@
 #!/bin/bash
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-APK=$(ls -t "$VT_REPO"/apks/*.apk 2>/dev/null | head -n 1)
+APK=$(vt_apk arm64-v8a)   # the tablets' 64-bit app, never the Fire TV one
 if [ -z "$APK" ]; then echo "No APK found in ~/viewtouch-main/apks/"; exit 1; fi
 # First a tablet plugged into the Pi by USB (e.g. one off Wi-Fi), over the cable (before vt-adb-ensure
 # switches it to Wi-Fi mode).

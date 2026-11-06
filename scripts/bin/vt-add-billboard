@@ -1,0 +1,67 @@
+#!/bin/bash
+# A TV with Fire TV (or an Android TV box) as a billboard: the guest screen's pictures and videos,
+# full screen, nothing else (signage only: it never gets a check or a customer). Over Wi-Fi:
+#   vt-add-billboard "Front TV" 192.168.1.60
+# First, on the TV: Settings > My Fire TV > About: select the TV's name 7 times (Developer options
+# on), then Settings > My Fire TV > Developer options: ADB debugging ON, Apps from Unknown
+# Sources ON. Its address: Settings > My Fire TV > About > Network.
+# Run it again to update the app on that TV (it keeps its pairing; add --pair-again to pair anew).
+# Its hours, mute and on/off: ViewTouch > Hardware Configuration > Billboards.
+set -e
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+NAME="$1"
+IP="$2"
+if [ -z "$NAME" ] || [ -z "$IP" ]; then
+    echo "Usage: vt-add-billboard \"Front TV\" <the TV's Wi-Fi address>"
+    exit 1
+fi
+DEV="$IP:5555"
+adb connect "$DEV" >/dev/null 2>&1 || true
+sleep 2
+if ! adb -s "$DEV" get-state 2>/dev/null | grep -q device; then
+    echo "The TV at $IP didn't let the Pi in. On the TV: Allow USB debugging? -> check 'Always allow from this computer' -> OK. Then run this again."
+    echo "(Is ADB debugging on? Settings > My Fire TV > Developer options.)"
+    exit 1
+fi
+# Most Fire TVs run 32-bit apps (armeabi-v7a), even on a 64-bit chip.
+CPU=$(adb -s "$DEV" shell getprop ro.product.cpu.abi | tr -d '\r')
+case "$CPU" in
+    arm64-v8a) APK=$(vt_apk arm64-v8a) ;;
+    *)         APK=$(vt_apk armeabi-v7a) ;;
+esac
+[ -z "$APK" ] && { echo "No APK for this TV ($CPU) in $VT_REPO/apks/ (from the Modern Android build: ViewTouch-android-armeabi-v7a)."; exit 1; }
+HAD=$(adb -s "$DEV" shell pm list packages org.viewtouch.pos | tr -d '\r')
+echo "Installing $(basename "$APK") on $NAME ($IP, $CPU)..."
+adb -s "$DEV" install -r -d "$APK" >/dev/null
+if [ -n "$HAD" ] && [ "$3" != "--pair-again" ]; then
+    # Already a billboard: the new app keeps its pairing.
+    adb -s "$DEV" shell am force-stop org.viewtouch.pos
+    adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+    echo "✓ Updated $NAME ($IP). (To pair it again: vt-add-billboard \"$NAME\" $IP --pair-again)"
+    exit 0
+fi
+if [ -n "$HAD" ]; then
+    adb -s "$DEV" uninstall org.viewtouch.pos >/dev/null 2>&1 || true   # its old pairing goes with it
+    adb -s "$DEV" install -r -d "$APK" >/dev/null
+fi
+# Paired here on the Pi as a billboard, then the pairing handed to the TV (read once, then removed).
+SERVER="$(vt_server_addr):$SERVER_PORT"
+CODE=$(QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
+[ -z "$CODE" ] && { echo "No pairing code: is ViewTouch running on this Pi?"; exit 1; }
+PAIR=$(mktemp -d /tmp/vt_billboard.XXXXXX)
+QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --data-dir "$PAIR" --connect "$SERVER" --pair "$CODE" \
+    --terminal "$NAME" --screen billboard --pair-only >/dev/null 2>&1
+CRED=$(find "$PAIR" -name terminal.json | head -n 1)
+[ -z "$CRED" ] && { rm -rf "$PAIR"; echo "Pairing $NAME didn't work."; exit 1; }
+adb -s "$DEV" shell am force-stop org.viewtouch.pos
+adb -s "$DEV" push "$CRED" /data/local/tmp/terminal.json >/dev/null
+rm -rf "$PAIR"
+adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+sleep 10
+adb -s "$DEV" shell rm -f /data/local/tmp/terminal.json >/dev/null 2>&1 || true
+mkdir -p "$VT_CONF_DIR"
+touch "$VT_CONF_DIR/billboards"
+grep -v "^$NAME|" "$VT_CONF_DIR/billboards" > "$VT_CONF_DIR/billboards.new" || true
+echo "$NAME|$IP" >> "$VT_CONF_DIR/billboards.new"
+mv "$VT_CONF_DIR/billboards.new" "$VT_CONF_DIR/billboards"
+echo "✓ $NAME ($IP) is a billboard of $SERVER. Its hours and sound: Hardware Configuration > Billboards."

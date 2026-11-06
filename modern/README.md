@@ -124,6 +124,18 @@ Also add ANDROID_KEYSTORE_ALIAS (`viewtouch`) and ANDROID_KEYSTORE_PASSWORD. Kee
 
 **Building elsewhere:** the workflow uses Qt 6.11.2 for Android (installed with `aqtinstall`), Android NDK r27c, JDK 17 and KDAB's OpenSSL for Android. Android builds need an x86_64 Linux, Windows or macOS machine: the NDK is not made for ARM64 Linux.
 
+## Billboards (TVs around the store)
+
+A **billboard** is a TV that shows the guest screen's turn of messages, pictures and videos (Store Settings → Customer display: between guests) full screen, and nothing else: no logo bar, prices, orders or customers. Signage only: the store's computer sends a billboard the slides, the pictures and the logo, never a check, a customer or a sale, and refuses anything else it asks for. The same timing as the guest screen (messages 7 s, pictures 10 s, videos to their end, a video's sound only if its slide has Sound on); no slides: the store's logo.
+
+- **The TV:** a Fire TV (a TV with Fire TV built in, a Fire TV Stick) or an Android TV box, running the ViewTouch app (`ViewTouch-b<build>-armeabi-v7a.apk`: most Fire TVs run 32-bit apps). It shows on the TV's home screen under *Your Apps & Channels*.
+- **Setting one up** (from the Pi, over Wi-Fi): on the TV, Settings → My Fire TV → About → select the TV's name 7 times; then Developer options → *ADB debugging* on and *Apps from Unknown Sources* on; its address is under About → Network. Put the armeabi-v7a APK in `~/viewtouch-main/apks/` and run `vt-add-billboard "Front TV" <address>`; the first time, the TV asks to allow the Pi (*Always allow*, then run it again). It installs the app, pairs it as a billboard and starts it. Run it again to update the app (it keeps its pairing).
+- **Any paired screen** becomes one in Manager → Terminals → *Screen layout: Billboard* (it reconnects as one), and a Linux screen with `vtmodern --connect <server> --screen billboard`.
+- **Hours, sound, on/off:** Hardware Configuration → **Billboards**: per billboard *On*, *Mute all videos* (whatever each video's Sound says), and its hours each day (all day, these hours, or closed), by the store's clock. Kept on the store's computer; the TV follows at once. Outside its hours it goes dark (black, no video) and lets the screen sleep, so Fire OS turns the TV off by its own sleep setting; at the start time it asks Android to wake the screen (a TV in deep standby may not wake for an app: then press the remote's Home).
+- **Videos** are files on the Pi (`~/Pictures/Guest Screen`). A billboard gets each one over its own encrypted connection, a part at a time, keeps it until the file changes, and deletes the ones no slide uses. Only videos on the slides and in that folder are ever sent.
+- **Closing it:** five taps in the top-left corner, or five presses of the remote's Back or OK within 4 seconds, then a manager's PIN (arrows and OK on the remote). The app closes; open it again from Your Apps & Channels.
+- **When the TV turns on:** ViewTouch starts again by itself where Fire OS allows apps to start at boot (Fire OS 7, Android 9); on newer Fire OS start it from the home screen.
+
 ## Phones and small screens
 
 Every page is designed on a 1920 × 1080 landscape canvas and scaled to the screen. On a phone that makes buttons too small, so phones get **phone pages** instead:

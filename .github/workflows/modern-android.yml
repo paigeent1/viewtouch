@@ -29,6 +29,7 @@ jobs:
       matrix:
         include:
           - { abi: arm64-v8a,   qt_arch: android_arm64_v8a }   # most tablets
+          - { abi: armeabi-v7a, qt_arch: android_armv7 }       # Fire TV / Android TV billboards (32-bit)
     steps:
       - uses: actions/checkout@v5
         with:
@@ -50,7 +51,8 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
           python3 -m pip install --user aqtinstall
-          python3 -m aqt install-qt all_os android "${QT_VERSION}" ${{ matrix.qt_arch }} -O "$HOME/Qt" --autodesktop
+          # Qt Multimedia: the guest-screen and billboard videos (GuestVideoSlide.qml).
+          python3 -m aqt install-qt all_os android "${QT_VERSION}" ${{ matrix.qt_arch }} -O "$HOME/Qt" --autodesktop -m qtmultimedia
           echo "QT_ANDROID=$HOME/Qt/${QT_VERSION}/${{ matrix.qt_arch }}" >> "$GITHUB_ENV"
           echo "QT_HOST=$(dirname "$(dirname "$(find "$HOME/Qt/${QT_VERSION}" -path '*gcc_64/bin/qmake' -o -path '*gcc_64/bin/qtpaths' | head -1)")")" >> "$GITHUB_ENV"
 

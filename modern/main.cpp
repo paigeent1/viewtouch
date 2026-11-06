@@ -1,4 +1,5 @@
 #include "app/pos_json.hh"
+#include "billboard.hh"
 #include "joincontroller.hh"
 #include "stationcontroller.hh"
 #include "language.hh"
@@ -153,8 +154,9 @@ struct Options {
           "Manager -> Terminals; on, except on Android, which has its own)."_s, u"yes|no"_s};
     QCommandLineOption screen{u"screen"_s,
         u"Pages for this screen: phone (phone versions, portrait), standard, auto "
-        "(phones get phone pages; the default on Android), or timeClock (only clocking in and out "
-        "and schedules). Overrides Manager → Terminals."_s, u"mode"_s};
+        "(phones get phone pages; the default on Android), timeClock (only clocking in and out "
+        "and schedules), or billboard (a TV showing the guest screen's pictures and videos, nothing "
+        "else; with --pair it is paired as one). Overrides Manager → Terminals."_s, u"mode"_s};
     QCommandLineOption windowed{u"windowed"_s,
         u"Start in a window instead of full screen (also with --size). F11 switches either way."_s};
     QCommandLineOption backupDir{u"backup-dir"_s, u"Where backups go (default: <data dir>/backups)."_s, u"dir"_s};
@@ -603,6 +605,48 @@ int runStation(const Args &cli, const Options &o)
 }
 
 constexpr int kRejoin = 75;   // qApp->exit code: the server refused this device
+constexpr int kRoleChanged = 76;   // ... this screen was made a billboard, or a terminal again
+
+// A billboard (ui/cpp/billboard.hh): the store's slides full screen, nothing else, until a
+// manager's PIN closes it. Returns what qApp->exit said.
+int runBillboard(const Args &cli, const Options &o, vt::net::RemoteSession &remote)
+{
+#ifdef Q_OS_ANDROID
+    keepScreenOn(true);   // Billboard.kt lets it sleep outside its hours
+#endif
+    BillboardController board(&remote);
+    const bool kiosk = cli.isSet(o.kiosk);
+    QObject::connect(&board, &BillboardController::closeRequested, qApp, [kiosk] {
+        qInfo("Billboard closed by a manager");
+        QCoreApplication::exit(kiosk ? kKioskClosed : 0);
+    });
+    // Made a terminal again in Manager -> Terminals: the store reconnects it; start again as one.
+    QObject::connect(&remote, &vt::net::RemoteSession::adminChanged, qApp, [&remote] {
+        if (remote.isConnected() && remote.screenMode() != u"billboard")
+            QCoreApplication::exit(kRoleChanged);
+    });
+    QQmlApplicationEngine engine;
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
+                     qApp, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+    engine.setInitialProperties({{u"billboard"_s, QVariant::fromValue(&board)}});
+    engine.addImportPath(u"qrc:/"_s);
+    engine.load(QUrl(u"qrc:/ViewTouch/ui/qml/Billboard.qml"_s));
+    auto *window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    if (!window)
+        return 1;
+    present(window, cli, o);
+    if (!QGuiApplication::overrideCursor() && !cli.isSet(o.windowed))
+        QGuiApplication::setOverrideCursor(Qt::BlankCursor);   // a TV: no pointer over the pictures
+    if (cli.isSet(o.screenshot)) {
+        const QString file = cli.value(o.screenshot);
+        QTimer::singleShot(1500, window, [window, file] {
+            window->grabWindow().save(file);
+            QCoreApplication::exit(0);
+        });
+    }
+    qInfo().noquote() << "Billboard: showing the store's slides as" << remote.terminalName();
+    return QCoreApplication::exec();
+}
 
 int runTerminal(const Args &cli, const Options &o)
 {
@@ -654,6 +698,8 @@ int runTerminal(const Args &cli, const Options &o)
                 creds = c;
             loop.quit();
         });
+        if (cli.value(o.screen) == u"billboard")   // vt-add-billboard: a billboard from the start
+            pairer.setScreen(u"billboard"_s);
         pairer.start(host, port, cli.value(o.pair), suggestedTerminalName(cli, o));
         loop.exec();
         if (!ok) {
@@ -662,7 +708,24 @@ int runTerminal(const Args &cli, const Options &o)
         }
         save(*creds);
         qInfo().noquote() << "Paired with" << creds->serverName << "as" << creds->terminalName;
+        // vt-add-tablet / vt-add-billboard pair on the Pi for the device, then hand it the pairing.
+        if (cli.isSet(o.pairOnly))
+            return 0;
     }
+    // What this screen was the last time the store said (a billboard starts as one even before the
+    // store answers; Kiosk.kt starts a billboard again when the TV turns on).
+    const QString roleFile = QDir(dataDir).filePath(u"screen-role.txt"_s);
+    const auto savedRole = [&roleFile] {
+        QFile f(roleFile);
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).trimmed() : QString();
+    };
+    const auto saveRole = [&roleFile](bool billboard) {
+        QSaveFile f(roleFile);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(billboard ? "billboard\n" : "terminal\n");
+            f.commit();
+        }
+    };
 
     QString problem;
     for (;;) {
@@ -680,12 +743,35 @@ int runTerminal(const Args &cli, const Options &o)
         remote.setCredentials(*creds);
         if (cli.isSet(o.selfOrder))
             remote.setRequestedScreen(u"selfOrder"_s);
-        else if (cli.value(o.screen) == u"timeClock")
-            remote.setRequestedScreen(u"timeClock"_s);
+        else if (cli.value(o.screen) == u"timeClock" || cli.value(o.screen) == u"billboard")
+            remote.setRequestedScreen(cli.value(o.screen));
         QObject::connect(&remote, &vt::net::RemoteSession::credentialsChanged, &remote, save);
         remote.connectTo(creds->host, creds->port);
         qInfo().noquote() << "Connecting to" << creds->host << "port" << creds->port << "as" << creds->terminalName
                           << "...";
+        // A billboard (Manager -> Terminals, or --screen billboard): the slides full screen, nothing
+        // else. The store decides once it answers; until then, what it said last time.
+        bool billboard = cli.value(o.screen) == u"billboard" || savedRole() == u"billboard";
+        if (billboard) {
+            remote.waitForWelcome(10000);
+            if (remote.isConnected())
+                billboard = remote.screenMode() == u"billboard";
+        }
+        if (billboard && !remote.isRejected()) {
+            saveRole(true);
+            QObject::connect(&remote, &vt::net::RemoteSession::rejected, qApp, [] { QCoreApplication::exit(kRejoin); });
+            const int result = runBillboard(cli, o, remote);
+            if (result == kRoleChanged)
+                continue;   // a terminal again: its pages
+            if (result != kRejoin)
+                return result;
+            QFile::remove(credentialFile);
+            problem = QCoreApplication::translate("main",
+                "%1 no longer accepts this terminal (it was removed in Manager → Terminals). Pair it again.")
+                          .arg(creds->serverName.isEmpty() ? creds->host : creds->serverName);
+            creds.reset();
+            continue;
+        }
         // The pages as last received, so the terminal can start (showing that
         // it is offline) while the server is still out of reach.
         const QString pagesFile = QDir(dataDir).filePath(u"pages-cache.json"_s);
@@ -724,6 +810,17 @@ int runTerminal(const Args &cli, const Options &o)
             continue;
         }
 
+        if (remote.isConnected())
+            saveRole(remote.screenMode() == u"billboard");
+        // Made a billboard in Manager -> Terminals while running: the store reconnects it, and it
+        // starts again as one.
+        QObject::connect(&remote, &vt::net::RemoteSession::adminChanged, qApp, [&remote] {
+            if (remote.isConnected() && remote.screenMode() == u"billboard")
+                QCoreApplication::exit(kRoleChanged);
+        });
+        if (remote.isConnected() && remote.screenMode() == u"billboard")
+            continue;
+
         LayoutController controller(*pages);
         controller.setPos(&remote);
 #ifndef Q_OS_ANDROID
@@ -756,6 +853,8 @@ int runTerminal(const Args &cli, const Options &o)
         if (!engine)
             return 1;
         const int result = qApp->exec();
+        if (result == kRoleChanged)
+            continue;   // a billboard now
         if (result != kRejoin)
             return result;
         QFile::remove(credentialFile);
@@ -909,6 +1008,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"site-setup"},     // Site Setup
                 {u"hardware-config", u"bluetooth"},      // Bluetooth scanner (pair one with a tablet)
                 {u"hardware-config", u"screen-check"},   // Screen check (which monitor is the register)
+                {u"hardware-config", u"billboards"},     // Billboards (TVs with the guest-screen slides)
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {

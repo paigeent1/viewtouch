@@ -190,7 +190,8 @@ object Kiosk {
     // The tablet started: ViewTouch again.
     fun boot(context: Context) {
         ensureWirelessAdb(context)
-        val dpm = policy(context) ?: return
+        // Not a locked tablet: a billboard TV still starts ViewTouch when it turns on (Billboard.kt).
+        val dpm = policy(context) ?: return Billboard.boot(context)
         // ViewTouch as the home screen again (Close ViewTouch turned that off): Android may not let a
         // starting tablet open an app from here, but it always opens the home screen.
         try {

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "billboards",
+  "name": "Billboards",
+  "kind": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "manager",
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1888,
+        "h": 72
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Billboards: TVs showing the guest-screen pictures and videos"
+    },
+    {
+      "id": "billboards",
+      "kind": "billboards",
+      "rect": {
+        "x": 16,
+        "y": 96,
+        "w": 1888,
+        "h": 840
+      },
+      "shape": "rect",
+      "behavior": "none"
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "rect": {
+        "x": 16,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "‹ Hardware",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}
