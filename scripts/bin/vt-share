@@ -1,0 +1,33 @@
+#!/bin/bash
+# Runs a command on the Pi, shows its output as usual, and shares that output with Bob:
+# saved in ~/vt-output/ and copied to Google Drive "POS project tmp/pi-output/" (the Pi's
+# rclone remote "gdrive"), so the owner doesn't have to copy and paste results.
+#   vt-share vt-screens                       one command
+#   vt-share sh -c "git pull myfork main && vt-server"   several, one after another
+#   vt-share cat ~/.vt-run.log                a file's contents
+# One way only: it uploads output, it never downloads or runs anything from Drive.
+# Don't share output with card numbers, IDs or customer details.
+[ $# -eq 0 ] && { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+OUT="$HOME/vt-output"
+mkdir -p "$OUT"
+name=$(basename "$1")
+[ "$name" = sh ] || [ "$name" = bash ] && name=commands
+file="$OUT/$(date +%Y-%m-%d_%H%M%S)-${name//[^A-Za-z0-9._-]/_}.txt"
+{
+    echo "\$ $*"
+    echo "# $(hostname) $(date '+%Y-%m-%d %H:%M:%S %Z') in $(pwd)"
+    echo
+} > "$file"
+"$@" 2>&1 | tee -a "$file"
+status=${PIPESTATUS[0]}
+echo "# exit status $status" >> "$file"
+cp -f "$file" "$OUT/latest.txt"
+# Keep the last 200 here.
+ls -1t "$OUT"/20*.txt 2>/dev/null | tail -n +201 | while read -r old; do rm -f -- "$old"; done
+if command -v rclone >/dev/null && rclone copy "$file" "gdrive:POS project tmp/pi-output/" 2>/dev/null \
+        && rclone copyto "$file" "gdrive:POS project tmp/pi-output/latest.txt" 2>/dev/null; then
+    echo "(Shared with Bob: $(basename "$file"))"
+else
+    echo "(Saved in $file; couldn't copy it to Google Drive)"
+fi
+exit "$status"

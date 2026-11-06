@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-06 11:56 ET — Bob (Claude) — vt-share: Pi output shared with Bob through Google Drive
+- **What:** New scripts/bin/vt-share <command>: runs it, shows the output as usual, saves it in ~/vt-output/ (last 200 kept, latest.txt) and copies it to Google Drive 'POS project tmp/pi-output/' with the Pi's rclone remote gdrive (also as latest.txt). Keeps the command's exit status. Upload only: it never downloads or runs anything from Drive.
+- **Why:** Owner 2026-11-06: Bob should read what the Pi did instead of the owner copying and pasting results.
+- **Files:** `scripts/bin/vt-share`
+- **Next person must know:** Bob reads pi-output/latest.txt with the Google Drive connector. Keep card, ID and customer details out of shared output. vt-server links new vt-* commands, so vt-share works by name after the next vt-server.
+
 ### 2026-11-06 11:56 ET — Bob (Claude) — Screen check: finger-sized buttons and scrolling
 - **What:** WidgetScreenCheck scrolls with TouchScrollColumn (finger-wide bar) instead of ScrollView, and its buttons are 64 high and at least 200 wide.
 - **Why:** CI 42251518875: 'every control on every page is big enough for a finger' flagged Look again, Show each monitor's name and the thin scroll bars (the only new failure).
