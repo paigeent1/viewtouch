@@ -6,28 +6,56 @@ import QtQuick.Layouts
 // every family, with a chip for each across the top). New items, prices and
 // sold-out items show up with no page editing. props.family: one family, or
 // empty for all; props.columns; props.photos: show item photos;
-// props.search: the items whose name has what's typed (the Find page);
+// props.search: the items whose name has every word typed (the Find page; the main computer finds
+// them, as Item Look Up does, and they show as bars, best first);
 // props.popular: today's best sellers, most sold first (the Popular page).
 Item {
     id: w
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
-    // The item list comes to a tablet only while a screen shows it (PosServer: on request): a
-    // 30,000-item price book would otherwise go to every tablet on every change.
+    // Find's answer comes to a tablet only while a screen shows it (PosServer: on request); the
+    // whole item list (a 30,000-item price book) no longer has to.
     Item {
         visible: false
-        readonly property var p: w.search ? w.pos : null   // only a search (Find Item) lists every item
+        readonly property var p: w.search ? w.pos : null
         property var asked: null
         function ask() {
             if (asked === p) return
-            if (asked) asked.want("menuItems", false)
+            if (asked) asked.want("itemSearch", false)
             asked = p
-            if (p) p.want("menuItems", true)
+            if (p) p.want("itemSearch", true)
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) asked.want("menuItems", false)
+        Component.onDestruction: if (asked) asked.want("itemSearch", false)
     }
+    // Typing: found a moment after the last key.
+    Timer {
+        id: findTyping
+        interval: 200
+        onTriggered: if (w.pos && w.search) w.pos.findItems(w.typed)
+    }
+    onTypedChanged: {
+        if (!search) return
+        findTyping.restart()
+        if (typed === "") refreshFound()      // cleared: no bars right away
+    }
+    Component.onCompleted: {
+        if (search && pos) pos.findItems(typed)
+        refreshFound()
+    }
+    readonly property var found: pos && search ? pos.itemSearch : ({})
+    // The bars: made again only when the answer is a new one (found.rev), so paging isn't lost when
+    // something else changes; none while nothing is typed.
+    property var foundItems: []
+    property var foundRev: undefined
+    function refreshFound() {
+        const r = found.rev
+        if (typed !== "" && r !== undefined && r === foundRev) return
+        foundRev = typed === "" ? undefined : r
+        foundItems = typed === "" ? [] : (found.items ?? [])
+    }
+    onFoundChanged: refreshFound()
     readonly property string fixedFamily: zone && zone.props && zone.props.family ? zone.props.family : ""
     // Columns: set by the page (0: as many as fit; see MenuButtons).
     readonly property int setColumns: zone && zone.props && zone.props.columns > 0 ? zone.props.columns : 0
@@ -38,8 +66,8 @@ Item {
     readonly property string face: zone.st.font ?? "DejaVu Sans"
 
     // The order screens: the menu less the retail-only categories (a price book stays on the main
-    // computer); a search (Find Item) looks through every item.
-    readonly property var allItems: pos ? (search ? pos.menuItems : pos.orderItems) : []
+    // computer); a search (Find Item) is done there, through every item (itemSearch).
+    readonly property var allItems: pos && !search ? pos.orderItems : []
     readonly property var items: allItems.filter(i => !i.modifier)
     // The menu's categories with items, in their order (Menu Builder).
     readonly property var categories: pos ? pos.menuCategories.filter(c => c.count > 0 && (search || !c.retailOnly)) : []
@@ -64,24 +92,13 @@ Item {
     function categoryOf(id) { return categories.find(c => c.id === id) ?? ({}) }
     // The category shown: its own button size, photos, prices (Menu Builder).
     readonly property var shownCategory: !search && !popular && family !== "★" ? categoryOf(family) : ({})
-    // Searching: every family, best matches first (the name starts with it, then a word does).
+    // Searching: every family, best matches first (found by the main computer: foundItems).
     readonly property var shown: {
+        if (search)
+            return foundItems
         if (popular)
             return (pos ? pos.popularItems : []).map(id => items.find(i => i.id === id)).filter(i => i !== undefined)
-        if (!search)
-            return family === "★" ? favorites : items.filter(i => i.family === family)
-        if (typed === "")
-            return []
-        const digits = /^[0-9]+$/.test(typed)
-        const rank = i => {
-            if (digits && i.number && i.number.startsWith(typed))
-                return i.number === typed ? 0 : 1            // its number first
-            const n = i.name.toLowerCase()
-            return n.startsWith(typed) ? 2 : n.split(/[^a-z0-9]+/).some(word => word.startsWith(typed)) ? 3
-                 : n.includes(typed) ? 4 : -1
-        }
-        return items.map(i => ({ item: i, rank: rank(i) })).filter(x => x.rank >= 0)
-                    .sort((a, b) => a.rank - b.rank || a.item.name.localeCompare(b.item.name)).map(x => x.item)
+        return family === "★" ? favorites : items.filter(i => i.family === family)
     }
     function title(f) {
         if (f === "★")
@@ -91,6 +108,8 @@ Item {
     }
 
     readonly property real gap: 12
+    // Find's bars: big enough to touch (64 at the least, in the page's units).
+    readonly property real barH: Math.max(64, zone ? zone.touch(64) : 64)
     // Arranging (managers): touch an item, then move it or color it.
     // Kept by the controller: a menu change rebuilds the page.
     property bool arranging: zone && zone.controller ? zone.controller.widgetState(zone.zoneId + ".arranging") === true : false
@@ -140,11 +159,118 @@ Item {
             }
         }
 
-        MenuButtons {
-            id: grid
+        // Find: one bar per item (name, price), best first, with big ▲ ▼ to page through them.
+        RowLayout {
+            objectName: "findBars"
+            visible: w.search && w.shown.length > 0
             Layout.fillWidth: true
             Layout.fillHeight: true
-            items: w.shown
+            spacing: w.gap
+            ListView {
+                id: bars
+                objectName: "findList"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: w.gap * 0.5
+                boundsBehavior: Flickable.StopAtBounds
+                model: w.search ? w.shown : []
+                readonly property var allergenNames: w.pos ? w.pos.allergenList() : []
+                function allergenName(id) { return (allergenNames.find(a => a.id === id) ?? { name: id }).name }
+                function page(by) {
+                    const step = Math.max(1, Math.floor(height / (w.barH + spacing)) - 1)
+                    const top = indexAt(10, contentY + 10)
+                    positionViewAtIndex(Math.max(0, Math.min(count - 1, (top < 0 ? 0 : top) + by * step)), ListView.Beginning)
+                }
+                delegate: Rectangle {
+                    id: bar
+                    required property var modelData
+                    objectName: "menuItem-" + modelData.id
+                    width: ListView.view.width
+                    height: w.barH
+                    radius: 8
+                    readonly property var hits: (modelData.allergens ?? []).filter(a => w.allergies.includes(a))
+                    color: !modelData.available ? "#3a3f48" : "#1f2937"
+                    border.color: hits.length > 0 ? "#f59e0b" : "#475569"
+                    border.width: hits.length > 0 ? 3 : 1
+                    opacity: modelData.available ? 1 : 0.7
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        spacing: 14
+                        Text {
+                            visible: !!bar.modelData.number
+                            text: bar.modelData.number ?? ""
+                            font.family: w.face
+                            font.pixelSize: 18
+                            color: "#93c5fd"
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Text {
+                                Layout.fillWidth: true
+                                text: qsTranslate("Page", bar.modelData.name)
+                                font.family: w.face
+                                font.pixelSize: 24; font.bold: true
+                                color: "white"
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                objectName: "allergyMark-" + bar.modelData.id
+                                visible: bar.hits.length > 0
+                                Layout.fillWidth: true
+                                text: "⚠ " + bar.hits.map(a => bars.allergenName(a)).join(", ")
+                                font.pixelSize: 16; font.bold: true
+                                color: "#fbbf24"
+                                elide: Text.ElideRight
+                            }
+                        }
+                        Text {
+                            objectName: "menuPrice-" + bar.modelData.id
+                            text: !bar.modelData.available ? qsTr("SOLD OUT")
+                                : bar.modelData.price + (bar.modelData.byWeight ? " / " + bar.modelData.unit : "")
+                            font.family: w.face
+                            font.pixelSize: 26; font.bold: true
+                            color: !bar.modelData.available ? "#ff6b6b" : "#fde047"
+                        }
+                    }
+                    TapHandler {
+                        enabled: bar.modelData.available
+                        onTapped: w.zone.controller.orderItem(bar.modelData.id, true)
+                    }
+                }
+            }
+            ColumnLayout {
+                Layout.fillHeight: true
+                Layout.preferredWidth: 130
+                spacing: w.gap
+                WidgetKey {
+                    objectName: "findPageUp"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: "▲"
+                    fontScale: 0.5
+                    onClicked: bars.page(-1)
+                }
+                WidgetKey {
+                    objectName: "findPageDown"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: "▼"
+                    fontScale: 0.5
+                    onClicked: bars.page(1)
+                }
+            }
+        }
+
+        MenuButtons {
+            id: grid
+            visible: !w.search
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            items: w.search ? [] : w.shown   // Find shows bars instead
             category: w.shownCategory
             categories: w.categories
             pos: w.pos
@@ -241,7 +367,8 @@ Item {
             text: !w.pos || !w.pos.loggedIn ? ""
                 : w.popular ? qsTr("Today's best sellers show up here as orders come in.")
                 : w.search ? (w.typed === "" ? qsTr("Type part of a name: \"cob\" finds Cobb.")
-                                              : qsTr("Nothing on the menu has \"%1\".").arg(w.typed))
+                              : String(w.found.query ?? "").toLowerCase() !== w.typed ? ""   // still looking
+                              : qsTr("Nothing on the menu has \"%1\".").arg(w.typed))
                 : qsTr("Nothing on the menu here yet (Manager -> Menu).")
             color: "#8a94a6"
             font.pixelSize: 24

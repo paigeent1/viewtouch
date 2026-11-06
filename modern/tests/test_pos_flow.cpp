@@ -2240,7 +2240,7 @@ TEST_CASE("UI: ring items in by number (keyboard, or Find)", "[flow][ui][plu]")
     s.pos.textKey(u"3"_s);
     s.pos.textKey(u"0"_s);
     s.pos.textKey(u"5"_s);
-    QTest::qWait(60);
+    QTest::qWait(350);                                        // found a moment after the last key
     CHECK(Screen::findBy(s.window->contentItem(), "objectName", u"menuItem-water"_s));   // 305
     CHECK_FALSE(Screen::findBy(s.window->contentItem(), "objectName", u"menuItem-coffee"_s));
 
@@ -2946,10 +2946,12 @@ TEST_CASE("UI: find an item by typing part of its name", "[flow][ui][find]")
     const auto find = [&](const QString &name) { return Screen::findBy(s.window->contentItem(), "objectName", name); };
     for (const QChar ch : u"cob"_s)
         s.pos.textKey(QString(ch));
-    QTest::qWait(60);
+    QTest::qWait(350);                                        // found a moment after the last key
     QQuickItem *cobb = find(u"menuItem-cobb"_s);
     REQUIRE(cobb);
     CHECK_FALSE(find(u"menuItem-caesar"_s));                  // only what matches
+    CHECK(cobb->height() >= 64);                              // a bar, big enough to touch
+    CHECK(find(u"findPageUp"_s));                             // with ▲ ▼ beside the bars
     s.shot("51-find-item");
     s.tapItem(cobb);
     QTest::qWait(60);
@@ -2962,12 +2964,17 @@ TEST_CASE("UI: find an item by typing part of its name", "[flow][ui][find]")
     // A word inside the name counts; nothing found says so.
     for (const QChar ch : u"bur"_s)
         s.pos.textKey(QString(ch));
-    QTest::qWait(60);
+    QTest::qWait(350);
     CHECK(find(u"menuItem-classic-burger"_s));                // "Classic Burger": a word starts with it
+    s.pos.textKey(u"clear"_s);
+    for (const QChar ch : u"burg clas"_s)                    // every word, in any order
+        s.pos.textKey(QString(ch));
+    QTest::qWait(350);
+    CHECK(find(u"menuItem-classic-burger"_s));
     s.pos.textKey(u"clear"_s);
     for (const QChar ch : u"zzz"_s)
         s.pos.textKey(QString(ch));
-    QTest::qWait(60);
+    QTest::qWait(350);
     CHECK(Screen::findBy(s.window->contentItem(), "text", u"Nothing on the menu has \"zzz\"."_s));
 }
 

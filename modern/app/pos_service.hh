@@ -544,6 +544,10 @@ public:
     QVariantMap retailLabels() const override;
     // Items for the Labels screen: by name or any of their UPCs.
     bool findRetailLabels(const QString &query);
+    // Find on the order screens: every word typed somewhere in the name (any order, as Item Look Up finds
+    // them), or an item number / UPC; the answer in itemSearch().
+    bool findItems(const QString &text);
+    QVariantMap itemSearch() const override;
     // The tree: [group, category, brand] (fewer: that level's children).
     bool browseRetailLabels(const QStringList &path);
     // Every item under the path (Show Items), up to 300; the levels below are still listed.
@@ -1364,6 +1368,9 @@ private:
     // given again as it is while nothing it comes from has changed; a longer search starts from the last.
     struct LabelLookup;
     mutable std::shared_ptr<LabelLookup> labelLookup_;
+    QString itemQuery_;               // Find (findItems)
+    struct ItemFind;
+    mutable std::shared_ptr<ItemFind> itemFind_;
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;

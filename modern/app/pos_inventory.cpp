@@ -732,6 +732,35 @@ QString brandFromName(const QString &upperName)
     return upperName.section(u' ', 0, 0, QString::SectionSkipEmpty);
 }
 
+// Finding items by name, the same on Item Look Up, the Labels screen and Find: every word typed is somewhere
+// in the name, in any order ("oliva mel" finds OLIVA V MELANIO). Names are looked at in small letters, made
+// once with each list of items.
+struct NameWords {
+    QStringList words;
+    explicit NameWords(const QString &typed)
+        : words(typed.trimmed().toLower().split(u' ', Qt::SkipEmptyParts))
+    {
+    }
+    bool matches(const QString &lowerName) const
+    {
+        return !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return lowerName.contains(w); });
+    }
+    // How well a name it matches does (Find puts the best first): 0 the name starts with the first word,
+    // 1 every word starts a word of the name, 2 some word is only inside a word.
+    int rank(const QString &lowerName) const
+    {
+        if (lowerName.startsWith(words.first()))
+            return 0;
+        const auto startsAWord = [&](const QString &w) {
+            for (qsizetype at = lowerName.indexOf(w); at >= 0; at = lowerName.indexOf(w, at + 1))
+                if (at == 0 || !lowerName.at(at - 1).isLetterOrNumber())
+                    return true;
+            return false;
+        };
+        return std::ranges::all_of(words, startsAWord) ? 1 : 2;
+    }
+};
+
 // One item on the Labels screen, from ViewTouch's menu or from the ILSA price book.
 struct LabelItem {
     QString id, name, price;
@@ -1021,10 +1050,8 @@ QVariantMap PosService::retailLabels() const
                     found.push_back(std::uint32_t(i));
         } else {
             const QString lower = q.toLower();
-            const QStringList words = lower.split(u' ', Qt::SkipEmptyParts);
-            const auto hit = [&](const LabelItem &it) {
-                return !words.isEmpty() && std::ranges::all_of(words, [&](const QString &w) { return it.lowerName.contains(w); });
-            };
+            const NameWords words(q);
+            const auto hit = [&](const LabelItem &it) { return words.matches(it.lowerName); };
             std::vector<std::uint32_t> hits;
             std::size_t from = 0;
             if (kept.searched && kept.searchItems == &items && kept.searchGeneration == gLabelItemsGeneration
@@ -1104,6 +1131,145 @@ bool PosService::findRetailLabels(const QString &query)
     labelBrowsing_ = false;
     emit sessionChanged();
     return true;
+}
+
+// --- Find on the order screens (the same finding by name as Item Look Up) ------------------------
+
+// What Find last found: the items (best first) for one search on one menu; the answer last given.
+struct PosService::ItemFind {
+    std::uint64_t generation = 0;
+    QString lower;                         // the search, in small letters
+    bool byName = false;                   // found by name only (no number / UPC)
+    std::vector<std::uint32_t> found;      // every item found, best first
+    QVariantMap answer;
+};
+
+bool PosService::findItems(const QString &text)
+{
+    if (itemQuery_ == text.trimmed())
+        return true;
+    itemQuery_ = text.trimmed();
+    emit sessionChanged();
+    return true;
+}
+
+QVariantMap PosService::itemSearch() const
+{
+    // Every item made ready once per menu change: its name in small letters, number, UPCs without
+    // leading zeros, and its place among all the names A-Z.
+    struct Ready {
+        std::uint64_t shared = 0;
+        int revision = -1;
+        std::size_t size = 0;
+        std::uint64_t generation = 0;
+        std::vector<QString> lowerName, number;
+        std::vector<QStringList> plainCodes;
+        std::vector<char> modifier;
+        std::vector<std::uint32_t> nameOrder;
+    };
+    static Ready ready;
+    if (ready.shared != s_->serial || ready.revision != s_->adminRevision || ready.size != s_->menu.size()) {
+        ready.shared = s_->serial;
+        ready.revision = s_->adminRevision;
+        ready.size = s_->menu.size();
+        ++ready.generation;
+        const std::size_t n = s_->menu.size();
+        ready.lowerName.assign(n, {});
+        ready.number.assign(n, {});
+        ready.plainCodes.assign(n, {});
+        ready.modifier.assign(n, 0);
+        ready.nameOrder.assign(n, 0);
+        std::vector<std::uint32_t> byName(n);
+        std::vector<QString> names(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const MenuItem &m = s_->menu[i];
+            names[i] = qs(m.name);
+            ready.lowerName[i] = names[i].toLower();
+            ready.number[i] = qs(m.number);
+            for (const std::string &b : m.barcodes)
+                if (const QString c = digitsOnly(qs(b)); !c.isEmpty())
+                    ready.plainCodes[i] << noLeadingZeros(c);
+            ready.modifier[i] = m.isModifier ? 1 : 0;
+            byName[i] = std::uint32_t(i);
+        }
+        std::ranges::stable_sort(byName, [&](std::uint32_t a, std::uint32_t b) {
+            return QString::localeAwareCompare(names[a], names[b]) < 0;
+        });
+        for (std::size_t k = 0; k < n; ++k)
+            ready.nameOrder[byName[k]] = std::uint32_t(k);
+    }
+    if (!itemFind_)
+        itemFind_ = std::make_shared<ItemFind>();
+    ItemFind &kept = *itemFind_;
+
+    // The items found, best first: its own number typed, or a UPC; a number that starts so; then by name
+    // (the name starts with the first word, every word starts a word, the words are somewhere); then A-Z.
+    const QString lower = itemQuery_.toLower();
+    const bool digits = !lower.isEmpty() && std::ranges::all_of(lower, [](QChar ch) { return ch >= u'0' && ch <= u'9'; });
+    if (kept.generation != ready.generation || kept.lower != lower) {
+        const NameWords words(lower);
+        const QString plain = noLeadingZeros(lower);
+        std::vector<std::pair<int, std::uint32_t>> hits;   // how well, which
+        const auto look = [&](std::uint32_t i) {
+            if (ready.modifier[i])
+                return;
+            int rank = -1;
+            if (digits) {
+                const QString &number = ready.number[i];
+                if (!number.isEmpty() && number == lower)
+                    rank = 0;
+                else if (lower.size() >= 4 && ready.plainCodes[i].contains(plain))
+                    rank = 0;
+                else if (!number.isEmpty() && number.startsWith(lower))
+                    rank = 1;
+            }
+            if (rank < 0 && words.matches(ready.lowerName[i]))
+                rank = 2 + words.rank(ready.lowerName[i]);
+            if (rank >= 0)
+                hits.emplace_back(rank, i);
+        };
+        // One more letter typed (by name): only what the last search found can still be found.
+        if (kept.byName && !digits && kept.generation == ready.generation && !kept.lower.isEmpty() && lower.startsWith(kept.lower)) {
+            for (std::uint32_t i : kept.found)
+                look(i);
+        } else if (!lower.isEmpty()) {
+            for (std::size_t i = 0; i < s_->menu.size(); ++i)
+                look(std::uint32_t(i));
+        }
+        std::ranges::sort(hits, [&](const auto &a, const auto &b) {
+            return a.first != b.first ? a.first < b.first : ready.nameOrder[a.second] < ready.nameOrder[b.second];
+        });
+        kept.found.clear();
+        kept.found.reserve(hits.size());
+        for (const auto &h : hits)
+            kept.found.push_back(h.second);
+        kept.generation = ready.generation;
+        kept.lower = lower;
+        kept.byName = !digits;
+    }
+
+    // The best 300 as they are now (sold out, prices of the hour): the very same answer while nothing changed.
+    QVariantList items;
+    if (user()) {
+        const std::string period = currentMealPeriod();
+        for (std::size_t k = 0; k < kept.found.size() && k < 300; ++k) {
+            const MenuItem &m = s_->menu[kept.found[k]];
+            QStringList allergens;
+            for (const std::string &a : m.allergens)
+                allergens << qs(a);
+            items.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"family"_s, qs(m.family)},
+                                     {u"price"_s, format(m.priceDuring(period))},
+                                     {u"available"_s, m.available && ticketsLeft(m) != 0}, {u"byWeight"_s, m.byWeight},
+                                     {u"unit"_s, qs(m.weightUnit)}, {u"number"_s, qs(m.number)}, {u"allergens"_s, allergens}});
+        }
+    }
+    const int count = user() ? int(kept.found.size()) : 0;
+    if (!kept.answer.isEmpty() && kept.answer.value(u"query"_s).toString() == itemQuery_
+        && kept.answer.value(u"count"_s).toInt() == count && kept.answer.value(u"items"_s).toList() == items)
+        return kept.answer;
+    static qint64 next = QDateTime::currentMSecsSinceEpoch();
+    kept.answer = {{u"query"_s, itemQuery_}, {u"count"_s, count}, {u"items"_s, items}, {u"rev"_s, ++next}};
+    return kept.answer;
 }
 
 bool PosService::previewRetailLabel(const QVariantMap &job)

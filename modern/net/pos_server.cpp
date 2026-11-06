@@ -77,7 +77,8 @@ bool onRequest(const QString &key)
     // items (Menu Builder, the menu grid, Sold Out) ask for it.
     // The Labels screen and Item Look Up (retailLabels) likewise: only to a screen showing one.
     // Menu Builder's own list (builderItems) too.
-    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems";
+    // Find's answer (itemSearch) too.
+    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems" || key == u"itemSearch";
 }
 
 // Screens that ask for things (this version) get the open checks in two
