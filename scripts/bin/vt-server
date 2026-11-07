@@ -17,15 +17,16 @@ fi
 if command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
     need=()
     dpkg -s qt6-base-private-dev >/dev/null 2>&1 || need+=(qt6-base-private-dev)
-    dpkg -s qt6-ffmpeg-multimedia-plugin >/dev/null 2>&1 || dpkg -s qt6-gstreamer-multimedia-plugin >/dev/null 2>&1 \
-        || need+=(qt6-ffmpeg-multimedia-plugin)
+    # A playback backend: Debian's Qt Multimedia brings its own (2026-11-07 the HCA Pi played video
+    # with no extra package; qt6-ffmpeg-multimedia-plugin doesn't exist there), so only when none is.
+    ls /usr/lib/*/qt6/plugins/multimedia/*.so >/dev/null 2>&1 || need+=(qt6-ffmpeg-multimedia-plugin)
     if [ ${#need[@]} -gt 0 ]; then
         echo "Installing ${need[*]} (video on the customer display)..."
         # --fresh: the build folder remembers "Qt Multimedia not found" from before the install
         # (2026-11-06 on the HCA Pi: a fresh project found it, the old build folder didn't).
         sudo apt-get install -y "${need[@]}" >/dev/null 2>&1 \
             && cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null \
-            || echo "Couldn't install ${need[*]}; ViewTouch builds without video (pictures and GIFs still work)."
+            || echo "Couldn't install ${need[*]}; video on the customer display may not play (pictures and GIFs still work)."
     fi
 fi
 # Guest-screen videos are made ready with ffmpeg (vt-guest-video-prep): installed once when missing.

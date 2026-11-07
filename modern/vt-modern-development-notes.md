@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 09:09 ET — Bob (Claude) — vt-server: no false 'without video' message
+- **What:** vt-server only installs a Qt Multimedia playback package when no plugin is in /usr/lib/*/qt6/plugins/multimedia; its failure message no longer claims ViewTouch builds without video.
+- **Why:** HCA Pi 2026-11-07 09:10: videos played with sound and muted during an open check, yet vt-server said it couldn't install qt6-ffmpeg-multimedia-plugin and that ViewTouch builds without video (that package doesn't exist on Debian trixie; Qt Multimedia brings its own backend).
+- **Files:** `scripts/bin/vt-server`
+
 ### 2026-11-07 09:08 ET — Bob (Claude) — vt-server: looks for Qt Multimedia again from a clean slate
 - **What:** vt-server: after installing Qt Multimedia's companions it reconfigures with cmake --fresh; and before each build, if CMakeCache.txt still has Qt6Multimedia_DIR NOTFOUND while Qt6MultimediaConfig.cmake exists, it reconfigures with --fresh once.
 - **Why:** HCA Pi 2026-11-06 23:52: a fresh project found Qt Multimedia, but ViewTouch's build folder kept its old 'not found' (no video on the guest screen).
