@@ -670,6 +670,8 @@ QVariantList PosService::adminFields(const QString &panel)
                   tr("Like 11:00 AM. Runs until the next period starts.")),
         };
     }
+    if (panel == u"billboards")   // Store Settings > Billboards (pos_billboards.cpp)
+        return billboardFields();
     if (panel == u"terminals") {
         QVariantList printers = options({{"", "Receipt (default)"}, {"ask", "Ask each time (handhelds)"}});
         for (const PrinterConfig &p : s_->settings.printers)

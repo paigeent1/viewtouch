@@ -418,6 +418,27 @@ public:
 
     void startDay();
 
+    // Store Settings > Billboards: the TVs' deploy / update / restart, run here on the store's
+    // computer in the background (vt-add-billboard), one at a time for each billboard: what it
+    // said (its plain lines, newest last), how far it got, how it ended.
+    struct BillboardJob {
+        QString action;            // "deploy" | "restart"
+        bool running = false;
+        bool ok = false;
+        int step = 0, steps = 0;   // "[2/6] ..." lines from the script
+        QStringList lines;
+        std::int64_t at = 0;
+        bool refused = false;      // the TV answered but wouldn't let adb in (ADB debugging off)
+        bool unreachable = false;  // no answer at all (off, another network, the VPN down)
+    };
+    std::map<std::string, BillboardJob> billboardJobs;
+    // Identify: the billboard shows its name until then (ms).
+    std::map<std::string, std::int64_t> billboardIdentify;
+    // vt-add-billboard (main: /usr/local/bin, or $VT_ADD_BILLBOARD; tests: a stand-in), and the
+    // list it keeps of the TVs it set up ($VT_CONF_DIR/billboards: "name|address" lines).
+    QString billboardScript;
+    QString billboardsFile;
+
     // Backups (set up by main on the store server): take one now, and how
     // the last one went - {at, ok, error, copy, copyOk}.
     std::function<bool()> requestBackup;
@@ -1136,6 +1157,32 @@ public:
     // adminRecords("billboards"), PosSession::setBillboard.)
     QVariantList billboards() const;
     bool setBillboard(const QString &name, const QVariantMap &settings);
+    // Store Settings > Billboards (managers; pos_billboards.cpp). "deploy" (install or update the
+    // app, pair it the first time: vt-add-billboard in the background; args: pairPort, pairCode for
+    // a Google TV's wireless debugging), "restart" (its app, over adb), "identify" (its name on
+    // the TV for 10 seconds, over its own connection). Progress: the record's job.
+    bool billboardAction(const QString &name, const QString &action, const QVariantMap &args = {});
+    // Removed for good (unpaired: it can't connect again until deployed anew), with a manager's PIN.
+    bool removeBillboard(const QString &name, const QString &managerPin);
+    // When these hours next turn a billboard on or off after `now` (ms, the store's clock); 0: never
+    // (always on, or always closed).
+    static std::int64_t billboardNextChange(const std::vector<std::string> &hours, std::int64_t now);
+    // Showing at `now`: switched on, and its on / off now if one is set (until it runs out), else its
+    // hours (its own, or the store's billboard defaults).
+    static bool billboardShowingAt(const core::TerminalConfig &t, const core::PosSettings &s, std::int64_t now);
+    // What a billboard goes by: its own hours, volume, mute and slides, else the defaults / the guest screen's.
+    static const std::vector<std::string> &billboardHoursOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    static int billboardVolumeOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    static bool billboardMuteOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    static const std::vector<std::string> &billboardSlidesOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    // Apply to...: this billboard's messages, pictures and videos copied to these billboards (by
+    // name; "@guest": the guest screen's list too). Managers.
+    bool applyBillboardContent(const QString &name, const QStringList &targets);
+    // The TVs vt-add-billboard set up before this page (its list: "name|address" lines, and a
+    // .new left by one stopped half way): their addresses, kept on the billboards. True if any changed.
+    static bool migrateBillboardsFile(core::PosSettings &settings, const QString &file);
+    // A billboard's day as the page shows it: "9:00 AM-9:00 PM", "closed", "" all day.
+    static QString billboardDayText(const std::string &kept);
     // A picture the store uses (a menu item's photo, the display logo or a
     // slide), base64, for screens on other computers; empty for anything else.
     QString storeImage(const QString &path) const;
@@ -1543,6 +1590,8 @@ private:
     core::ReportContext reportContext(const QString &period) const;
     QString dayLabel(const core::BusinessDay &day) const;
     bool saveMenuRecord(int index, const QVariantMap &record);
+    bool saveBillboardRecord(int index, const QVariantMap &record);
+    QVariantList billboardFields() const;
     bool saveEmployeeRecord(int index, const QVariantMap &record);
     bool saveTenderRecord(int index, const QVariantMap &record);
     bool saveMealPeriodRecord(int index, const QVariantMap &record);

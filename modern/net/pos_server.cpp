@@ -672,8 +672,15 @@ bool PosServer::allowedForBillboard(const QString &ref) const
         return false;
     if (ref.toStdString() == shared_->settings.displayLogo)
         return true;
-    return std::ranges::any_of(shared_->settings.displaySlides,
-                               [&](const std::string &sl) { return QString::fromStdString(sl) == u"image:"_s + ref; });
+    const auto onList = [&](const std::vector<std::string> &list) {
+        return std::ranges::any_of(list, [&](const std::string &sl) { return QString::fromStdString(sl) == u"image:"_s + ref; });
+    };
+    // The guest screen's slides, or a billboard's own (Store Settings > Billboards).
+    if (onList(shared_->settings.displaySlides))
+        return true;
+    return std::ranges::any_of(shared_->settings.terminals, [&](const core::TerminalConfig &t) {
+        return t.screen == "billboard" && t.billboardOwnSlides && onList(t.billboardSlides);
+    });
 }
 
 void PosServer::handleBillboard(Connection *c, const QJsonObject &m)
@@ -735,8 +742,12 @@ QString PosServer::billboardVideo(const QString &name) const
     const QString file = guestVideoFile(guestVideoDir_, name);
     if (file.isEmpty())
         return {};
-    // Only a video the store has on its slides now.
-    for (const std::string &sl : shared_->settings.displaySlides) {
+    // Only a video the store has on its slides now (the guest screen's, or a billboard's own).
+    std::vector<std::string> lists = shared_->settings.displaySlides;
+    for (const core::TerminalConfig &t : shared_->settings.terminals)
+        if (t.screen == "billboard" && t.billboardOwnSlides)
+            lists.insert(lists.end(), t.billboardSlides.begin(), t.billboardSlides.end());
+    for (const std::string &sl : lists) {
         QString line = QString::fromStdString(sl);
         if (!line.startsWith(u"video:"))
             continue;

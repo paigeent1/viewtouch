@@ -6,8 +6,8 @@ import QtQuick.Layouts
 // messages, pictures and videos, full screen, and nothing else - signage only, never a check or a
 // customer. The same timing as the guest screen (WidgetGuestMessages.qml): each message 7 seconds,
 // each picture 10, a video to its end (its sound only if its slide has #sound and this billboard
-// isn't muted). No slides: the store's logo (or its name). Outside its hours (Hardware
-// Configuration > Billboards, by the store's clock): black, nothing drawn, no video. Across the top
+// isn't muted). No slides: the store's logo (or its name). Outside its hours (Store
+// Settings > Billboards, by the store's clock): black, nothing drawn, no video. Across the top
 // while showing: the store's ribbon (its colour and logo), as on the guest screen.
 // The only way out: five taps in the top-left corner, or five presses of the remote's Back or OK
 // within 4 seconds, then a manager's PIN (the remote's arrows and OK, or its number keys).
@@ -26,177 +26,26 @@ ApplicationWindow {
     readonly property var slides: billboard.slides
     readonly property color accent: billboard.accent || "#2f6fd6"
 
-    onDarkChanged: billboard.setDark(dark)
-    Component.onCompleted: billboard.setDark(dark)
+    // Identify (Store Settings > Billboards): awake for its 10 seconds even outside its hours.
+    readonly property bool asleep: dark && !billboard.identify
+    onAsleepChanged: billboard.setDark(asleep)
+    Component.onCompleted: billboard.setDark(asleep)
     // A manager's PIN closes the app (main.cpp, BillboardController::closeRequested).
 
-    // --- the turn ------------------------------------------------------------------------------
-    property int index: 0
-    property bool videoOff: false      // this build can't play video: every video is skipped
-    property var badVideos: ({})       // videos that failed here, tried again every 10 minutes
-    function videoUrl(s) { return root.billboard.revision < 0 ? "" : root.billboard.videoUrl(s) }
-    // A video shows once it is on this device (it comes from the store a part at a time).
-    function usable(s) { return !s.startsWith("video:") || (!videoOff && !badVideos[s] && videoUrl(s) !== "") }
-    function next() {
-        const n = slides.length
-        for (let k = 1; k <= n; ++k) {
-            const j = (index + k) % n
-            if (usable(slides[j])) { index = j; return }
-        }
-    }
-    function videoFailed() {
-        const bad = Object.assign({}, badVideos)
-        bad[slide.current] = true
-        badVideos = bad
-        fade.restart()
-    }
-    Timer {
-        interval: slide.picture ? 10000 : 7000
-        running: !root.dark && root.slides.length > 1 && !slide.video
-        repeat: true
-        onTriggered: fade.restart()
-    }
-    // The only slide was a video still on its way: look again now and then.
-    Timer {
-        interval: 5000
-        running: !root.dark && slide.current === "" && root.slides.length > 0
-        repeat: true
-        onTriggered: root.next()
-    }
-    Timer {
-        id: videoCap
-        interval: 10 * 60 * 1000
-        running: !root.dark && slide.video
-        onTriggered: fade.restart()
-    }
-    Timer {
-        interval: 10 * 60 * 1000
-        running: Object.keys(root.badVideos).length > 0
-        repeat: true
-        onTriggered: root.badVideos = ({})
-    }
-    SequentialAnimation {
-        id: fade
-        NumberAnimation { target: slide; property: "opacity"; to: 0; duration: 350 }
-        ScriptAction {
-            script: {
-                root.next()
-                videoCap.restart()
-                if (slide.video && videoSlide.item)
-                    videoSlide.item.play(slide.videoUrl)
-            }
-        }
-        NumberAnimation { target: slide; property: "opacity"; to: 1; duration: 350 }
-    }
-
-    // The store's ribbon across the top, as on the guest screen: its colour, its logo (or its name).
-    Rectangle {
-        id: ribbon
-        visible: !root.dark
-        anchors { left: parent.left; right: parent.right; top: parent.top }
-        height: root.u * 3.4
-        color: root.accent
-        Image {
-            id: ribbonLogo
-            visible: source != ""
-            anchors { left: parent.left; leftMargin: root.u; verticalCenter: parent.verticalCenter }
-            height: parent.height * 0.75
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            source: root.billboard.revision < 0 ? "" : root.billboard.logoUrl
-        }
-        Text {
-            visible: !ribbonLogo.visible
-            anchors { left: parent.left; leftMargin: root.u; verticalCenter: parent.verticalCenter }
-            text: root.billboard.storeName
-            color: "white"
-            font.family: "DejaVu Sans"
-            font.pixelSize: root.u * 1.6
-            font.bold: true
-        }
-    }
-
-    Item {
-        id: slide
-        anchors { left: parent.left; right: parent.right; top: ribbon.bottom; bottom: parent.bottom }
-        visible: !root.dark
-        readonly property string shown: root.slides.length ? root.slides[root.index % root.slides.length] : ""
-        readonly property string current: shown !== "" && root.usable(shown) ? shown : ""
-        readonly property bool picture: current.startsWith("image:")
-        readonly property bool video: current.startsWith("video:")
-        readonly property bool sound: video && current.endsWith("#sound") && !root.billboard.mute
-        readonly property string videoUrl: video ? root.videoUrl(current) : ""
-        readonly property bool message: current !== "" && !picture && !video
-
-        Image {
-            anchors.fill: parent
-            visible: slide.picture
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            source: !slide.picture ? "" : (root.billboard.revision < 0 ? "" : root.billboard.imageUrl(slide.current.slice(6)))
-        }
-        Loader {
-            id: videoSlide
-            anchors.fill: parent
-            active: !root.dark && slide.video && !root.videoOff
-            source: active ? "GuestVideoSlide.qml" : ""
-            onStatusChanged: if (status === Loader.Error) { root.videoOff = true; fade.restart() }
-            onLoaded: {
-                item.sound = Qt.binding(() => slide.sound)
-                item.muted = Qt.binding(() => root.billboard.mute)
-                item.finished.connect(() => fade.restart())
-                item.failed.connect(() => root.videoFailed())
-                item.play(slide.videoUrl)
-            }
-        }
-        // A message: big, centred, in the store's colour.
-        ColumnLayout {
-            anchors.centerIn: parent
-            width: parent.width - root.u * 6
-            visible: slide.message
-            spacing: root.u
-            Text {
-                Layout.fillWidth: true
-                Layout.preferredWidth: 1
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                text: slide.message ? slide.current : ""
-                color: "white"
-                font.family: "DejaVu Sans"
-                font.pixelSize: root.u * 3.4
-                font.bold: true
-            }
-            Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: root.u * 8
-                Layout.preferredHeight: Math.max(3, root.u * 0.3)
-                radius: height / 2
-                color: root.accent
-            }
-        }
-        // Nothing to show yet (no slides, or only a video on its way): the logo, or the store's name.
-        Image {
-            id: logo
-            anchors.centerIn: parent
-            width: parent.width * 0.6
-            height: parent.height * 0.6
-            visible: slide.current === "" && source != ""
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            source: root.billboard.revision < 0 ? "" : root.billboard.logoUrl
-        }
-        Text {
-            anchors.centerIn: parent
-            width: parent.width - root.u * 6
-            visible: slide.current === "" && !logo.visible
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: root.billboard.storeName
-            color: "white"
-            font.family: "DejaVu Sans"
-            font.pixelSize: root.u * 3.4
-            font.bold: true
-        }
+    // The ribbon and the turn of messages, pictures and videos (also the page's Preview).
+    BillboardShow {
+        id: show
+        anchors.fill: parent
+        slides: root.slides
+        dark: root.dark
+        mute: root.billboard.mute
+        volume: root.billboard.volume
+        accent: root.accent
+        storeName: root.billboard.storeName
+        revision: root.billboard.revision
+        logoUrl: root.billboard.revision < 0 ? "" : root.billboard.logoUrl
+        imageFor: ref => root.billboard.imageUrl(ref)
+        videoFor: line => root.billboard.videoUrl(line)
     }
 
     // A small sign in the corner only while the store is out of reach, or a video is arriving.
@@ -334,5 +183,37 @@ ApplicationWindow {
         z: 15
         visible: root.dark && !pad.visible
         color: "black"
+    }
+
+    // Identify: which TV this is, big, for the manager looking around the room.
+    Rectangle {
+        objectName: "billboardIdentify"
+        anchors.centerIn: parent
+        z: 16
+        visible: root.billboard.identify && !pad.visible
+        width: Math.min(parent.width - root.u * 2, idName.implicitWidth + root.u * 6)
+        height: idName.implicitHeight + root.u * 4
+        radius: root.u
+        color: "#ffd60a"
+        border.color: "black"
+        border.width: Math.max(4, root.u * 0.3)
+        SequentialAnimation on opacity {
+            running: root.billboard.identify
+            loops: Animation.Infinite
+            NumberAnimation { to: 0.35; duration: 500 }
+            NumberAnimation { to: 1; duration: 500 }
+        }
+        Text {
+            id: idName
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, root.width - root.u * 6)
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            text: root.billboard.name
+            color: "black"
+            font.family: "DejaVu Sans"
+            font.pixelSize: root.u * 4
+            font.bold: true
+        }
     }
 }

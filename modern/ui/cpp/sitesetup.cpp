@@ -591,7 +591,7 @@ QVariantMap LayoutController::guestPictures() const
     return out;
 }
 
-QString LayoutController::addGuestPicture(const QString &fileOrUrl)
+QString LayoutController::addGuestPicture(const QString &fileOrUrl, bool onGuestList)
 {
     if (!pos_)
         return {};
@@ -602,7 +602,7 @@ QString LayoutController::addGuestPicture(const QString &fileOrUrl)
     const QString path = fileOrUrl.startsWith(u"file:") ? QUrl(fileOrUrl).toLocalFile() : fileOrUrl;
     const QFileInfo info(path);
     if (guestVideoKinds().contains(info.suffix().toLower()))
-        return addGuestVideo(path);
+        return addGuestVideo(path, onGuestList);
     if (!inGuestPictureFolder(path)) {
         setStatus(tr("Pictures for the guest screen come from Dropbox > POS project > Guest Screen."));
         return {};
@@ -642,9 +642,9 @@ QString LayoutController::addGuestPicture(const QString &fileOrUrl)
     // (Here the answer comes at once: a refusal returns ""; a remote server's comes later.)
     QPointer<LayoutController> self(this);
     auto refused = std::make_shared<bool>(false);
-    pos_->invoke(u"addStoreImage"_s, {ref.mid(6), QString::fromLatin1(jpeg.toBase64())}, [self, line, refused](const QVariant &ok) {
+    pos_->invoke(u"addStoreImage"_s, {ref.mid(6), QString::fromLatin1(jpeg.toBase64())}, [self, line, refused, onGuestList](const QVariant &ok) {
         *refused = !ok.toBool();
-        if (!self || !self->pos_ || *refused)
+        if (!self || !self->pos_ || *refused || !onGuestList)
             return;
         const QVariantList records = self->pos_->adminRecords(u"store"_s);
         if (records.isEmpty())
@@ -660,7 +660,7 @@ QString LayoutController::addGuestPicture(const QString &fileOrUrl)
     return *refused ? QString() : line;
 }
 
-QString LayoutController::addGuestVideo(const QString &fileOrUrl)
+QString LayoutController::addGuestVideo(const QString &fileOrUrl, bool onGuestList)
 {
     if (!pos_)
         return {};
@@ -724,6 +724,8 @@ QString LayoutController::addGuestVideo(const QString &fileOrUrl)
         });
     }
     // On the list of slides (sound off), saved as a manager's change; one there already stays as it is.
+    if (!onGuestList)
+        return vt::guest::videoSlide(target, false);   // a billboard's own list keeps it
     const QVariantList records = pos_->adminRecords(u"store"_s);
     if (records.isEmpty())
         return {};

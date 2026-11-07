@@ -309,6 +309,7 @@ QVariantList PosService::adminRecords(const QString &panel)
                 qs(t.name), (p ? qs(p->name) : tr("Receipt (default)"))
                                 + (s_->settings.hasDrawer(t.name) ? QString() : tr(" · no drawer"))
                                 + (t.key.empty() ? QString() : tr(" · paired device"))
+                                + (t.screen == "billboard" ? tr(" · billboard") : QString())
                                 + (qs(t.name) == terminal_ ? tr(" · this screen") : QString()));
         }
     }
@@ -334,6 +335,25 @@ QVariantMap PosService::adminNewRecord(const QString &panel)
     if (panel == u"tenders")
         return {{u"id"_s, QString()}, {u"name"_s, QString()}, {u"kind"_s, u"card"_s}, {u"percent"_s, 0.0},
                 {u"staffMeal"_s, false}};
+    if (panel == u"billboards") {
+        // A new billboard: the defaults' hours, volume and mute (null: "default"), and a copy of the
+        // guest screen's messages, pictures and videos to start from.
+        QVariantMap inherit{{u"volume"_s, s_->settings.billboardDefaultVolume}, {u"mute"_s, s_->settings.billboardDefaultMute}};
+        QStringList slides;
+        for (const std::string &sl : s_->settings.displaySlides)
+            slides << qs(sl);
+        QVariantMap r{{u"_board"_s, true}, {u"name"_s, QString()}, {u"ip"_s, QString()}, {u"port"_s, QString()},
+                      {u"enabled"_s, true}, {u"now"_s, QString()}, {u"mute"_s, QVariant()}, {u"volume"_s, QVariant()},
+                      {u"pairPort"_s, QString()}, {u"pairCode"_s, QString()}, {u"ownContent"_s, true},
+                      {u"slides"_s, slides.join(u'\n')}};
+        for (int d = 0; d < 7; ++d) {
+            const auto &h = s_->settings.billboardDefaultHours;
+            r.insert(u"day"_s + QString::number(d + 1), QVariant());
+            inherit.insert(u"day"_s + QString::number(d + 1), billboardDayText(size_t(d) < h.size() ? h[size_t(d)] : std::string()));
+        }
+        r.insert(u"_inherit"_s, inherit);
+        return r;
+    }
     if (panel == u"terminals")
         return {{u"name"_s, terminal_}, {u"receiptPrinter"_s, QString()}, {u"drawer"_s, QString()},
                 {u"screen"_s, QString()}, {u"look"_s, QString()}, {u"keyboard"_s, QString()}, {u"requireName"_s, QString()},

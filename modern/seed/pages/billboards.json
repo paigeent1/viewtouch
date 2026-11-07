@@ -21,7 +21,7 @@
       },
       "shape": "rect",
       "behavior": "none",
-      "label": "Billboards: TVs showing the guest-screen pictures and videos"
+      "label": "Billboards: TVs showing the guest-screen pictures and videos, here or at another store"
     },
     {
       "id": "billboards",
@@ -46,7 +46,7 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "‹ Hardware",
+      "label": "‹ Back",
       "actions": [
         {
           "type": "jump",

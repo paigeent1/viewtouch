@@ -77,6 +77,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         ok = saveTenderRecord(index, record);
     } else if (panel == u"printers") {
         ok = savePrinterRecord(index, record);
+    } else if (panel == u"billboards") {
+        ok = saveBillboardRecord(index, record);   // pos_billboards.cpp
     } else if (panel == u"mealPeriods") {
         ok = saveMealPeriodRecord(index, record);
     } else if (panel == u"modifierGroups") {

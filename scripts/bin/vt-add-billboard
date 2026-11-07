@@ -1,26 +1,114 @@
 #!/bin/bash
-# A TV with Fire TV (or an Android TV box) as a billboard: the guest screen's pictures and videos,
-# full screen, nothing else (signage only: it never gets a check or a customer). Over Wi-Fi:
+# A TV with a Fire TV (a Fire TV, or a Fire TV Stick in any TV) as a billboard: the guest screen's
+# pictures and videos, full screen, nothing else (signage only: it never gets a check or a
+# customer). Usually started from ViewTouch: Store Settings > Billboards > + Add (or Deploy /
+# Update app), which runs this on the store's computer and shows what it says. By hand:
 #   vt-add-billboard "Front TV" 192.168.1.60
-# First, on the TV: Settings > My Fire TV > About: select the TV's name 7 times (Developer options
-# on), then Settings > My Fire TV > Developer options: ADB debugging ON, Apps from Unknown
-# Sources ON. Its address: Settings > My Fire TV > About > Network.
+# Any address this computer reaches works: a TV at another store over the VPN too.
+# First, on the Fire TV: Settings > My Fire TV (or Device & Software) > Developer options: ADB
+# debugging ON (no Developer options: Settings > My Fire TV > About, select the device's name 7
+# times). Its address: Settings > Network, highlight its network, press Play/Pause.
 # Run it again to update the app on that TV (it keeps its pairing; add --pair-again to pair anew).
-# Its hours, mute and on/off: ViewTouch > Hardware Configuration > Billboards.
-set -e
+# Options:
+#   --port N                adb's port on the TV (5555; a Google TV's wireless debugging shows another)
+#   --pair-port N --pair-code C   a Google TV / Android TV 11+: Developer options > Wireless
+#                           debugging > Pair device with pairing code (not needed on a Fire TV)
+#   --restart               restart the app on it, nothing else
+#   --pair-again            pair it with the store anew
+# Lines like "[2/6] ..." say how far it got; "@vt ..." lines are notes for ViewTouch's page.
+# Its hours, sound, on/off: ViewTouch > Store Settings > Billboards.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 NAME="$1"
 IP="$2"
 if [ -z "$NAME" ] || [ -z "$IP" ]; then
-    echo "Usage: vt-add-billboard \"Front TV\" <the TV's Wi-Fi address>"
+    echo "Usage: vt-add-billboard \"Front TV\" <the TV's IP address> [--port N] [--pair-port N --pair-code C] [--restart] [--pair-again]"
     exit 1
 fi
-DEV="$IP:5555"
-adb connect "$DEV" >/dev/null 2>&1 || true
+shift 2
+PORT=5555
+PAIR_PORT=
+PAIR_CODE=
+MODE=deploy
+PAIR_AGAIN=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --port) PORT="$2"; shift ;;
+        --pair-port) PAIR_PORT="$2"; shift ;;
+        --pair-code) PAIR_CODE="$2"; shift ;;
+        --restart) MODE=restart ;;
+        --pair-again) PAIR_AGAIN=1 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+done
+# The lowest Android the app runs on (CMakeLists.txt: QT_ANDROID_MIN_SDK_VERSION 28 = Android 9).
+MIN_SDK=28
+STEPS=6
+[ "$MODE" = restart ] && STEPS=2
+DEV="$IP:$PORT"
+command -v adb >/dev/null 2>&1 || { echo "adb isn't installed on this computer (sudo apt install adb)."; exit 1; }
+
+echo "[1/$STEPS] Reaching $NAME at $IP..."
+PINGED=yes
+if command -v ping >/dev/null 2>&1 && ! ping -c 2 -W 2 "$IP" >/dev/null 2>&1; then
+    PINGED=no
+fi
+if [ -n "$PAIR_PORT" ] && [ -n "$PAIR_CODE" ]; then
+    OUT=$(timeout 20 adb pair "$IP:$PAIR_PORT" "$PAIR_CODE" 2>&1)
+    if ! echo "$OUT" | grep -qi "successfully paired"; then
+        echo "Pairing with the TV didn't work: check the pairing port and code (the TV shows new ones each time). ($OUT)"
+        exit 1
+    fi
+    echo "Paired with the TV."
+fi
+adb disconnect "$DEV" >/dev/null 2>&1
+OUT=$(timeout 15 adb connect "$DEV" 2>&1)
 sleep 2
-if ! adb -s "$DEV" get-state 2>/dev/null | grep -q device; then
-    echo "The TV at $IP didn't let the Pi in. On the TV: Allow USB debugging? -> check 'Always allow from this computer' -> OK. Then run this again."
-    echo "(Is ADB debugging on? Settings > My Fire TV > Developer options.)"
+STATE=$(timeout 10 adb -s "$DEV" get-state 2>&1 | tr -d '\r')
+if [ "$STATE" != device ]; then
+    if echo "$STATE $OUT" | grep -qi unauthorized; then
+        echo "@vt refused"
+        echo "The TV is asking whether to let the store's computer in. On the TV: choose 'Always allow from this computer', then OK. Then tap Try again."
+        exit 1
+    fi
+    if [ "$PINGED" = no ] && ! echo "$OUT" | grep -qi refused; then
+        echo "@vt unreachable"
+        echo "The TV isn't reachable at $IP: check it's on and on the same network (or, at another store, that the VPN is up). If it just updated, unplug it for 60 seconds."
+        exit 1
+    fi
+    if echo "$OUT" | grep -qi refused; then
+        echo "@vt refused"
+        echo "The TV at $IP answered but didn't let the store's computer in: on the Fire TV, Settings > My Fire TV > Developer options > ADB debugging ON. Then tap Try again."
+        exit 1
+    fi
+    echo "@vt unreachable"
+    echo "The TV at $IP didn't answer on port $PORT ($OUT). Check it's on, ADB debugging is ON, and it's on the same network or VPN. Then tap Try again."
+    exit 1
+fi
+MAKER=$(adb -s "$DEV" shell getprop ro.product.manufacturer 2>/dev/null | tr -d '\r')
+[ -n "$MAKER" ] && echo "@vt maker $MAKER"
+
+start_app() {
+    adb -s "$DEV" shell am force-stop org.viewtouch.pos >/dev/null 2>&1
+    adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+}
+
+if [ "$MODE" = restart ]; then
+    echo "[2/2] Restarting the app on $NAME..."
+    if [ -z "$(adb -s "$DEV" shell pm list packages org.viewtouch.pos | tr -d '\r')" ]; then
+        echo "The ViewTouch app isn't on $NAME yet: tap Deploy."
+        exit 1
+    fi
+    start_app
+    echo "✓ Restarted the app on $NAME."
+    exit 0
+fi
+
+echo "[2/6] Checking the TV..."
+SDK=$(adb -s "$DEV" shell getprop ro.build.version.sdk | tr -d '\r')
+RELEASE=$(adb -s "$DEV" shell getprop ro.build.version.release | tr -d '\r')
+if [ -n "$SDK" ] && [ "$SDK" -lt "$MIN_SDK" ] 2>/dev/null; then
+    echo "This TV runs Android $RELEASE (API $SDK); the ViewTouch app needs Android 9 (API $MIN_SDK) or newer. A newer Fire TV (or Fire TV Stick) works."
     exit 1
 fi
 # Most Fire TVs run 32-bit apps (armeabi-v7a), even on a 64-bit chip.
@@ -29,33 +117,49 @@ case "$CPU" in
     arm64-v8a) APK=$(vt_apk arm64-v8a) ;;
     *)         APK=$(vt_apk armeabi-v7a) ;;
 esac
-[ -z "$APK" ] && { echo "No APK for this TV ($CPU) in $VT_REPO/apks/ (from the Modern Android build: ViewTouch-android-armeabi-v7a)."; exit 1; }
+[ -z "$APK" ] && { echo "No ViewTouch app for this TV ($CPU) in $VT_REPO/apks/ (from the Modern Android build: ViewTouch-android-armeabi-v7a)."; exit 1; }
 HAD=$(adb -s "$DEV" shell pm list packages org.viewtouch.pos | tr -d '\r')
-echo "Installing $(basename "$APK") on $NAME ($IP, $CPU)..."
-adb -s "$DEV" install -r -d "$APK" >/dev/null
-if [ -n "$HAD" ] && [ "$3" != "--pair-again" ]; then
+echo "[3/6] Installing $(basename "$APK") on $NAME ($CPU, Android $RELEASE)... (a minute or two)"
+if ! OUT=$(adb -s "$DEV" install -r -d "$APK" 2>&1); then
+    if echo "$OUT" | grep -q OLDER_SDK; then
+        echo "This TV's Android ($RELEASE) is older than the app needs (Android 9 or newer)."
+    else
+        echo "Installing didn't work: $(echo "$OUT" | tail -n 1)"
+    fi
+    exit 1
+fi
+if [ -n "$HAD" ] && [ -z "$PAIR_AGAIN" ]; then
     # Already a billboard: the new app keeps its pairing.
-    adb -s "$DEV" shell am force-stop org.viewtouch.pos
-    adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
-    echo "✓ Updated $NAME ($IP). (To pair it again: vt-add-billboard \"$NAME\" $IP --pair-again)"
+    echo "[6/6] Starting it..."
+    start_app
+    echo "✓ Updated $NAME ($IP)."
     exit 0
 fi
 if [ -n "$HAD" ]; then
     adb -s "$DEV" uninstall org.viewtouch.pos >/dev/null 2>&1 || true   # its old pairing goes with it
-    adb -s "$DEV" install -r -d "$APK" >/dev/null
+    adb -s "$DEV" install -r -d "$APK" >/dev/null 2>&1
 fi
-# Paired here on the Pi as a billboard, then the pairing handed to the TV (read once, then removed).
-SERVER="$(vt_server_addr):$SERVER_PORT"
+# Paired here as a billboard, then the pairing handed to the TV (read once, then removed). A TV
+# reached through a router (another store over the VPN): the address it reaches this computer by.
+echo "[4/6] Pairing $NAME with the store..."
+ADDR=$(vt_server_addr)
+if ip route get "$IP" 2>/dev/null | grep -q " via "; then
+    SRC=$(ip route get "$IP" 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n 1)
+    [ -n "$SRC" ] && ADDR="$SRC"
+fi
+SERVER="$ADDR:$SERVER_PORT"
 CODE=$(QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
-[ -z "$CODE" ] && { echo "No pairing code: is ViewTouch running on this Pi?"; exit 1; }
+[ -z "$CODE" ] && { echo "No pairing code: is ViewTouch running on this computer?"; exit 1; }
 PAIR=$(mktemp -d /tmp/vt_billboard.XXXXXX)
 QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --data-dir "$PAIR" --connect "$SERVER" --pair "$CODE" \
     --terminal "$NAME" --screen billboard --pair-only >/dev/null 2>&1
 CRED=$(find "$PAIR" -name terminal.json | head -n 1)
-[ -z "$CRED" ] && { rm -rf "$PAIR"; echo "Pairing $NAME didn't work."; exit 1; }
+[ -z "$CRED" ] && { rm -rf "$PAIR"; echo "Pairing $NAME with the store didn't work."; exit 1; }
+echo "[5/6] Handing $NAME its pairing..."
 adb -s "$DEV" shell am force-stop org.viewtouch.pos
 adb -s "$DEV" push "$CRED" /data/local/tmp/terminal.json >/dev/null
 rm -rf "$PAIR"
+echo "[6/6] Starting it..."
 adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
 sleep 10
 adb -s "$DEV" shell rm -f /data/local/tmp/terminal.json >/dev/null 2>&1 || true
@@ -64,4 +168,4 @@ touch "$VT_CONF_DIR/billboards"
 grep -v "^$NAME|" "$VT_CONF_DIR/billboards" > "$VT_CONF_DIR/billboards.new" || true
 echo "$NAME|$IP" >> "$VT_CONF_DIR/billboards.new"
 mv "$VT_CONF_DIR/billboards.new" "$VT_CONF_DIR/billboards"
-echo "✓ $NAME ($IP) is a billboard of $SERVER. Its hours and sound: Hardware Configuration > Billboards."
+echo "✓ $NAME ($IP) is a billboard of $SERVER. Its hours and sound: Store Settings > Billboards."

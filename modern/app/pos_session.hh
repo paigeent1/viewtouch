@@ -593,6 +593,11 @@ public:
     Q_INVOKABLE void leaveSelfOrder(const QString &pin) { invoke(QStringLiteral("leaveSelfOrder"), {pin}); }
     // Hardware Configuration > Billboards: {enabled, mute, hours: [7, Monday first]} for one (managers).
     Q_INVOKABLE void setBillboard(const QString &name, const QVariantMap &settings) { invoke(QStringLiteral("setBillboard"), {name, settings}); }
+    // Store Settings > Billboards: "deploy" ({pairPort, pairCode}), "restart" or "identify" one; remove one (a manager's PIN).
+    Q_INVOKABLE void billboardAction(const QString &name, const QString &action, const QVariantMap &args = {}) { invoke(QStringLiteral("billboardAction"), {name, action, args}); }
+    Q_INVOKABLE void removeBillboard(const QString &name, const QString &pin) { invoke(QStringLiteral("removeBillboard"), {name, pin}); }
+    // Apply to...: its content copied to these billboards ("@guest": the guest screen).
+    Q_INVOKABLE void applyBillboardContent(const QString &name, const QStringList &targets) { invoke(QStringLiteral("applyBillboardContent"), {name, targets}); }
     Q_INVOKABLE void clockInAs(const QString &role) { invoke(QStringLiteral("clockInAs"), {role}); }
     Q_INVOKABLE void setExpenseCategory(const QString &category) { invoke(QStringLiteral("setExpenseCategory"), {category}); }
     Q_INVOKABLE void receiveDelivery(const QVariantMap &delivery) { invoke(QStringLiteral("receiveDelivery"), {delivery}); }

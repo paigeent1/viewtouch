@@ -17,7 +17,7 @@ namespace vt::net { class RemoteSession; }
 // `vtmodern --connect ... --screen billboard`) that shows the guest screen's turn of messages,
 // pictures and videos full screen, and nothing else (Billboard.qml). Signage only: the server
 // sends a billboard the slides, pictures and logo, never a check or a customer (PosServer).
-// Its settings (on/off, hours, mute) are kept on the server: Hardware Configuration > Billboards.
+// Its settings (on/off, hours, mute, volume) are kept on the server: Store Settings > Billboards.
 // A manager closes it: five taps in the top-left corner (or five presses of the remote's Back or
 // OK button) and their PIN.
 class BillboardController : public QObject {
@@ -34,6 +34,11 @@ class BillboardController : public QObject {
     Q_PROPERTY(bool showing READ showing NOTIFY changed)
     // Every video silent here, whatever its own Sound switch says.
     Q_PROPERTY(bool mute READ mute NOTIFY changed)
+    // Its videos' volume, 0-1 (Store Settings > Billboards).
+    Q_PROPERTY(qreal volume READ volume NOTIFY changed)
+    // Identify (Store Settings > Billboards): its name across the screen while true (10 seconds).
+    Q_PROPERTY(bool identify READ identify NOTIFY changed)
+    Q_PROPERTY(QString name READ name NOTIFY changed)
     Q_PROPERTY(bool online READ online NOTIFY changed)
     // Changes when a picture or video has arrived (bind imageUrl / videoUrl to it).
     Q_PROPERTY(int revision READ revision NOTIFY changed)
@@ -51,6 +56,9 @@ public:
     QString accent() const;
     bool showing() const;
     bool mute() const;
+    qreal volume() const;
+    bool identify() const;
+    QString name() const;
     bool online() const;
     int revision() const;
     int videoProgress() const;

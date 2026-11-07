@@ -4,6 +4,8 @@
 #include "net/remote_session.hh"
 
 #include <QUrl>
+
+#include <algorithm>
 #include <QVariantMap>
 #if defined(Q_OS_ANDROID)
 #include <QCoreApplication>
@@ -64,6 +66,17 @@ bool BillboardController::showing() const
 }
 
 bool BillboardController::mute() const { return info().value(u"mute"_s).toBool(); }
+qreal BillboardController::volume() const
+{
+    const QVariantMap i = info();
+    return i.contains(u"volume"_s) ? std::clamp(i.value(u"volume"_s).toInt(), 0, 100) / 100.0 : 1.0;
+}
+bool BillboardController::identify() const { return info().value(u"identify"_s).toBool(); }
+QString BillboardController::name() const
+{
+    const QString n = info().value(u"name"_s).toString();
+    return n.isEmpty() ? remote_->terminalName() : n;
+}
 bool BillboardController::online() const { return remote_->online(); }
 int BillboardController::revision() const { return remote_->imageRevision() + remote_->videoRevision(); }
 int BillboardController::videoProgress() const { return remote_->videoProgress(); }

@@ -286,7 +286,7 @@ inline QString panelName(const QString &panel)
         {u"taxes"_s, QT_TR_NOOP("Taxes")}, {u"store"_s, QT_TR_NOOP("Store Settings")},
         {u"terminals"_s, QT_TR_NOOP("Terminals")}, {u"vendors"_s, QT_TR_NOOP("Vendors")},
         {u"inventory"_s, QT_TR_NOOP("Inventory")}, {u"customers"_s, QT_TR_NOOP("Customers")},
-        {u"schedule"_s, QT_TR_NOOP("Schedule")},
+        {u"schedule"_s, QT_TR_NOOP("Schedule")}, {u"billboards"_s, QT_TR_NOOP("Billboards")},
     };
     const auto it = names.constFind(panel);
     return it == names.cend() ? panel : QCoreApplication::translate("PosService", *it);

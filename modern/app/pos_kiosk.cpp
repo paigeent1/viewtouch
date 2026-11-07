@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QTime>
 #include <QUrl>
 
@@ -260,7 +261,12 @@ QVariantMap PosService::billboard() const
     // check or a customer: the store's lines, its running promotions, its logo and colour.
     QVariantList slides;
     QVariantMap videos;
-    for (const std::string &sl : s_->settings.displaySlides) {
+    // Its own list (Store Settings > Billboards), else the guest screen's.
+    const std::vector<std::string> *list = &s_->settings.displaySlides;
+    for (const TerminalConfig &t : s_->settings.terminals)
+        if (qs(t.name) == terminal_ && t.screen == "billboard")
+            list = &billboardSlidesOf(t, s_->settings);
+    for (const std::string &sl : *list) {
         const QString line = qs(sl);
         slides.append(line);
         if (!line.startsWith(u"video:"))
@@ -276,20 +282,23 @@ QVariantMap PosService::billboard() const
     }
     for (const QVariant &p : promotionsNow())
         slides.append(tr("Now: %1").arg(p.toString()));
-    // This billboard's own settings (Hardware Configuration > Billboards), its hours by the store's
-    // clock: outside them it goes dark.
-    bool enabled = true, mute = false, showing = true;
+    // This billboard's own settings (Store Settings > Billboards), its hours by the store's clock:
+    // outside them (or switched off now) it goes dark. Identify: its name across it for 10 seconds.
+    bool enabled = true, mute = false, showing = true, identify = false;
+    int volume = 100;
     for (const TerminalConfig &t : s_->settings.terminals)
         if (qs(t.name) == terminal_) {
             enabled = t.billboardOn;
-            mute = t.billboardMute;
-            const QDateTime now = QDateTime::fromMSecsSinceEpoch(s_->now());
-            showing = enabled && billboardOpenAt(t.billboardHours, now.date().dayOfWeek(),
-                                                 now.time().hour() * 60 + now.time().minute());
+            mute = billboardMuteOf(t, s_->settings);
+            volume = billboardVolumeOf(t, s_->settings);
+            showing = billboardShowingAt(t, s_->settings, s_->now());
+            const auto id = s_->billboardIdentify.find(t.name);
+            identify = id != s_->billboardIdentify.end() && id->second > s_->now();
         }
     return {{u"slides"_s, slides}, {u"videos"_s, videos}, {u"logo"_s, qs(s_->settings.displayLogo)},
             {u"accent"_s, qs(s_->settings.displayAccent)}, {u"storeName"_s, qs(s_->settings.storeName)},
-            {u"enabled"_s, enabled}, {u"mute"_s, mute}, {u"showing"_s, showing}};
+            {u"enabled"_s, enabled}, {u"mute"_s, mute}, {u"showing"_s, showing},
+            {u"volume"_s, volume}, {u"identify"_s, identify}, {u"name"_s, terminal_}};
 }
 
 namespace {
@@ -335,71 +344,40 @@ bool PosService::billboardOpenAt(const std::vector<std::string> &hours, int week
 
 std::optional<std::string> PosService::billboardDayHours(const QString &typed)
 {
-    const QString t = typed.trimmed().toLower();
-    if (t.isEmpty())
+    QString t = typed.trimmed().toLower();
+    if (t.isEmpty() || t == u"all day")
         return std::string();
-    if (t == u"closed")
+    if (t == u"closed" || t == u"off")
         return std::string("closed");
-    const auto r = parseHours(ss(t));
-    if (!r)
+    // "9:00-21:00", "9am-9pm", "9:30 AM - 10 PM"
+    t.replace(QChar(0x2013), u'-');
+    const QStringList parts = t.split(u'-');
+    if (parts.size() != 2)
+        return std::nullopt;
+    static const QRegularExpression clock(uR"(^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$)"_s);
+    int minutes[2];
+    for (int i = 0; i < 2; ++i) {
+        const QRegularExpressionMatch m = clock.match(parts[i].trimmed());
+        if (!m.hasMatch())
+            return std::nullopt;
+        int h = m.captured(1).toInt();
+        const int mm = m.captured(2).isEmpty() ? 0 : m.captured(2).toInt();
+        const QString ap = m.captured(3);
+        if (mm > 59)
+            return std::nullopt;
+        if (!ap.isEmpty()) {
+            if (h < 1 || h > 12)
+                return std::nullopt;
+            h = h % 12 + (ap.startsWith(u'p') ? 12 : 0);
+        } else if (h > 23) {
+            return std::nullopt;
+        }
+        minutes[i] = h * 60 + mm;
+    }
+    if (minutes[0] == minutes[1])
         return std::nullopt;
     const auto hhmm = [](int m) { return QTime(m / 60, m % 60).toString(u"HH:mm"_s); };
-    return ss(hhmm(r->first) + u'-' + hhmm(r->second));
-}
-
-QVariantList PosService::billboards() const
-{
-    QVariantList out;
-    if (!can(QString::fromLatin1(perm::Manager)))
-        return out;
-    const QDateTime now = QDateTime::fromMSecsSinceEpoch(s_->now());
-    for (const TerminalConfig &t : s_->settings.terminals) {
-        if (t.screen != "billboard")
-            continue;
-        QStringList hours;
-        for (int d = 0; d < 7; ++d)
-            hours << (size_t(d) < t.billboardHours.size() ? qs(t.billboardHours[size_t(d)]) : QString());
-        out.append(QVariantMap{{u"name"_s, qs(t.name)}, {u"enabled"_s, t.billboardOn}, {u"mute"_s, t.billboardMute},
-                               {u"hours"_s, hours},
-                               {u"showing"_s, t.billboardOn && billboardOpenAt(t.billboardHours, now.date().dayOfWeek(),
-                                                                               now.time().hour() * 60 + now.time().minute())}});
-    }
-    return out;
-}
-
-bool PosService::setBillboard(const QString &name, const QVariantMap &settings)
-{
-    if (!require(perm::Manager, tr("Billboard settings")))
-        return false;
-    auto it = std::ranges::find_if(s_->settings.terminals, [&](const TerminalConfig &t) {
-        return qs(t.name) == name && t.screen == "billboard";
-    });
-    if (it == s_->settings.terminals.end())
-        return fail(tr("%1 is not a billboard.").arg(name));
-    std::vector<std::string> hours;
-    if (settings.contains(u"hours"_s)) {
-        const QVariantList typed = settings.value(u"hours"_s).toList();
-        if (!typed.isEmpty() && typed.size() != 7)
-            return fail(tr("Give the hours for each day of the week."));
-        bool any = false;
-        for (const QVariant &v : typed) {
-            const auto h = billboardDayHours(v.toString());
-            if (!h)
-                return fail(tr("\"%1\" isn't a time like 9:00-21:00, or closed.").arg(v.toString()));
-            any = any || !h->empty();
-            hours.push_back(*h);
-        }
-        if (!any)
-            hours.clear();   // every day all day: always on
-        it->billboardHours = hours;
-    }
-    if (settings.contains(u"enabled"_s))
-        it->billboardOn = settings.value(u"enabled"_s).toBool();
-    if (settings.contains(u"mute"_s))
-        it->billboardMute = settings.value(u"mute"_s).toBool();
-    settingsChanged();
-    emit s_->adminChanged();   // the billboard follows at once
-    return true;
+    return ss(hhmm(minutes[0]) + u'-' + hhmm(minutes[1]));
 }
 
 bool PosService::leaveBillboard(const QString &managerPin)

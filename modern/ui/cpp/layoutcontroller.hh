@@ -128,12 +128,13 @@ public:
     // else): made to fit 1920x1080, kept by the store as "guest-<name>.jpg" and added to the guest
     // screen's slides (Store Settings, saved as a manager's change). Returns its slide line
     // ("image:store:guest-<name>.jpg"), or "" (the status line says why). Managers.
-    // A video (MP4, MOV, M4V) goes to addGuestVideo.
-    Q_INVOKABLE QString addGuestPicture(const QString &fileOrUrl);
+    // A video (MP4, MOV, M4V) goes to addGuestVideo. onGuestList false (a billboard's own list,
+    // Store Settings > Billboards): kept by the store, not added to the guest screen's slides.
+    Q_INVOKABLE QString addGuestPicture(const QString &fileOrUrl, bool onGuestList = true);
     // A video from those folders (500 MB at most): copied as it is into ~/Pictures/Guest Screen (too
     // big for the store's pictures; in the background when it comes from the Dropbox copy) and added
     // to the slides as "video:<that path>", its sound off (guestslides.hh). Returns the line, or "".
-    Q_INVOKABLE QString addGuestVideo(const QString &fileOrUrl);
+    Q_INVOKABLE QString addGuestVideo(const QString &fileOrUrl, bool onGuestList = true);
     // A video slide's line with its sound on or off (Store Settings' Sound switch); others as they are.
     Q_INVOKABLE QString guestVideoSound(const QString &slide, bool sound) const;
     // The ILSA price book's automatic sync (Site Setup > ILSA price book; app/ilsa_sync.hh), on the

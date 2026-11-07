@@ -11,6 +11,8 @@ Item {
     id: v
     property bool sound: false
     property bool muted: false
+    // 0-1 (a billboard's Volume, Store Settings > Billboards); the guest screen: full.
+    property real volume: 1.0
     signal finished()
     signal failed()
     function play(url) {
@@ -29,7 +31,7 @@ Item {
         videoOutput: out
         audioOutput: AudioOutput {
             muted: !v.sound || v.muted
-            volume: 1.0
+            volume: v.volume
         }
         onErrorOccurred: v.failed()
         onMediaStatusChanged: {

@@ -3,14 +3,21 @@ import QtQuick.Controls.Fusion
 import QtQuick.Layouts
 
 // Manager editor for one kind of record (props.panel: menu | employees |
-// tenders | printers | taxes | store | terminals | mealPeriods). List on the left, form on the right;
-// the form's fields come from the service, like the page inspector.
+// tenders | printers | taxes | store | terminals | mealPeriods | billboards). List on the left, form
+// on the right; the form's fields come from the service, like the page inspector.
+// Billboards (Store Settings > Billboards; WidgetBillboards.qml): each TV's row says its address and
+// whether it's online, on or dark, muted; its form adds Deploy / Update app, Restart app, Identify
+// and Remove (a manager's PIN), and + Add is a step-by-step for a Fire TV (name and address, ADB
+// debugging, then Deploy with its progress).
 Item {
     id: w
     focus: true
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
-    readonly property string panel: zone && zone.props && zone.props.panel ? zone.props.panel : "menu"
+    // Set by a widget that is this panel (WidgetBillboards: "billboards"); else the zone's props.panel.
+    property string forcedPanel: ""
+    readonly property string panel: forcedPanel !== "" ? forcedPanel
+                                  : zone && zone.props && zone.props.panel ? zone.props.panel : "menu"
     readonly property bool single: panel === "taxes" || panel === "store"
 
     readonly property var fields: {
@@ -50,6 +57,89 @@ Item {
         return fields.filter(f => (key === undefined || f.groupKey === key) && differs(f.path)).length
     }
     readonly property int changes: changedIn()
+
+    // --- billboards ---------------------------------------------------------------------------
+    readonly property bool boards: panel === "billboards"
+    // Connected now, and its app (Manager -> Network's list, live).
+    function liveOf(name) {
+        const list = w.pos && w.pos.network ? (w.pos.network.terminals ?? []) : []
+        return list.find(t => t.name === name) ?? null
+    }
+    function boardOnline(r) { return r ? (w.liveOf(r.name) !== null || (w.pos && !w.pos.network.terminals && r.online === true)) : false }
+    function boardState(r) { return !r.enabled ? qsTr("off") : r.showing ? qsTr("on") : qsTr("dark") }
+    function boardDetail(r) {
+        if (!r._board) return r._detail ?? ""
+        const out = [r.ip ? r.ip : qsTr("no IP yet"), w.boardOnline(r) ? qsTr("online") : qsTr("offline"), w.boardState(r)]
+        if (r.muted) out.push(qsTr("muted"))
+        return out.join(" · ")
+    }
+    function boardStatus(r) {
+        if (!r) return ""
+        const live = w.liveOf(r.name)
+        const out = [w.boardOnline(r) ? qsTr("Online") : qsTr("Offline"), w.boardState(r),
+                     r.muted ? qsTr("muted") : qsTr("sound %1%").arg(r.loudness)]
+        const version = live ? (live.version ?? "") : (r.version ?? "")
+        if (version !== "") out.push(qsTr("app %1").arg(version))
+        if (r.now !== "" && r.nowUntil > 0)
+            out.push((r.now === "on" ? qsTr("on now until %1") : qsTr("off now until %1"))
+                     .arg(Qt.formatDateTime(new Date(r.nowUntil), "ddd h:mm AP")))
+        return out.join(" · ")
+    }
+    // The job running (or last run) for this billboard: deploy / restart, with its lines.
+    readonly property var boardJob: boards && saved ? (saved.job ?? null) : null
+    // A billboard chosen (not the defaults row).
+    readonly property bool boardOpen: boards && index >= 0 && draft._board === true
+    // Preview: the arrangement as the TV would play it (the form's, saved or not); videos muted,
+    // and only those on this computer (the store's); pictures the store's.
+    readonly property var previewSlides: {
+        if (!boardOpen) return []
+        const text = draft.ownContent ? String(draft.slides ?? "") : String(draft._guestSlides ?? "")
+        return text.split("\n").map(x => x.trim()).filter(x => x !== "").concat(draft._promotions ?? [])
+    }
+    function openPreview() { if (boardOpen) previewBox.open() }
+    // Apply to...: the other billboards, and the guest screen, ticked.
+    property var applyPicked: ({})
+    function openApplyTo() { if (boardOpen) { applyPicked = ({}); applyBox.open() } }
+    function applyTargets() { return Object.keys(applyPicked).filter(k => applyPicked[k]) }
+    // + Add: the step-by-step (1 name and address, 2 ADB debugging on the Fire TV, 3 Deploy).
+    property bool adding: false
+    property int addStep: 1
+    property string addName: ""
+    property string addIp: ""
+    property bool addStarted: false
+    property bool notFireTv: false     // tapped "This TV isn't a Fire TV" (Google TV: a pairing code)
+    readonly property var addRecord: adding ? (records.find(r => r.name === addName.trim()) ?? null) : null
+    readonly property var addJob: addRecord && addStarted ? (addRecord.job ?? null) : null
+    readonly property bool addAskPairing: notFireTv || (addRecord !== null && addRecord._askPairing === true)
+    function startAdding() {
+        adding = true
+        addStep = 1
+        addName = ""
+        addIp = ""
+        addStarted = false
+        notFireTv = false
+        index = -2
+    }
+    // Saved (new, or its name and address changed), then deployed, in that order on the store's computer.
+    function addDeploy(pairPort, pairCode, adbPort) {
+        const name = addName.trim()
+        const i = records.findIndex(r => r.name === name)
+        const rec = copy(i >= 0 ? records[i] : pos.adminNewRecord("billboards"))
+        rec.name = name
+        rec.ip = addIp.trim()
+        if (adbPort !== undefined) rec.port = adbPort
+        pos.adminSave("billboards", i, rec)
+        pos.billboardAction(name, "deploy", { pairPort: pairPort ?? "", pairCode: pairCode ?? "" })
+        addStarted = true
+    }
+    function finishAdding() {
+        const i = records.findIndex(r => r.name === addName.trim())
+        adding = false
+        if (i >= 0) choose(i)
+    }
+    // A step's buttons and texts: a finger's height once the panel is scaled.
+    component BoardButton: Button { implicitHeight: 44; font.pixelSize: 15 }
+    component BoardText: Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 15 }
 
     // Store Settings: in sections (the fields' groups), with a search across
     // them all. A field with "when" shows while that other setting is on.
@@ -217,6 +307,7 @@ Item {
     function open() {
         keepUnsaved()
         openPanel = panel
+        adding = false
         query = ""
         sectionOpen = false
         dirty = false
@@ -384,8 +475,9 @@ Item {
                         width: ListView.view.width - listBar.room
                         // A phone: each row a finger's height.
                         implicitHeight: Math.max(implicitContentHeight + topPadding + bottomPadding, w.narrow ? 36 : 0)
-                        highlighted: w.sectioned ? w.query === "" && row.modelData.key === w.sectionShown : row.index === w.index
+                        highlighted: w.sectioned ? w.query === "" && row.modelData.key === w.sectionShown : row.index === w.index && !w.adding
                         onClicked: {
+                            w.adding = false
                             if (!w.sectioned) return w.choose(row.index)
                             w.query = ""
                             w.openSection(row.modelData.key)
@@ -403,7 +495,7 @@ Item {
                             Label {
                                 visible: text !== ""
                                 // A section: how many of its settings are changed.
-                                text: !w.sectioned ? row.modelData._detail ?? ""
+                                text: !w.sectioned ? (w.boards ? w.boardDetail(row.modelData) : row.modelData._detail ?? "")
                                     : w.changedIn(row.modelData.key) > 0 ? qsTr("%n changed", "", w.changedIn(row.modelData.key)) : ""
                                 color: w.sectioned ? EditorStyle.warning : palette.windowText
                                 opacity: w.sectioned ? 1 : 0.7
@@ -418,8 +510,9 @@ Item {
                     Layout.minimumHeight: w.narrow ? 36 : 0
                     visible: !w.sectioned
                     Layout.fillWidth: true
-                    text: qsTr("+ Add")
-                    onClicked: w.choose(-1)
+                    objectName: "adminAdd"
+                    text: w.boards ? qsTr("+ Add billboard") : qsTr("+ Add")
+                    onClicked: w.boards ? w.startAdding() : w.choose(-1)
                 }
             }
 
@@ -430,10 +523,183 @@ Item {
                 color: "#3a4250"
             }
 
+            // --- billboards: + Add, a step at a time ---
+            ColumnLayout {
+                objectName: "billboardAdd"
+                visible: w.adding
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 10
+                Label {
+                    text: qsTr("Add a billboard: step %1 of 3").arg(w.addStep)
+                    font.bold: true
+                    font.pixelSize: 18
+                }
+                ScrollView {
+                    id: addScroll
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    contentWidth: availableWidth
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical: TouchScrollBar {
+                        id: addBar
+                        parent: addScroll
+                        x: addScroll.width - width
+                        y: addScroll.topPadding
+                        height: addScroll.availableHeight
+                    }
+                    ColumnLayout {
+                        width: addScroll.availableWidth - addBar.room
+                        spacing: 10
+                        // 1: its name and address.
+                        ColumnLayout {
+                            visible: w.addStep === 1
+                            Layout.fillWidth: true
+                            spacing: 8
+                            BoardText { text: qsTr("A TV with a Fire TV (or a Fire TV Stick) shows the guest screen's messages, pictures and videos. Give it a name, and its IP address.") }
+                            Label { text: qsTr("Name"); font.bold: true }
+                            TextField {
+                                objectName: "billboardAddName"
+                                Layout.fillWidth: true
+                                implicitHeight: 44
+                                placeholderText: qsTr("Bar TV")
+                                text: w.addName
+                                onTextEdited: w.addName = text
+                            }
+                            Label { text: qsTr("IP address"); font.bold: true }
+                            TextField {
+                                objectName: "billboardAddIp"
+                                Layout.fillWidth: true
+                                implicitHeight: 44
+                                placeholderText: "192.168.1.60"
+                                inputMethodHints: Qt.ImhPreferNumbers
+                                text: w.addIp
+                                onTextEdited: w.addIp = text
+                            }
+                            BoardText {
+                                opacity: 0.8
+                                text: qsTr("On the Fire TV: Settings > Network, highlight its network, press Play/Pause: its IP address shows. A TV at another store works too, over the VPN.")
+                            }
+                        }
+                        // 2: ADB debugging on, on the Fire TV.
+                        ColumnLayout {
+                            visible: w.addStep === 2
+                            Layout.fillWidth: true
+                            spacing: 8
+                            BoardText { text: qsTr("Turn on ADB debugging on the Fire TV (once):"); font.bold: true }
+                            BoardText { text: qsTr("1. Settings > My Fire TV (or Device & Software) > Developer Options.") }
+                            BoardText { text: qsTr("2. ADB debugging: ON.") }
+                            BoardText { text: qsTr("No Developer Options? Settings > My Fire TV > About: click the device's name 7 times, then go back.") }
+                            BoardText { opacity: 0.8; text: qsTr("Then Next. The TV may ask to allow this computer: choose Always allow.") }
+                        }
+                        // 3: Deploy, and how it goes.
+                        ColumnLayout {
+                            visible: w.addStep === 3
+                            Layout.fillWidth: true
+                            spacing: 8
+                            BoardText {
+                                visible: !w.addStarted
+                                text: qsTr("Deploy puts the ViewTouch app on %1 (%2) and pairs it with the store. It takes a minute or two.")
+                                      .arg(w.addName.trim()).arg(w.addIp.trim())
+                            }
+                            ProgressBar {
+                                visible: w.addJob !== null
+                                Layout.fillWidth: true
+                                from: 0
+                                to: w.addJob && w.addJob.steps > 0 ? w.addJob.steps : 1
+                                value: !w.addJob ? 0 : w.addJob.ok ? to : w.addJob.step
+                                indeterminate: w.addJob !== null && w.addJob.running && w.addJob.steps === 0
+                            }
+                            Repeater {
+                                model: w.addJob ? w.addJob.lines.slice(-8) : []
+                                delegate: BoardText {
+                                    required property string modelData
+                                    required property int index
+                                    text: modelData
+                                    opacity: !w.addJob || index === Math.min(7, w.addJob.lines.length - 1) ? 1 : 0.65
+                                }
+                            }
+                            BoardText {
+                                visible: w.addJob !== null && !w.addJob.running && w.addJob.ok
+                                color: "#7ee0a1"
+                                font.bold: true
+                                text: qsTr("Done: %1 is a billboard. Its hours, sound and on / off are on its page.").arg(w.addName.trim())
+                            }
+                            // Not a Fire TV (a Google TV, Android TV 11 or newer): wireless debugging with a code.
+                            Button {
+                                flat: true
+                                visible: w.addJob !== null && !w.addJob.running && !w.addJob.ok && !w.addAskPairing
+                                         && (w.addRecord === null || (w.addRecord.maker ?? "") === "")
+                                text: qsTr("This TV isn't a Fire TV")
+                                font.underline: true
+                                onClicked: w.notFireTv = true
+                            }
+                            ColumnLayout {
+                                visible: w.addAskPairing && !(w.addJob && w.addJob.ok)
+                                Layout.fillWidth: true
+                                spacing: 6
+                                BoardText { text: qsTr("Not a Fire TV: on the TV, Developer options > Wireless debugging ON, then Pair device with pairing code. Type what it shows:") }
+                                GridLayout {
+                                    columns: 2
+                                    columnSpacing: 10
+                                    rowSpacing: 6
+                                    Label { text: qsTr("Pairing port") }
+                                    TextField { id: pairPort; implicitHeight: 44; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+                                    Label { text: qsTr("Pairing code") }
+                                    TextField { id: pairCode; implicitHeight: 44; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+                                    Label { text: qsTr("ADB port") }
+                                    TextField {
+                                        id: adbPort
+                                        implicitHeight: 44
+                                        Layout.fillWidth: true
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        placeholderText: qsTr("the port on Wireless debugging, after the address")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    BoardButton {
+                        objectName: "billboardAddBack"
+                        text: w.addStep === 1 ? qsTr("Cancel") : qsTr("‹ Back")
+                        enabled: !(w.addJob && w.addJob.running)
+                        onClicked: w.addStep === 1 ? (w.adding = false) : (w.addStep = w.addStep - 1)
+                    }
+                    Item { Layout.fillWidth: true }
+                    BoardButton {
+                        objectName: "billboardAddNext"
+                        visible: w.addStep < 3
+                        highlighted: true
+                        enabled: w.addStep !== 1 || (w.addName.trim() !== "" && w.addIp.trim() !== "")
+                        text: qsTr("Next ›")
+                        onClicked: w.addStep = w.addStep + 1
+                    }
+                    BoardButton {
+                        objectName: "billboardAddDeploy"
+                        visible: w.addStep === 3 && !(w.addJob && w.addJob.ok)
+                        highlighted: true
+                        enabled: !(w.addJob && w.addJob.running)
+                        text: w.addJob ? qsTr("Try again") : qsTr("Deploy")
+                        onClicked: w.addAskPairing ? w.addDeploy(pairPort.text, pairCode.text, adbPort.text) : w.addDeploy()
+                    }
+                    BoardButton {
+                        visible: w.addStep === 3 && w.addJob !== null && w.addJob.ok
+                        highlighted: true
+                        text: qsTr("Done")
+                        onClicked: w.finishAdding()
+                    }
+                }
+            }
+
             // --- form ---
             ColumnLayout {
-                visible: w.sectioned ? !w.narrow || w.sectionOpen || w.query !== ""
-                                     : !w.narrow || w.index !== -2 || w.single
+                visible: !w.adding && (w.sectioned ? !w.narrow || w.sectionOpen || w.query !== ""
+                                                   : !w.narrow || w.index !== -2 || w.single)
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 8
@@ -456,7 +722,7 @@ Item {
                     Layout.fillHeight: true
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: qsTr("Choose something on the left, or Add.")
+                    text: w.boards ? qsTr("Choose a billboard on the left, or + Add billboard.") : qsTr("Choose something on the left, or Add.")
                     opacity: 0.7
                 }
 
@@ -503,7 +769,9 @@ Item {
                                 required property var modelData
                                 minHeight: w.narrow ? 36 : 0
                                 // A "look" field: an enum of this screen's looks.
-                                field: modelData.type !== "look" || !w.zone ? modelData
+                                // The billboard defaults row: its values are the defaults themselves.
+                                field: w.boards && w.draft._defaults === true ? Object.assign({}, modelData, { inheritable: false })
+                                     : modelData.type !== "look" || !w.zone ? modelData
                                      : Object.assign({}, modelData, {
                                            type: "enum",
                                            options: [{ value: "", text: qsTr("The store's look") }].concat(
@@ -516,8 +784,12 @@ Item {
                                 // This screen's own lines (About): from this screen, not the store.
                                 value: modelData.path === "screen.version" && w.zone ? w.zone.controller.screenBuild()
                                      : modelData.path === "screen.display" ? w.screenText
+                                     : w.boards && modelData.path === "status" ? w.boardStatus(w.saved)
                                      : w.draft[modelData.path]
-                                isSet: true
+                                isSet: !(modelData.inheritable === true && w.draft._defaults !== true
+                                         && (w.draft[modelData.path] === null || w.draft[modelData.path] === undefined))
+                                resolved: modelData.inheritable === true ? (w.draft._inherit ?? {})[modelData.path] : undefined
+                                inheritedText: qsTr("default")
                                 changed: w.differs(modelData.path)
                                 section: w.sectioned && w.query !== "" ? modelData.group : ""
                                 readOnly: modelData.readonlyExisting === true && w.index >= 0
@@ -534,9 +806,49 @@ Item {
                                     w.dirty = true   // first: the new draft may rebuild this form
                                     w.draft = d
                                 }
-                                // Emptied (a color): back to the usual.
-                                onReset: commit("")
+                                // Emptied (a color): back to the usual. A billboard's: back to the defaults.
+                                onReset: commit(modelData.inheritable === true ? null : "")
                             }
+                        }
+                    }
+                }
+
+                // Billboards: Deploy / Restart as it goes (what vt-add-billboard says, plainly).
+                Rectangle {
+                    objectName: "billboardJob"
+                    visible: w.boardOpen && w.boardJob !== null
+                    Layout.fillWidth: true
+                    implicitHeight: jobBody.implicitHeight + 16
+                    radius: 6
+                    color: !w.boardJob || w.boardJob.running ? "#232a35" : w.boardJob.ok ? "#173a26" : "#3a1f1f"
+                    ColumnLayout {
+                        id: jobBody
+                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
+                        spacing: 4
+                        ProgressBar {
+                            visible: w.boardJob !== null && w.boardJob.running
+                            Layout.fillWidth: true
+                            from: 0
+                            to: w.boardJob && w.boardJob.steps > 0 ? w.boardJob.steps : 1
+                            value: w.boardJob ? w.boardJob.step : 0
+                            indeterminate: w.boardJob !== null && w.boardJob.steps === 0
+                        }
+                        Repeater {
+                            model: w.boardJob ? w.boardJob.lines.slice(-4) : []
+                            delegate: Label {
+                                required property string modelData
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                text: modelData
+                            }
+                        }
+                        Button {
+                            flat: true
+                            visible: w.boardJob !== null && !w.boardJob.running && !w.boardJob.ok && w.boardJob.refused
+                                     && w.saved && (w.saved.maker ?? "") === "" && w.draft._askPairing !== true
+                            text: qsTr("This TV isn't a Fire TV")
+                            font.underline: true
+                            onClicked: { const d = w.copy(w.draft); d._askPairing = true; w.draft = d }
                         }
                     }
                 }
@@ -567,6 +879,48 @@ Item {
                         text: w.dirty ? qsTr("Save, then Test Print") : qsTr("Test Print")
                         onClicked: w.pos.testPrinter(w.draft.id, false)
                     }
+                    // Billboards: the TV itself (on the store's computer, in the background).
+                    Button {
+                        objectName: "billboardDeploy"
+                        visible: w.boardOpen
+                        enabled: !(w.boardJob && w.boardJob.running)
+                        text: w.saved && w.saved.paired ? qsTr("Update app") : qsTr("Deploy")
+                        onClicked: {
+                            if (w.dirty) w.save()
+                            w.pos.billboardAction(w.draft.name, "deploy", { pairPort: String(w.draft.pairPort ?? ""), pairCode: String(w.draft.pairCode ?? "") })
+                        }
+                    }
+                    Button {
+                        objectName: "billboardRestart"
+                        visible: w.boardOpen
+                        enabled: !w.dirty && !(w.boardJob && w.boardJob.running)
+                        text: qsTr("Restart app")
+                        onClicked: w.pos.billboardAction(w.saved.name, "restart")
+                    }
+                    Button {
+                        objectName: "billboardIdentify"
+                        visible: w.boardOpen
+                        enabled: !w.dirty
+                        text: qsTr("Identify")
+                        onClicked: w.pos.billboardAction(w.saved.name, "identify")
+                    }
+                    Button {
+                        objectName: "billboardPreview"
+                        visible: w.boardOpen
+                        text: qsTr("Preview")
+                        onClicked: w.openPreview()
+                    }
+                    Button {
+                        objectName: "billboardApplyTo"
+                        visible: w.boardOpen
+                        text: qsTr("Apply to…")
+                        onClicked: w.openApplyTo()
+                    }
+                    Button {
+                        visible: w.panel === "terminals" && w.index >= 0 && w.draft.screen === "billboard"
+                        text: qsTr("Billboards page…")
+                        onClicked: if (w.zone && w.zone.controller) w.zone.controller.jumpTo("billboards")
+                    }
                     Button {
                         visible: w.panel === "printers" && w.index >= 0 && w.draft.drawerKick === true
                         enabled: !w.dirty
@@ -575,7 +929,13 @@ Item {
                     }
                     Item { Layout.fillWidth: true }
                     Button {
-                        visible: !w.single && w.index >= 0
+                        objectName: "billboardRemove"
+                        visible: w.boardOpen
+                        text: qsTr("Remove")
+                        onClicked: { removePin.text = ""; removeBox.open() }
+                    }
+                    Button {
+                        visible: !w.single && w.index >= 0 && !w.boards
                         text: w.armDelete ? qsTr("Tap again to confirm")
                                           : (w.panel === "employees" ? qsTr("Deactivate") : qsTr("Remove"))
                         onClicked: {
@@ -586,6 +946,200 @@ Item {
                             w.remove()
                             w.armDelete = false
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // Billboards: Remove asks for a manager's PIN (it unpairs the TV for good).
+    Popup {
+        id: removeBox
+        objectName: "billboardRemoveBox"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(560, (parent ? parent.width : 560) - 32)
+        padding: 20
+        ColumnLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 12
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 20
+                font.bold: true
+                text: qsTr("Remove %1?").arg(w.saved ? w.saved.name : "")
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 16
+                text: qsTr("It's unpaired: it can't connect to the store again until it's added and deployed anew. A manager's PIN:")
+            }
+            TextField {
+                id: removePin
+                objectName: "billboardRemovePin"
+                Layout.fillWidth: true
+                implicitHeight: 64
+                font.pixelSize: 24
+                echoMode: TextInput.Password
+                inputMethodHints: Qt.ImhDigitsOnly
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Button {
+                    implicitHeight: 64
+                    Layout.fillWidth: true
+                    font.pixelSize: 18
+                    text: qsTr("Cancel")
+                    onClicked: removeBox.close()
+                }
+                Button {
+                    objectName: "billboardRemoveOk"
+                    implicitHeight: 64
+                    Layout.fillWidth: true
+                    font.pixelSize: 18
+                    enabled: removePin.text !== ""
+                    text: qsTr("Remove")
+                    onClicked: {
+                        w.pos.removeBillboard(w.saved.name, removePin.text)
+                        removePin.text = ""
+                        removeBox.close()
+                        w.index = -2
+                    }
+                }
+            }
+        }
+    }
+
+    // Billboards: Preview - the arrangement played as the TV would, before it's saved or sent.
+    Popup {
+        id: previewBox
+        objectName: "billboardPreviewBox"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        padding: 12
+        width: Math.min(1200, (parent ? parent.width : 1200) - 32)
+        background: Rectangle { color: "#14171c"; radius: 10; border.color: "#3a4250" }
+        ColumnLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                font.pixelSize: 18
+                font.bold: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Preview: %1 (videos without sound here)").arg(w.draft.name ?? "")
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: width * 9 / 16
+                color: "black"
+                clip: true
+                Loader {
+                    anchors.fill: parent
+                    active: previewBox.visible
+                    sourceComponent: BillboardShow {
+                        slides: w.previewSlides
+                        mute: true
+                        accent: w.draft._accent || "#2f6fd6"
+                        storeName: w.draft._storeName ?? ""
+                        revision: w.pos ? w.pos.imageRevision : 0
+                        logoUrl: w.pos && (w.draft._logo ?? "") !== "" ? w.pos.imageUrl(w.draft._logo) : ""
+                        imageFor: ref => w.pos ? w.pos.imageUrl(ref) : ""
+                        // A video plays here only when its file is on this computer (the store's).
+                        videoFor: line => {
+                            let path = String(line).slice(6)
+                            if (path.endsWith("#sound")) path = path.slice(0, -6)
+                            return path.startsWith("/") ? "file://" + path : ""
+                        }
+                    }
+                }
+            }
+            Button {
+                objectName: "billboardPreviewClose"
+                Layout.alignment: Qt.AlignRight
+                implicitHeight: 64
+                implicitWidth: 200
+                font.pixelSize: 18
+                text: qsTr("Close")
+                onClicked: previewBox.close()
+            }
+        }
+    }
+
+    // Billboards: Apply to... - this one's messages, pictures and videos copied to the ones ticked.
+    Popup {
+        id: applyBox
+        objectName: "billboardApplyBox"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        padding: 20
+        width: Math.min(640, (parent ? parent.width : 640) - 32)
+        readonly property var targets: [{ key: "@guest", name: qsTr("Guest screen") }].concat(
+            w.records.filter(r => r._board === true && r.name !== (w.saved ? w.saved.name : "")).map(r => ({ key: r.name, name: r.name })))
+        ColumnLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 8
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pixelSize: 20
+                font.bold: true
+                text: qsTr("Copy %1's messages, pictures and videos to:").arg(w.saved ? w.saved.name : "")
+            }
+            Repeater {
+                model: applyBox.targets
+                delegate: ItemDelegate {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 64
+                    font.pixelSize: 18
+                    text: (w.applyPicked[modelData.key] ? "✓  " : "     ") + modelData.name
+                    highlighted: w.applyPicked[modelData.key] === true
+                    onClicked: {
+                        const p = Object.assign({}, w.applyPicked)
+                        p[modelData.key] = !p[modelData.key]
+                        w.applyPicked = p
+                    }
+                }
+            }
+            Label {
+                visible: applyBox.targets.length === 1
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                opacity: 0.75
+                text: qsTr("No other billboards yet.")
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Button {
+                    implicitHeight: 64
+                    Layout.fillWidth: true
+                    font.pixelSize: 18
+                    text: qsTr("Cancel")
+                    onClicked: applyBox.close()
+                }
+                Button {
+                    objectName: "billboardApplyOk"
+                    implicitHeight: 64
+                    Layout.fillWidth: true
+                    font.pixelSize: 18
+                    highlighted: true
+                    enabled: w.applyTargets().length > 0
+                    text: qsTr("Copy to %n", "", w.applyTargets().length)
+                    onClicked: {
+                        if (w.dirty) w.save()   // what's on the form, first
+                        w.pos.applyBillboardContent(w.saved.name, w.applyTargets())
+                        applyBox.close()
                     }
                 }
             }

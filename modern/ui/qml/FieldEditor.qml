@@ -21,6 +21,8 @@ ColumnLayout {
     property bool mixed: false
     property bool isSet: value !== undefined
     property var resolved
+    // What a value not set here is called ("inherited"; Store Settings > Billboards: "default").
+    property string inheritedText: qsTr("inherited")
     property bool readOnly: false
     // Settings forms: edited but not saved yet; and, in search results, the
     // section the setting is in.
@@ -97,7 +99,7 @@ ColumnLayout {
         }
         Label {
             visible: fe.inheritable && !fe.isSet && !fe.mixed
-            text: qsTr("inherited")
+            text: fe.inheritedText
             color: EditorStyle.muted
             font.pixelSize: 11
             font.italic: true
@@ -800,6 +802,23 @@ ColumnLayout {
                             }
                         }
                     }
+                    // field.reorder: a row moved up (the order they're shown in).
+                    Button {
+                        Layout.minimumHeight: fe.minHeight
+                        objectName: "rowUp"
+                        visible: fe.field.reorder === true
+                        text: "▲"
+                        implicitWidth: 44
+                        implicitHeight: 44
+                        enabled: !fe.readOnly && rowLine.index > 0
+                        onClicked: {
+                            const r = rowsBox.rows.slice()
+                            const moved = r.splice(rowLine.index, 1)[0]
+                            r.splice(rowLine.index - 1, 0, moved)
+                            rowsBox.rows = r
+                            rowsBox.save()
+                        }
+                    }
                     Button {
                         Layout.minimumHeight: fe.minHeight
                         objectName: "rowRemove"
@@ -854,7 +873,7 @@ ColumnLayout {
                         id: guestPicker
                         controller: fe.controller
                         onPicked: (path) => {
-                            const line = fe.controller ? fe.controller.addGuestPicture(path) : ""
+                            const line = fe.controller ? fe.controller.addGuestPicture(path, fe.field.guestList !== false) : ""
                             if (line === "" || rowsBox.rows.some(r => r[0] === line))
                                 return
                             rowsBox.rows = rowsBox.rows.concat([[line]])

@@ -106,6 +106,25 @@ struct TerminalConfig {
     bool billboardOn = true;
     bool billboardMute = false;
     std::vector<std::string> billboardHours;
+    // Store Settings > Billboards: where the store's computer reaches it with adb (its address,
+    // any the server can route to: a VPN to another store too; port 0 = 5555), its videos' volume
+    // (0-100), "on" / "off" now whatever its hours say until billboardOverrideUntil (the next
+    // change of its hours, ms; 0: until set back), and who made it (adb's
+    // ro.product.manufacturer: "Amazon" for a Fire TV; empty until first reached).
+    std::string billboardIp;
+    int billboardPort = 0;
+    int billboardVolume = 100;
+    std::string billboardOverride;
+    std::int64_t billboardOverrideUntil = 0;
+    std::string billboardMaker;
+    // Its hours, volume and mute its own (else the store's billboard defaults: PosSettings).
+    bool billboardHoursOwn = false;
+    bool billboardVolumeOwn = false;
+    bool billboardMuteOwn = false;
+    // What it shows: its own messages, pictures and videos in turn (the guest screen's kind of list,
+    // displaySlides), or (off) the guest screen's list itself, following it as it changes.
+    bool billboardOwnSlides = false;
+    std::vector<std::string> billboardSlides;
 
     bool operator==(const TerminalConfig &) const = default;
 };
@@ -406,6 +425,11 @@ struct PosSettings {
     bool receiptLogo = false;    // printed at the top of receipts (ESC/POS printers)
     std::string displayAccent = "#2f6fd6";
     std::vector<std::string> displaySlides;
+    // Billboard defaults (Store Settings > Billboards): the usual hours (as TerminalConfig's),
+    // volume and mute of every billboard that doesn't have its own.
+    std::vector<std::string> billboardDefaultHours;
+    int billboardDefaultVolume = 100;
+    bool billboardDefaultMute = false;
     // The customer display's left third between guests (where the order shows during a sale):
     // a picture or an animated GIF (a picture ref or path); empty: the messages use the whole screen.
     std::string displayPanel;

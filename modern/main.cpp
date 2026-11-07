@@ -1011,6 +1011,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"bluetooth"},      // Bluetooth scanner (pair one with a tablet)
                 {u"hardware-config", u"screen-check"},   // Screen check (which monitor is the register)
                 {u"hardware-config", u"billboards"},     // Billboards (TVs with the guest-screen slides)
+                {u"admin-store", u"billboards"},         // Store Settings > Billboards…
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
             };
             bool zonesAdded = false;
@@ -1241,6 +1242,15 @@ int runStore(const Args &cli, const Options &o)
     }
     // ILSA's sales history, beside the database (scripts/bin/vt-ilsa-history writes it): read-only.
     shared->legacyDb = vt::app::legacy::historyPath(dbPath);
+    // Store Settings > Billboards: vt-add-billboard does the TVs (in the background, from here), and its
+    // list of the TVs it set up gives the billboards made before that page their addresses (once).
+    shared->billboardScript = qEnvironmentVariable("VT_ADD_BILLBOARD", u"/usr/local/bin/vt-add-billboard"_s);
+    shared->billboardsFile = QDir(qEnvironmentVariable("VT_CONF_DIR", QDir::homePath() + u"/.config/viewtouch"_s))
+                                 .filePath(u"billboards"_s);
+    if (vt::app::PosService::migrateBillboardsFile(shared->settings, shared->billboardsFile)) {
+        qInfo().noquote() << "Billboards: their addresses taken from" << shared->billboardsFile;
+        shared->saveSettings();
+    }
 
     // Printing: a worker thread delivers tickets; "file" printers write under
     // <app data>/printouts so tickets are visible without hardware.
