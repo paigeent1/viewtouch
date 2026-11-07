@@ -119,6 +119,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 17:46 ET — Bob (Claude) — ILSA stores: tick one, several or all; By store or Corp roll-up; tie a cashier in all stores
+- **What:** New reusable StorePicker (ui/qml/StorePicker.qml): a tick box per store in the history (BHDAN, BHNM, later HCA), All, None, and with several ticked By store / Corp roll-up. Used on every ILSA History report (Daily Z, Departments, Item Movement, GP, ILSA vs ViewTouch, Differences, By Employee, Cashiers) and Look Up Checks > ILSA history (list and reprints). By store: a section per store with its own totals; Corp roll-up: one combined total; default this site's store (Store Settings' ILSA history store), By store. The store argument is 'BHDAN,BHNM' ('-' none, '*' all, '|rollup' for one total); ViewTouch's own checks go with this site's store. vt-ilsa-history --recheck --store BHDAN,BHNM checks those stores' days. Cashier ties stay per ILSA copy; tying a cashier also ties the same number and name in that store's other copies, and with 'Tie the same cashier in all stores' (on by default) in every store's copies.
+- **Why:** Owner 2026-11-07 (like ILSA Corp): choose stores with tick boxes, see them by store or rolled up; the Gaylordsville (BHNM) ILSA data comes next, back to 2006, with the same cashiers as BHDAN.
+- **Files:** `modern/CMakeLists.txt`, `modern/app/legacy_history.cpp`, `modern/app/legacy_history.hh`, `modern/app/pos_commands.cpp`, `modern/app/pos_legacy.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.hh`, `modern/i18n/es.json`, `modern/tests/test_legacy.cpp`, `modern/ui/qml/StorePicker.qml`, `modern/ui/qml/WidgetLegacyReceipts.qml`, `modern/ui/qml/WidgetLegacyReports.qml`, `scripts/bin/vt-ilsa-history`
+- **Next person must know:** StorePicker takes stores / ticked / byStore and emits chosen('BHDAN,BHNM' or '...|rollup'): the corporate setup can reuse it.
+
 ### 2026-11-07 17:25 ET — Bob (Claude) — Store Settings: 'ILSA history store' in The store section
 - **What:** The new ILSA history store setting is listed in Store Settings > The store (it fell into More).
 - **Why:** CI 42419256739: 'Store Settings: every setting is in a section'.

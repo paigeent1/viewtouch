@@ -92,29 +92,22 @@ Rectangle {
                 font.pixelSize: w.unit * 1.1
                 font.bold: true
             }
-            // Which store's ILSA history (Store Settings' ILSA history store first), or every store's.
-        RowLayout {
-            visible: (w.range.stores ?? []).length > 0
-            Layout.fillWidth: true
-            Layout.preferredHeight: w.keyH
-            Layout.fillHeight: false
-            spacing: w.unit * 0.3
-            Text { text: qsTr("Store"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            Repeater {
-                model: (w.range.stores ?? []).concat(["*"])
-                delegate: WidgetKey {
-                    required property string modelData
-                    objectName: "ilsaStore-" + modelData
-                    Layout.preferredWidth: w.unit * 6
-                    Layout.fillHeight: true
-                    text: modelData === "*" ? qsTr("All stores") : modelData
-                    fontScale: 0.34
-                    baseColor: (w.range.store ?? "") === modelData ? "#1f8a4c" : "#2b3340"
-                    onClicked: { w.store = modelData; Qt.callLater(w.reload) }
-                }
+            // Which stores: one, several or all (Store Settings' ILSA history store first); by store or rolled up.
+            StorePicker {
+                objectName: "ilsaStores"
+                Layout.fillWidth: true
+                Layout.preferredHeight: w.keyH
+                Layout.fillHeight: false
+                stores: w.range.stores ?? []
+                ticked: w.range.ticked ?? []
+                byStore: w.range.byStore ?? true
+                showMode: false
+                unit: w.unit
+                keyH: w.keyH
+                ink: w.ink
+                face: w.face
+                onChosen: function(arg) { w.store = arg; Qt.callLater(w.reload) }
             }
-            Item { Layout.fillWidth: true }
-        }
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6

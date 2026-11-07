@@ -184,6 +184,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetReceiptLookup.qml
             ui/qml/WidgetLegacyReceipts.qml
             ui/qml/WidgetLegacyReports.qml
+            ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml
             ui/qml/GuestPageView.qml

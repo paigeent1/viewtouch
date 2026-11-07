@@ -19,7 +19,7 @@ day by day against ILSA's own Z reports.
                                                                   when its Sys_Pram names another store; days are
                                                                   per store (one store never replaces another's)
   vt-ilsa-history --prefix BHDAN                                  set every copy's store (receipts: BHDAN-836100)
-  vt-ilsa-history --recheck --store BHNM                          the self-check of one store's days
+  vt-ilsa-history --recheck --store BHDAN,BHNM                    the self-check of those stores' days
   vt-ilsa-history --self-test                                     check the importer on made-up data
 
 What it does
@@ -1132,8 +1132,10 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
         src.backup(dst); dst.close(); src.close()
         say(f"Backup: {backup}")
     db = open_db(db_path)
-    days = [d for (d,) in db.execute("SELECT DISTINCT day FROM legacy_days WHERE day BETWEEN ? AND ? AND (? = '' OR store = ?) ORDER BY day",
-                                     (day_from or "0000", day_to or "9999", (store or "").upper(), (store or "").upper()))]
+    stores = [x.strip().upper() for x in (store or "").split(",") if x.strip()]   # --store BHDAN,BHNM (none: every store's)
+    days = [d for (d,) in db.execute("SELECT DISTINCT day FROM legacy_days WHERE day BETWEEN ? AND ?"
+                                     + (f" AND store IN ({','.join('?' * len(stores))})" if stores else "") + " ORDER BY day",
+                                     (day_from or "0000", day_to or "9999", *stores))]
     say(("DRY RUN (nothing kept): " if dry else "") + f"rechecking {len(days):,} day(s) in {db_path}")
     db.execute("BEGIN")
     try:

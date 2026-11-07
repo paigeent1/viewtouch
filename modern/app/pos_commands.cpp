@@ -265,7 +265,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"requestForecast"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.requestForecast(a.value(0).toInt())); }},
         {u"requestLegacyReport"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.requestLegacyReport(a.value(0).toString(), a.value(1).toString(), a.value(2).toString(), a.value(3).toString(), a.value(4).toString())); }},
         {u"printLegacyReport"_s, [](PosService &p, const QVariantList &) { return QVariant(p.printLegacyReport()); }},
-        {u"setLegacyCashier"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setLegacyCashier(a.value(0).toInt(), a.value(1).toInt(), a.value(2).toString())); }},
+        {u"setLegacyCashier"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setLegacyCashier(a.value(0).toInt(), a.value(1).toInt(), a.value(2).toString(), a.value(3).toBool())); }},
         {u"findLegacyReceipts"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findLegacyReceipts(a.value(0).toString(), a.value(1).toInt(), a.value(2).toString())); }},
         {u"selectLegacyReceipt"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.selectLegacyReceipt(a.value(0).toLongLong())); }},
         {u"reprintLegacyReceipt"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.reprintLegacyReceipt(a.value(0).toLongLong(), a.value(1).toBool())); }},

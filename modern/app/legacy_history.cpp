@@ -92,18 +92,39 @@ QString prefixColumn(QSqlDatabase &db)
     return hasColumn(db, u"legacy_sources"_s, u"store"_s) ? u"COALESCE(s.store, '')"_s : u"'BHDAN'"_s;
 }
 
-// Only one store's copies (`store` empty: every store's): " AND <sourceExpr> IN (...)" and its argument.
+// Only some stores' copies: `store` "BHDAN" or "BHDAN,BHNM" (empty: every store's; "-": none):
+// " AND <sourceExpr> IN (...)" and its arguments.
 struct Scope {
     QString sql;
     QVariantList args;
 };
-Scope storeScope(QSqlDatabase &db, const QString &store, const QString &sourceExpr)
+QStringList storeList(const QString &store)
+{
+    QStringList out;
+    for (const QString &x : store.split(u',', Qt::SkipEmptyParts))
+        if (!x.trimmed().isEmpty() && x.trimmed() != u"-")
+            out << x.trimmed().toUpper();
+    return out;
+}
+Scope storeScope(QSqlDatabase &db, const QString &store, const QString &sourceExpr, const QString &table = u"legacy_sources"_s,
+                 const QString &column = u"store"_s)
 {
     if (store.trimmed().isEmpty())
         return {};
-    if (!hasColumn(db, u"legacy_sources"_s, u"store"_s))   // before stores were kept: everything is BHDAN's
-        return {store.compare(u"BHDAN"_s, Qt::CaseInsensitive) == 0 ? QString() : u" AND 0"_s, {}};
-    return {u" AND %1 IN (SELECT id FROM legacy_sources WHERE store = ?)"_s.arg(sourceExpr), {store.trimmed().toUpper()}};
+    const QStringList list = storeList(store);
+    if (list.isEmpty())
+        return {u" AND 0"_s, {}};
+    if (!hasColumn(db, table, column))   // before stores were kept: everything is BHDAN's
+        return {list.contains(u"BHDAN"_s) ? QString() : u" AND 0"_s, {}};
+    QStringList marks;
+    QVariantList args;
+    for (const QString &s : list) {
+        marks << u"?"_s;
+        args << s;
+    }
+    if (table == u"legacy_days")
+        return {u" AND %1 IN (%2)"_s.arg(sourceExpr, marks.join(u", "_s)), args};
+    return {u" AND %1 IN (SELECT id FROM legacy_sources WHERE store IN (%2))"_s.arg(sourceExpr, marks.join(u", "_s)), args};
 }
 
 
@@ -168,17 +189,8 @@ Status status(const QString &path, QString *error, const QString &store)
     return withHistory<Status>(path, error, Status{}, [&](QSqlDatabase &db) {
         Status s;
         QSqlQuery q(db);
-        QString where;
-        QVariantList args;
-        if (!store.trimmed().isEmpty()) {
-            if (hasColumn(db, u"legacy_days"_s, u"store"_s)) {
-                where = u" WHERE store = ?"_s;
-                args << store.trimmed().toUpper();
-            } else if (store.compare(u"BHDAN"_s, Qt::CaseInsensitive) != 0) {
-                where = u" WHERE 0"_s;
-            }
-        }
-        if (run(q, u"SELECT MIN(day), MAX(day), COUNT(*), COALESCE(SUM(receipts), 0) FROM legacy_days%1"_s.arg(where), args, error)
+        const Scope ds = storeScope(db, store, u"store"_s, u"legacy_days"_s);
+        if (run(q, u"SELECT MIN(day), MAX(day), COUNT(*), COALESCE(SUM(receipts), 0) FROM legacy_days WHERE 1%1"_s.arg(ds.sql), ds.args, error)
             && q.next()) {
             s.first = q.value(0).toString();
             s.last = q.value(1).toString();
@@ -513,7 +525,7 @@ std::vector<Cashier> cashiers(const QString &path, QString *error, const QString
 }
 
 bool setCashier(const QString &path, int sourceId, int number, const std::string &employeeId,
-                const std::string &employeeName, QString *error)
+                const std::string &employeeName, QString *error, bool allStores)
 {
     if (path.isEmpty() || !QFileInfo::exists(path)) {
         if (error)
@@ -543,14 +555,19 @@ bool setCashier(const QString &path, int sourceId, int number, const std::string
                 } else {
                     ok = run(w, u"INSERT OR REPLACE INTO legacy_cashier_map VALUES (?, ?, ?, ?)"_s,
                              {sourceId, number, QString::fromStdString(employeeId), QString::fromStdString(employeeName)}, error);
-                    // The same person in the other copies: the same number and name, not tied yet.
+                    // The same person in the other copies (the same number and name): this store's other
+                    // copies, or every store's (allStores: the same cashier in all stores); a tie set there stays.
                     if (ok && hasTable(db, u"legacy_cashiers"_s)) {
+                        const bool stores = hasColumn(db, u"legacy_sources"_s, u"store"_s);
+                        const QString sameStore = allStores || !stores ? QString()
+                            : u" AND (SELECT store FROM legacy_sources WHERE id = o.source_id) = "
+                              "(SELECT store FROM legacy_sources WHERE id = me.source_id)"_s;
                         QSqlQuery same(db);
                         ok = run(same, u"INSERT OR IGNORE INTO legacy_cashier_map "
                                         "SELECT o.source_id, o.cashier_num, ?, ? FROM legacy_cashiers o "
                                         "JOIN legacy_cashiers me ON me.source_id = ? AND me.cashier_num = ? "
                                         "WHERE o.cashier_num = me.cashier_num AND o.source_id <> me.source_id "
-                                        "AND lower(trim(o.name)) = lower(trim(me.name))"_s,
+                                        "AND lower(trim(o.name)) = lower(trim(me.name))%1"_s.arg(sameStore),
                                  {QString::fromStdString(employeeId), QString::fromStdString(employeeName), sourceId, number}, error);
                     }
                 }

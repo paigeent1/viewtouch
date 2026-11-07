@@ -26,7 +26,8 @@ struct Status {
     QString first, last;      // its first and last business days
     std::int64_t days = 0, receipts = 0;
 };
-// `store`, everywhere below: one store's copies only (BHDAN, BHNM: legacy_sources.store); empty: every store's.
+// `store`, everywhere below: those stores' copies only ("BHDAN", "BHDAN,BHNM": legacy_sources.store); empty: every
+// store's; "-": none.
 Status status(const QString &path, QString *error = nullptr, const QString &store = {});
 // The stores the history file has copies of (BHDAN, BHNM...), in order.
 QStringList stores(const QString &path, QString *error = nullptr);
@@ -58,10 +59,11 @@ std::vector<core::legacy::UnnamedItem> unnamedItems(const QString &path, const Q
 std::vector<core::legacy::Cashier> cashiers(const QString &path, QString *error = nullptr,
     const QString &store = {});
 // Ties ILSA cashier `number` of copy `sourceId` to ViewTouch employee `employeeId` (empty: a former
-// employee, untied); also the same number with the same name in the other copies when they aren't
-// tied yet. Writes the history file (Reports > ILSA History > Cashiers).
+// employee, untied); also the same number with the same name in that store's other copies (allStores:
+// in every store's copies) when they aren't tied yet. Ties are per copy. Writes the history file
+// (Reports > ILSA History > Cashiers).
 bool setCashier(const QString &path, int sourceId, int number, const std::string &employeeId,
-                const std::string &employeeName, QString *error = nullptr);
+                const std::string &employeeName, QString *error = nullptr, bool allStores = false);
 // What each cashier sold of each item (sales receipts; voided lines and lottery out); `filter`: an
 // item name, UPC or department name containing it (empty: all).
 std::vector<core::legacy::EmployeeItemRow> employeeItems(const QString &path, const QString &from, const QString &to,

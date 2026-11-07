@@ -1395,11 +1395,14 @@ public:
     // store: an ILSA store (BHDAN, BHNM), "*" every store's, empty this site's (Store Settings' ILSA history store).
     bool requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {},
                              const QString &store = {});
-    QString legacyStore(const QString &asked) const;   // the store asked for: empty = every store's
+    QString legacyStore(const QString &asked) const;   // the stores asked for ("BHDAN,BHNM"): empty = every store's, "-" none
+    // "<stores>|rollup": the ticked stores as one; otherwise a section per store (By store).
+    static bool legacyByStore(const QString &asked);
     bool printLegacyReport();   // the one last shown
     // Reports > ILSA History > Cashiers: ILSA cashier `number` of copy `sourceId` is ViewTouch employee
     // `employeeId` (empty: a former employee); their ILSA sales then show under that name in By Employee.
-    bool setLegacyCashier(int sourceId, int number, const QString &employeeId);
+    // allStores: the same cashier (number and name) in every store's copies too.
+    bool setLegacyCashier(int sourceId, int number, const QString &employeeId, bool allStores = false);
     // Its receipts, read-only (Receipt Lookup > ILSA): found (rangeReport {id: ilsa-receipts, results,
     // more, nextOffset}), one shown (selected: {id, number, text, hasDob}), reprinted (withDob: as ILSA
     // printed it, the buyer's date of birth on it: Store Settings' dobReprintNeedsManager applies).
