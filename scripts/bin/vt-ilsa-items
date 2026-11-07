@@ -5,6 +5,8 @@ Reads ~/ilsa-pricebook/latest (what the ILSA computer sends). One ViewTouch item
 NOTHING is merged (the owner decides merges himself). ILSA's ACTIVE flag is ignored; lottery and vapor
 (no longer sold) are left out: history only. One category per ILSA department. Tax: ILSA's POS flag (tax group 1 = merchandise, otherwise
 none). Barcodes: PLU_NUM + Alt_PLUNum + UPC_E. No quantities on hand.
+Cost: PLU.LAST_COST (the owner's system cost, list + OTP, kept in ILSA) as "cost"; none when 0 or blank
+(AVG_COST is empty in practice).
 Writes ~/ilsa-items/viewtouch-menu.json (and viewtouch-menu-part1.json... to import), and for review:
   possible-duplicates.csv  same name in the same department, each with its UPC, price, last sale
   inhouse-upcs.csv         the store's own UPCs (708694...): item, last sold, and any same-name item
@@ -92,6 +94,7 @@ for r in rows(BOOK, "PLU"):
             if v and v not in codes:
                 codes.append(v)
     groups[(d, name.upper())].append({"upc": upc, "codes": codes, "name": name, "price": num(r.get("LAST_PRICE")),
+                                      "cost": num(r.get("LAST_COST")),
                                       "tax": taxgroup.get(flag, "1"), "age": agereq.get(flag, "0"),
                                       "mfg": clean(r.get("MANUF")).upper(), "pg": clean(r.get("PROD_GRP")).upper(),
                                       "sg": clean(r.get("SUBGROUP")).upper()})
@@ -110,6 +113,8 @@ for (d, _), g in sorted(groups.items()):
         used.update(barcodes)
         item = {"id": "ilsa-" + x["upc"], "name": x["name"], "price": x["price"],
                 "taxClass": "merchandise" if x["tax"] == "1" else "none", "family": cid, "barcodes": barcodes}
+        if x["cost"] > 0:   # ILSA's LAST_COST; 0 / blank: no cost (never sent as 0)
+            item["cost"] = x["cost"]
         if x["mfg"] and x["mfg"] != "GENERAL" and not x["mfg"].isdigit():
             item["manufacturer"] = x["mfg"]
         if x["pg"]:

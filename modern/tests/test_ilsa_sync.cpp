@@ -236,3 +236,50 @@ TEST_CASE("ILSA sync: 33,000 items, quick", "[catalog][ilsasync]")
     CHECK(firstMs < 8000);
     CHECK(nextMs < 5000);
 }
+
+TEST_CASE("ILSA sync: the cost follows ILSA; an empty ILSA cost keeps ViewTouch's", "[ilsasync][cost]")
+{
+    QTemporaryDir dir;
+    PosService pos{test::seedPosData(true), nullptr};
+    auto &s = *pos.shared();
+    core::MenuItem padron = here("padron-2000", "PADRON 2000", 1000, {"111"});
+    padron.recipe.push_back({"__cost__", 6.00});
+    core::MenuItem tube = here("tube", "TUBE", 300, {"555"});
+    tube.recipe.push_back({"__cost__", 1.25});
+    s.menu.push_back(padron);
+    s.menu.push_back(tube);
+
+    QVariantMap withCost = ilsaItem(u"111"_s, u"PADRON 2000"_s, 10.00, u"ilsa-cigars"_s, {u"111"_s});
+    withCost.insert(u"cost"_s, 6.40);                                                                // ILSA's LAST_COST
+    const QVariantMap noCost = ilsaItem(u"555"_s, u"TUBE"_s, 3.00, u"ilsa-cigars"_s, {u"555"_s});   // none in ILSA
+    QVariantMap fresh = ilsaItem(u"777"_s, u"NEW PIPE"_s, 40.00, u"ilsa-pipes"_s, {u"777"_s});
+    fresh.insert(u"cost"_s, 22.50);
+    const QVariantMap file = book({withCost, noCost, fresh});
+
+    const QVariantMap r = pos.syncPriceBook(file);
+    REQUIRE(r[u"ok"_s].toBool());
+    CHECK(r[u"costs"_s].toInt() == 1);
+    CHECK(rowsOf(r, u"cost"_s) == 1);
+    REQUIRE(byId(pos, "padron-2000"));
+    CHECK(pos.itemCostNow(*byId(pos, "padron-2000")) == Money::fromCents(640));
+    CHECK(pos.itemCostNow(*byId(pos, "tube")) == Money::fromCents(125));       // an empty ILSA cost: kept
+    REQUIRE(byId(pos, "ilsa-777"));
+    CHECK(pos.itemCostNow(*byId(pos, "ilsa-777")) == Money::fromCents(2250));  // a new item gets ILSA's
+    CHECK(byId(pos, "padron-2000")->price.cents() == 1000);                     // the price was already right
+
+    // In the Changes report as the ILSA sync's: cost old -> new.
+    CHECK(std::ranges::any_of(pos.changesToday(), [](const core::Change &c) {
+        return c.who == "ILSA sync" && c.field == "Cost" && c.item == "PADRON 2000" && c.before.find("6.00") != std::string::npos
+               && c.after.find("6.40") != std::string::npos;
+    }));
+    // And in sync-log.csv.
+    app::IlsaSync sync(&pos);
+    sync.setLogDir(dir.path());
+    const QString said = sync.writeLogs(r, QDateTime(QDate(2026, 11, 7), QTime(11, 0)));
+    CHECK(said.contains(u"1 costs changed"_s));
+    const QStringList log = linesOf(QDir(dir.path()).filePath(u"sync-log.csv"_s));
+    CHECK(std::ranges::any_of(log, [](const QString &l) { return l.contains(u",cost,"_s) && l.contains(u"6.40"_s); }));
+
+    // The same book again: nothing more.
+    CHECK(pos.syncPriceBook(file)[u"costs"_s].toInt() == 0);
+}

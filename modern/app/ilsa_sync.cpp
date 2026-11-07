@@ -262,7 +262,7 @@ QString IlsaSync::writeLogs(const QVariantMap &result, const QDateTime &at)
     const QDir dir(logDir_);
     // Differences are written once (noted.txt holds today's); changes every time.
     static const QHash<QString, QString> what{
-        {u"added"_s, u"added"_s}, {u"price"_s, u"price"_s}, {u"barcode"_s, u"barcode added"_s},
+        {u"added"_s, u"added"_s}, {u"price"_s, u"price"_s}, {u"cost"_s, u"cost"_s}, {u"barcode"_s, u"barcode added"_s},
         {u"name"_s, u"ILSA name differs"_s}, {u"department"_s, u"department differs"_s}, {u"tax"_s, u"tax differs"_s},
         {u"gone"_s, u"gone from ILSA"_s}, {u"conflict"_s, u"ILSA items differ on price"_s},
         {u"skipped"_s, u"not added: no barcode of its own"_s}};
@@ -281,7 +281,7 @@ QString IlsaSync::writeLogs(const QVariantMap &result, const QDateTime &at)
     for (const QVariant &v : result.value(u"rows"_s).toList()) {
         const QVariantMap r = v.toMap();
         const QString kind = r.value(u"kind"_s).toString();
-        const bool change = kind == u"added" || kind == u"price" || kind == u"barcode";
+        const bool change = kind == u"added" || kind == u"price" || kind == u"cost" || kind == u"barcode";
         if (!change) {
             const QString key = kind + u'\t' + r.value(u"id"_s).toString() + u'\t' + r.value(u"after"_s).toString();
             nowNoted.insert(key);
@@ -312,6 +312,7 @@ QString IlsaSync::writeLogs(const QVariantMap &result, const QDateTime &at)
     };
     part("added", tr("%1 added"));
     part("price", tr("%1 prices changed"));
+    part("cost", tr("%1 costs changed"));
     part("barcode", tr("%1 barcodes added"));
     part("name", tr("%1 names differ"));
     part("department", tr("%1 departments differ"));

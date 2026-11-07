@@ -1639,10 +1639,28 @@ int PosService::importMenuFile(const QVariantMap &file)
 
 // The ILSA price book's automatic sync (app/ilsa_sync.cpp, every 15 minutes on the Pi): the store's own
 // job, so no one needs to be logged in. Owner's rules (2026-11-07): new ILSA items are added (into their
-// department's category); an existing item's PRICE follows ILSA, and ILSA's new barcodes for it are added;
+// department's category); an existing item's PRICE and COST follow ILSA (cost: ILSA's LAST_COST, "cost" in
+// the file; an empty ILSA cost never clears one here), and ILSA's new barcodes for it are added;
 // nothing else of an existing item changes (its name, sizes, category, tax...): differences are only
 // reported, like items gone from ILSA. Matched by any of its barcodes, then by its "ilsa-<PLU>" id, never
-// by name. Nothing merged or removed. Open checks keep their prices (each line has its own).
+// by name. Nothing merged or removed. Open checks keep their prices (each line has its own), and every
+// sale line keeps the cost it had when it was rung (OrderLine::unitCost): a cost change never alters past sales.
+namespace {
+// An item's Menu Builder cost (recipe "__cost__", dollars) in cents; 0: none.
+std::int64_t costCents(const MenuItem &m)
+{
+    for (const RecipeLine &rl : m.recipe)
+        if (rl.ingredientId == "__cost__" && rl.quantity > 0.0)
+            return std::llround(rl.quantity * 100.0);
+    return 0;
+}
+void setCostCents(MenuItem &m, std::int64_t cents)
+{
+    std::erase_if(m.recipe, [](const RecipeLine &rl) { return rl.ingredientId == "__cost__"; });
+    m.recipe.push_back({"__cost__", double(cents) / 100.0});
+}
+} // namespace
+
 QVariantMap PosService::syncPriceBook(const QVariantMap &file)
 {
     if (file.value(u"format"_s).toString() != u"viewtouch-menu"_s)
@@ -1683,7 +1701,8 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             idCheck.insert(ss(v.toMap().value(u"id"_s).toString()));
 
     QVariantList rows;
-    int added = 0, prices = 0, barcodes = 0, names = 0, departments = 0, taxes = 0, gone = 0, conflicts = 0, skipped = 0;
+    int added = 0, prices = 0, costs = 0, barcodes = 0, names = 0, departments = 0, taxes = 0, gone = 0, conflicts = 0,
+        skipped = 0;
     const auto row = [&](const QString &kind, const MenuItem &m, const QString &upc, const QString &before, const QString &after) {
         rows << QVariantMap{{u"kind"_s, kind}, {u"id"_s, qs(m.id)}, {u"item"_s, qs(m.name)}, {u"upc"_s, upc},
                             {u"before"_s, before}, {u"after"_s, after}};
@@ -1724,9 +1743,12 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
     // Each ILSA item: the item here it is, or a new one.
     std::vector<MenuItem> fromFile;
     fromFile.reserve(std::size_t(fileItems.size()));
+    std::vector<std::int64_t> fileCost;   // each ILSA item's cost in cents (0: none), beside fromFile
+    fileCost.reserve(std::size_t(fileItems.size()));
     std::vector<std::vector<std::size_t>> filesFor(had);   // item here -> the ILSA items that are it
     for (const QVariant &v : fileItems) {
         MenuItem f = menuItemFromJson(QJsonObject::fromVariantMap(v.toMap()));
+        fileCost.push_back(std::max<std::int64_t>(0, std::llround(v.toMap().value(u"cost"_s).toDouble() * 100.0)));
         const std::size_t at = fromFile.size();
         std::size_t match = SIZE_MAX;
         for (const std::string &b : f.barcodes)
@@ -1756,6 +1778,8 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
         item.soldOutToday = false;
         item.image.clear();
         item.modifierGroups.clear();
+        if (fileCost.back() > 0)   // ILSA's cost
+            setCostCents(item, fileCost.back());
         ids.insert(item.id);
         byId.emplace(item.id, s_->menu.size());
         for (const std::string &b : item.barcodes)
@@ -1797,6 +1821,17 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             for (std::size_t h : hits)
                 each << upcOf(fromFile[h]) + u' ' + format(fromFile[h].price);
             row(u"conflict"_s, m, upc, format(m.price), each.join(u", "_s));
+        }
+        // Its cost follows ILSA's when ILSA has one (all its ILSA items agreeing); an empty ILSA cost
+        // never clears the cost here. Past sales keep the cost they were rung at.
+        if (const std::int64_t cost = fileCost[hits.front()];
+            cost > 0 && std::ranges::all_of(hits, [&](std::size_t h) { return fileCost[h] == cost; })) {
+            if (const std::int64_t was = costCents(m); was != cost) {
+                ++costs;
+                row(u"cost"_s, m, upc, was > 0 ? format(Money::fromCents(was)) : QString(), format(Money::fromCents(cost)));
+                setCostCents(m, cost);
+                changed = true;
+            }
         }
         for (std::size_t h : hits) {
             const MenuItem &f = fromFile[h];
@@ -1841,7 +1876,7 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
     for (const QVariant &v : rows) {
         const QVariantMap r = v.toMap();
         const QString kind = r.value(u"kind"_s).toString();
-        if (kind != u"added" && kind != u"price" && kind != u"barcode")
+        if (kind != u"added" && kind != u"price" && kind != u"cost" && kind != u"barcode")
             continue;
         if (++logged > 40)
             continue;
@@ -1849,6 +1884,8 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             change(r.value(u"item"_s).toString(), QString(), QString(), tr("Added, %1").arg(r.value(u"after"_s).toString()));
         else if (kind == u"price")
             change(r.value(u"item"_s).toString(), tr("Price"), r.value(u"before"_s).toString(), r.value(u"after"_s).toString());
+        else if (kind == u"cost")
+            change(r.value(u"item"_s).toString(), tr("Cost"), r.value(u"before"_s).toString(), r.value(u"after"_s).toString());
         else
             change(r.value(u"item"_s).toString(), tr("Barcode"), QString(), tr("Added %1").arg(r.value(u"after"_s).toString()));
     }
@@ -1858,12 +1895,12 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
     // One save of what changed, one new menu for every screen.
     if (settingsDirty)
         settingsChanged();
-    if (added || prices || barcodes) {
+    if (added || prices || costs || barcodes) {
         menuChanged();
         emit notice(tr("ILSA price book: %1 new items, %2 price changes.").arg(added).arg(prices));
     }
     return {{u"ok"_s, true}, {u"exported"_s, file.value(u"exported"_s)}, {u"items"_s, int(fileItems.size())},
-            {u"added"_s, added}, {u"prices"_s, prices}, {u"barcodes"_s, barcodes}, {u"names"_s, names},
+            {u"added"_s, added}, {u"prices"_s, prices}, {u"costs"_s, costs}, {u"barcodes"_s, barcodes}, {u"names"_s, names},
             {u"departments"_s, departments}, {u"taxes"_s, taxes}, {u"gone"_s, gone}, {u"conflicts"_s, conflicts},
             {u"skipped"_s, skipped}, {u"rows"_s, rows}};
 }
