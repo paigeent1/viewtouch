@@ -29,6 +29,7 @@
 #include "core/employee.hh"
 #include "core/settings.hh"
 #include "core/id_card.hh"
+#include "core/receipt_ref.hh"
 #include "app/menu_import.hh"
 #include "layout/menu_screens.hh"
 #include "layout/reflow.hh"
@@ -1667,6 +1668,28 @@ void LayoutController::scanned(const QString &code)
     }
     if (nowMs - lastIdScanAt_ < 3000)
         return;
+    // A receipt's barcode (Store Settings > Print a barcode on receipts: "R-5012", "RHCA-5012"): never an
+    // item. On the order and Retail screens, Find a check and Look Up Checks it opens that check on
+    // Find a check (Refund… there for a return); from another store it says where it's from.
+    if (vt::core::parseReceiptReference(c.toStdString())) {
+        const auto *here = currentPage();
+        const auto zoneShown = [this](const QString &kind) {
+            return std::ranges::any_of(shown().zones, [&](const Layout::PlacedZone &pz) { return pz.zone->kind == kind; });
+        };
+        const bool atRegister = here && (here->kind == u"index" || here->kind == u"items" || here->kind == u"modifier"
+                                         || here->kind == u"order" || here->kind == u"settle" || here->id == u"retail-entry");
+        const bool lookingUp = here && (here->id == u"find-check" || here->id == u"reprint-receipt" || here->id == u"receipt-lookup"
+                                        || zoneShown(u"checkSearch"_s) || zoneShown(u"receiptLookup"_s));
+        if (!atRegister && !lookingUp)
+            return;   // as any scan there: nothing on the screen, nothing said
+        call(u"openReceiptCode"_s, {c}, [this, zoneShown](const QVariant &ok) {
+            if (!ok.toBool() || zoneShown(u"checkSearch"_s))
+                return;
+            if (activeLayout().page(u"find-check"_s))
+                navigate(Navigator::Mode::Push, u"find-check"_s);
+        });
+        return;
+    }
     // PRICE CHECK on: the code shows its item (and its box or singles); nothing is rung in.
     if (pos_->priceCheck().value(u"on"_s).toBool()) {
         call(u"priceCheckCode"_s, {c}, [](const QVariant &) {});

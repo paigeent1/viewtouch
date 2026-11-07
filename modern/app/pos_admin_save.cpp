@@ -245,6 +245,11 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         const QString name = record.value(u"storeName"_s).toString().trimmed();
         if (name.isEmpty())
             return fail(tr("The store needs a name."));
+        if (record.contains(u"checkPrefix"_s)) {   // checked before anything changes
+            const QString typed = record.value(u"checkPrefix"_s).toString().trimmed();
+            if (typed.size() > 8 || std::size_t(typed.size()) != normalCheckPrefix(ss(typed)).size())
+                return fail(tr("Check prefix: letters and digits only, up to 8 (e.g. HCA)."));
+        }
         s_->settings.storeName = ss(name);
         if (record.contains(u"storeZip"_s)) s_->settings.storeZip = ss(record.value(u"storeZip"_s).toString().trimmed());
         if (record.contains(u"giftCardLocation"_s)) s_->settings.giftCardLocation = ss(record.value(u"giftCardLocation"_s).toString().trimmed());
@@ -258,6 +263,10 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             s_->settings.receiptFreeChoices = record.value(u"receiptFreeChoices"_s).toBool();
         if (record.contains(u"receiptShowVoids"_s))
             s_->settings.receiptShowVoids = record.value(u"receiptShowVoids"_s).toBool();
+        if (record.contains(u"receiptBarcode"_s))
+            s_->settings.receiptBarcode = record.value(u"receiptBarcode"_s).toBool();
+        if (record.contains(u"checkPrefix"_s))
+            s_->settings.checkPrefix = normalCheckPrefix(ss(record.value(u"checkPrefix"_s).toString()));
         if (record.contains(u"ageAlcohol"_s))
             s_->settings.ageAlcohol = std::clamp(record.value(u"ageAlcohol"_s).toInt(), 0, 99);
         if (record.contains(u"ageTobacco"_s))

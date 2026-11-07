@@ -8,6 +8,7 @@
 
 #include "core/check.hh"
 #include "core/inventory.hh"
+#include "core/receipt_ref.hh"
 #include "core/tax.hh"
 
 #include <ctime>
@@ -204,6 +205,12 @@ struct PosSettings {
     // Voided and error-corrected items on the guest's receipt (marked VOID / ERR CORR, price in brackets, not
     // counted); off (the store's choice): clean customer copies without them.
     bool receiptShowVoids = false;
+    // A Code 128 barcode at the bottom of every receipt, reprint and gift receipt: "R" + checkPrefix + "-" +
+    // the check number (core/receipt_ref.hh); scanned at the register it opens that check (returns).
+    bool receiptBarcode = false;
+    // This store's check prefix (HCA, BHDAN...): letters and digits, in capitals; empty for none. On the
+    // receipt barcode, so a receipt from another store is told apart.
+    std::string checkPrefix;
     // Items 86'd during service are back on the menu after End of Day.
     bool soldOutBackNextDay = true;
     // The ILSA price book's automatic sync on the Pi (every 15 minutes; Site Setup > ILSA price book).

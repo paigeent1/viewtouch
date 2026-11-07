@@ -28,11 +28,14 @@ QImage ticketImage(const Document &doc, int widthChars)
         QString text;
         bool bold = false;
         bool big = false;
+        std::vector<bool> bars;   // a barcode's modules (drawn above its text row)
     };
     std::vector<Row> rows;
     for (const Document::Line &l : doc.lines) {
         if (l.kind == Document::Kind::Image)
             continue;
+        if (l.kind == Document::Kind::Barcode)
+            rows.push_back({QString(), false, false, code128Modules(l.text)});
         // The printer's own layout, one line at a time (wrapping, columns, rules).
         Document one;
         one.cut = false;
@@ -46,8 +49,9 @@ QImage ticketImage(const Document &doc, int widthChars)
 
     const int pad = 28;
     int height = 2 * pad;
+    const int barsHeight = 3 * lh;
     for (const Row &r : rows)
-        height += r.big ? 2 * lh : lh;
+        height += !r.bars.empty() ? barsHeight : r.big ? 2 * lh : lh;
     QImage img(cw * width + 2 * pad, std::max(height, 2 * pad + lh), QImage::Format_RGB32);
     img.fill(Qt::white);
     QPainter p(&img);
@@ -55,6 +59,20 @@ QImage ticketImage(const Document &doc, int widthChars)
     p.setPen(Qt::black);
     int y = pad;
     for (const Row &r : rows) {
+        if (!r.bars.empty()) {
+            // The bars as wide as fits (with a quiet zone each side), centered on the paper.
+            const int paperW = cw * width;
+            const int n = int(r.bars.size());
+            const int module = std::clamp(paperW / (n + 20), 1, 4);
+            int x = pad + (paperW - module * n) / 2;
+            for (const bool black : r.bars) {
+                if (black)
+                    p.fillRect(x, y + lh / 2, module, barsHeight - lh / 2, Qt::black);
+                x += module;
+            }
+            y += barsHeight;
+            continue;
+        }
         QFont f = r.big ? bigFont : font;
         f.setBold(r.bold || r.big);
         p.setFont(f);

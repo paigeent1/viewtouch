@@ -557,6 +557,10 @@ public:
     // Closed checks back to the first: `query` (empty: all of them) in the
     // last `days` (0: ever), a page from `offset` (checkSearch: nextOffset).
     bool searchChecks(const QString &query, int days = 365, int offset = 0);
+    // A receipt's barcode (Store Settings > Print a barcode on receipts) scanned at the register:
+    // that check found (any day) and shown on Find a check, for a return or a reprint; from another
+    // store (its prefix isn't ours): says so. A receipt's reference typed in searchChecks does the same.
+    bool openReceiptCode(const QString &code);
     void selectFoundCheck(qint64 id);
     // A copy of a found check's receipt, a gift receipt, or a copy with the buyer's date of birth
     // (from the ID check; Store Settings: a manager's, if dobReprintNeedsManager).
@@ -1550,6 +1554,8 @@ private:
     QVariantMap lastKioskOrder_;   // the confirmation the guest sees
     bool closePractice(core::Check &c);   // a manager switched this screen to practice
     bool fail(const QString &message);
+    // A receipt reference of this store (its check prefix); else says where it's from (false).
+    bool receiptIsOurs(const core::ReceiptReference &ref);
     void changed(core::Check &check);   // persist + notify
     const core::Employee *employeeByPin(const QString &pin) const;
     core::TimePunch *openPunch(const std::string &employeeId);

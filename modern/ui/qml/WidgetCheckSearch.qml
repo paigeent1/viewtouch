@@ -124,7 +124,7 @@ Item {
             }
             RowLayout {
                 Layout.fillWidth: true
-                visible: w.searched
+                visible: w.searched || !!w.info.query   // a receipt's barcode scanned elsewhere: shown found
                 Label {
                     Layout.fillWidth: true
                     text: w.info.loading ? qsTr("Looking…")

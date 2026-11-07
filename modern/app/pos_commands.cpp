@@ -75,6 +75,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"logout"_s, [](PosService &p, const QVariantList &) { p.logout(); return QVariant(true); }},
         {u"clockIn"_s, [](PosService &p, const QVariantList &) { return QVariant(p.clockIn()); }},
         {u"searchChecks"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.searchChecks(a.value(0).toString(), a.value(1, 365).toInt(), a.value(2, 0).toInt())); }},
+        {u"openReceiptCode"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.openReceiptCode(a.value(0).toString())); }},
         {u"selectFoundCheck"_s, [](PosService &p, const QVariantList &a) { p.selectFoundCheck(a.value(0).toLongLong()); return QVariant(true); }},
         {u"reprintCheck"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.reprintCheck(a.value(0).toLongLong(), a.value(1).toBool(), a.value(2).toBool()));

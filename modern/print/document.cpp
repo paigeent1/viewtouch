@@ -46,6 +46,74 @@ Document &Document::image(std::shared_ptr<const Raster> raster)
 
 namespace {
 
+// What a receipt barcode may read: the scanner types it back, so nothing it could mistype.
+std::string barcodeData(const std::string &s)
+{
+    std::string out;
+    for (const char c : s)
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == ' ')
+            out += c;
+    return out.substr(0, 40);
+}
+
+// Code 128 symbols 0..106 as bar/space widths (bar first); 103-105 start A/B/C, 106 the stop.
+constexpr std::array<const char *, 107> kCode128 = {
+    "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312",
+    "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222",
+    "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131",
+    "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321",
+    "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
+    "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121",
+    "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321",
+    "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224",
+    "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114",
+    "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111",
+    "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112",
+    "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113",
+    "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412",
+    "211214", "211232", "2331112",
+};
+
+} // namespace
+
+Document &Document::barcode(std::string data)
+{
+    data = barcodeData(data);
+    if (!data.empty()) {
+        Line l;
+        l.kind = Kind::Barcode;
+        l.text = std::move(data);
+        l.align = Align::Center;
+        lines.push_back(std::move(l));
+    }
+    return *this;
+}
+
+std::vector<bool> code128Modules(const std::string &data)
+{
+    std::vector<int> symbols{104};   // start B
+    int sum = 104;
+    int weight = 1;
+    for (const char ch : data) {
+        const auto c = static_cast<unsigned char>(ch);
+        if (c < 32 || c > 126)
+            continue;
+        symbols.push_back(c - 32);
+        sum += (c - 32) * weight++;
+    }
+    symbols.push_back(sum % 103);   // the check symbol
+    symbols.push_back(106);         // stop
+    std::vector<bool> out;
+    for (const int s : symbols) {
+        bool black = true;
+        for (const char *w = kCode128[std::size_t(s)]; *w; ++w, black = !black)
+            out.insert(out.end(), std::size_t(*w - '0'), black);
+    }
+    return out;
+}
+
+namespace {
+
 bool isContinuation(unsigned char c) { return (c & 0xC0) == 0x80; }
 
 // First `n` code points of s.
@@ -240,6 +308,9 @@ std::vector<std::string> layoutLine(const Document::Line &l, std::size_t width, 
     case Document::Kind::Blank:
         rows.emplace_back();
         break;
+    case Document::Kind::Barcode:   // as text: what it reads, centered (a thermal printer draws the bars too)
+        rows.push_back(aligned(printable(l.text, accents), width, Document::Align::Center));
+        break;
     case Document::Kind::Rule:
         rows.push_back(std::string(width, '-'));
         break;
@@ -331,6 +402,23 @@ std::string renderEscPos(const Document &doc, int width, bool accents)
                            std::size_t(rows) * std::size_t(bytes));
             }
             out += ESC + "a" + std::string(1, '\0');
+            continue;
+        }
+        if (l.kind == Document::Kind::Barcode) {
+            // GS k 73: Code 128, code set B ("{B"), centered, its text under it (GS H 2, Font A).
+            // Modules as wide as the paper allows (GS w 2 or 3; 12 dots a character).
+            const int modules = int(code128Modules(l.text).size()) + 20;   // with the quiet zones
+            const int dots = std::max(32, width) * 12;
+            const int module = std::clamp(dots / std::max(1, modules), 2, 3);
+            const std::string data = "{B" + l.text;
+            out += ESC + "M" + std::string(1, '\0') + GS + "!" + std::string(1, '\0') + ESC + "E" + std::string(1, '\0');
+            out += ESC + "a" + std::string(1, '\x01');
+            out += GS + "h" + std::string(1, char(80));   // 80 dots tall (10 mm)
+            out += GS + "w" + std::string(1, char(module));
+            out += GS + "H" + std::string(1, '\x02');     // its text below
+            out += GS + "f" + std::string(1, '\0');
+            out += GS + "k" + std::string(1, char(73)) + std::string(1, char(data.size())) + data;
+            out += "\n" + ESC + "a" + std::string(1, '\0');
             continue;
         }
         const bool isSubLine = !l.big && !l.bold && (l.text.starts_with("  ") || l.text.starts_with("Opened "));

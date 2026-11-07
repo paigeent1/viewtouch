@@ -338,6 +338,12 @@ QVariantList PosService::adminFields(const QString &panel)
                   tr("Off: the guest's receipt shows only choices that change the price (Extra bacon), not No onion or Medium rare. Kitchen tickets show them all.")),
             field(u"receiptShowVoids"_s, tr("Voids and error corrects on receipts"), u"bool"_s,
                   tr("On: voided and error-corrected items print on the guest's receipt, marked VOID or ERR CORR with the price in brackets (not counted). Off: clean receipts without them. The cashier's screen and the Exceptions report always show them.")),
+            field(u"receiptBarcode"_s, tr("Print a barcode on receipts"), u"bool"_s,
+                  tr("On: every receipt, reprint and gift receipt ends with a barcode of its check (R-1234, with the check prefix: RHCA-1234). "
+                     "Scanned at the register, Find a check opens that check, for a return or a reprint.")),
+            field(u"checkPrefix"_s, tr("Check prefix"), u"string"_s,
+                  tr("This store's letters on receipt barcodes, e.g. HCA, BHDAN or BHNM (letters and digits, up to 8). "
+                     "A receipt with another store's prefix is from there. Empty: none.")),
             field(u"soldOutBackNextDay"_s, tr("86'd items come back the next day"), u"bool"_s,
                   tr("On: items marked sold out during service are back after End of Day. Off: until someone turns them back on. Marked sold out in the Menu Builder: always until changed there.")),
             with(field(u"cashMode"_s, tr("Cash handling"), u"enum"_s,
