@@ -66,11 +66,16 @@ Item {
         return list.find(t => t.name === name) ?? null
     }
     function boardOnline(r) { return r ? (w.liveOf(r.name) !== null || (w.pos && !w.pos.network.terminals && r.online === true)) : false }
-    function boardState(r) { return !r.enabled ? qsTr("off") : r.showing ? qsTr("on") : qsTr("dark") }
+    // On: showing; dark: the TV on, its screen black; asleep: the TV in standby (put there by the store).
+    function boardState(r) {
+        return !r.enabled ? qsTr("off") : r.power === "waking" ? qsTr("waking") : r.power === "asleep" ? qsTr("asleep")
+             : r.showing ? qsTr("on") : qsTr("dark")
+    }
     function boardDetail(r) {
         if (!r._board) return r._detail ?? ""
         const out = [r.ip ? r.ip : qsTr("no IP yet"), w.boardOnline(r) ? qsTr("online") : qsTr("offline"), w.boardState(r)]
         if (r.muted) out.push(qsTr("muted"))
+        if (r.powerProblem) out.push(r.powerProblem)
         return out.join(" · ")
     }
     function boardStatus(r) {
@@ -83,6 +88,7 @@ Item {
         if (r.now !== "" && r.nowUntil > 0)
             out.push((r.now === "on" ? qsTr("on now until %1") : qsTr("off now until %1"))
                      .arg(Qt.formatDateTime(new Date(r.nowUntil), "ddd h:mm AP")))
+        if (r.powerProblem) out.push(r.powerProblem)
         return out.join(" · ")
     }
     // The job running (or last run) for this billboard: deploy / restart, with its lines.
@@ -889,6 +895,21 @@ Item {
                             if (w.dirty) w.save()
                             w.pos.billboardAction(w.draft.name, "deploy", { pairPort: String(w.draft.pairPort ?? ""), pairCode: String(w.draft.pairCode ?? "") })
                         }
+                    }
+                    // Off now / On now: the TV to standby or woken (when it powers off), at once.
+                    Button {
+                        objectName: "billboardOffNow"
+                        visible: w.boardOpen
+                        enabled: !w.dirty && !(w.boardJob && w.boardJob.running)
+                        text: qsTr("Off now")
+                        onClicked: w.pos.setBillboard(w.saved.name, { now: "off" })
+                    }
+                    Button {
+                        objectName: "billboardOnNow"
+                        visible: w.boardOpen
+                        enabled: !w.dirty && !(w.boardJob && w.boardJob.running)
+                        text: qsTr("On now")
+                        onClicked: w.pos.setBillboard(w.saved.name, { now: "on" })
                     }
                     Button {
                         objectName: "billboardRestart"

@@ -1099,6 +1099,7 @@ QJsonObject toJson(const PosSettings &s)
                                      {u"billboardMaker"_s, qs(t.billboardMaker)},
                                      {u"billboardHoursOwn"_s, t.billboardHoursOwn}, {u"billboardVolumeOwn"_s, t.billboardVolumeOwn},
                                      {u"billboardMuteOwn"_s, t.billboardMuteOwn}, {u"billboardOwnSlides"_s, t.billboardOwnSlides},
+                                     {u"billboardPowerOwn"_s, t.billboardPowerOwn}, {u"billboardPowerOff"_s, t.billboardPowerOff},
                                      {u"billboardSlides"_s, [&t] {
                                           QJsonArray a;
                                           for (const std::string &sl : t.billboardSlides) a.append(qs(sl));
@@ -1251,7 +1252,8 @@ QJsonObject toJson(const PosSettings &s)
              return QJsonObject{{u"logo"_s, qs(s.displayLogo)}, {u"accent"_s, qs(s.displayAccent)}, {u"slides"_s, slides},
                                 {u"panel"_s, qs(s.displayPanel)}, {u"video"_s, qs(s.displayVideo)},
                                 {u"billboardHours"_s, boardHours}, {u"billboardVolume"_s, s.billboardDefaultVolume},
-                                {u"billboardMute"_s, s.billboardDefaultMute}};
+                                {u"billboardMute"_s, s.billboardDefaultMute},
+                                {u"billboardPowerOff"_s, s.billboardDefaultPowerOff}};
          }()},
         {u"loyalty"_s, [&] {
              QJsonArray rewards;
@@ -1443,6 +1445,8 @@ PosSettings settingsFromJson(const QJsonObject &o)
         c.billboardVolumeOwn = t.value(u"billboardVolumeOwn").toBool(false);
         c.billboardMuteOwn = t.value(u"billboardMuteOwn").toBool(c.billboardMute);
         c.billboardOwnSlides = t.value(u"billboardOwnSlides").toBool(false);
+        c.billboardPowerOwn = t.value(u"billboardPowerOwn").toBool(false);
+        c.billboardPowerOff = t.value(u"billboardPowerOff").toBool(false);
         for (const QJsonValue &sl : t.value(u"billboardSlides").toArray())
             if (!sl.toString().trimmed().isEmpty())
                 c.billboardSlides.push_back(ss(sl.toString().trimmed()));
@@ -1584,6 +1588,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         s.billboardDefaultHours.push_back(ss(v.toString()));
     s.billboardDefaultVolume = std::clamp(display.value(u"billboardVolume").toInt(100), 0, 100);
     s.billboardDefaultMute = display.value(u"billboardMute").toBool(false);
+    s.billboardDefaultPowerOff = display.value(u"billboardPowerOff").toBool(true);
     const QJsonObject loyalty = o.value(u"loyalty").toObject();
     s.loyaltyEnabled = loyalty.value(u"enabled").toBool(false);
     s.pointsPerDollar = std::clamp(loyalty.value(u"pointsPerDollar").toInt(1), 1, 100);

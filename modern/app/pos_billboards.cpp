@@ -16,7 +16,11 @@
 #include <QTime>
 #include <QTimer>
 
+#include <QDebug>
+#include <QSet>
+
 #include <algorithm>
+#include <functional>
 #include <memory>
 
 using namespace Qt::StringLiterals;
@@ -99,7 +103,8 @@ bool takeLine(PosShared *sh, const std::string &name, const QString &line)
     return true;
 }
 
-void runBillboardScript(PosShared *sh, const std::string &name, const QString &action, const QStringList &args)
+void runBillboardScript(PosShared *sh, const std::string &name, const QString &action, const QStringList &args,
+                        std::function<void(bool ok)> done = {})
 {
     PosShared::BillboardJob &job = sh->billboardJobs[name];
     job = {};
@@ -129,7 +134,7 @@ void runBillboardScript(PosShared *sh, const std::string &name, const QString &a
         if (readLines(false))
             touched(sh);
     });
-    QObject::connect(proc, &QProcess::finished, sh, [sh, proc, name, readLines](int code, QProcess::ExitStatus status) {
+    QObject::connect(proc, &QProcess::finished, sh, [sh, proc, name, readLines, done](int code, QProcess::ExitStatus status) {
         readLines(true);
         PosShared::BillboardJob &j = sh->billboardJobs[name];
         j.running = false;
@@ -137,9 +142,11 @@ void runBillboardScript(PosShared *sh, const std::string &name, const QString &a
         if (!j.ok && j.lines.size() <= 1)
             j.lines << QCoreApplication::translate("PosService", "It stopped without saying why.");
         proc->deleteLater();
+        if (done)
+            done(j.ok);
         sh->saveSettings();   // who made it (Fire TV or not), learned on the way; and every screen told
     });
-    QObject::connect(proc, &QProcess::errorOccurred, sh, [sh, proc, name, program](QProcess::ProcessError e) {
+    QObject::connect(proc, &QProcess::errorOccurred, sh, [sh, proc, name, program, done](QProcess::ProcessError e) {
         if (e != QProcess::FailedToStart)
             return;
         PosShared::BillboardJob &j = sh->billboardJobs[name];
@@ -147,6 +154,8 @@ void runBillboardScript(PosShared *sh, const std::string &name, const QString &a
         j.ok = false;
         j.lines << QCoreApplication::translate("PosService", "%1 isn't on the store's computer: install the scripts there (vt-install).").arg(program);
         proc->deleteLater();
+        if (done)
+            done(false);
         touched(sh);
     });
     // Never left hanging (a TV that stops answering half way).
@@ -231,6 +240,126 @@ int PosService::billboardVolumeOf(const TerminalConfig &t, const PosSettings &s)
     return t.billboardVolumeOwn ? t.billboardVolume : s.billboardDefaultVolume;
 }
 
+bool PosService::billboardPowerOf(const TerminalConfig &t, const PosSettings &s)
+{
+    if (t.billboardPowerOwn)
+        return t.billboardPowerOff;
+    // Fire TVs (a TV not known to be another make counts as one: the store's are).
+    return s.billboardDefaultPowerOff && (t.billboardMaker.empty() || t.billboardMaker == "Amazon");
+}
+
+namespace {
+
+QStringList adbArgs(const TerminalConfig &t, const QString &mode)
+{
+    QStringList a{QString::fromStdString(t.name), QString::fromStdString(t.billboardIp)};
+    if (t.billboardPort)
+        a << u"--port"_s << QString::number(t.billboardPort);
+    return a << mode;
+}
+
+void powerLog(const TerminalConfig &t, const QString &what)
+{
+    qInfo().noquote() << u"Billboard power: %1 (%2): %3"_s.arg(QString::fromStdString(t.name),
+                                                               QString::fromStdString(t.billboardIp), what);
+}
+
+void wakeBillboard(PosShared *sh, const TerminalConfig &t, const QString &why)
+{
+    PosShared::BillboardPower &p = sh->billboardPower[t.name];
+    ++p.tries;
+    p.waking = true;
+    p.wokeAt = sh->now();
+    powerLog(t, u"waking (%1, try %2)"_s.arg(why).arg(p.tries));
+    const std::string name = t.name;
+    runBillboardScript(sh, name, u"wake"_s, adbArgs(t, u"--wake"_s), [sh, name](bool ok) {
+        // Still counted asleep until it connects (then all's well: billboardPowerTick).
+        sh->billboardPower[name].wokeAt = sh->now();   // its 60 seconds from now
+        qInfo().noquote() << u"Billboard power: %1 %2"_s.arg(QString::fromStdString(name),
+                                                             ok ? u"woken; opening the billboard"_s : u"didn't wake"_s);
+    });
+}
+
+} // namespace
+
+void PosService::billboardPowerTick(PosShared *sh)
+{
+    if (!sh->billboardPowerOn)
+        return;
+    const std::int64_t now = sh->now();
+    QSet<QString> online;
+    if (sh->network)
+        for (const QVariant &v : sh->network().value(u"terminals"_s).toList())
+            online << v.toMap().value(u"name"_s).toString();
+    // By name: running a script may change the list (who made the TV).
+    std::vector<std::string> names;
+    for (const TerminalConfig &t : sh->settings.terminals)
+        if (t.screen == "billboard" && !t.billboardIp.empty())
+            names.push_back(t.name);
+    bool changed = false;
+    for (const std::string &name : names) {
+        const TerminalConfig *t = billboardNamed(sh->settings, QString::fromStdString(name));
+        if (!t)
+            continue;
+        if (const auto j = sh->billboardJobs.find(name); j != sh->billboardJobs.end() && j->second.running)
+            continue;   // deploying, restarting, or a power step still going
+        PosShared::BillboardPower &p = sh->billboardPower[name];
+        const bool managed = billboardPowerOf(*t, sh->settings);
+        // Not powered here (the setting off): a TV put to sleep is woken (it goes dark the usual way).
+        const bool wantOn = !managed || billboardShowingAt(*t, sh->settings, now);
+        const bool there = online.contains(QString::fromStdString(name));
+        if (p.waking) {
+            if (there) {
+                p = {};
+                powerLog(*t, u"back on and showing"_s);
+                changed = true;
+                continue;
+            }
+            if (wantOn) {
+                if (now - p.wokeAt < 60 * 1000)
+                    continue;
+                if (p.tries < 2) {
+                    wakeBillboard(sh, *t, u"it didn't connect within 60 seconds"_s);
+                } else {
+                    p.waking = false;
+                    p.noWake = true;
+                    powerLog(*t, u"didn't come back after two tries (Wake on Wi-Fi off?)"_s);
+                    changed = true;
+                }
+                continue;
+            }
+            p.waking = false;   // its hours ended meanwhile: to sleep again (it may be awake)
+            p.asleep = false;
+        }
+        if (p.asleep && there && now - p.sleptAt > 5 * 60 * 1000)
+            p.asleep = false;   // turned on by hand: it's awake (and goes to sleep again outside its hours)
+        if (!wantOn && !p.asleep) {
+            if (p.sleepFailedAt && now - p.sleepFailedAt < 10 * 60 * 1000)
+                continue;   // tried lately: again in 10 minutes
+            powerLog(*t, u"going to sleep (outside its hours, or Off now)"_s);
+            runBillboardScript(sh, name, u"sleep"_s, adbArgs(*t, u"--sleep"_s), [sh, name](bool ok) {
+                PosShared::BillboardPower &q = sh->billboardPower[name];
+                q.asleep = ok;
+                q.sleptAt = ok ? sh->now() : 0;
+                q.sleepFailedAt = ok ? 0 : sh->now();
+                q.noWake = false;
+                q.tries = 0;
+                qInfo().noquote() << u"Billboard power: %1 %2"_s.arg(QString::fromStdString(name),
+                                                                     ok ? u"asleep"_s : u"didn't go to sleep (stays dark)"_s);
+            });
+        } else if (wantOn && (p.asleep || p.noWake) && !there) {
+            if (p.noWake)
+                continue;   // said on its row; Wake (On now) tries again
+            p.tries = 0;
+            wakeBillboard(sh, *t, managed ? u"its hours start, or On now"_s : u"powering off was switched off"_s);
+        } else if (wantOn && p.asleep && there) {
+            p = {};
+        }
+    }
+    if (changed)
+        touched(sh);
+}
+
 bool PosService::billboardMuteOf(const TerminalConfig &t, const PosSettings &s)
 {
     return t.billboardMuteOwn ? t.billboardMute : s.billboardDefaultMute;
@@ -281,6 +410,7 @@ QVariantList PosService::billboards() const
     {
         QVariantMap d{{u"_defaults"_s, true}, {u"_board"_s, false}, {u"name"_s, QString()},
                       {u"volume"_s, st.billboardDefaultVolume}, {u"mute"_s, st.billboardDefaultMute},
+                      {u"powerOff"_s, st.billboardDefaultPowerOff},
                       {u"_title"_s, tr("Billboard defaults")},
                       {u"_detail"_s, tr("The usual hours, volume and mute")}};
         for (int i = 0; i < 7; ++i)
@@ -308,7 +438,10 @@ QVariantList PosService::billboards() const
         const int volume = billboardVolumeOf(t, st);
         const auto &hours = billboardHoursOf(t, st);
         // Its own values; null where it goes by the defaults (shown with "default").
-        QVariantMap inherit{{u"volume"_s, st.billboardDefaultVolume}, {u"mute"_s, st.billboardDefaultMute}};
+        QVariantMap inherit{{u"volume"_s, st.billboardDefaultVolume}, {u"mute"_s, st.billboardDefaultMute},
+                            {u"powerOff"_s, st.billboardDefaultPowerOff && (t.billboardMaker.empty() || t.billboardMaker == "Amazon")}};
+        const auto pw = s_->billboardPower.find(t.name);
+        const PosShared::BillboardPower power = pw != s_->billboardPower.end() ? pw->second : PosShared::BillboardPower{};
         QVariantMap r{{u"_board"_s, true}, {u"name"_s, name}, {u"ip"_s, qs(t.billboardIp)},
                       {u"port"_s, t.billboardPort ? QString::number(t.billboardPort) : QString()},
                       {u"enabled"_s, t.billboardOn},
@@ -340,7 +473,13 @@ QVariantList PosService::billboards() const
         r.insert(u"_inherit"_s, inherit);
         if (const auto j = s_->billboardJobs.find(t.name); j != s_->billboardJobs.end())
             r.insert(u"job"_s, jobMap(j->second));
-        const QString state = !t.billboardOn ? tr("off") : showing ? tr("on") : tr("dark");
+        // Asleep: the TV in standby (put there here); dark: on, its screen black; on: showing.
+        const QString state = !t.billboardOn ? tr("off") : power.waking ? tr("waking") : power.asleep ? tr("asleep")
+                            : showing ? tr("on") : tr("dark");
+        const QString problem = power.noWake ? tr("Didn't come back: check the TV's Wake on Wi-Fi setting") : QString();
+        r.insert(u"power"_s, power.waking ? u"waking"_s : power.asleep ? u"asleep"_s : QString());
+        r.insert(u"powerProblem"_s, problem);
+        r.insert(u"powerOff"_s, t.billboardPowerOwn ? QVariant(t.billboardPowerOff) : QVariant());
         r.insert(u"status"_s, QStringList{online ? tr("Online") : tr("Offline"), state,
                                           mute ? tr("muted") : tr("sound %1%").arg(volume)}
                                   .join(u" · "_s)
@@ -350,6 +489,8 @@ QVariantList PosService::billboards() const
         QStringList detail{t.billboardIp.empty() ? tr("no IP yet") : qs(t.billboardIp), online ? tr("online") : tr("offline"), state};
         if (mute)
             detail << tr("muted");
+        if (!problem.isEmpty())
+            detail << problem;
         r.insert(u"_detail"_s, detail.join(u" · "_s));
         out.append(r);
     }
@@ -371,6 +512,9 @@ QVariantList PosService::billboardFields() const
                          tr("For now only: back to its hours at their next change.")),
                    u"options"_s, options({{"", "Follow its hours"}, {"on", "On now"}, {"off", "Off now"}}))),
         inherits(field(u"mute"_s, tr("Mute all videos"), u"bool"_s)),
+        inherits(field(u"powerOff"_s, tr("Power the TV off outside its hours"), u"bool"_s,
+                       tr("The TV goes to standby when its hours end (and with Off now), and wakes with the billboard "
+                          "when they start. Off: the screen only goes black. Fire TVs; on by default for them."))),
         inherits(with(with(field(u"volume"_s, tr("Volume (percent)"), u"int"_s, tr("Its videos with sound, this loud.")),
                            u"min"_s, 0), u"max"_s, 100)),
     };
@@ -458,7 +602,10 @@ bool PosService::saveBillboardRecord(int index, const QVariantMap &record)
             s_->settings.billboardDefaultVolume = std::clamp(record.value(u"volume"_s).toInt(), 0, 100);
         if (isSet(record, u"mute"_s))
             s_->settings.billboardDefaultMute = record.value(u"mute"_s).toBool();
+        if (isSet(record, u"powerOff"_s))
+            s_->settings.billboardDefaultPowerOff = record.value(u"powerOff"_s).toBool();
         settingsChanged();
+        QTimer::singleShot(0, s_, [sh = s_] { billboardPowerTick(sh); });
         return true;
     }
     auto list = billboardList(s_->settings);
@@ -502,6 +649,10 @@ bool PosService::saveBillboardRecord(int index, const QVariantMap &record)
     t.billboardOn = record.value(u"enabled"_s, true).toBool();
     t.billboardMuteOwn = isSet(record, u"mute"_s);
     t.billboardMute = t.billboardMuteOwn && record.value(u"mute"_s).toBool();
+    t.billboardPowerOwn = isSet(record, u"powerOff"_s);
+    t.billboardPowerOff = t.billboardPowerOwn && record.value(u"powerOff"_s).toBool();
+    if (now == u"on")
+        s_->billboardPower[t.name].noWake = false;   // On now: woken again, even after it didn't come back
     t.billboardVolumeOwn = isSet(record, u"volume"_s);
     t.billboardVolume = t.billboardVolumeOwn ? std::clamp(record.value(u"volume"_s).toInt(), 0, 100) : 100;
     if (record.contains(u"ownContent"_s)) {
@@ -529,6 +680,7 @@ bool PosService::saveBillboardRecord(int index, const QVariantMap &record)
         s_->settings.terminals.push_back(t);
     }
     settingsChanged();
+    QTimer::singleShot(0, s_, [sh = s_] { billboardPowerTick(sh); });   // Off now / On now: at once
     return true;
 }
 
@@ -573,9 +725,16 @@ bool PosService::setBillboard(const QString &name, const QVariantMap &settings)
             return fail(tr("Choose whether it follows its hours."));
         t->billboardOverride = ss(now);
         t->billboardOverrideUntil = now.isEmpty() ? 0 : billboardNextChange(billboardHoursOf(*t, s_->settings), s_->now());
+        if (now == u"on")
+            s_->billboardPower[t->name].noWake = false;   // woken again, even after it didn't come back
+    }
+    if (settings.contains(u"powerOff"_s)) {
+        t->billboardPowerOwn = true;
+        t->billboardPowerOff = settings.value(u"powerOff"_s).toBool();
     }
     settingsChanged();
     touched(s_);   // the billboard follows at once
+    QTimer::singleShot(0, s_, [sh = s_] { billboardPowerTick(sh); });   // Off now / On now: the TV at once
     return true;
 }
 

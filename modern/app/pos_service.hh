@@ -418,6 +418,22 @@ public:
 
     void startDay();
 
+    // Power (Store Settings > Billboards: Power the TV off outside its hours): what this computer
+    // last did to each TV - put it to sleep, or woke it and opened the billboard again (then it
+    // should connect within 60 seconds: tried once more, then said on its row).
+    struct BillboardPower {
+        bool asleep = false;        // put to sleep here (and not woken since)
+        bool waking = false;        // woken; waiting for the billboard to connect
+        std::int64_t wokeAt = 0;
+        int tries = 0;
+        bool noWake = false;        // woken twice, never came back
+        std::int64_t sleptAt = 0;
+        std::int64_t sleepFailedAt = 0;   // tried and failed: again 10 minutes later
+    };
+    std::map<std::string, BillboardPower> billboardPower;
+    // Powering the TVs is this computer's job (main: the store's server); off elsewhere.
+    bool billboardPowerOn = false;
+
     // Store Settings > Billboards: the TVs' deploy / update / restart, run here on the store's
     // computer in the background (vt-add-billboard), one at a time for each billboard: what it
     // said (its plain lines, newest last), how far it got, how it ended.
@@ -1174,6 +1190,14 @@ public:
     static const std::vector<std::string> &billboardHoursOf(const core::TerminalConfig &t, const core::PosSettings &s);
     static int billboardVolumeOf(const core::TerminalConfig &t, const core::PosSettings &s);
     static bool billboardMuteOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    // Powered off outside its hours: its own setting, else the defaults' for a Fire TV (one not
+    // known to be another make counts as one), off for any other TV.
+    static bool billboardPowerOf(const core::TerminalConfig &t, const core::PosSettings &s);
+    // The store's computer, every 30 seconds and at once after a change (main.cpp): each TV powered
+    // to match - asleep outside its hours (or Off now), woken and its billboard opened at their
+    // start (or On now), retried once if it doesn't connect within 60 seconds. In the background
+    // (vt-add-billboard --sleep / --wake); each step logged.
+    static void billboardPowerTick(PosShared *shared);
     static const std::vector<std::string> &billboardSlidesOf(const core::TerminalConfig &t, const core::PosSettings &s);
     // Apply to...: this billboard's messages, pictures and videos copied to these billboards (by
     // name; "@guest": the guest screen's list too). Managers.

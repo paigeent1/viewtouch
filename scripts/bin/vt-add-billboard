@@ -14,6 +14,8 @@
 #   --pair-port N --pair-code C   a Google TV / Android TV 11+: Developer options > Wireless
 #                           debugging > Pair device with pairing code (not needed on a Fire TV)
 #   --restart               restart the app on it, nothing else
+#   --sleep                 the TV to standby (outside its hours: Store Settings > Billboards)
+#   --wake                  the TV out of standby, and the billboard opened again on it
 #   --pair-again            pair it with the store anew
 # Lines like "[2/6] ..." say how far it got; "@vt ..." lines are notes for ViewTouch's page.
 # Its hours, sound, on/off: ViewTouch > Store Settings > Billboards.
@@ -36,6 +38,8 @@ while [ $# -gt 0 ]; do
         --pair-port) PAIR_PORT="$2"; shift ;;
         --pair-code) PAIR_CODE="$2"; shift ;;
         --restart) MODE=restart ;;
+        --sleep) MODE=sleep ;;
+        --wake) MODE=wake ;;
         --pair-again) PAIR_AGAIN=1 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -44,7 +48,7 @@ done
 # The lowest Android the app runs on (CMakeLists.txt: QT_ANDROID_MIN_SDK_VERSION 28 = Android 9).
 MIN_SDK=28
 STEPS=6
-[ "$MODE" = restart ] && STEPS=2
+[ "$MODE" != deploy ] && STEPS=2
 DEV="$IP:$PORT"
 command -v adb >/dev/null 2>&1 || { echo "adb isn't installed on this computer (sudo apt install adb)."; exit 1; }
 
@@ -93,6 +97,27 @@ start_app() {
     adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
 }
 
+if [ "$MODE" = sleep ]; then
+    echo "[2/2] Putting $NAME to sleep..."
+    if ! adb -s "$DEV" shell input keyevent KEYCODE_SLEEP >/dev/null 2>&1; then
+        echo "$NAME didn't take the sleep key."
+        exit 1
+    fi
+    echo "✓ $NAME is asleep (standby)."
+    exit 0
+fi
+if [ "$MODE" = wake ]; then
+    echo "[2/2] Waking $NAME and opening the billboard..."
+    if ! adb -s "$DEV" shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1; then
+        echo "$NAME didn't take the wake key."
+        exit 1
+    fi
+    # The Fire TV wakes on its home screen: the billboard is opened again.
+    sleep "${VT_WAKE_WAIT:-5}"
+    adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
+    echo "✓ $NAME is awake."
+    exit 0
+fi
 if [ "$MODE" = restart ]; then
     echo "[2/2] Restarting the app on $NAME..."
     if [ -z "$(adb -s "$DEV" shell pm list packages org.viewtouch.pos | tr -d '\r')" ]; then

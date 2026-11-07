@@ -16,6 +16,7 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QDir>
 #include <QFile>
 #include <QJSValue>
 #include <QQmlApplicationEngine>
@@ -748,4 +749,135 @@ TEST_CASE("Billboards page: the page loads, a billboard open and + Add's steps, 
     sink2 = nullptr;
     INFO(warnings.join(u'\n').toStdString());
     CHECK(warnings.isEmpty());
+}
+
+// --- Billboards page: the TV powered off outside its hours (adb's sleep and wake keys) ----------
+
+TEST_CASE("Billboard power: asleep outside its hours, woken with the billboard, retried, said when it doesn't come back", "[billboard]")
+{
+    // The real vt-add-billboard, with a stand-in adb (it keeps what it was asked) and ping.
+    QTemporaryDir home;
+    REQUIRE(home.isValid());
+    QDir(home.path()).mkpath(u"bin"_s);
+    const QString adbLog = home.filePath(u"adb.log"_s);
+    writeFile(home.filePath(u"bin/adb"_s), "#!/bin/sh\necho \"$@\" >> \"$HOME/adb.log\"\n"
+                                           "case \"$1\" in connect) echo \"connected to $2\" ;; esac\n"
+                                           "case \"$3\" in get-state) echo device ;; esac\n"
+                                           "case \"$5\" in ro.product.manufacturer) echo Amazon ;; esac\nexit 0\n");
+    writeFile(home.filePath(u"bin/ping"_s), "#!/bin/sh\nexit 0\n");
+    for (const char *f : {"bin/adb", "bin/ping"})
+        QFile::setPermissions(home.filePath(QString::fromLatin1(f)), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    const QByteArray oldPath = qgetenv("PATH"), oldHome = qgetenv("HOME");
+    qputenv("PATH", home.filePath(u"bin"_s).toLocal8Bit() + ':' + oldPath);
+    qputenv("HOME", home.path().toLocal8Bit());
+    qputenv("VT_WAKE_WAIT", "0");
+    struct Restore {
+        QByteArray path, homeDir;
+        ~Restore() { qputenv("PATH", path); qputenv("HOME", homeDir); qunsetenv("VT_WAKE_WAIT"); }
+    } restore{oldPath, oldHome};
+    const auto adbSaid = [&](const char *what) {
+        QFile f(adbLog);
+        if (!f.open(QIODevice::ReadOnly))
+            return 0;
+        return int(f.readAll().count(what));
+    };
+
+    test::RecordingSink sink;
+    PosShared shared{test::seedPosData(), &sink};
+    shared.billboardScript = QStringLiteral(VTM_SEED_DIR "/../../scripts/bin/vt-add-billboard");
+    shared.billboardPowerOn = true;
+    std::int64_t clock = QDateTime(QDate(2026, 11, 2), QTime(22, 0)).toMSecsSinceEpoch();   // Monday night
+    shared.setClock([&clock] { return clock; });
+    QStringList online;   // the screens connected now (Manager -> Network)
+    shared.network = [&online] {
+        QVariantList l;
+        for (const QString &n : online)
+            l << QVariantMap{{u"name"_s, n}};
+        return QVariantMap{{u"terminals"_s, l}};
+    };
+    core::TerminalConfig t;
+    t.name = "Bar TV";
+    t.screen = "billboard";
+    t.billboardIp = "192.0.2.70";
+    t.billboardHoursOwn = true;
+    t.billboardHours = std::vector<std::string>(7, "09:00-21:00");
+    shared.settings.terminals.push_back(t);
+    PosService manager(&shared, u"Office"_s);
+    REQUIRE(manager.loginWithPin(u"1234"_s));
+    const auto rec = [&] { return boardRecord(manager, u"Bar TV"_s); };
+    const auto settle = [&] { REQUIRE(waitFor([&] { return !rec()[u"job"_s].toMap()[u"running"_s].toBool(); }, 15000)); };
+
+    // A Fire TV (or one of no known make): powered off by default; another make isn't.
+    CHECK(PosService::billboardPowerOf(shared.settings.terminals.back(), shared.settings));
+    core::TerminalConfig other = t;
+    other.billboardMaker = "Google";
+    CHECK_FALSE(PosService::billboardPowerOf(other, shared.settings));
+    other.billboardPowerOwn = other.billboardPowerOff = true;
+    CHECK(PosService::billboardPowerOf(other, shared.settings));
+
+    // Outside its hours: to sleep, once.
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("shell input keyevent KEYCODE_SLEEP") == 1);
+    CHECK(rec()[u"power"_s].toString() == u"asleep"_s);
+    CHECK(rec()[u"_detail"_s].toString().contains(u"asleep"_s));
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("KEYCODE_SLEEP") == 1);
+
+    // Its hours start: woken, the billboard opened again; not back in 60 seconds: once more, then said.
+    clock = QDateTime(QDate(2026, 11, 3), QTime(9, 0)).toMSecsSinceEpoch();
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("KEYCODE_WAKEUP") == 1);
+    CHECK(adbSaid("am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity") == 1);
+    CHECK(rec()[u"power"_s].toString() == u"waking"_s);
+    clock += 30 * 1000;
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("KEYCODE_WAKEUP") == 1);   // still within its 60 seconds
+    clock += 61 * 1000;
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("KEYCODE_WAKEUP") == 2);
+    clock += 61 * 1000;
+    PosService::billboardPowerTick(&shared);
+    settle();
+    CHECK(adbSaid("KEYCODE_WAKEUP") == 2);
+    CHECK(rec()[u"powerProblem"_s].toString() == u"Didn't come back: check the TV's Wake on Wi-Fi setting"_s);
+    CHECK(rec()[u"_detail"_s].toString().contains(u"Wake on Wi-Fi"_s));
+
+    // On now: tried again at once; connected: on, nothing said.
+    REQUIRE(manager.setBillboard(u"Bar TV"_s, {{u"now"_s, u"on"_s}}));
+    REQUIRE(waitFor([&] { return adbSaid("KEYCODE_WAKEUP") == 3; }, 15000));
+    settle();
+    online << u"Bar TV"_s;
+    PosService::billboardPowerTick(&shared);
+    CHECK(rec()[u"power"_s].toString().isEmpty());
+    CHECK(rec()[u"powerProblem"_s].toString().isEmpty());
+    CHECK(rec()[u"_detail"_s].toString().contains(u" · on"_s));
+
+    // Off now: to sleep at once (within its hours).
+    clock = QDateTime(QDate(2026, 11, 3), QTime(10, 0)).toMSecsSinceEpoch();
+    REQUIRE(manager.setBillboard(u"Bar TV"_s, {{u"now"_s, u"off"_s}}));
+    REQUIRE(waitFor([&] { return adbSaid("KEYCODE_SLEEP") == 2; }, 15000));
+    settle();
+    online.clear();
+    CHECK(rec()[u"power"_s].toString() == u"asleep"_s);
+
+    // Powering off switched off for it: woken, and only its screen goes dark from now on.
+    REQUIRE(manager.setBillboard(u"Bar TV"_s, {{u"powerOff"_s, false}}));
+    REQUIRE(waitFor([&] { return adbSaid("KEYCODE_WAKEUP") == 4; }, 15000));
+    settle();
+    online << u"Bar TV"_s;
+    PosService::billboardPowerTick(&shared);
+    CHECK(rec()[u"power"_s].toString().isEmpty());
+    CHECK(rec()[u"_detail"_s].toString().contains(u"dark"_s));   // Off now: its screen black
+    CHECK(adbSaid("KEYCODE_SLEEP") == 2);
+
+    // Not on the store's server (a tablet, the standby): never.
+    shared.billboardPowerOn = false;
+    REQUIRE(manager.setBillboard(u"Bar TV"_s, {{u"powerOff"_s, true}}));
+    QTest::qWait(300);
+    CHECK(adbSaid("KEYCODE_SLEEP") == 2);
 }

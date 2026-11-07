@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 14:29 ET — Bob (Claude) — Billboards: power the TV off outside its hours (adb sleep / wake)
+- **What:** New billboard setting 'Power the TV off outside its hours' (Billboard defaults: on, for Fire TVs; a TV of another known make is off unless set). The store's server checks every 30 s (and at once after a change): outside its hours or Off now it runs vt-add-billboard --sleep (adb KEYCODE_SLEEP); at their start or On now --wake (KEYCODE_WAKEUP, 5 s, am start of the billboard). Not connected 60 s after waking: woken once more, then its row says "Didn't come back: check the TV's Wake on Wi-Fi setting" (On now tries again). Setting off or wake failed: the screen just goes black as before. Rows say asleep / waking / dark / on; Off now and On now buttons on its form. Each power step is logged (journal: 'Billboard power: ...') and shown in its job box. A failed sleep is tried again 10 minutes later.
+- **Why:** Owner tested on fire5 (Insignia Fire TV): adb's sleep key puts the TV in standby and the wake key brings it back on the Fire home screen, so the app must be started again.
+- **Files:** `modern/app/pos_billboards.cpp`, `modern/app/pos_json.cpp`, `modern/app/pos_service.hh`, `modern/core/settings.hh`, `modern/i18n/es.json`, `modern/main.cpp`, `modern/tests/test_billboard.cpp`, `modern/ui/qml/WidgetAdminPanel.qml`, `scripts/bin/vt-add-billboard`
+- **Next person must know:** Only the store's server powers TVs (main.cpp: shared->billboardPowerOn). A TV turned on by hand outside its hours is put back to sleep within a minute or so (5 minutes after it was slept, once it connects); use On now instead.
+
 ### 2026-11-07 13:30 ET — Bob (Claude) — Release g: Billboards page, ILSA cashiers
 - **What:** Linear release: bob/billboards-page plus the ILSA cashiers commits (cherry-picked; es.json and notes conflicts kept both sides; LIKE escape build fix included).
 - **Why:** One build for Pi, tablets and fire5.

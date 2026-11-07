@@ -121,6 +121,10 @@ struct TerminalConfig {
     bool billboardHoursOwn = false;
     bool billboardVolumeOwn = false;
     bool billboardMuteOwn = false;
+    // The TV put to standby outside its hours (adb: KEYCODE_SLEEP) and woken at their start, the
+    // billboard opened again; its own, or the defaults' (on for a Fire TV).
+    bool billboardPowerOwn = false;
+    bool billboardPowerOff = false;
     // What it shows: its own messages, pictures and videos in turn (the guest screen's kind of list,
     // displaySlides), or (off) the guest screen's list itself, following it as it changes.
     bool billboardOwnSlides = false;
@@ -430,6 +434,7 @@ struct PosSettings {
     std::vector<std::string> billboardDefaultHours;
     int billboardDefaultVolume = 100;
     bool billboardDefaultMute = false;
+    bool billboardDefaultPowerOff = true;   // Fire TVs only: another TV goes by its own setting
     // The customer display's left third between guests (where the order shows during a sale):
     // a picture or an animated GIF (a picture ref or path); empty: the messages use the whole screen.
     std::string displayPanel;

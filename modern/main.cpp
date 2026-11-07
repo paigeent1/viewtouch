@@ -1695,6 +1695,15 @@ int runStore(const Args &cli, const Options &o)
         ilsaSync = std::make_unique<vt::app::IlsaSync>(&pos);
         ilsaSync->start();
     }
+    // Billboards' TVs to standby outside their hours and woken at their start (Store Settings >
+    // Billboards: Power the TV off outside its hours): from the store's server, every 30 seconds.
+    QTimer billboardPower;
+    if (server) {
+        shared->billboardPowerOn = true;
+        QObject::connect(&billboardPower, &QTimer::timeout, shared, [shared] { vt::app::PosService::billboardPowerTick(shared); });
+        billboardPower.start(30 * 1000);
+        QTimer::singleShot(5 * 1000, shared, [shared] { vt::app::PosService::billboardPowerTick(shared); });
+    }
     if (cli.isSet(o.headless) || gServeHeadless)
         return qApp->exec();
 
