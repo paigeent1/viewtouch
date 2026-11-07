@@ -99,7 +99,7 @@ Rectangle {
                 Layout.preferredHeight: w.keyH
                 Layout.fillHeight: false
                 stores: w.range.stores ?? []
-                ticked: w.range.ticked ?? []
+                selected: w.range.ticked ?? []
                 byStore: w.range.byStore ?? true
                 showMode: false
                 unit: w.unit

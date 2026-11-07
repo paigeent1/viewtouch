@@ -3,13 +3,13 @@ import QtQuick.Layouts
 
 // Which stores (like ILSA Corp): a tick box per store (BHDAN, BHNM, later HCA), All / None, and with
 // more than one ticked, By store (a section per store, its own totals) or Corp roll-up (one total).
-// It shows what it is given (stores, ticked, byStore: usually the server's answer) and asks through
+// It shows what it is given (stores, selected, byStore: usually the server's answer) and asks through
 // chosen(arg): "BHDAN,BHNM" ("-" none), with "|rollup" for one combined total. For the ILSA History
 // screens now, the corporate setup later.
 RowLayout {
     id: p
     property var stores: []
-    property var ticked: []
+    property var selected: []
     property bool byStore: true
     property bool showMode: true   // By store / Corp roll-up (a list of receipts has no totals)
     property real unit: 14
@@ -20,7 +20,7 @@ RowLayout {
 
     function arg(list, by) { return (list.length ? list.join(",") : "-") + (by ? "" : "|rollup") }
     function toggle(s) {
-        const l = p.ticked.slice()
+        const l = p.selected.slice()
         const i = l.indexOf(s)
         if (i >= 0) l.splice(i, 1)
         else l.push(s)
@@ -34,7 +34,7 @@ RowLayout {
         model: p.stores
         delegate: WidgetKey {
             required property string modelData
-            readonly property bool on: p.ticked.indexOf(modelData) >= 0
+            readonly property bool on: p.selected.indexOf(modelData) >= 0
             objectName: "storePick-" + modelData
             Layout.preferredWidth: p.unit * 6.5
             Layout.preferredHeight: p.keyH
@@ -62,23 +62,23 @@ RowLayout {
     }
     WidgetKey {
         objectName: "storePickByStore"
-        visible: p.showMode && p.ticked.length > 1
+        visible: p.showMode && p.selected.length > 1
         Layout.preferredWidth: p.unit * 6
         Layout.preferredHeight: p.keyH
         text: qsTr("By store")
         fontScale: 0.32
         baseColor: p.byStore ? "#2f6fd6" : "#343c49"
-        onClicked: p.chosen(p.arg(p.ticked, true))
+        onClicked: p.chosen(p.arg(p.selected, true))
     }
     WidgetKey {
         objectName: "storePickRollup"
-        visible: p.showMode && p.ticked.length > 1
+        visible: p.showMode && p.selected.length > 1
         Layout.preferredWidth: p.unit * 7
         Layout.preferredHeight: p.keyH
         text: qsTr("Corp roll-up")
         fontScale: 0.32
         baseColor: p.byStore ? "#343c49" : "#2f6fd6"
-        onClicked: p.chosen(p.arg(p.ticked, false))
+        onClicked: p.chosen(p.arg(p.selected, false))
     }
     Item { Layout.fillWidth: true }
 }
