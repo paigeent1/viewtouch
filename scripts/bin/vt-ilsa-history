@@ -6,6 +6,10 @@ day by day against ILSA's own Z reports.
   vt-ilsa-history ~/ilsa-export/"copy bhdan 10-29-2026"          import every day not in yet
   vt-ilsa-history EXPORT --from 2026-10-01 --to 2026-10-28        only those business days
   vt-ilsa-history EXPORT --replace                                days already in are imported again
+  vt-ilsa-history --recheck [--dry-run] [--from/--to]              the self-check again from the history
+                                                                  file (no export needed, nothing imported),
+                                                                  with what explains each kind of difference
+                                                                  and the days whose dates look wrong
   vt-ilsa-history --self-test                                     check the importer on made-up data
 
 What it does
@@ -97,6 +101,9 @@ ADDED_COLUMNS = [
     # name_src: export (its copy's item list or the line itself) | other (another copy's item list) |
     # dept (no item list had its UPC: named after its department) | fixed (promotion, paid out...)
     ("legacy_lines", "name_src", "TEXT NOT NULL DEFAULT 'export'"),
+    ("legacy_lines", "cur_dept", "INTEGER"),
+    ("legacy_lines", "disc_cents", "INTEGER NOT NULL DEFAULT 0"),
+    ("legacy_receipts", "disc_cents", "INTEGER NOT NULL DEFAULT 0"),
 ]
 LATE_SCHEMA = [
     "CREATE INDEX IF NOT EXISTS legacy_lines_unnamed ON legacy_lines (upc) WHERE name_src = 'dept'",
@@ -484,7 +491,8 @@ OURS_SQL = """
 SELECT r.z_id,
   SUM(CASE WHEN r.mode = 0 THEN r.tax_cents ELSE 0 END),
   SUM(CASE WHEN r.mode = 0 THEN r.total_cents ELSE 0 END),
-  SUM(CASE WHEN r.mode = 0 THEN 1 ELSE 0 END)
+  SUM(CASE WHEN r.mode = 0 THEN 1 ELSE 0 END),
+  SUM(CASE WHEN r.mode = 0 THEN r.disc_cents ELSE 0 END)
 FROM legacy_receipts r WHERE r.day = ? GROUP BY r.z_id"""
 LINES_SQL = """
 SELECT r.z_id, l.kind, l.lottery, SUM(CASE WHEN r.mode = 0 OR l.kind = 'payout' THEN l.amount_cents ELSE 0 END)
@@ -492,18 +500,38 @@ FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id WHERE l.day = 
 TENDERS_SQL = """
 SELECT r.z_id, t.type, SUM(t.amount_cents), SUM(t.change_cents)
 FROM legacy_tenders t JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day = ? GROUP BY r.z_id, t.type"""
-MISMATCH_SQL = """
-SELECT r.z_id, COUNT(*) FROM legacy_receipts r
-WHERE r.day = ? AND r.mode = 0 AND r.total_cents <> r.tax_cents +
+# Each sales receipt: its total, tax, receipt discount and what its lines add up to.
+RECEIPT_SUMS_SQL = """
+SELECT r.z_id, r.total_cents, r.tax_cents, r.disc_cents,
   (SELECT COALESCE(SUM(amount_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id)
-GROUP BY r.z_id"""
+FROM legacy_receipts r WHERE r.day = ? AND r.mode = 0"""
+RECEIPT_STATS = Counter()     # how each receipt's total was explained (printed by --recheck)
+RECEIPT_DIFFS = Counter()     # the unexplained differences (total - lines - tax), cents
+
+
+def receipt_explained(total, tax, disc, lines):
+    """Whether a receipt's total is its lines + tax, less (or plus) its receipt discount, to the cent."""
+    base = total - lines - tax
+    if abs(base) <= 1:
+        RECEIPT_STATS["lines + tax"] += 1
+        return True
+    if disc and abs(base + disc) <= 1:
+        RECEIPT_STATS["lines + tax - receipt discount"] += 1
+        return True
+    if disc and abs(base - disc) <= 1:
+        RECEIPT_STATS["lines + tax + receipt discount (sign kept the other way)"] += 1
+        return True
+    RECEIPT_STATS["unexplained"] += 1
+    RECEIPT_DIFFS[base] += 1
+    return False
 
 
 def ours_for_day(db, day):
     """z_id -> {name: cents} rebuilt from the imported rows of `day`."""
     out = defaultdict(lambda: defaultdict(int))
-    for z, tax, total, n in db.execute(OURS_SQL, (day,)):
+    for z, tax, total, n, disc in db.execute(OURS_SQL, (day,)):
         o = out[z]; o["ours:tax"] += tax or 0; o["ours:sale_totals"] += total or 0; o["ours:receipts"] += n or 0
+        o["ours:discounts"] += disc or 0
     for z, kind, lottery, amt in db.execute(LINES_SQL, (day,)):
         o = out[z]; amt = amt or 0
         if kind == "payout":
@@ -517,11 +545,57 @@ def ours_for_day(db, day):
         change[z] += ch or 0
     for z, ch in change.items():   # all change given comes out of cash (also on card / gift overtenders)
         out[z]["ours:tender:1"] = out[z].get("ours:tender:1", 0) - ch
-    for z, n in db.execute(MISMATCH_SQL, (day,)):
-        out[z]["ours:receipts_off"] += n
+    for z, total, tax, disc, lines in db.execute(RECEIPT_SUMS_SQL, (day,)):
+        if not receipt_explained(total, tax, disc or 0, lines):
+            out[z]["ours:receipts_off"] += 1
     for o in out.values():
         o["ours:gross"] = o.get("ours:net", 0) + o.get("ours:tax", 0)
     return out
+
+
+# Differences known and left as ILSA recorded them (owner): (day, Z, what it starts with) -> why.
+KNOWN = {
+    ("2023-02-02", 5828, "Tender Cash"): "known: a mistyped tender amount in ILSA, left as recorded",
+}
+NO_SAVED_TENDERS = Counter()   # Z's whose ILSA Z kept no tenders at all: not compared (printed by --recheck)
+
+
+def check_day(db, day):
+    """ILSA's own Z against the imported receipts, for one business day (inside the caller's
+    transaction): our totals rebuilt and kept (ours:...), the day's differences rewritten (the Z_Totals
+    ones are learn_z_totals'). Returns the differences."""
+    ours = ours_for_day(db, day)
+    zs = db.execute("SELECT id, z_counter FROM legacy_z WHERE day = ?", (day,)).fetchall()
+    db.execute("DELETE FROM legacy_z_values WHERE name LIKE 'ours:%' AND z_id IN (SELECT id FROM legacy_z WHERE day = ?)", (day,))
+    db.executemany("INSERT OR REPLACE INTO legacy_z_values VALUES (?, ?, ?)",
+                   [(z, k, v) for z, o in ours.items() for k, v in o.items()])
+    db.execute("DELETE FROM legacy_variances WHERE day = ? AND what NOT LIKE 'Z_Totals %'", (day,))
+    var = []
+    for zid, zc in zs:
+        ilsa = dict(db.execute("SELECT name, cents FROM legacy_z_values WHERE z_id = ? AND name LIKE 'ilsa:%'", (zid,)).fetchall())
+        o = ours.get(zid, {})
+        checks = [("Tax", ilsa.get("ilsa:tax"), o.get("ours:tax", 0))]
+        # Tenders only when ILSA's Z kept some: a Z with none saved can't be compared (counted apart).
+        if any(k.startswith("ilsa:tender:") for k in ilsa):
+            types = {int(k.rsplit(":", 1)[1]) for k in list(ilsa) + list(o) if k.startswith(("ilsa:tender:", "ours:tender:"))}
+            for ty in sorted(types):
+                checks.append((f"Tender {TENDER_NAMES.get(ty, ty)} ({ty})", ilsa.get(f"ilsa:tender:{ty}", 0), o.get(f"ours:tender:{ty}", 0)))
+        elif any(k.startswith("ours:tender:") and v for k, v in o.items()):
+            NO_SAVED_TENDERS[day[:4]] += 1
+        if "ilsa:payouts" in ilsa and abs(ilsa["ilsa:payouts"]) != abs(o.get("ours:payouts", 0)):
+            var.append((day, zid, "Paid outs", ilsa["ilsa:payouts"], o.get("ours:payouts", 0)))
+        for what, a, b in checks:
+            if a is not None and abs(a - b) > 1:
+                var.append((day, zid, what, a, b))
+        if o.get("ours:receipts_off"):
+            var.append((day, zid, "Receipts whose lines + tax (less their discount) differ from their total (count)", 0, o["ours:receipts_off"]))
+        for i, (d, z, what, a, b) in enumerate(var):
+            for (kd, kz, kw), why in KNOWN.items():
+                if z == zid and d == kd and zc == kz and what.startswith(kw) and "known:" not in what:
+                    var[i] = (d, z, f"{what} ({why})", a, b)
+    db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) VALUES (?, ?, ?, ?, ?)", var)
+    db.execute("UPDATE legacy_days SET variances = ? WHERE day = ?", (len(var), day))
+    return var
 
 
 def import_day(db, source_id, day, partial, replace_old, now):
@@ -558,26 +632,7 @@ def import_day(db, source_id, day, partial, replace_old, now):
         db.execute("""INSERT OR REPLACE INTO legacy_z_values (z_id, name, cents)
                       SELECT lz.id, sv.name, sv.cents FROM legacy_z lz CROSS JOIN sv ON sv.reg = lz.reg_num AND sv.z = lz.z_counter
                       WHERE lz.day = ? AND lz.source_id = ?""", (day, source_id))
-        ours = ours_for_day(db, day)
-        db.executemany("INSERT OR REPLACE INTO legacy_z_values VALUES (?, ?, ?)",
-                       [(z, k, v) for z, o in ours.items() for k, v in o.items()])
-        # The self-check: ILSA's Z against the imported receipts.
-        var = []
-        for (zid,) in db.execute("SELECT id FROM legacy_z WHERE day = ?", (day,)).fetchall():
-            ilsa = dict(db.execute("SELECT name, cents FROM legacy_z_values WHERE z_id = ? AND name LIKE 'ilsa:%'", (zid,)).fetchall())
-            o = ours.get(zid, {})
-            checks = [("Tax", ilsa.get("ilsa:tax"), o.get("ours:tax", 0))]
-            types = {int(k.rsplit(":", 1)[1]) for k in list(ilsa) + list(o) if k.startswith(("ilsa:tender:", "ours:tender:"))}
-            for ty in sorted(types):
-                checks.append((f"Tender {TENDER_NAMES.get(ty, ty)} ({ty})", ilsa.get(f"ilsa:tender:{ty}", 0), o.get(f"ours:tender:{ty}", 0)))
-            if "ilsa:payouts" in ilsa and abs(ilsa["ilsa:payouts"]) != abs(o.get("ours:payouts", 0)):
-                var.append((day, zid, "Paid outs", ilsa["ilsa:payouts"], o.get("ours:payouts", 0)))
-            for what, a, b in checks:
-                if a is not None and abs(a - b) > 1:
-                    var.append((day, zid, what, a, b))
-            if o.get("ours:receipts_off"):
-                var.append((day, zid, "Receipts whose lines + tax differ from their total (count)", 0, o["ours:receipts_off"]))
-        db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) VALUES (?, ?, ?, ?, ?)", var)
+        var = check_day(db, day)
         n = db.execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = ?", (day,)).fetchone()[0]
         db.execute("INSERT OR REPLACE INTO legacy_days VALUES (?, ?, ?, ?, ?, ?)", (day, source_id, int(partial), n, len(var), now))
         db.execute("COMMIT")
@@ -590,11 +645,14 @@ def import_day(db, source_id, day, partial, replace_old, now):
 # Z_Totals: which of ILSA's amounts equals which of our totals is learned from the days themselves
 # (the column names don't say): a column that equals one of ours on 90% of the days or more is checked.
 BUCKETS = ["ours:merchandise", "ours:items", "ours:entrys", "ours:promos", "ours:others", "ours:net", "ours:gross",
-           "ours:sale_totals", "ours:tax", "ours:payouts", "ours:lottery"]
+           "ours:sale_totals", "ours:tax", "ours:payouts", "ours:lottery", "ours:discounts",
+           "ours:promos+discounts", "ours:others+discounts"]
 BUCKET_TEXT = {"ours:merchandise": "item sales (lottery out)", "ours:items": "item sales (lottery in)",
                "ours:entrys": "dept entries", "ours:promos": "promotions", "ours:others": "other lines",
                "ours:net": "net sales", "ours:gross": "sales with tax", "ours:sale_totals": "receipt totals",
-               "ours:tax": "tax", "ours:payouts": "paid outs", "ours:lottery": "lottery item sales"}
+               "ours:tax": "tax", "ours:payouts": "paid outs", "ours:lottery": "lottery item sales",
+               "ours:discounts": "receipt discounts", "ours:promos+discounts": "promotions + receipt discounts",
+               "ours:others+discounts": "other lines + receipt discounts"}
 
 
 def name_backfill(db):
@@ -612,21 +670,29 @@ def name_backfill(db):
     return named, left
 
 
-def learn_z_totals(db):
-    """Matches Z_Totals columns to our totals over every day in the file; rewrites their variances."""
+def learn_z_totals(db, tx=True):
+    """Matches Z_Totals columns to our totals over every day in the file (either sign: ILSA keeps some
+    amounts positive that its receipts keep negative); rewrites their variances."""
     vals = defaultdict(dict)
     for z, name, c in db.execute("SELECT z_id, name, cents FROM legacy_z_values WHERE name LIKE 'ilsa:totals:%' OR name LIKE 'ours:%'"):
         vals[z][name] = c
+    for v in vals.values():
+        v["ours:promos+discounts"] = v.get("ours:promos", 0) + v.get("ours:discounts", 0)
+        v["ours:others+discounts"] = v.get("ours:others", 0) + v.get("ours:discounts", 0)
+        for b in BUCKETS:
+            v["-" + b] = -v.get(b, 0)
+    signed = BUCKETS + ["-" + b for b in BUCKETS]
     cols = sorted({n for v in vals.values() for n in v if n.startswith("ilsa:totals:")})
     mapping = {}
     for col in cols:
         days = [v for v in vals.values() if col in v]
         if not days or all(v[col] == 0 for v in days):
             continue
-        best = max(BUCKETS, key=lambda b: sum(1 for v in days if abs(v[col] - v.get(b, 0)) <= 1))
+        best = max(signed, key=lambda b: sum(1 for v in days if abs(v[col] - v.get(b, 0)) <= 1))
         hits = sum(1 for v in days if abs(v[col] - v.get(best, 0)) <= 1)
         mapping[col] = (best, hits, len(days))
-    db.execute("BEGIN")
+    if tx:
+        db.execute("BEGIN")
     db.execute("DELETE FROM legacy_variances WHERE what LIKE 'Z_Totals %'")
     var = []
     for col, (b, hits, n) in mapping.items():
@@ -634,12 +700,17 @@ def learn_z_totals(db):
             continue
         for z, v in vals.items():
             if col in v and abs(v[col] - v.get(b, 0)) > 1:
-                var.append((z, f"Z_Totals {col[12:]} vs {BUCKET_TEXT[b]}", v[col], v.get(b, 0)))
+                var.append((z, f"Z_Totals {col[12:]} vs {bucket_text(b)}", v[col], v.get(b, 0)))
     db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) SELECT day, ?, ?, ?, ? FROM legacy_z WHERE id = ?",
                    [(z, w, a, b, z) for z, w, a, b in var])
     db.execute("UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v WHERE v.day = legacy_days.day)")
-    db.execute("COMMIT")
+    if tx:
+        db.execute("COMMIT")
     return mapping
+
+
+def bucket_text(b):
+    return ("minus " + BUCKET_TEXT[b[1:]]) if b.startswith("-") else BUCKET_TEXT[b]
 
 
 def money(c):
@@ -751,7 +822,7 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
             if mapping and not quiet:
                 say("\n== ILSA Z_Totals amounts (meaning learned from the days: equal to one of ours on most days)")
                 for col, (b, hits, n) in sorted(mapping.items()):
-                    say(f"  {col[12:]}: = {BUCKET_TEXT[b]} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+                    say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
         named, (codes, lines) = name_backfill(db)
         if named or codes:
             say(f"\nItems no longer in their copy's list: {named:,} line(s) named from another copy's list;"
@@ -770,6 +841,137 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
         if was_running:
             print("Starting ViewTouch again...")
             subprocess.Popen(["vt-server"])
+
+
+# --- --recheck: the self-check again, from the history file -------------------------------------------
+
+def explain(db, what_like, cands, say):
+    """For the Z's that differ on `what_like`: does the difference (ILSA - imported) equal one of
+    `cands` (name -> SQL giving z_id, cents for the Z's of a day range), or minus it?"""
+    bad = db.execute("SELECT v.z_id, v.ilsa_cents - v.ours_cents, substr(v.day, 1, 4) FROM legacy_variances v "
+                     "WHERE v.what LIKE ? AND v.what NOT LIKE '%known:%'", (what_like,)).fetchall()
+    if not bad:
+        return
+    say(f"  {len(bad):,} Z's; by year: " + ", ".join(f"{y} {n}" for y, n in sorted(Counter(y for _, _, y in bad).items())))
+    diffs = {z: d for z, d, _ in bad}
+    for name, sql in cands.items():
+        vals = dict(db.execute(sql).fetchall())
+        hit = sum(1 for z, d in diffs.items() if vals.get(z, 0) and abs(d - vals[z]) <= 1)
+        neg = sum(1 for z, d in diffs.items() if vals.get(z, 0) and abs(d + vals[z]) <= 1)
+        if hit or neg:
+            say(f"    = {name}: {hit:,} Z's; = minus it: {neg:,}")
+    sizes = sorted(diffs.values())
+    small = sum(1 for d in sizes if abs(d) <= 5)
+    say(f"    differences: {small:,} of 5 cents or less; smallest {money(sizes[0])}, largest {money(sizes[-1])}; "
+        "most common: " + ", ".join(f"{money(d)} x{n}" for d, n in Counter(sizes).most_common(5)))
+
+
+def dates_report(db, say):
+    """Days and receipts whose dates look wrong (a register clock set wrong): what they are."""
+    say("\n== Dates")
+    for sid, name, first, last in db.execute("SELECT id, name, first_day, last_day FROM legacy_sources ORDER BY first_day"):
+        say(f"  {name}: {first} .. {last}")
+    # Each copy's days far from the rest of its days (more than 30 days before the next one).
+    for sid, name in db.execute("SELECT id, name FROM legacy_sources ORDER BY first_day").fetchall():
+        days = [d for (d,) in db.execute("SELECT day FROM legacy_days WHERE source_id = ? ORDER BY day", (sid,))]
+        lone = [d for i, d in enumerate(days) if i + 1 < len(days) and i < 20 and
+                (time.mktime(time.strptime(days[i + 1], "%Y-%m-%d")) - time.mktime(time.strptime(d, "%Y-%m-%d"))) > 30 * 86400]
+        for d in lone:
+            say(f"  {name}: {d} stands apart from its copy's other days (the next is more than 30 days later):")
+            for zc, zat, n, a, b in db.execute(
+                    "SELECT z.z_counter, z.z_at, COUNT(r.id), MIN(r.at), MAX(r.at) FROM legacy_z z "
+                    "LEFT JOIN legacy_receipts r ON r.z_id = z.id WHERE z.day = ? AND z.source_id = ? GROUP BY z.id", (d, sid)):
+                dates = db.execute("SELECT substr(r.at, 1, 10), COUNT(*) FROM legacy_receipts r JOIN legacy_z z ON z.id = r.z_id "
+                                   "WHERE z.day = ? AND z.source_id = ? AND z.z_counter = ? GROUP BY 1 ORDER BY 2 DESC LIMIT 4",
+                                   (d, sid, zc)).fetchall()
+                say(f"    Z {zc}: run {zat or '?'}; {n} receipt(s) rung {a} .. {b}; their dates: "
+                    + ", ".join(f"{x} x{c}" for x, c in dates))
+    # Z's whose receipts were rung on more than one date, or more than a day from when the Z was run.
+    rows = db.execute("SELECT s.name, z.day, z.z_counter, z.z_at, MIN(substr(r.at, 1, 10)), MAX(substr(r.at, 1, 10)), COUNT(r.id) "
+                      "FROM legacy_z z JOIN legacy_sources s ON s.id = z.source_id JOIN legacy_receipts r ON r.z_id = z.id "
+                      "GROUP BY z.id HAVING julianday(MAX(r.at)) - julianday(MIN(r.at)) > 1.5 "
+                      "OR (z.z_at <> '' AND abs(julianday(substr(z.z_at, 1, 10)) - julianday(z.day)) > 1) ORDER BY z.day").fetchall()
+    say(f"  Z's whose receipts span more than a day, or run more than a day after their first receipt: {len(rows):,}")
+    for name, d, zc, zat, a, b, n in rows[:15]:
+        say(f"    {name} Z {zc} (day {d}, run {zat or '?'}): {n} receipts dated {a} .. {b}")
+
+
+RECHECK_CANDIDATES = {
+    "Tax": {
+        "tax on cancelled / no-sale receipts (modes 1, 2)": "SELECT z_id, SUM(tax_cents) FROM legacy_receipts WHERE mode <> 0 GROUP BY z_id",
+        "tax on receipts with a return": "SELECT r.z_id, SUM(r.tax_cents) FROM legacy_receipts r WHERE r.mode = 0 AND EXISTS "
+                                         "(SELECT 1 FROM legacy_lines l WHERE l.receipt_id = r.id AND l.returned = 1) GROUP BY r.z_id",
+        "tax on receipts with a negative total": "SELECT z_id, SUM(tax_cents) FROM legacy_receipts WHERE mode = 0 AND total_cents < 0 GROUP BY z_id",
+        "tax on receipts dated another day than their Z": "SELECT r.z_id, SUM(r.tax_cents) FROM legacy_receipts r WHERE r.mode = 0 "
+                                                           "AND substr(r.at, 1, 10) <> r.day GROUP BY r.z_id",
+    },
+    "Tender Cash": {
+        "change given on card / gift card / check tenders": "SELECT r.z_id, SUM(t.change_cents) FROM legacy_tenders t JOIN legacy_receipts r "
+                                                             "ON r.id = t.receipt_id WHERE t.type <> 1 GROUP BY r.z_id",
+        "cash given back (negative cash tenders)": "SELECT r.z_id, SUM(t.amount_cents) FROM legacy_tenders t JOIN legacy_receipts r "
+                                                    "ON r.id = t.receipt_id WHERE t.type = 1 AND t.amount_cents < 0 GROUP BY r.z_id",
+        "paid outs": "SELECT r.z_id, SUM(l.amount_cents) FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id "
+                     "WHERE l.kind = 'payout' GROUP BY r.z_id",
+        "cash on cancelled / no-sale receipts": "SELECT r.z_id, SUM(t.amount_cents - t.change_cents) FROM legacy_tenders t JOIN legacy_receipts r "
+                                                "ON r.id = t.receipt_id WHERE t.type = 1 AND r.mode <> 0 GROUP BY r.z_id",
+        "cash on receipts dated another day than their Z": "SELECT r.z_id, SUM(t.amount_cents - t.change_cents) FROM legacy_tenders t "
+                                                            "JOIN legacy_receipts r ON r.id = t.receipt_id WHERE t.type = 1 "
+                                                            "AND substr(r.at, 1, 10) <> r.day GROUP BY r.z_id",
+    },
+}
+
+
+def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False):
+    """The self-check again over the history file's days (no export, nothing imported): our totals
+    rebuilt, the differences rewritten, then what explains each kind and the dates that look wrong.
+    --dry-run prints it all and keeps the file as it was."""
+    say = (lambda *a: None) if quiet else print
+    if not os.path.exists(db_path):
+        sys.exit(f"No history file at {db_path}: import first.")
+    t0 = time.time()
+    stamp = time.strftime("%Y-%m-%d_%H%M%S")
+    RECEIPT_STATS.clear(); RECEIPT_DIFFS.clear(); NO_SAVED_TENDERS.clear()
+    if not dry:   # the differences are rewritten: a copy first
+        os.makedirs(os.path.join(out_dir, "backups"), exist_ok=True)
+        backup = os.path.join(out_dir, "backups", f"ilsa-history-before-recheck-{stamp}.db")
+        src, dst = sqlite3.connect(db_path), sqlite3.connect(backup)
+        src.backup(dst); dst.close(); src.close()
+        say(f"Backup: {backup}")
+    db = open_db(db_path)
+    days = [d for (d,) in db.execute("SELECT day FROM legacy_days WHERE day BETWEEN ? AND ? ORDER BY day",
+                                     (day_from or "0000", day_to or "9999"))]
+    say(("DRY RUN (nothing kept): " if dry else "") + f"rechecking {len(days):,} day(s) in {db_path}")
+    db.execute("BEGIN")
+    try:
+        for i, d in enumerate(days):
+            check_day(db, d)
+            if not quiet and (i % 500 == 499 or i == len(days) - 1):
+                print(f"  {i + 1:,}/{len(days):,} days ({d}), {time.time() - t0:,.0f} s", flush=True)
+        mapping = learn_z_totals(db, tx=False)
+        say("\n== Receipts: total against lines + tax")
+        for k, n in RECEIPT_STATS.most_common():
+            say(f"  {k}: {n:,}")
+        if RECEIPT_DIFFS:
+            say("  unexplained, most common differences (total - lines - tax): "
+                + ", ".join(f"{money(d)} x{n:,}" for d, n in RECEIPT_DIFFS.most_common(8)))
+        if NO_SAVED_TENDERS:
+            say("  Z's whose ILSA Z kept no tenders (not compared), by year: "
+                + ", ".join(f"{y} {n}" for y, n in sorted(NO_SAVED_TENDERS.items())))
+        say("\n== ILSA Z_Totals amounts (meaning learned from the days)")
+        for col, (b, hits, n) in sorted(mapping.items()):
+            say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+        for what, cands in RECHECK_CANDIDATES.items():
+            say(f"\n== {what}: ILSA's Z - imported, on the Z's that differ")
+            explain(db, what + "%", cands, say)
+        dates_report(db, say)
+        report(db, days, out_dir, stamp, say)
+        db.execute("ROLLBACK" if dry else "COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    close_db(db)
+    say(f"\nDone in {time.time() - t0:,.0f} s" + (" (dry run: the history file is unchanged)." if dry else "."))
+    return dict(RECEIPT_STATS)
 
 
 # --- self-test on made-up data -------------------------------------------------------------------------
@@ -838,15 +1040,18 @@ def older_export(d):
     copy's list does: MADE UP CUTTER) and one no list has."""
     write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"], [[1, 401, "10/20/26 21:00:00"]])
     write_csv(d, "RegSale", ["REG_NUM", "RECEIPT_NUM", "REG_Z_COUNTER", "START_TIME", "Z_MODE", "CSHR_NUM", "SALE_TOTAL",
-                             "TAX1_AMT", "TAX1_REFUND_AMT"], [[1, 8001, 401, "10/20/26 10:00:00", 0, 2, "5.32", "0.32", "0"]])
+                             "TAX1_AMT", "TAX1_REFUND_AMT", "RT_AMT_DISCOUNTS"],
+              [[1, 8001, 401, "10/20/26 10:00:00", 0, 2, "5.32", "0.32", "0", "0"],
+               [1, 8002, 401, "10/20/26 11:00:00", 0, 2, "9.57", "0.57", "0", "1.00"]])   # $1.00 off the receipt
     write_csv(d, "PDetail", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "DETAIL_CLASS", "DETAIL_TYPE", "MODE_FLAGS", "DEPT", "PLU",
                              "DETAIL_ITEM_PRC", "DETAIL_FOR_QTY", "DETAIL_LINE_AMT", "ITEM_COST", "TIME_STAMP"],
               [[1, 401, 8001, 1, 1, 0, 20, "55555555555", "3.00", 1, "3.00", "1.00", "10/20/26 10:00:00"],
-               [1, 401, 8001, 1, 1, 0, 20, "077777777777", "2.00", 1, "2.00", "0.50", "10/20/26 10:00:00"]])
+               [1, 401, 8001, 1, 1, 0, 20, "077777777777", "2.00", 1, "2.00", "0.50", "10/20/26 10:00:00"],
+               [1, 401, 8002, 1, 1, 0, 20, "55555555555", "10.00", 1, "10.00", "1.00", "10/20/26 11:00:00"]])
     write_csv(d, "TendSale", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "TENDER_TYPE", "SALE_AMT", "AMT_TEND", "CHANGE_DUE"],
-              [[1, 401, 8001, 1, "5.32", "5.32", "0"]])
-    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 401, 0, 1, "5.32"]])
-    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 401, 0, "0.32"]])
+              [[1, 401, 8001, 1, "5.32", "5.32", "0"], [1, 401, 8002, 1, "9.57", "10.00", "0.43"]])
+    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 401, 0, 1, "14.89"]])
+    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 401, 0, "0.89"]])
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["11111111111", "OLD ITEM NEVER SOLD", 20, "Old Co"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[20, "OLD ACCESSORIES NAME"]])
     write_csv(d, "Employee", ["EMP_NUM", "FIRST_NAME", "LAST_NAME", "SSN"], [[2, "Test", "Cashier Two", "000-00-0000"]])
@@ -934,6 +1139,24 @@ def self_test(write_fixture=False):
               == [(1, 3, "Test Cashier Three"), (1, 4, "Test Cashier Four"), (2, 2, "Test Cashier Two")]
               and [c[1] for c in db.execute("PRAGMA table_info(legacy_cashiers)")] == ["source_id", "cashier_num", "name"])
         check("the older day matches its Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-20'") == (0,))
+        check("a receipt discount explains its total (no difference)",
+              q("SELECT COUNT(*) FROM legacy_variances WHERE what LIKE 'Receipts%'") == (0,))
+        before = db.execute("SELECT * FROM legacy_variances ORDER BY id").fetchall()
+        db.close()
+        stats = recheck(dbp, None, None, False, out, quiet=True)
+        db = sqlite3.connect(dbp)
+        q = lambda s, *a: db.execute(s, a).fetchone()
+        check("--recheck: every receipt explained, the same differences",
+              stats.get("unexplained", 0) == 0 and stats.get("lines + tax - receipt discount") == 1
+              and [r[1:] for r in db.execute("SELECT * FROM legacy_variances ORDER BY id")] == [r[1:] for r in before])
+        db.execute("UPDATE legacy_receipts SET total_cents = total_cents + 5 WHERE receipt_num = 8001")
+        db.commit(); db.close()
+        stats = recheck(dbp, None, None, True, out, quiet=True)
+        db = sqlite3.connect(dbp)
+        check("--recheck finds a receipt that doesn't add up; --dry-run keeps the file",
+              stats.get("unexplained") == 1 and db.execute("SELECT COUNT(*) FROM legacy_variances WHERE what LIKE 'Receipts%'").fetchone() == (0,))
+        db.execute("UPDATE legacy_receipts SET total_cents = total_cents - 5 WHERE receipt_num = 8001")
+        db.commit()
         check("readable by ViewTouch read-only (no WAL left)", db.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
         text = fixture_sql(db)
         db.close()
@@ -964,6 +1187,13 @@ def main(argv):
             args.append(a)
     if "--help" in opts or "-h" in args:
         print(__doc__); return 0
+    for k in ("--from", "--to"):
+        if k in opts and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", opts[k]):
+            sys.exit(f"{k}: write the date like 2026-10-28")
+    if "--recheck" in opts:
+        recheck(os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--from"), opts.get("--to"),
+                bool(opts.get("--dry-run")), os.path.expanduser(opts.get("--out", OUT_DIR)))
+        return 0
     export = os.path.expanduser(args[0]) if args else None
     if export and not os.path.isdir(export) and os.path.isdir(os.path.join(EXPORT, args[0])):
         export = os.path.join(EXPORT, args[0])
