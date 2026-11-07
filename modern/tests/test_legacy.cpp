@@ -453,11 +453,21 @@ TEST_CASE("ILSA history: several stores ticked, by store or rolled up; a cashier
         db.close();
     }
     QSqlDatabase::removeDatabase(u"legacy-stores"_s);
+    // Who cashier 3 of a copy is tied to (the tie table: BHNM's made-up copy has no receipt of cashier 3).
     const auto tiedIn = [&](int source) {
-        for (const auto &c : app::legacy::cashiers(path))
-            if (c.sourceId == source && c.number == 3)
-                return c.employeeId;
-        return std::string("(none)");
+        std::string who;
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, u"legacy-ties"_s);
+            db.setDatabaseName(path);
+            REQUIRE(db.open());
+            QSqlQuery q(db);
+            REQUIRE(q.exec(u"SELECT employee_id FROM legacy_cashier_map WHERE source_id = %1 AND cashier_num = 3"_s.arg(source)));
+            if (q.next())
+                who = q.value(0).toString().toStdString();
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(u"legacy-ties"_s);
+        return who;
     };
     REQUIRE(app::legacy::setCashier(path, dan, 3, "emp-7", "Pat Example"));
     CHECK(tiedIn(dan) == "emp-7");
