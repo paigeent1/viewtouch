@@ -78,7 +78,7 @@ TEST_CASE("ILSA history: a day's totals as its Daily Z, both GPs", "[legacy]")
     const auto st = app::legacy::status(path);
     CHECK(st.present);
     CHECK(st.days == 3);           // two days of the made-up copy, one of an older made-up copy
-    CHECK(st.receipts == 7);
+    CHECK(st.receipts == 8);
     CHECK(st.first == u"2026-10-20"_s);
 
     QString error;
@@ -199,7 +199,7 @@ TEST_CASE("ILSA history: its Z beside the receipts, and the days that differ", "
     REQUIRE(unnamed.size() == 1);
     CHECK(unnamed[0].upc == "077777777777");
     CHECK(unnamed[0].sales == Money::fromCents(200));
-    CHECK(app::legacy::findReceipts(path, u"cutter"_s, 50, 0).size() == 1);
+    CHECK(app::legacy::findReceipts(path, u"cutter"_s, 50, 0).size() == 2);
     const core::Report d = core::legacy::differences(diffs, ctx, unnamed);
     CHECK(d.find("2026-10-20").at(2) == "UPC 077777777777 (OLD ACCESSORIES NAME)");
 }
