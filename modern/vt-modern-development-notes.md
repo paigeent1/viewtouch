@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 11:19 ET — Bob (Claude) — Fix By Employee report build
+- **What:** The Sales by Employee and Item report now gets the menu's categories from the shared store (s_->categories()); the build stopped on two calls that couldn't find them.
+- **Why:** CI build of bob/audit failed to compile pos_day.cpp.
+- **Files:** (none)
+
 ### 2026-11-07 10:52 ET — Bob (Claude) — ILSA cost comes over with the price book
 - **What:** vt-ilsa-items now writes each item's cost from ILSA's PLU.LAST_COST (the owner's system cost: list + OTP, set in ILSA); 0 or blank means no cost and nothing is sent. The ILSA sync (PosService::syncPriceBook) gives new items that cost and updates an existing item's cost like its price (when all ILSA items on it agree); an empty ILSA cost never clears a cost set in ViewTouch. Each cost change is logged 'cost old -> new' in ~/ilsa-sync/sync-log.csv, counted in runs.log ('N costs changed') and shown in the Changes report as ILSA sync (field Cost). Because every sale line now freezes its cost when it is rung, a later cost change never alters past sales or their reports. The notes bullet that said the export has no cost is corrected.
 - **Why:** Owner 2026-11-07 10:11: ILSA cost comes over too; reports build from register sales using the cost at the time of sale.

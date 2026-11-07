@@ -1459,7 +1459,7 @@ Report PosService::buildReport(const QString &id) const
     if (id == u"items")
         return itemSales(s_->closedToday, s_->menu, ctx);
     if (isEmployeeItems(id))
-        return employeeItemSales(s_->closedToday, s_->menu, categories(), reportFilter(id), ctx);
+        return employeeItemSales(s_->closedToday, s_->menu, s_->categories(), reportFilter(id), ctx);
     if (id == u"checklists")
         return checklistReport(ctx);
     if (id == u"servers")
@@ -1553,7 +1553,7 @@ Report PosService::rangeCapableReport(const QString &id, const std::vector<Check
     if (id == u"items")
         return itemSales(closed, s_->menu, ctx);
     if (isEmployeeItems(id))
-        return employeeItemSales(closed, s_->menu, categories(), reportFilter(id), ctx);
+        return employeeItemSales(closed, s_->menu, s_->categories(), reportFilter(id), ctx);
     if (id == u"categories")
         return categorySales(closed, s_->menu, ctx);
     if (id == u"hourly")
