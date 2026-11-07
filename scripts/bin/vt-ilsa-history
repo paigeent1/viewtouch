@@ -1,0 +1,840 @@
+#!/usr/bin/env python3
+"""ILSA sales history -> ViewTouch's history database (ilsa-history.db, next to viewtouch.db), checked
+day by day against ILSA's own Z reports.
+
+  vt-ilsa-history ~/ilsa-export/"copy bhdan 10-29-2026" --dry-run --from 2026-10-28 --to 2026-10-28
+  vt-ilsa-history ~/ilsa-export/"copy bhdan 10-29-2026"          import every day not in yet
+  vt-ilsa-history EXPORT --from 2026-10-01 --to 2026-10-28        only those business days
+  vt-ilsa-history EXPORT --replace                                days already in are imported again
+  vt-ilsa-history --self-test                                     check the importer on made-up data
+
+What it does
+  * Reads the CSVs vt-ilsa-export wrote (RegSale receipts, PDetail lines, TendSale tenders, RegZCnt,
+    Z_Tender, Z_Taxes, Z_Totals, RegReconcile, PLU, Dept). Nothing in the export is changed.
+  * Writes the history into its own SQLite file (--db, default ~/.local/share/ViewTouch/ViewTouch/
+    ilsa-history.db): legacy_receipts, legacy_lines, legacy_tenders, legacy_z (+ ILSA's Z numbers),
+    legacy_days, legacy_variances. ViewTouch reads it for the ILSA History reports and Receipt Lookup;
+    it never loads it into memory and never counts it in today's drawers, X/Z or end of day.
+  * One transaction per business day (an ILSA register Z, dated by its first receipt). Re-running skips
+    the days already in (the newest day of an export is kept as "partial" and is replaced by a newer
+    export); --replace imports them again. Stop it any time: the next run carries on.
+  * Real runs stop ViewTouch first (it saves), back up the history file, import, and start ViewTouch
+    again (vt-server) if it was running. --dry-run imports into a scratch copy and throws it away.
+  * Self-check: every Z's tax and tenders rebuilt from the imported receipts against ILSA's Z_Taxes /
+    Z_Tender, paid outs against RegReconcile, ILSA's Z_Totals amounts against the line totals they match
+    on most days; the days that differ are printed and saved to ~/ilsa-history/variances-<when>.csv.
+
+Rules (from vt-ilsa-tieout 1-4 and vt-ilsa-costcheck, 2026-11-04/05):
+  receipts Z_MODE 0 are sales; 1 and 2 are imported but are not sales (cancelled / no sale);
+  lines DETAIL_CLASS,TYPE 1,1 item sales | 1,x other dept entries (coupons, lottery redemptions) |
+  15,x promotions | 16,x promotion reversals | 4,1 paid outs (not sales) | 9,x stock moves: skipped |
+  anything else (30,30...) "other"; MODE_FLAGS 1/128 = a voided line pair (nets to 0), 256 = return;
+  line cost = ITEM_COST x quantity (DETAIL_FOR_QTY); lines with no ITEM_COST are "no-cost" (dept 260
+  open rings): ILSA counts their cost = their retail (0% margin; vt-ilsa-deptcheck 2026-11-07), so GP
+  is shown as ILSA counted it and without them; promotions (15/16) are ILSA's "Buydowns" (Adjusted
+  Cost = Cost + Buydowns); 1,x entries (gift cards, BH / MFG coupons) are not sales in ILSA's
+  department report; departments: when sold (PDetail.DEPT), and the item's current one (PLU.DEPT_NUM)
+  kept beside it for ILSA's printouts; lottery departments are history
+  only, kept out of merchandise sales and GP; tax = TAXn_AMT - TAXn_REFUND_AMT; tenders = AMT_TEND
+  (SALE_AMT is the whole sale repeated on each row); cash = cash AMT_TEND - all CHANGE_DUE.
+Counts and dollars only are printed: never card, license or birth-date columns. The buyer's date of
+birth is kept with its receipt in the history file (owner decision 2026-11-06), on this Pi only.
+"""
+import codecs, csv, io, os, re, shutil, sqlite3, subprocess, sys, tempfile, time
+from collections import Counter, defaultdict
+
+csv.field_size_limit(1 << 30)
+SCHEMA_VERSION = 1
+VT_DIR = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch")
+DEFAULT_DB = os.path.join(VT_DIR, "ilsa-history.db")
+EXPORT = os.path.expanduser("~/ilsa-export")
+OUT_DIR = os.path.expanduser("~/ilsa-history")
+LOTTERY = {270, 275, 280, 300, 320, 340, 345, 360, 365, 370, 375, 377, 378, 379, 380, 400, 405, 420}
+TENDER_NAMES = {1: "Cash", 10: "Check", 12: "House charge", 15: "BH Gift Card", 40: "Credit card",
+                70: "Credit card", 80: "American Express", 0: "Tender 0"}
+VOID_FLAGS, RETURN_FLAG = 1 | 128, 256
+
+# The history file's tables (ViewTouch reads them: modern/app/legacy_history.cpp). One statement per
+# line item, so the test fixture (modern/tests/legacy_fixture.inc) can be run a statement at a time.
+SCHEMA = [
+    "CREATE TABLE IF NOT EXISTS legacy_meta (key TEXT PRIMARY KEY, value TEXT)",
+    "CREATE TABLE IF NOT EXISTS legacy_sources (id INTEGER PRIMARY KEY, name TEXT UNIQUE, first_day TEXT, last_day TEXT, imported_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS legacy_depts (dept INTEGER PRIMARY KEY, name TEXT, lottery INTEGER NOT NULL DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS legacy_z (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, reg_num INTEGER NOT NULL, z_counter INTEGER NOT NULL, day TEXT NOT NULL, z_at TEXT, UNIQUE (source_id, reg_num, z_counter))",
+    "CREATE INDEX IF NOT EXISTS legacy_z_day ON legacy_z (day)",
+    # name: ilsa:tax, ilsa:tender:<type>, ilsa:payouts, ilsa:totals:<Z_Totals column> (ILSA's numbers);
+    # ours:... the same rebuilt from the imported receipts at import time. Cents.
+    "CREATE TABLE IF NOT EXISTS legacy_z_values (z_id INTEGER NOT NULL, name TEXT NOT NULL, cents INTEGER NOT NULL, PRIMARY KEY (z_id, name))",
+    "CREATE TABLE IF NOT EXISTS legacy_receipts (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, reg_num INTEGER NOT NULL, receipt_num INTEGER NOT NULL, z_id INTEGER, day TEXT NOT NULL, at TEXT, mode INTEGER NOT NULL DEFAULT 0, cashier INTEGER, total_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, age_verified INTEGER NOT NULL DEFAULT 0, dob TEXT NOT NULL DEFAULT '', disc_cents INTEGER NOT NULL DEFAULT 0, UNIQUE (source_id, reg_num, receipt_num))",
+    "CREATE INDEX IF NOT EXISTS legacy_receipts_day ON legacy_receipts (day)",
+    "CREATE INDEX IF NOT EXISTS legacy_receipts_num ON legacy_receipts (receipt_num)",
+    # kind: item | entry | promo | payout | other. mode: the receipt's (0 = a sale). qty signed (returns
+    # and the voiding half of a pair are negative). unit_cost_c4: ITEM_COST in 1/10000 dollars.
+    # dept: the department at the time of sale (PDetail.DEPT); cur_dept: the item's department in ILSA
+    # now (PLU.DEPT_NUM: ILSA's own Department Sales report seems to use it). disc_cents: a discount
+    # column of the line, if the export has one (receipts: theirs).
+    "CREATE TABLE IF NOT EXISTS legacy_lines (id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL, seq INTEGER NOT NULL, day TEXT NOT NULL, mode INTEGER NOT NULL DEFAULT 0, cls INTEGER, type INTEGER, flags INTEGER NOT NULL DEFAULT 0, kind TEXT NOT NULL, dept INTEGER, lottery INTEGER NOT NULL DEFAULT 0, upc TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '', brand TEXT NOT NULL DEFAULT '', qty REAL NOT NULL DEFAULT 0, unit_cents INTEGER NOT NULL DEFAULT 0, amount_cents INTEGER NOT NULL DEFAULT 0, unit_cost_c4 INTEGER NOT NULL DEFAULT 0, cost_cents INTEGER NOT NULL DEFAULT 0, has_cost INTEGER NOT NULL DEFAULT 0, voided INTEGER NOT NULL DEFAULT 0, returned INTEGER NOT NULL DEFAULT 0, cur_dept INTEGER, disc_cents INTEGER NOT NULL DEFAULT 0)",
+    "CREATE INDEX IF NOT EXISTS legacy_lines_day ON legacy_lines (day, kind)",
+    "CREATE INDEX IF NOT EXISTS legacy_lines_receipt ON legacy_lines (receipt_id)",
+    "CREATE INDEX IF NOT EXISTS legacy_lines_upc ON legacy_lines (upc)",
+    "CREATE TABLE IF NOT EXISTS legacy_tenders (id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL, seq INTEGER NOT NULL, type INTEGER NOT NULL, name TEXT NOT NULL, amount_cents INTEGER NOT NULL DEFAULT 0, change_cents INTEGER NOT NULL DEFAULT 0, sale_cents INTEGER NOT NULL DEFAULT 0)",
+    "CREATE INDEX IF NOT EXISTS legacy_tenders_receipt ON legacy_tenders (receipt_id)",
+    "CREATE TABLE IF NOT EXISTS legacy_days (day TEXT PRIMARY KEY, source_id INTEGER NOT NULL, partial INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0, variances INTEGER NOT NULL DEFAULT 0, imported_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS legacy_variances (id INTEGER PRIMARY KEY, day TEXT NOT NULL, z_id INTEGER, what TEXT NOT NULL, ilsa_cents INTEGER NOT NULL, ours_cents INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS legacy_variances_day ON legacy_variances (day)",
+]
+DATA_TABLES = ["legacy_meta", "legacy_sources", "legacy_depts", "legacy_z", "legacy_z_values", "legacy_receipts",
+               "legacy_lines", "legacy_tenders", "legacy_days", "legacy_variances"]
+
+
+# --- reading the export ------------------------------------------------------------------------------
+
+def _cp1252(err):
+    """Bytes that aren't UTF-8 are read as Windows-1252 (the ILSA computer's character set)."""
+    return err.object[err.start:err.end].decode("cp1252", errors="replace"), err.end
+codecs.register_error("vt_cp1252", _cp1252)
+
+
+def table_path(d, t):
+    for f in os.listdir(d):
+        if f.lower() == (t + ".csv").lower():
+            return os.path.join(d, f)
+    return None
+
+
+def rows(d, t):
+    """(header -> index map, row lists) of one table; nothing if it isn't in the export."""
+    p = table_path(d, t)
+    if not p:
+        return {}, iter(())
+    fh = open(p, "rb")
+    text = io.TextIOWrapper(fh, encoding="utf-8-sig", errors="vt_cp1252", newline="")
+    reader = csv.reader(text)
+    header = next(reader, [])
+    return {h.strip().upper(): i for i, h in enumerate(header)}, reader
+
+
+class Row:
+    """A CSV row read by column name (any case)."""
+    __slots__ = ("h", "r")
+    def __init__(self, h): self.h, self.r = h, []
+    def __call__(self, *names):
+        for n in names:
+            i = self.h.get(n)
+            if i is not None and i < len(self.r):
+                return self.r[i]
+        return ""
+
+
+def num(s):
+    try:
+        return float((s or "").replace("$", "").replace(",", "").strip() or 0)
+    except ValueError:
+        return 0.0
+
+
+def cents(s):
+    return int(round(num(s) * 100))
+
+
+def code(s):
+    s = (s or "").strip()
+    return s[:-2] if s.endswith(".0") and s[:-2].lstrip("-").isdigit() else s
+
+
+def integer(s, default=0):
+    try:
+        return int(float(code(s) or default))
+    except ValueError:
+        return default
+
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?)?")
+def iso(s):
+    """2024-01-02 10:00:00, 01/02/24 10:00:00 or 1/2/2024 10:00 AM -> '2024-01-02 10:00:00' ('' if none)."""
+    s = (s or "").strip()
+    if len(s) >= 10 and s[:4].isdigit() and s[4] == "-":
+        return (s[:19] + " 00:00:00"[len(s[:19]) - 10:]) if len(s) < 19 else s[:19]
+    m = US.match(s)
+    if not m:
+        return ""
+    mo, d, y, hh, mi, ss, ap = m.groups()
+    y = int(y); y += 2000 if y < 70 else (1900 if y < 100 else 0)
+    h = int(hh or 0)
+    if ap:
+        h = h % 12 + (12 if ap.lower() == "pm" else 0)
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d} {h:02d}:{int(mi or 0):02d}:{int(ss or 0):02d}"
+
+
+def dob_date(s, sale_year):
+    """A birth date as YYYY-MM-DD (a 2-digit year is in the past century when it'd be after the sale)."""
+    s = (s or "").strip()
+    if not s or s in ("0", "0.0"):
+        return ""
+    m = US.match(s)
+    if m:
+        mo, d, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if y < 100:
+            y += 2000 if 2000 + y <= sale_year else 1900
+        return f"{y:04d}-{mo:02d}-{d:02d}"
+    if len(s) >= 10 and s[:4].isdigit() and s[4] == "-":
+        return s[:10]
+    if re.fullmatch(r"\d{8}", s):   # YYYYMMDD
+        return f"{s[:4]}-{s[4:6]}-{s[6:]}"
+    return ""
+
+
+def kind_of(cls, typ):
+    if cls == 1:
+        return "item" if typ == 1 else "entry"
+    if cls in (15, 16):
+        return "promo"
+    if cls == 4:
+        return "payout"
+    if cls == 9:
+        return None          # stock moves, never on a receipt
+    return "other"
+
+
+# --- the history file --------------------------------------------------------------------------------
+
+def open_db(path):
+    db = sqlite3.connect(path)
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("PRAGMA synchronous=NORMAL")
+    db.execute("PRAGMA temp_store=FILE")
+    for s in SCHEMA:
+        db.execute(s)
+    db.execute("INSERT OR REPLACE INTO legacy_meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
+    db.commit()
+    return db
+
+
+def close_db(db):
+    """Back to a plain rollback journal, so ViewTouch can open the file read-only."""
+    db.commit()
+    db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    db.execute("PRAGMA journal_mode=DELETE")
+    db.close()
+
+
+STAGE = [
+    "CREATE TEMP TABLE sz (reg INTEGER, z INTEGER, z_at TEXT, day TEXT, PRIMARY KEY (reg, z))",
+    "CREATE TEMP TABLE sr (reg INTEGER, num INTEGER, z INTEGER, at TEXT, mode INTEGER, cashier INTEGER, total INTEGER, tax INTEGER, age INTEGER, dob TEXT, disc INTEGER, PRIMARY KEY (reg, num))",
+    "CREATE TEMP TABLE sl (reg INTEGER, num INTEGER, seq INTEGER, cls INTEGER, type INTEGER, flags INTEGER, kind TEXT, dept INTEGER, lottery INTEGER, upc TEXT, name TEXT, brand TEXT, qty REAL, unit INTEGER, amount INTEGER, cost4 INTEGER, cost INTEGER, has_cost INTEGER, voided INTEGER, returned INTEGER, cur_dept INTEGER, disc INTEGER)",
+    "CREATE TEMP TABLE st (reg INTEGER, num INTEGER, seq INTEGER, type INTEGER, name TEXT, amount INTEGER, change INTEGER, sale INTEGER)",
+    "CREATE TEMP TABLE sv (reg INTEGER, z INTEGER, name TEXT, cents INTEGER, PRIMARY KEY (reg, z, name))",
+]
+
+
+def z_rows(export, table):
+    """A Z table's rows for the whole register: cashier 0 / blank and mode 0 / blank when the table has
+    such rows (else every row: ILSA kept only one kind), as vt-ilsa-tieout did."""
+    h, it = rows(export, table)
+    r = Row(h)
+    every = []
+    for r.r in it:
+        every.append(list(r.r))
+    def level(row):
+        r.r = row
+        return ("CSHR_NUM" not in h or code(r("CSHR_NUM")) in ("", "0")) and ("Z_MODE" not in h or code(r("Z_MODE")) in ("", "0"))
+    reg = [x for x in every if level(x)]
+    for x in (reg or every):
+        r.r = x
+        yield h, r
+
+
+def stage(db, export, day_from, day_to, done, say):
+    """The export into temp tables; returns the business days to import (ordered)."""
+    for s in STAGE:
+        db.execute(s)
+    # Z's and receipts.
+    h, it = rows(export, "RegZCnt"); r = Row(h); zs = []
+    for r.r in it:
+        zs.append((integer(r("REG_NUM")), integer(r("REG_Z_COUNTER")), iso(r("REG_Z_DATETIME"))))
+    db.executemany("INSERT OR IGNORE INTO sz (reg, z, z_at) VALUES (?, ?, ?)", zs)
+    h, it = rows(export, "RegSale"); r = Row(h)
+    if not h:
+        sys.exit(f"RegSale.csv isn't in {export}")
+    dob_col = next((c for c in h if re.search(r"DOB|BIRTH", c)), None)
+    age_col = next((c for c in h if "AGE_VER" in c), None)
+    disc_cols = [c for c in h if "DISC" in c and ("AMT" in c or c.endswith("DISC"))]
+    if disc_cols:
+        say("  receipt discount columns: " + ", ".join(disc_cols))
+    batch, n = [], 0
+    for r.r in it:
+        at = iso(r("START_TIME", "END_TIME", "DATE_TIME"))
+        tax = sum(cents(r(f"TAX{i}_AMT")) - cents(r(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+        batch.append((integer(r("REG_NUM")), integer(r("RECEIPT_NUM")), integer(r("REG_Z_COUNTER")), at,
+                      integer(r("Z_MODE")), integer(r("CSHR_NUM")), cents(r("SALE_TOTAL")), tax,
+                      integer(r(age_col)) if age_col else 0,
+                      dob_date(r(dob_col), int(at[:4] or 0) or 9999) if dob_col else "",
+                      sum(cents(r(c)) for c in disc_cols)))
+        if len(batch) >= 20000:
+            db.executemany("INSERT OR IGNORE INTO sr VALUES (?,?,?,?,?,?,?,?,?,?,?)", batch); n += len(batch); batch = []
+    db.executemany("INSERT OR IGNORE INTO sr VALUES (?,?,?,?,?,?,?,?,?,?,?)", batch); n += len(batch)
+    say(f"  receipts in the export: {n:,}" + ("" if dob_col else "  (no birth-date column found)"))
+    db.execute("CREATE INDEX sr_z ON sr (reg, z)")
+    db.execute("INSERT OR IGNORE INTO sz (reg, z) SELECT DISTINCT reg, z FROM sr")
+    # A Z's business day: the date of its first receipt (a Z run after midnight still belongs to the
+    # day it closed); a Z with no receipts: the date it was run.
+    db.execute("UPDATE sz SET day = COALESCE((SELECT substr(MIN(at), 1, 10) FROM sr WHERE sr.reg = sz.reg AND sr.z = sz.z AND at <> ''), substr(z_at, 1, 10))")
+    db.execute("DELETE FROM sz WHERE day IS NULL OR day = ''")
+    last = db.execute("SELECT MAX(day) FROM sz").fetchone()[0]
+    days = [d for (d,) in db.execute("SELECT DISTINCT day FROM sz ORDER BY day")
+            if (not day_from or d >= day_from) and (not day_to or d <= day_to) and d not in done]
+    day_set = set(days)
+    wanted_z = {(a, b) for (a, b, d) in db.execute("SELECT reg, z, day FROM sz") if d in day_set}
+    keep = {(a, b) for (a, b, z) in db.execute("SELECT reg, num, z FROM sr") if (a, z) in wanted_z}
+    db.execute("CREATE TEMP TABLE wz (reg INTEGER, z INTEGER, PRIMARY KEY (reg, z))")
+    db.executemany("INSERT INTO wz VALUES (?, ?)", wanted_z)
+    db.execute("DELETE FROM sr WHERE NOT EXISTS (SELECT 1 FROM wz WHERE wz.reg = sr.reg AND wz.z = sr.z)")
+    db.execute("DELETE FROM sz WHERE NOT EXISTS (SELECT 1 FROM wz WHERE wz.reg = sz.reg AND wz.z = sz.z)")
+    db.execute("CREATE INDEX sz_day ON sz (day)")
+    if not days:
+        return days, last
+
+    # Names: items and departments as ILSA has them now; promotions by their id.
+    h, it = rows(export, "PLU"); r = Row(h); item = {}
+    for r.r in it:
+        item[code(r("PLU_NUM"))] = ((r("PLU_DESC") or r("POS_DESC")).strip(), r("MANUF").strip().upper(),
+                                     integer(r("DEPT_NUM"), -1))
+    h, it = rows(export, "Dept"); r = Row(h); dept_name = {}
+    for r.r in it:
+        d = integer(r("DEPT_NUM"), -1)
+        if d >= 0:
+            dept_name[d] = (r("DEPT_NAME") or r("POS_DESC")).strip()
+    db.executemany("INSERT OR REPLACE INTO legacy_depts VALUES (?, ?, ?)",
+                   [(d, n, int(d in LOTTERY)) for d, n in dept_name.items()])
+    promo = {}
+    for t in ("PRC_ADJ", "PRC_ADJ_ARCHIVE", "SYSDISCOUNT", "SYSDISCOUNT_ARCHIVE"):
+        h, it = rows(export, t); r = Row(h)
+        for r.r in it:
+            name = (r("PRC_NAME", "DISC_NAME", "DESCRIPTION", "NAME")).strip()
+            if name:
+                promo.setdefault(integer(r("ID"), -1), name)
+
+    # Lines of the receipts to import.
+    h, it = rows(export, "PDetail"); r = Row(h)
+    desc_col = next((c for c in ("DETAIL_DESC", "PLU_DESC", "DESCRIPTION") if c in h), None)
+    line_disc = [c for c in h if "DISC" in c and ("AMT" in c or c.endswith("DISC"))]
+    if line_disc:
+        say("  line discount columns: " + ", ".join(line_disc))
+    batch, n, seq = [], 0, 0
+    for r.r in it:
+        seq += 1
+        key = (integer(r("REG_NUM")), integer(r("RECEIPT_NUM")))
+        if key not in keep:
+            continue
+        cls, typ = integer(r("DETAIL_CLASS")), integer(r("DETAIL_TYPE"))
+        kind = kind_of(cls, typ)
+        if kind is None:
+            continue
+        flags = integer(r("MODE_FLAGS"))
+        dept = integer(r("DEPT", "DEPT_NUM"), 0)
+        upc = code(r("PLU", "PLU_NUM"))
+        amount = cents(r("DETAIL_LINE_AMT"))
+        unit = cents(r("DETAIL_ITEM_PRC"))
+        q = abs(num(r("DETAIL_FOR_QTY")))
+        if q == 0:
+            q = round(abs(amount / unit), 3) if unit else 1.0
+        qty = -q if amount < 0 else q
+        cost4 = int(round(num(r("ITEM_COST")) * 10000))
+        cost = int(round(cost4 * qty / 100)) if kind == "item" else 0
+        name, brand, cur = item.get(upc, ("", "", -1))
+        if desc_col and r(desc_col).strip():
+            name = r(desc_col).strip()
+        if kind == "promo":
+            name = ("Promotion reversed" if cls == 16 else "Promotion") + (f": {promo[typ]}" if typ in promo else "")
+        elif kind == "payout":
+            name = "Paid out"
+        elif not name:
+            name = dept_name.get(dept) or f"Dept {dept}"
+        batch.append((key[0], key[1], seq, cls, typ, flags, kind, dept, int(dept in LOTTERY), upc, name, brand,
+                      qty, unit, amount, cost4, cost, int(cost4 != 0), int(bool(flags & VOID_FLAGS)),
+                      int(bool(flags & RETURN_FLAG)), cur if cur >= 0 else dept, sum(cents(r(c)) for c in line_disc)))
+        if len(batch) >= 20000:
+            db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 22)})", batch); n += len(batch); batch = []
+    db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 22)})", batch); n += len(batch)
+    say(f"  lines to import: {n:,}")
+    db.execute("CREATE INDEX sl_key ON sl (reg, num)")
+
+    h, it = rows(export, "TendSale"); r = Row(h)
+    batch, seq = [], 0
+    for r.r in it:
+        seq += 1
+        key = (integer(r("REG_NUM")), integer(r("RECEIPT_NUM")))
+        if key not in keep:
+            continue
+        ty = integer(r("TENDER_TYPE"))
+        batch.append((key[0], key[1], seq, ty, TENDER_NAMES.get(ty, f"Tender {ty}"), cents(r("AMT_TEND")),
+                      cents(r("CHANGE_DUE")), cents(r("SALE_AMT"))))
+    db.executemany("INSERT INTO st VALUES (?,?,?,?,?,?,?,?)", batch)
+    db.execute("CREATE INDEX st_key ON st (reg, num)")
+
+    # ILSA's own Z numbers.
+    vals = defaultdict(int)
+    h, it = rows(export, "Z_Tender"); r = Row(h)
+    for r.r in it:
+        z = (integer(r("REG_NUM")), integer(r("REG_Z_COUNTER")))
+        if z in wanted_z:
+            vals[(z, f"ilsa:tender:{integer(r('TENDER_TYPE'))}")] += cents(r("TENDER_AMT"))
+    for h, r in z_rows(export, "Z_Taxes"):
+        z = (integer(r("REG_NUM")), integer(r("REG_Z_COUNTER")))
+        if z in wanted_z:
+            vals[(z, "ilsa:tax")] += sum(cents(r(f"TAX{i}_AMT")) - cents(r(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+    for h, r in z_rows(export, "Z_Totals"):
+        z = (integer(r("REG_NUM")), integer(r("REG_Z_COUNTER")))
+        if z in wanted_z:
+            for c in h:
+                if c.endswith("_AMT"):
+                    vals[(z, f"ilsa:totals:{c}")] += cents(r(c))
+    h, it = rows(export, "RegReconcile"); r = Row(h)
+    for r.r in it:
+        z = (integer(r("REG_NUM")), integer(r("REG_Z_COUNTER")))
+        if z in wanted_z and "Z_PAYOUTS" in h:
+            vals[(z, "ilsa:payouts")] += cents(r("Z_PAYOUTS"))
+    db.executemany("INSERT INTO sv VALUES (?, ?, ?, ?)", [(z[0], z[1], name, c) for (z, name), c in vals.items()])
+    return days, last
+
+
+# What the imported receipts of one Z add up to (the same rules ViewTouch's reports use).
+OURS_SQL = """
+SELECT r.z_id,
+  SUM(CASE WHEN r.mode = 0 THEN r.tax_cents ELSE 0 END),
+  SUM(CASE WHEN r.mode = 0 THEN r.total_cents ELSE 0 END),
+  SUM(CASE WHEN r.mode = 0 THEN 1 ELSE 0 END)
+FROM legacy_receipts r WHERE r.day = ? GROUP BY r.z_id"""
+LINES_SQL = """
+SELECT r.z_id, l.kind, l.lottery, SUM(CASE WHEN r.mode = 0 OR l.kind = 'payout' THEN l.amount_cents ELSE 0 END)
+FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id WHERE l.day = ? GROUP BY r.z_id, l.kind, l.lottery"""
+TENDERS_SQL = """
+SELECT r.z_id, t.type, SUM(t.amount_cents), SUM(t.change_cents)
+FROM legacy_tenders t JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day = ? GROUP BY r.z_id, t.type"""
+MISMATCH_SQL = """
+SELECT r.z_id, COUNT(*) FROM legacy_receipts r
+WHERE r.day = ? AND r.mode = 0 AND r.total_cents <> r.tax_cents +
+  (SELECT COALESCE(SUM(amount_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id)
+GROUP BY r.z_id"""
+
+
+def ours_for_day(db, day):
+    """z_id -> {name: cents} rebuilt from the imported rows of `day`."""
+    out = defaultdict(lambda: defaultdict(int))
+    for z, tax, total, n in db.execute(OURS_SQL, (day,)):
+        o = out[z]; o["ours:tax"] += tax or 0; o["ours:sale_totals"] += total or 0; o["ours:receipts"] += n or 0
+    for z, kind, lottery, amt in db.execute(LINES_SQL, (day,)):
+        o = out[z]; amt = amt or 0
+        if kind == "payout":
+            o["ours:payouts"] += amt; continue
+        o["ours:net"] += amt
+        o[f"ours:{kind}s"] += amt
+        o["ours:lottery" if lottery else "ours:merchandise"] += amt if kind == "item" else 0
+    change = defaultdict(int)
+    for z, ty, amt, ch in db.execute(TENDERS_SQL, (day,)):
+        out[z][f"ours:tender:{ty}"] += amt or 0
+        change[z] += ch or 0
+    for z, ch in change.items():   # all change given comes out of cash (also on card / gift overtenders)
+        out[z]["ours:tender:1"] = out[z].get("ours:tender:1", 0) - ch
+    for z, n in db.execute(MISMATCH_SQL, (day,)):
+        out[z]["ours:receipts_off"] += n
+    for o in out.values():
+        o["ours:gross"] = o.get("ours:net", 0) + o.get("ours:tax", 0)
+    return out
+
+
+def import_day(db, source_id, day, partial, replace_old, now):
+    """One business day, in one transaction. Returns (receipts, variances)."""
+    db.execute("BEGIN")
+    try:
+        if replace_old:
+            db.execute("DELETE FROM legacy_lines WHERE day = ?", (day,))
+            db.execute("DELETE FROM legacy_tenders WHERE receipt_id IN (SELECT id FROM legacy_receipts WHERE day = ?)", (day,))
+            db.execute("DELETE FROM legacy_receipts WHERE day = ?", (day,))
+            db.execute("DELETE FROM legacy_z_values WHERE z_id IN (SELECT id FROM legacy_z WHERE day = ?)", (day,))
+            db.execute("DELETE FROM legacy_variances WHERE day = ?", (day,))
+            db.execute("DELETE FROM legacy_z WHERE day = ?", (day,))
+        db.execute("INSERT OR IGNORE INTO legacy_z (source_id, reg_num, z_counter, day, z_at) SELECT ?, reg, z, day, z_at FROM sz WHERE day = ?",
+                   (source_id, day))
+        db.execute("""INSERT OR IGNORE INTO legacy_receipts (source_id, reg_num, receipt_num, z_id, day, at, mode, cashier,
+                        total_cents, tax_cents, age_verified, dob, disc_cents)
+                      SELECT ?, sr.reg, sr.num, lz.id, ?, sr.at, sr.mode, sr.cashier, sr.total, sr.tax, sr.age, COALESCE(sr.dob, ''),
+                        COALESCE(sr.disc, 0)
+                      FROM sz CROSS JOIN sr ON sr.reg = sz.reg AND sr.z = sz.z
+                      CROSS JOIN legacy_z lz ON lz.source_id = ? AND lz.reg_num = sr.reg AND lz.z_counter = sr.z
+                      WHERE sz.day = ? ORDER BY sr.at, sr.num""", (source_id, day, source_id, day))
+        db.execute("""INSERT INTO legacy_lines (receipt_id, seq, day, mode, cls, type, flags, kind, dept, lottery, upc, name, brand,
+                        qty, unit_cents, amount_cents, unit_cost_c4, cost_cents, has_cost, voided, returned, cur_dept, disc_cents)
+                      SELECT r.id, sl.seq, ?, r.mode, sl.cls, sl.type, sl.flags, sl.kind, sl.dept, sl.lottery, sl.upc, sl.name,
+                        sl.brand, sl.qty, sl.unit, sl.amount, sl.cost4, sl.cost, sl.has_cost, sl.voided, sl.returned, sl.cur_dept, sl.disc
+                      FROM legacy_receipts r CROSS JOIN sl ON sl.reg = r.reg_num AND sl.num = r.receipt_num
+                      WHERE r.day = ? AND r.source_id = ? ORDER BY r.id, sl.seq""", (day, day, source_id))
+        db.execute("""INSERT INTO legacy_tenders (receipt_id, seq, type, name, amount_cents, change_cents, sale_cents)
+                      SELECT r.id, st.seq, st.type, st.name, st.amount, st.change, st.sale
+                      FROM legacy_receipts r CROSS JOIN st ON st.reg = r.reg_num AND st.num = r.receipt_num
+                      WHERE r.day = ? AND r.source_id = ? ORDER BY r.id, st.seq""", (day, source_id))
+        db.execute("""INSERT OR REPLACE INTO legacy_z_values (z_id, name, cents)
+                      SELECT lz.id, sv.name, sv.cents FROM legacy_z lz CROSS JOIN sv ON sv.reg = lz.reg_num AND sv.z = lz.z_counter
+                      WHERE lz.day = ? AND lz.source_id = ?""", (day, source_id))
+        ours = ours_for_day(db, day)
+        db.executemany("INSERT OR REPLACE INTO legacy_z_values VALUES (?, ?, ?)",
+                       [(z, k, v) for z, o in ours.items() for k, v in o.items()])
+        # The self-check: ILSA's Z against the imported receipts.
+        var = []
+        for (zid,) in db.execute("SELECT id FROM legacy_z WHERE day = ?", (day,)).fetchall():
+            ilsa = dict(db.execute("SELECT name, cents FROM legacy_z_values WHERE z_id = ? AND name LIKE 'ilsa:%'", (zid,)).fetchall())
+            o = ours.get(zid, {})
+            checks = [("Tax", ilsa.get("ilsa:tax"), o.get("ours:tax", 0))]
+            types = {int(k.rsplit(":", 1)[1]) for k in list(ilsa) + list(o) if k.startswith(("ilsa:tender:", "ours:tender:"))}
+            for ty in sorted(types):
+                checks.append((f"Tender {TENDER_NAMES.get(ty, ty)} ({ty})", ilsa.get(f"ilsa:tender:{ty}", 0), o.get(f"ours:tender:{ty}", 0)))
+            if "ilsa:payouts" in ilsa and abs(ilsa["ilsa:payouts"]) != abs(o.get("ours:payouts", 0)):
+                var.append((day, zid, "Paid outs", ilsa["ilsa:payouts"], o.get("ours:payouts", 0)))
+            for what, a, b in checks:
+                if a is not None and abs(a - b) > 1:
+                    var.append((day, zid, what, a, b))
+            if o.get("ours:receipts_off"):
+                var.append((day, zid, "Receipts whose lines + tax differ from their total (count)", 0, o["ours:receipts_off"]))
+        db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) VALUES (?, ?, ?, ?, ?)", var)
+        n = db.execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = ?", (day,)).fetchone()[0]
+        db.execute("INSERT OR REPLACE INTO legacy_days VALUES (?, ?, ?, ?, ?, ?)", (day, source_id, int(partial), n, len(var), now))
+        db.execute("COMMIT")
+        return n, len(var)
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+
+
+# Z_Totals: which of ILSA's amounts equals which of our totals is learned from the days themselves
+# (the column names don't say): a column that equals one of ours on 90% of the days or more is checked.
+BUCKETS = ["ours:merchandise", "ours:items", "ours:entrys", "ours:promos", "ours:others", "ours:net", "ours:gross",
+           "ours:sale_totals", "ours:tax", "ours:payouts", "ours:lottery"]
+BUCKET_TEXT = {"ours:merchandise": "item sales (lottery out)", "ours:items": "item sales (lottery in)",
+               "ours:entrys": "dept entries", "ours:promos": "promotions", "ours:others": "other lines",
+               "ours:net": "net sales", "ours:gross": "sales with tax", "ours:sale_totals": "receipt totals",
+               "ours:tax": "tax", "ours:payouts": "paid outs", "ours:lottery": "lottery item sales"}
+
+
+def learn_z_totals(db):
+    """Matches Z_Totals columns to our totals over every day in the file; rewrites their variances."""
+    vals = defaultdict(dict)
+    for z, name, c in db.execute("SELECT z_id, name, cents FROM legacy_z_values WHERE name LIKE 'ilsa:totals:%' OR name LIKE 'ours:%'"):
+        vals[z][name] = c
+    cols = sorted({n for v in vals.values() for n in v if n.startswith("ilsa:totals:")})
+    mapping = {}
+    for col in cols:
+        days = [v for v in vals.values() if col in v]
+        if not days or all(v[col] == 0 for v in days):
+            continue
+        best = max(BUCKETS, key=lambda b: sum(1 for v in days if abs(v[col] - v.get(b, 0)) <= 1))
+        hits = sum(1 for v in days if abs(v[col] - v.get(best, 0)) <= 1)
+        mapping[col] = (best, hits, len(days))
+    db.execute("BEGIN")
+    db.execute("DELETE FROM legacy_variances WHERE what LIKE 'Z_Totals %'")
+    var = []
+    for col, (b, hits, n) in mapping.items():
+        if hits < 0.9 * n:
+            continue
+        for z, v in vals.items():
+            if col in v and abs(v[col] - v.get(b, 0)) > 1:
+                var.append((z, f"Z_Totals {col[12:]} vs {BUCKET_TEXT[b]}", v[col], v.get(b, 0)))
+    db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) SELECT day, ?, ?, ?, ? FROM legacy_z WHERE id = ?",
+                   [(z, w, a, b, z) for z, w, a, b in var])
+    db.execute("UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v WHERE v.day = legacy_days.day)")
+    db.execute("COMMIT")
+    return mapping
+
+
+def money(c):
+    return f"-${-c / 100:,.2f}" if c < 0 else f"${c / 100:,.2f}"
+
+
+def report(db, days, out_dir, stamp, say):
+    """The self-check: what matched, and every difference (also saved as a CSV)."""
+    if not days:
+        return None
+    marks = ",".join("?" * len(days)) if len(days) < 900 else None
+    where = f"v.day IN ({marks})" if marks else "v.day BETWEEN ? AND ?"
+    args = days if marks else [days[0], days[-1]]
+    var = db.execute(f"""SELECT v.day, z.reg_num, z.z_counter, v.what, v.ilsa_cents, v.ours_cents FROM legacy_variances v
+                         LEFT JOIN legacy_z z ON z.id = v.z_id WHERE {where} ORDER BY v.day, v.what""", args).fetchall()
+    zs = db.execute(f"SELECT COUNT(*) FROM legacy_z v WHERE {where}", args).fetchone()[0]
+    by = Counter(w if not w.startswith("Tender") else w for _, _, _, w, _, _ in var)
+    bad_days = {d for d, *_ in var}
+    say(f"\n== Self-check: {len(days):,} day(s), {zs:,} ILSA Z(s); {len(days) - len(bad_days):,} day(s) match ILSA's Z on everything checked")
+    for w, n in by.most_common():
+        say(f"  differs on {n:,} Z(s): {w}")
+    path = None
+    if var:
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(out_dir, f"variances-{stamp}.csv")
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(["day", "register", "z", "what", "ilsa", "imported", "difference"])
+            for d, reg, z, what, a, b in var:
+                cnt = what.endswith("(count)")
+                w.writerow([d, reg, z, what, a if cnt else f"{a / 100:.2f}", b if cnt else f"{b / 100:.2f}",
+                            (b - a) if cnt else f"{(b - a) / 100:.2f}"])
+        worst = sorted((r for r in var if not r[3].endswith("(count)")), key=lambda r: -abs(r[5] - r[4]))[:10]
+        if worst:
+            say("  largest differences (imported - ILSA):")
+            for d, reg, z, what, a, b in worst:
+                say(f"    {d} Z {z}: {what}: ILSA {money(a)}, imported {money(b)} ({money(b - a)})")
+        say(f"  every difference: {path}")
+    return path
+
+
+# --- ViewTouch stopped while the file changes ---------------------------------------------------------
+
+def running():
+    return subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode == 0
+
+
+def stop_viewtouch():
+    if not running():
+        return False
+    print("Stopping ViewTouch (it saves first)...")
+    subprocess.run(["pkill", "-TERM", "-x", "vtmodern"])
+    for _ in range(40):
+        if not running():
+            return True
+        time.sleep(0.5)
+    sys.exit("ViewTouch didn't stop; nothing was changed.")
+
+
+def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, now=None, manage=True):
+    say = (lambda *a: None) if quiet else print
+    t0 = time.time()
+    now = now or time.strftime("%Y-%m-%d %H:%M:%S")
+    stamp = time.strftime("%Y-%m-%d_%H%M%S")
+    source = os.path.basename(os.path.normpath(export))
+    was_running = False
+    scratch = None
+    if dry:
+        fd, scratch = tempfile.mkstemp(prefix="ilsa-history-dry-", suffix=".db"); os.close(fd)
+        if os.path.exists(db_path):   # the days already in count as in
+            shutil.copyfile(db_path, scratch)
+        db_path = scratch
+        say(f"DRY RUN: {source} into a scratch copy (nothing is kept, ViewTouch keeps running)")
+    else:
+        os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+        if manage:
+            was_running = stop_viewtouch()
+        if os.path.exists(db_path):
+            os.makedirs(os.path.join(out_dir, "backups"), exist_ok=True)
+            backup = os.path.join(out_dir, "backups", f"ilsa-history-before-{stamp}.db")
+            src, dst = sqlite3.connect(db_path), sqlite3.connect(backup)
+            src.backup(dst); dst.close(); src.close()
+            say(f"Backup: {backup}")
+        say(f"Importing {source} into {db_path}")
+    try:
+        db = open_db(db_path)
+        db.execute("INSERT OR IGNORE INTO legacy_sources (name) VALUES (?)", (source,))
+        source_id = db.execute("SELECT id FROM legacy_sources WHERE name = ?", (source,)).fetchone()[0]
+        db.commit()
+        done = set() if replace else {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 0")}
+        partial_in = {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 1")}
+        days, last = stage(db, export, day_from, day_to, done, say)
+        db.commit()
+        if not days:
+            say("Nothing to import: every day in that range is in already (--replace imports them again).")
+        receipts = variances = 0
+        for i, d in enumerate(days):
+            n, v = import_day(db, source_id, d, d == last, replace or d in partial_in, now)
+            receipts += n; variances += v
+            if not quiet and (i % 100 == 99 or i == len(days) - 1):
+                print(f"  {i + 1:,}/{len(days):,} days ({d}), {receipts:,} receipts, {time.time() - t0:,.0f} s", flush=True)
+        if days:
+            first_all, last_all = db.execute("SELECT MIN(day), MAX(day) FROM legacy_days WHERE source_id = ?", (source_id,)).fetchone()
+            db.execute("UPDATE legacy_sources SET first_day = ?, last_day = ?, imported_at = ? WHERE id = ?",
+                       (first_all, last_all, now, source_id))
+            db.execute("INSERT OR REPLACE INTO legacy_meta VALUES ('last_import', ?)", (now,))
+            db.commit()
+            mapping = learn_z_totals(db)
+            if mapping and not quiet:
+                say("\n== ILSA Z_Totals amounts (meaning learned from the days: equal to one of ours on most days)")
+                for col, (b, hits, n) in sorted(mapping.items()):
+                    say(f"  {col[12:]}: = {BUCKET_TEXT[b]} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+        path = report(db, days, out_dir, stamp, say)
+        totals = db.execute("SELECT COUNT(*), MIN(day), MAX(day) FROM legacy_days").fetchone()
+        close_db(db)
+        say(f"\nDone in {time.time() - t0:,.0f} s: {len(days):,} day(s), {receipts:,} receipts imported this run."
+            f" The history file has {totals[0]:,} days ({totals[1]} .. {totals[2]}).")
+        return {"days": days, "receipts": receipts, "variances": variances, "csv": path}
+    finally:
+        if scratch:
+            for suffix in ("", "-wal", "-shm"):
+                if os.path.exists(scratch + suffix):
+                    os.remove(scratch + suffix)
+        if was_running:
+            print("Starting ViewTouch again...")
+            subprocess.Popen(["vt-server"])
+
+
+# --- self-test on made-up data -------------------------------------------------------------------------
+
+def write_csv(d, name, header, data):
+    with open(os.path.join(d, name + ".csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f); w.writerow(header); w.writerows(data)
+
+
+def made_up_export(d):
+    """A tiny made-up ILSA export: two days, one register. Day 1 (2026-10-27) matches its Z; day 2
+    (2026-10-28) has a void pair, a return, a dept 260 open ring with no cost, a lottery sale, a coupon
+    entry, a promotion, a paid out, a cancelled (mode 1) receipt, and its Z's cash is $1.00 off."""
+    write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"],
+              [[1, 501, "10/27/26 21:05:00"], [1, 502, "10/28/26 21:10:00"]])
+    write_csv(d, "RegSale", ["REG_NUM", "RECEIPT_NUM", "REG_Z_COUNTER", "START_TIME", "Z_MODE", "CSHR_NUM", "SALE_TOTAL",
+                             "TAX1_AMT", "TAX1_REFUND_AMT", "AGE_VERIFIED", "BUYER_DOB"],
+              [[1, 9001, 501, "10/27/26 10:00:00", 0, 3, "10.63", "0.63", "0", 21, "01/02/80"],
+               [1, 9002, 501, "10/27/26 15:30:00", 0, 3, "5.00", "0", "0", 0, ""],
+               [1, 9003, 502, "10/28/26 09:15:00", 0, 4, "26.58", "1.58", "0", 21, "03/04/1975"],
+               [1, 9004, 502, "10/28/26 11:00:00", 0, 4, "-10.63", "0", "0.63", 0, ""],
+               [1, 9005, 502, "10/28/26 12:00:00", 1, 4, "7.00", "0", "0", 0, ""],
+               [1, 9006, 502, "10/28/26 13:00:00", 0, 4, "-20.00", "0", "0", 0, ""]])
+    cols = ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "DETAIL_CLASS", "DETAIL_TYPE", "MODE_FLAGS", "DEPT", "PLU",
+            "DETAIL_ITEM_PRC", "DETAIL_FOR_QTY", "DETAIL_LINE_AMT", "ITEM_COST", "TIME_STAMP"]
+    write_csv(d, "PDetail", cols, [
+        [1, 501, 9001, 1, 1, 0, 10, "012345678905", "10.00", 1, "10.00", "7.00", "10/27/26 10:00:00"],
+        [1, 501, 9002, 1, 1, 0, 275, "", "5.00", 1, "5.00", "0", "10/27/26 15:30:00"],          # lottery
+        [1, 502, 9003, 1, 1, 0, 10, "012345678905", "10.00", 2, "20.00", "7.00", "10/28/26 09:15:00"],
+        [1, 502, 9003, 1, 1, 1, 20, "098765432109", "4.00", 1, "4.00", "2.50", "10/28/26 09:15:00"],   # voided
+        [1, 502, 9003, 1, 1, 128, 20, "098765432109", "4.00", 1, "-4.00", "2.50", "10/28/26 09:15:00"],
+        [1, 502, 9003, 1, 1, 0, 260, "", "6.00", 1, "6.00", "0", "10/28/26 09:15:00"],          # open ring, no cost
+        [1, 502, 9003, 15, 7, 0, 10, "", "0", 1, "-1.00", "0", "10/28/26 09:15:00"],             # promotion
+        [1, 502, 9003, 9, 15, 0, 10, "012345678905", "0", 1, "0", "7.00", "10/28/26 09:15:00"],  # stock move: skipped
+        [1, 502, 9004, 1, 1, 256, 10, "012345678905", "10.00", 1, "-10.00", "7.00", "10/28/26 11:00:00"],  # return
+        [1, 502, 9005, 1, 1, 0, 20, "098765432109", "7.00", 1, "7.00", "2.50", "10/28/26 12:00:00"],  # mode 1
+        [1, 502, 9006, 4, 1, 0, 0, "", "0", 1, "-20.00", "0", "10/28/26 13:00:00"],             # paid out
+        [1, 502, 9001, 9, 15, 0, 10, "", "0", 1, "0", "0", "10/28/26 13:00:00"],
+    ])
+    write_csv(d, "TendSale", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "TENDER_TYPE", "SALE_AMT", "AMT_TEND", "CHANGE_DUE"],
+              [[1, 501, 9001, 1, "10.63", "20.00", "9.37"], [1, 501, 9002, 70, "5.00", "5.00", "0"],
+               [1, 502, 9003, 70, "26.58", "20.00", "0"], [1, 502, 9003, 1, "26.58", "10.00", "3.42"],
+               [1, 502, 9004, 1, "-10.63", "-10.63", "0"], [1, 502, 9006, 1, "-20.00", "-20.00", "0"]])
+    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT", "Z_MODE"],
+              [[1, 501, 0, 1, "10.63", 0], [1, 501, 0, 70, "5.00", 0],
+               [1, 502, 0, 1, "-23.05", 0], [1, 502, 0, 70, "20.00", 0]])   # cash really -24.05: $1.00 off
+    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "Z_MODE", "TAX1_AMT", "TAX1_REFUND_AMT"],
+              [[1, 501, 0, 0, "0.63", "0"], [1, 502, 0, 0, "1.58", "0.63"], [1, 502, 3, 0, "9.99", "0"]])
+    write_csv(d, "Z_Totals", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "Z_PLU_AMT", "Z_SALE_COUNT"],
+              [[1, 501, 0, "15.00", 0], [1, 502, 0, "16.00", 0]])
+    write_csv(d, "RegReconcile", ["REG_NUM", "REG_Z_COUNTER", "Z_PAYOUTS"], [[1, 501, "0"], [1, 502, "20.00"]])
+    write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "POS_DESC", "DEPT_NUM", "MANUF"],
+              [["12345678905", "MADE UP CIGAR ROBUSTO", "", 10, "Acme Cigars"],
+               ["012345678905", "MADE UP CIGAR ROBUSTO", "", 10, "Acme Cigars"],
+               ["098765432109", "MADE UP LIGHTER", "", 30, "Sparky"]])
+    write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"], [20, "ACCESSORIES"], [30, "LIGHTERS"], [260, "OPEN RING"],
+                                                     [275, "INSTANT LOTTERY"], [0, "PAID OUT"]])
+    write_csv(d, "PRC_ADJ", ["ID", "PRC_NAME"], [[7, "BUY 2 SAVE 1"]])
+
+
+def fixture_sql(db):
+    """The file's tables and rows, one statement per line (the C++ tests' fixture)."""
+    out = [s + ";" for s in SCHEMA]
+    for t in DATA_TABLES:
+        cols = [c[1] for c in db.execute(f"PRAGMA table_info({t})")]
+        for r in db.execute(f"SELECT * FROM {t} ORDER BY 1, 2"):
+            vals = ", ".join("NULL" if v is None else str(v) if isinstance(v, (int, float)) else
+                             "'" + str(v).replace("'", "''") + "'" for v in r)
+            out.append(f"INSERT INTO {t} ({', '.join(cols)}) VALUES ({vals});")
+    return "\n".join(out) + "\n"
+
+
+FIXTURE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "modern", "tests", "legacy_fixture.inc")
+
+
+def self_test(write_fixture=False):
+    ok = True
+    def check(what, cond):
+        nonlocal ok
+        print(("  ok   " if cond else "  FAIL ") + what)
+        ok = ok and bool(cond)
+    with tempfile.TemporaryDirectory() as tmp:
+        exp = os.path.join(tmp, "made up export"); os.makedirs(exp); made_up_export(exp)
+        dbp, out = os.path.join(tmp, "ilsa-history.db"), os.path.join(tmp, "out")
+        now = "2026-11-07 00:00:00"
+        dry = run(exp, dbp, "2026-10-28", "2026-10-28", True, False, out, quiet=True, now=now, manage=False)
+        check("dry run imports one day and finds its cash difference", dry["days"] == ["2026-10-28"] and dry["variances"] >= 1)
+        check("dry run leaves no history file", not os.path.exists(dbp))
+        res = run(exp, dbp, None, None, False, False, out, quiet=True, now=now, manage=False)
+        check("both days imported", res["days"] == ["2026-10-27", "2026-10-28"] and res["receipts"] == 6)
+        db = sqlite3.connect(dbp)
+        q = lambda s, *a: db.execute(s, a).fetchone()
+        check("stock move lines skipped", q("SELECT COUNT(*) FROM legacy_lines WHERE cls = 9")[0] == 0)
+        check("10 lines kept", q("SELECT COUNT(*) FROM legacy_lines")[0] == 10)
+        check("void pair nets to 0 and is marked", q("SELECT SUM(amount_cents), COUNT(*) FROM legacy_lines WHERE voided = 1") == (0, 2))
+        check("return is negative with negative quantity and cost",
+              q("SELECT amount_cents, qty, cost_cents FROM legacy_lines WHERE returned = 1") == (-1000, -1.0, -700))
+        check("2 units x $7.00 cost", q("SELECT cost_cents FROM legacy_lines WHERE amount_cents = 2000")[0] == 1400)
+        check("open ring has no cost", q("SELECT has_cost FROM legacy_lines WHERE dept = 260") == (0,))
+        check("current department kept beside the one at sale",
+              q("SELECT dept, cur_dept FROM legacy_lines WHERE upc = '098765432109' LIMIT 1") == (20, 30))
+        check("lottery marked", q("SELECT lottery FROM legacy_lines WHERE dept = 275") == (1,))
+        check("promotion named", q("SELECT name FROM legacy_lines WHERE kind = 'promo'") == ("Promotion: BUY 2 SAVE 1",))
+        check("item names and brands from the item list",
+              q("SELECT name, brand FROM legacy_lines WHERE upc = '012345678905' LIMIT 1") == ("MADE UP CIGAR ROBUSTO", "ACME CIGARS"))
+        check("business day of each Z", q("SELECT GROUP_CONCAT(day) FROM (SELECT day FROM legacy_z ORDER BY day)")[0] == "2026-10-27,2026-10-28")
+        check("mode 1 receipt kept, not a sale", q("SELECT mode FROM legacy_receipts WHERE receipt_num = 9005") == (1,))
+        check("birth date read (2-digit year in the past)", q("SELECT dob FROM legacy_receipts WHERE receipt_num = 9001") == ("1980-01-02",))
+        check("cashier-level Z tax rows ignored", q("SELECT cents FROM legacy_z_values v JOIN legacy_z z ON z.id = v.z_id WHERE z.z_counter = 502 AND name = 'ilsa:tax'") == (95,))
+        check("day 1 matches ILSA's Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-27'") == (0,))
+        cash = q("SELECT ilsa_cents, ours_cents FROM legacy_variances WHERE day = '2026-10-28' AND what LIKE 'Tender Cash%'")
+        check("day 2 cash: ILSA -$23.05 vs imported -$24.05 (cash less all change)", cash == (-2305, -2405))
+        check("tax and card match on day 2", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-28' AND (what = 'Tax' OR what LIKE 'Tender Credit%')") == (0,))
+        check("paid outs match RegReconcile", q("SELECT COUNT(*) FROM legacy_variances WHERE what = 'Paid outs'") == (0,))
+        check("Z_Totals Z_PLU_AMT learned as item sales (lottery in)",
+              q("SELECT COUNT(*) FROM legacy_variances WHERE what LIKE 'Z_Totals%'") == (0,))
+        check("the newest day is kept as partial", q("SELECT partial FROM legacy_days WHERE day = '2026-10-28'") == (1,))
+        check("variance list saved", res["csv"] and os.path.exists(res["csv"]))
+        before = q("SELECT COUNT(*), SUM(amount_cents) FROM legacy_lines")
+        db.close()
+        again = run(exp, dbp, None, None, False, False, out, quiet=True, now=now, manage=False)
+        db = sqlite3.connect(dbp)
+        check("re-run: the complete day is skipped, the partial day replaced, nothing doubled",
+              again["days"] == ["2026-10-28"] and db.execute("SELECT COUNT(*), SUM(amount_cents) FROM legacy_lines").fetchone() == before)
+        check("readable by ViewTouch read-only (no WAL left)", db.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
+        text = fixture_sql(db)
+        db.close()
+        if write_fixture:
+            with open(FIXTURE, "w") as f:
+                f.write("// Made-up ILSA history (scripts/bin/vt-ilsa-history --self-test --write-fixture writes it):\n"
+                        "// the history file's tables and rows, one statement per line, for tests/test_legacy.cpp.\n"
+                        'R"SQL(\n' + text + ')SQL"\n')
+            print(f"  wrote {os.path.normpath(FIXTURE)}")
+        elif os.path.exists(FIXTURE):
+            have = open(FIXTURE).read()
+            check("the C++ tests' fixture is this importer's output (else --write-fixture)", text in have)
+    print("self-test " + ("passed" if ok else "FAILED"))
+    return 0 if ok else 1
+
+
+def main(argv):
+    if "--self-test" in argv:
+        return self_test("--write-fixture" in argv)
+    args, opts = [], {}
+    it = iter(argv)
+    for a in it:
+        if a in ("--from", "--to", "--db", "--out"):
+            opts[a] = next(it, "")
+        elif a.startswith("--"):
+            opts[a] = True
+        else:
+            args.append(a)
+    if "--help" in opts or "-h" in args:
+        print(__doc__); return 0
+    export = os.path.expanduser(args[0]) if args else None
+    if export and not os.path.isdir(export) and os.path.isdir(os.path.join(EXPORT, args[0])):
+        export = os.path.join(EXPORT, args[0])
+    if not export or not os.path.isdir(export):
+        sys.exit('Usage: vt-ilsa-history ~/ilsa-export/"copy bhdan 10-29-2026" [--dry-run] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--replace]')
+    for k in ("--from", "--to"):
+        if k in opts and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", opts[k]):
+            sys.exit(f"{k}: write the date like 2026-10-28")
+    run(export, os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--from"), opts.get("--to"),
+        bool(opts.get("--dry-run")), bool(opts.get("--replace")), os.path.expanduser(opts.get("--out", OUT_DIR)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
