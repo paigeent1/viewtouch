@@ -1,0 +1,41 @@
+#!/bin/bash
+# What Debian / Raspberry Pi OS updates are waiting on this Pi, and which could touch how ViewTouch
+# runs (Qt, the kernel and firmware, the screen/desktop, sound and video, the C library). Read-only:
+# it refreshes the package lists and lists what's upgradable; it never installs anything.
+# Result in ~/vt-output/pi-updates.txt, copied to Google Drive "POS project tmp/pi-output/pi-updates.txt"
+# for Bob's morning check.
+#   vt-pi-updates            check now
+#   vt-pi-updates --daily    also run it every day at 4:50 AM (user crontab; kept after reboots)
+#   vt-pi-updates --no-daily stop the daily run
+OUT="$HOME/vt-output"; mkdir -p "$OUT"; FILE="$OUT/pi-updates.txt"
+SELF="$(readlink -f "$0")"
+case "$1" in
+  --daily)
+    ( crontab -l 2>/dev/null | grep -v 'vt-pi-updates'; echo "50 4 * * * $SELF >/dev/null 2>&1 # vt-pi-updates" ) | crontab -
+    echo "vt-pi-updates will run every day at 4:50 AM."; "$SELF"; exit $? ;;
+  --no-daily)
+    crontab -l 2>/dev/null | grep -v 'vt-pi-updates' | crontab -; echo "Daily update check stopped."; exit 0 ;;
+esac
+# Packages whose update could change how ViewTouch runs: checked before updating, never during service.
+SENSITIVE='^(qt6|libqt6|qml6|linux-image|raspberrypi-kernel|raspi-firmware|raspberrypi-bootloader|rpi-eeprom|firmware-|libc6|libc-bin|labwc|wayfire|xserver|xwayland|mesa|libgl|libegl|libgbm|libdrm|pipewire|wireplumber|pulseaudio|alsa|libasound|gstreamer|libgstreamer|ffmpeg|libav|libsqlite3|sqlite3|openssl|libssl|systemd|udev|network-manager|wpasupplicant|cups|adb|android-)'
+{
+  echo "# $(hostname) $(date '+%Y-%m-%d %H:%M %Z')"
+  . /etc/os-release 2>/dev/null; echo "System: ${PRETTY_NAME:-?}; kernel $(uname -r)"
+  if ! sudo -n apt-get update -qq >/dev/null 2>&1; then
+    echo "Couldn't refresh the package lists (no internet, or sudo needs a password); showing the last known list."
+  fi
+  list=$(apt list --upgradable 2>/dev/null | sed 1d)
+  n=$(printf '%s\n' "$list" | grep -c . )
+  if [ "$n" -eq 0 ]; then echo "No updates waiting."; else
+    s=$(printf '%s\n' "$list" | cut -d/ -f1 | grep -E "$SENSITIVE")
+    ns=$(printf '%s\n' "$s" | grep -c .)
+    echo "Updates waiting: $n ($ns could affect ViewTouch, $((n-ns)) routine)"
+    if [ "$ns" -gt 0 ]; then echo; echo "Could affect ViewTouch:"; printf '%s\n' "$list" | grep -E "^($(printf '%s\n' "$s" | paste -sd'|'))/" | sed 's/^/  /'; fi
+    echo; echo "Routine:"; printf '%s\n' "$list" | grep -v -E "$SENSITIVE" | sed 's/^/  /'
+  fi
+  [ -f /var/run/reboot-required ] && echo && echo "A restart is already waiting from an earlier update."
+} > "$FILE" 2>&1
+cat "$FILE"
+command -v rclone >/dev/null && rclone copyto "$FILE" "gdrive:POS project tmp/pi-output/pi-updates.txt" 2>/dev/null \
+  && echo "(Shared with Bob: pi-updates.txt)"
+exit 0

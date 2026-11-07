@@ -119,6 +119,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 17:46 ET — Bob (Claude) — vt-pi-updates: daily check of waiting Debian/Pi updates
+- **What:** New scripts/bin/vt-pi-updates: refreshes package lists, lists upgradable packages, splits ones that could affect ViewTouch (Qt, kernel/firmware, display, sound/video, libc, sqlite, ssl, systemd, network, adb) from routine ones, notes a pending restart; never installs. Writes ~/vt-output/pi-updates.txt and copies it to Drive pi-output/pi-updates.txt. --daily adds a 4:50 AM user crontab entry. The morning scheduled task reads it and advises.
+- **Why:** Owner 2026-11-07 17:45: during development, check daily for Debian/Pi updates and whether they can be applied without affecting how we run.
+- **Files:** (none)
+
 ### 2026-11-07 16:57 ET — Bob (Claude) — Backlog: synchronized transactions with store check prefixes
 - **What:** Cross-store plan: check numbers prefixed by store; each store writes only its own checks; closed checks copied read-only to every store via the corporate Pi; returns of another store's sale are a new check pointing to the original.
 - **Why:** Owner 2026-11-07 16:57 idea.
