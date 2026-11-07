@@ -10,6 +10,10 @@ day by day against ILSA's own Z reports.
                                                                   file (no export needed, nothing imported),
                                                                   with what explains each kind of difference
                                                                   and the days whose dates look wrong
+  vt-ilsa-history EXPORT --fill-dob [--dob TABLE.COLUMN] [--dry-run]
+                                                                  the buyers' birth dates into receipts already
+                                                                  imported from EXPORT (found by looking at
+                                                                  every column; counts printed, never dates)
   vt-ilsa-history --self-test                                     check the importer on made-up data
 
 What it does
@@ -207,6 +211,112 @@ def dob_date(s, sale_year):
     if re.fullmatch(r"\d{8}", s):   # YYYYMMDD
         return f"{s[:4]}-{s[4:6]}-{s[6:]}"
     return ""
+
+
+# --- the buyer's date of birth: where the export keeps it -----------------------------------------------
+
+def find_dob_columns(export, sample=200000):
+    """Columns that hold birth dates, in any table: most of their values read as dates with years from
+    1900 to 2010, spread over 10 years or more and starting before 1990 (sale and Z times are later or
+    close together). Returns [(score, table, column, keyed, n, year_from,
+    year_to)], the likeliest first; keyed: the table has RECEIPT_NUM (and maybe REG_NUM). Counts and
+    years only: no date is printed or kept here."""
+    out = []
+    for f in sorted(os.listdir(export)):
+        if not f.lower().endswith(".csv"):
+            continue
+        table = f[:-4]
+        h, it = rows(export, table)
+        if not h:
+            continue
+        cols = list(h)
+        named = [c for c in cols if re.search(r"DOB|BIRTH|BDAY|AGE_DATE|DL_DATE|ID_DATE", c)]
+        seen = defaultdict(lambda: [0, 0, 9999, 0])   # column -> [dates, birth-like, min year, max year]
+        r = Row(h)
+        for i, r.r in enumerate(it):
+            if i >= sample:
+                break
+            for c in cols:
+                v = r(c).strip()
+                if len(v) < 6 or not v[:1].isdigit():
+                    continue
+                d = dob_date(v, 2030)
+                if not d or not d[:4].isdigit():
+                    continue
+                y = int(d[:4]); t = seen[c]
+                t[0] += 1
+                if 1900 <= y <= 2010:
+                    t[1] += 1; t[2] = min(t[2], y); t[3] = max(t[3], y)
+        keyed = "RECEIPT_NUM" in h
+        for c, (n, birth, y0, y1) in seen.items():
+            # Buyers' birth years spread over decades and start well before any sale (a 2006-2008 copy's
+            # sale times are years 1900-2010 too, but all close together).
+            if birth >= 20 and birth >= 0.8 * n and y0 < 1990 and y1 - y0 >= 10:
+                score = (c in named, keyed, birth)
+                out.append((score, table, c, keyed, birth, y0, y1))
+    out.sort(key=lambda x: x[0], reverse=True)
+    return out
+
+
+def fill_dob(db, export, source_id, say, column=None, dry=False):
+    """Fills legacy_receipts.dob (where empty) for this copy's receipts from the export's birth-date
+    column (`column` "TABLE.COLUMN", else the likeliest keyed one). Returns how many were filled."""
+    found = find_dob_columns(export)
+    for score, table, c, keyed, n, y0, y1 in found[:6]:
+        say(f"  birth dates? {table}.{c}: {n:,} values read as dates from {y0} to {y1}"
+            + ("" if keyed else " (no RECEIPT_NUM: can't be tied to a receipt)"))
+    if column:
+        table, _, c = column.partition(".")
+        pick = next(((t, cc) for _, t, cc, k, *_ in found if t.lower() == table.lower() and cc == c.upper() and k), None)
+        if not pick:
+            say(f"  {column}: not a column of birth dates keyed by RECEIPT_NUM in this export")
+            return 0
+    else:
+        pick = next(((t, cc) for _, t, cc, k, *_ in found if k), None)
+        if not pick:
+            say("  birth dates: none found in this export (receipts keep only the age checked)")
+            return 0
+    table, c = pick
+    h, it = rows(export, table); r = Row(h)
+    years = {(a, b): y for a, b, y in db.execute("SELECT reg_num, receipt_num, CAST(substr(at, 1, 4) AS INTEGER) FROM legacy_receipts "
+                                                  "WHERE source_id = ? AND dob = ''", (source_id,))}
+    regs = defaultdict(set)
+    for a, b in years:
+        regs[b].add(a)
+    batch = []
+    for r.r in it:
+        num = integer(r("RECEIPT_NUM"), -1)
+        reg = integer(r("REG_NUM"), -1) if "REG_NUM" in h else (next(iter(regs[num])) if len(regs.get(num, ())) == 1 else -1)
+        if (reg, num) not in years:
+            continue
+        d = dob_date(r(c), years[(reg, num)] or 9999)
+        if d:
+            batch.append((d, source_id, reg, num))
+    if not dry:
+        db.executemany("UPDATE legacy_receipts SET dob = ? WHERE source_id = ? AND reg_num = ? AND receipt_num = ? AND dob = ''", batch)
+        db.commit()
+    say(f"  birth dates from {table}.{c}: {len(batch):,} receipt(s) " + ("would get theirs (dry run)" if dry else "filled"))
+    return len(batch)
+
+
+def fill_dob_command(export, db_path, column, dry, out_dir):
+    if not os.path.exists(db_path):
+        sys.exit(f"No history file at {db_path}: import first.")
+    source = os.path.basename(os.path.normpath(export))
+    db = open_db(db_path)
+    row = db.execute("SELECT id FROM legacy_sources WHERE name = ?", (source,)).fetchone()
+    if not row:
+        sys.exit(f"{source} hasn't been imported into {db_path}.")
+    if not dry:
+        stamp = time.strftime("%Y-%m-%d_%H%M%S")
+        os.makedirs(os.path.join(out_dir, "backups"), exist_ok=True)
+        backup = os.path.join(out_dir, "backups", f"ilsa-history-before-dob-{stamp}.db")
+        dst = sqlite3.connect(backup); db.backup(dst); dst.close()
+        print(f"Backup: {backup}")
+    print(("DRY RUN: " if dry else "") + f"birth dates for {source}'s receipts")
+    n = fill_dob(db, export, row[0], print, column, dry)
+    close_db(db)
+    return n
 
 
 def kind_of(cls, typ):
@@ -823,6 +933,9 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
                 say("\n== ILSA Z_Totals amounts (meaning learned from the days: equal to one of ours on most days)")
                 for col, (b, hits, n) in sorted(mapping.items()):
                     say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+        if days and not db.execute("SELECT 1 FROM legacy_receipts WHERE source_id = ? AND dob <> '' LIMIT 1", (source_id,)).fetchone():
+            say("\nBirth dates: RegSale has none; looking in the other tables")
+            fill_dob(db, export, source_id, say)
         named, (codes, lines) = name_backfill(db)
         if named or codes:
             say(f"\nItems no longer in their copy's list: {named:,} line(s) named from another copy's list;"
@@ -1055,6 +1168,9 @@ def older_export(d):
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["11111111111", "OLD ITEM NEVER SOLD", 20, "Old Co"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[20, "OLD ACCESSORIES NAME"]])
     write_csv(d, "Employee", ["EMP_NUM", "FIRST_NAME", "LAST_NAME", "SSN"], [[2, "Test", "Cashier Two", "000-00-0000"]])
+    # made-up birth dates, in a table of their own (as some ILSA copies may keep them)
+    write_csv(d, "AgeCheck", ["REG_NUM", "RECEIPT_NUM", "CHECKED_AT", "ID_VALUE"],
+              [[1, 8001, "10/20/26 10:00:00", "07/04/76"]] + [[1, 7000 + i, "10/20/26 09:00:00", f"01/01/{50 + i:02d}"] for i in range(30)])
 
 
 def fixture_sql(db):
@@ -1139,6 +1255,14 @@ def self_test(write_fixture=False):
               == [(1, 3, "Test Cashier Three"), (1, 4, "Test Cashier Four"), (2, 2, "Test Cashier Two")]
               and [c[1] for c in db.execute("PRAGMA table_info(legacy_cashiers)")] == ["source_id", "cashier_num", "name"])
         check("the older day matches its Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-20'") == (0,))
+        check("birth dates found in another table by their values (ID_VALUE), tied by receipt",
+              q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8001") == ("1976-07-04",)
+              and q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8002") == ("",))
+        db.execute("UPDATE legacy_receipts SET dob = '' WHERE receipt_num = 8001"); db.commit(); db.close()
+        filled = fill_dob_command(old, dbp, None, False, out)
+        db = sqlite3.connect(dbp)
+        q = lambda s, *a: db.execute(s, a).fetchone()
+        check("--fill-dob fills receipts already imported", filled == 1 and q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8001") == ("1976-07-04",))
         check("a receipt discount explains its total (no difference)",
               q("SELECT COUNT(*) FROM legacy_variances WHERE what LIKE 'Receipts%'") == (0,))
         before = db.execute("SELECT * FROM legacy_variances ORDER BY id").fetchall()
@@ -1179,7 +1303,7 @@ def main(argv):
     args, opts = [], {}
     it = iter(argv)
     for a in it:
-        if a in ("--from", "--to", "--db", "--out"):
+        if a in ("--from", "--to", "--db", "--out", "--dob"):
             opts[a] = next(it, "")
         elif a.startswith("--"):
             opts[a] = True
@@ -1202,6 +1326,10 @@ def main(argv):
     for k in ("--from", "--to"):
         if k in opts and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", opts[k]):
             sys.exit(f"{k}: write the date like 2026-10-28")
+    if "--fill-dob" in opts:
+        fill_dob_command(export, os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--dob"),
+                         bool(opts.get("--dry-run")), os.path.expanduser(opts.get("--out", OUT_DIR)))
+        return 0
     run(export, os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--from"), opts.get("--to"),
         bool(opts.get("--dry-run")), bool(opts.get("--replace")), os.path.expanduser(opts.get("--out", OUT_DIR)))
     return 0

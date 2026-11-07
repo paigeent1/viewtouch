@@ -221,9 +221,11 @@ TEST_CASE("ILSA history: receipts found and shown read-only", "[legacy]")
     REQUIRE(r);
     CHECK(r->lines.size() == 5);
     CHECK(r->dob == "1975-03-04");
+    CHECK(r->cashierName == "Test Cashier Four");   // as that ILSA copy had it
     const std::string text = core::legacy::receiptText(*r, false);
     CHECK(text.find("2 MADE UP CIGAR ROBUSTO") != std::string::npos);
     CHECK(text.find("VOID") != std::string::npos);
+    CHECK(text.find("Cashier 4 Test Cashier Four") != std::string::npos);
     CHECK(text.find("UPC 012345678905") != std::string::npos);
     CHECK(text.find("Age checked: 21+") != std::string::npos);
     CHECK(text.find("ILSA receipt") != std::string::npos);
@@ -268,6 +270,8 @@ TEST_CASE("ILSA History on the Reports screen and in Receipt Lookup", "[legacy][
     REQUIRE(pos.selectLegacyReceipt(results[0].toMap()[u"id"_s].toLongLong()));
     const QVariantMap picked = pos.rangeReport()[u"selected"_s].toMap();
     CHECK(picked[u"text"_s].toString().contains(u"ILSA receipt"_s));
+    // The store's receipt header on top, as ViewTouch's own receipts.
+    CHECK(picked[u"text"_s].toString().startsWith(QString::fromStdString(pos.shared()->settings.storeName)));
 
     // History only: nothing of it in today's sales.
     CHECK(pos.shared()->closedToday.empty());

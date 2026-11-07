@@ -143,6 +143,7 @@ struct Receipt {
     std::string day, at;        // business day; when it was rung (YYYY-MM-DD HH:MM:SS)
     int mode = 0;               // 0: a sale
     int cashier = 0;
+    std::string cashierName;    // as that ILSA copy had it (empty: none kept)
     Money total, tax;
     int ageVerified = 0;        // 18, 21; 0: not checked
     std::string dob;            // the buyer's date of birth as ILSA had it (YYYY-MM-DD); empty: none

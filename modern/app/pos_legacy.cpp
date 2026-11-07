@@ -292,7 +292,8 @@ bool PosService::findLegacyReceipts(const QString &query, int offset)
                 results.append(QVariantMap{{u"id"_s, qint64(h.id)}, {u"number"_s, qint64(h.number)},
                                            {u"when"_s, at.isValid() ? i18n::locale().toString(at, u"ddd MMM d yyyy, h:mm AP"_s) : qs(h.day)},
                                            {u"day"_s, qs(h.day)}, {u"total"_s, self->format(h.total)},
-                                           {u"mode"_s, h.mode}, {u"source"_s, qs(h.source)}});
+                                           {u"mode"_s, h.mode}, {u"source"_s, qs(h.source)},
+                                           {u"cashier"_s, h.cashier}, {u"cashierName"_s, qs(h.cashierName)}});
             }
             QVariantMap out{{u"loading"_s, false}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset},
                             {u"results"_s, results}, {u"more"_s, int(hits.size()) > kReceiptPage},
@@ -306,6 +307,18 @@ bool PosService::findLegacyReceipts(const QString &query, int offset)
     return true;
 }
 
+// As it prints (the store's receipt header on top), else plain.
+QString PosService::legacyText(const core::legacy::Receipt &r) const
+{
+    const QString printed = s_->printer ? s_->printer->legacyReceiptText(s_->settings, core::legacy::receiptRows(r, false)) : QString();
+    if (!printed.isEmpty())
+        return printed;
+    std::string head = s_->settings.storeName + "\n";
+    if (!s_->settings.receiptHeader.empty())
+        head += s_->settings.receiptHeader + "\n";
+    return qs(head + "\n" + core::legacy::receiptText(r, false));
+}
+
 bool PosService::selectLegacyReceipt(qint64 id)
 {
     if (!require(perm::Settle, tr("Finding checks")))
@@ -316,7 +329,7 @@ bool PosService::selectLegacyReceipt(qint64 id)
         return fail(tr("That ILSA receipt isn't in the history."));
     QVariantMap out = rangeReport_;
     out.insert(u"selected"_s, QVariantMap{{u"id"_s, qint64(r->id)}, {u"number"_s, qint64(r->number)},
-                                          {u"text"_s, qs(core::legacy::receiptText(*r, false))},
+                                          {u"text"_s, legacyText(*r)},
                                           {u"hasDob"_s, !r->dob.empty()}, {u"mode"_s, r->mode}});
     rangeReport_ = out;
     emit sessionChanged();
@@ -339,7 +352,8 @@ bool PosService::reprintLegacyReceipt(qint64 id, bool withDob)
         if (s_->settings.dobReprintNeedsManager && !require(perm::Manager, tr("Reprinting with the date of birth")))
             return false;
     }
-    s_->printer->printReport(s_->settings, core::legacy::receiptReport(*r, withDob), receiptPrinter());
+    s_->printer->printLegacyReceipt(s_->settings, core::legacy::receiptReport(*r, withDob),
+                                    core::legacy::receiptRows(*r, withDob), receiptPrinter());
     emit notice(tr("Printing ILSA receipt #%1").arg(r->number));
     return true;
 }

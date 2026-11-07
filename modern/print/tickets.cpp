@@ -100,16 +100,38 @@ static std::string serverFirstLastInitial(const std::string &full)
     return first;
 }
 
-Document receipt(const Check &check, const TicketContext &ctx)
+void receiptHeader(Document &d, const TicketContext &ctx)
 {
-    const Totals t = check.totals(ctx.settings.tax);
-    Document d;
     if (ctx.logo)
         d.image(ctx.logo);
     d.center(ctx.settings.storeName, true, true);
     for (const std::string &l : splitLines(ctx.settings.receiptHeader))
         d.center(l);
     d.blank();
+}
+
+Document legacyReceipt(const std::vector<std::pair<std::string, std::string>> &rows, const TicketContext &ctx)
+{
+    Document d;
+    receiptHeader(d, ctx);
+    for (const auto &[left, right] : rows) {
+        if (left == "-" && right == "-")
+            d.rule();
+        else if (right.empty() && (left.starts_with("ILSA receipt") || left.starts_with("From ")))
+            d.center(left);
+        else if (right.empty())
+            d.text(left);
+        else
+            d.columns(left, right, left == "TOTAL");
+    }
+    return d;
+}
+
+Document receipt(const Check &check, const TicketContext &ctx)
+{
+    const Totals t = check.totals(ctx.settings.tax);
+    Document d;
+    receiptHeader(d, ctx);
     d.columns(ctx.tr("Check #%1", {std::to_string(check.id)}), check.label, true);
     d.columns(ctx.tr("Server: %1", {serverFirstLastInitial(check.serverName)}), ctx.tr("Guests: %1", {std::to_string(check.guests)}));
     {
@@ -242,12 +264,7 @@ Document receipt(const Check &check, const TicketContext &ctx)
 Document giftReceipt(const Check &check, const TicketContext &ctx)
 {
     Document d;
-    if (ctx.logo)
-        d.image(ctx.logo);
-    d.center(ctx.settings.storeName, true, true);
-    for (const std::string &l : splitLines(ctx.settings.receiptHeader))
-        d.center(l);
-    d.blank();
+    receiptHeader(d, ctx);
     d.center(upper(ctx.tr("Gift receipt")), true, true);
     d.columns(ctx.tr("Check #%1", {std::to_string(check.id)}), ctx.dateTime(check.closedAt ? check.closedAt : ctx.now));
     d.rule();

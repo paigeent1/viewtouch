@@ -33,6 +33,10 @@
 #include <optional>
 #include <vector>
 
+namespace vt::core::legacy {
+struct Receipt;   // core/legacy_sales.hh
+}
+
 namespace vt::app {
 
 // "11.50", "$11.50", "11,50" (with `symbol`, the currency's): a price in
@@ -136,6 +140,15 @@ public:
     // A copy of a receipt as text (on screen: Look Up Checks), or the gift receipt's.
     virtual QString receiptText(const core::PosSettings &, const core::Check &, bool gift) { (void)gift; return {}; }
     virtual void printGiftReceipt(const core::PosSettings &, const core::Check &, const std::string &) {}
+    // An ILSA receipt from the imported history (rows: core::legacy::receiptRows), under the store's
+    // receipt header; without a ticket printer, as a report. Its text for the screen (empty: none).
+    virtual void printLegacyReceipt(const core::PosSettings &settings, const core::Report &asReport,
+                                    const std::vector<std::pair<std::string, std::string>> &rows, const std::string &printerId)
+    {
+        (void)rows;
+        printReport(settings, asReport, printerId);
+    }
+    virtual QString legacyReceiptText(const core::PosSettings &, const std::vector<std::pair<std::string, std::string>> &) { return {}; }
     // The full privacy notice, for a customer who asks (Customers screen).
     virtual void printPrivacyNotice(const core::PosSettings &, const std::string &) {}
     // The full privacy notice as a text file on the server (Desktop/Privacy Notice.txt): where it went.
@@ -1390,6 +1403,7 @@ public:
     bool findLegacyReceipts(const QString &query, int offset = 0);
     bool selectLegacyReceipt(qint64 id);
     bool reprintLegacyReceipt(qint64 id, bool withDob = false);
+    QString legacyText(const core::legacy::Receipt &r) const;   // an ILSA receipt as it prints
 
     // Tips after tip-outs and pools (see core::tipShares), everyone / one person.
     std::map<std::string, core::TipShare> allTipShares() const;
