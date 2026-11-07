@@ -121,6 +121,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 18:21 ET — Bob (Claude) — Release i: ILSA stores and BHDAN- numbers, DOB, cashier names, receipt barcode
+- **What:** Linear release on main 3b3f346: cherry-picked bob/release-h (recheck, DOB fill, cashier names, store receipt header, ILSA stores BHDAN/BHNM with StorePicker, ILSA history store setting) and bob/receipt-barcode (Receipt barcode + Check prefix); pos_admin_shared.hh conflict resolved by keeping ilsaHistoryStore and receiptBarcode/checkPrefix; notes/es.json kept both sides.
+- **Why:** One update for Pi, tablets and fire5.
+- **Files:** (none)
+- **Next person must know:** Owner: Pi update, tablets+fire5, then vt-ilsa-history --prefix BHDAN and --recheck --dry-run, then --fill-dob dry runs.
+
 ### 2026-11-07 18:08 ET — Bob (Claude) — Backlog: customer phone changes
 - **What:** SMS/customer backlog: how a phone number change keeps history, previous numbers, text choices per number, merges, logging, sync.
 - **Why:** Owner 2026-11-07 18:07.
