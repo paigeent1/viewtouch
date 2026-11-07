@@ -8,7 +8,9 @@ Nothing is changed: it reads ViewTouch's item list (viewtouch.db, opened read-on
   vt-pricebook-cleanup --db FILE       read another copy of viewtouch.db
   vt-pricebook-cleanup --apply         APPLY the suggested names and fill empty sizes (owner approved the
                                        before/after sheet 2026-11-06): stops ViewTouch, backs up viewtouch.db,
-                                       changes the items, starts ViewTouch again (vt-server)
+                                       changes the items, writes each change to the Changes report (area
+                                       "Price book cleanup", by "Owner-approved cleanup"), starts ViewTouch
+                                       again (vt-server)
   vt-pricebook-cleanup --out DIR       write fractions.csv there instead
   vt-pricebook-cleanup --self-test     check the name rules against a table of examples
 
@@ -254,7 +256,27 @@ def self_test():
     ok = row["length"] == "" and row["ring_gauge"] == "" and "length already 6" in row["flag"]
     bad += not ok
     print(f"{'ok  ' if ok else 'FAIL'} existing size kept -> {row['flag']!r}")
-    print(f"\n{len(EXAMPLES) + 1 - bad} of {len(EXAMPLES) + 1} passed")
+    # --apply writes each change to the Changes report (a small database with the real tables).
+    import tempfile
+    lib = changes_lib()
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "viewtouch.db")
+        at = lib.stamp_ms("2026-11-06_151030")
+        lib.make_db(path, [("a", {"id": "a", "name": "TORO 6+ X 52"}), ("b", {"id": "b", "name": "NO SIZE HERE"})],
+                    [(5, at - 3_600_000, 0, None)])
+        con = sqlite3.connect(path)
+        con.execute("BEGIN IMMEDIATE")
+        changed, sized = apply_items(con, lib, at)
+        con.commit()
+        rows = [json.loads(r) for (r,) in con.execute("SELECT json FROM changes ORDER BY id")]
+        con.close()
+        want = [("TORO 6⅛ X 52", "Name", "TORO 6+ X 52", "TORO 6⅛ X 52"), ("TORO 6⅛ X 52", "Size", "", "6 1/8 x 52")]
+        got = [(r["item"], r["field"], r["before"], r["after"]) for r in rows]
+        ok = (changed == [("a", "TORO 6+ X 52", "TORO 6⅛ X 52")] and sized == 1 and got == want
+              and all(r["day"] == 5 and r["at"] == at and r["area"] == "Price book cleanup" for r in rows))
+    bad += not ok
+    print(f"{'ok  ' if ok else 'FAIL'} --apply writes Changes rows -> {got}")
+    print(f"\n{len(EXAMPLES) + 2 - bad} of {len(EXAMPLES) + 2} passed")
     return 0 if bad == 0 else 1
 
 
@@ -275,9 +297,59 @@ def cut(text, n):
     return text if len(text) <= n else text[:n - 1] + "…"
 
 
+def changes_lib():
+    """vt-changes-import-cleanup (beside this script) as a module: it writes the Changes report rows."""
+    from importlib.machinery import SourceFileLoader
+    import importlib.util
+    sys.dont_write_bytecode = True   # no __pycache__ beside the scripts
+    path =os.path.join(os.path.dirname(os.path.realpath(__file__)), "vt-changes-import-cleanup")
+    loader = SourceFileLoader("vt_changes_import_cleanup", path)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def apply_items(src, lib, at):
+    """In an open transaction: every suggested name and empty size, each also a row in the Changes report
+    (at `at`, on the business day open then). Returns ([(item_id, before, after)], items sized)."""
+    changed, sized = [], 0
+    log_rows = []   # (item, field, before, after) for the Changes report
+    for (iid, raw) in src.execute("SELECT id, json FROM menu_items").fetchall():
+        try:
+            item = json.loads(raw)
+        except ValueError:
+            continue
+        r = review(item)
+        if not r:
+            continue
+        touched = False
+        size_before = lib.size_text(item)
+        if r["suggested_name"]:
+            changed.append((iid, item.get("name", ""), r["suggested_name"]))
+            item["name"] = r["suggested_name"]
+            touched = True
+            log_rows.append((item["name"], "Name", r["name_now"], r["suggested_name"]))
+        if r["length_in"]:
+            item["length"] = float(r["length_in"]); touched = True
+        if r["ring_gauge"]:
+            item["ringGauge"] = int(r["ring_gauge"]); touched = True
+        if r["ring_gauge2"]:
+            item["ringGauge2"] = int(r["ring_gauge2"]); touched = True
+        if r["length_in"] or r["ring_gauge"] or r["ring_gauge2"]:
+            sized += 1
+            log_rows.append((item.get("name") or "", "Size", size_before, lib.size_text(item)))
+        if touched:
+            src.execute("UPDATE menu_items SET json = ? WHERE id = ?", (json.dumps(item, ensure_ascii=False), iid))
+    if log_rows:
+        lib.insert_changes(src, log_rows, at)
+    return changed, sized
+
+
 def apply(db, out_dir):
     """Stops ViewTouch, backs up the database, applies every suggested name and fills empty sizes."""
     import shutil, subprocess, time
+    lib = changes_lib()   # before anything is stopped: if it is missing, nothing happens
     os.makedirs(out_dir, exist_ok=True)
     stamp = time.strftime("%Y-%m-%d_%H%M%S")
     print("Stopping ViewTouch (it saves first)...")
@@ -294,32 +366,9 @@ def apply(db, out_dir):
     src.backup(dst)   # a whole, consistent copy (its journal included)
     dst.close()
     print(f"Backup: {backup}")
-    changed, sized = [], 0
     try:
         src.execute("BEGIN IMMEDIATE")
-        for (iid, raw) in src.execute("SELECT id, json FROM menu_items").fetchall():
-            try:
-                item = json.loads(raw)
-            except ValueError:
-                continue
-            r = review(item)
-            if not r:
-                continue
-            touched = False
-            if r["suggested_name"]:
-                changed.append((iid, item.get("name", ""), r["suggested_name"]))
-                item["name"] = r["suggested_name"]
-                touched = True
-            if r["length_in"]:
-                item["length"] = float(r["length_in"]); touched = True
-            if r["ring_gauge"]:
-                item["ringGauge"] = int(r["ring_gauge"]); touched = True
-            if r["ring_gauge2"]:
-                item["ringGauge2"] = int(r["ring_gauge2"]); touched = True
-            if r["length_in"] or r["ring_gauge"] or r["ring_gauge2"]:
-                sized += 1
-            if touched:
-                src.execute("UPDATE menu_items SET json = ? WHERE id = ?", (json.dumps(item, ensure_ascii=False), iid))
+        changed, sized = apply_items(src, lib, int(time.time() * 1000))
         src.commit()
     except Exception as e:
         src.rollback()
@@ -332,7 +381,7 @@ def apply(db, out_dir):
         w = csv.writer(f)
         w.writerow(["item_id", "before", "after"])
         w.writerows(changed)
-    print(f"Applied: {len(changed):,} names changed, {sized:,} items got a size. List: {log}")
+    print(f"Applied: {len(changed):,} names changed, {sized:,} items got a size (each in the Changes report). List: {log}")
     print(f"To undo: stop ViewTouch, copy {backup} over {db}, run vt-server.")
     print("Starting ViewTouch again...")
     return subprocess.call(["vt-server"])

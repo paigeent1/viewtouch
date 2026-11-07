@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""Put the price book cleanup of 2026-11-06 15:10:30 into ViewTouch's Changes report.
+
+vt-pricebook-cleanup --apply changed item names and filled empty cigar sizes straight in viewtouch.db, so the
+Changes report (the `changes` table) never heard of them. This adds one change row per name changed (from
+~/pricebook-cleanup/applied-2026-11-06_151030.csv) and one per item that got a size (the backup taken just
+before, compared with the database now: only sizes that were empty and now have a value), all at the time of
+the cleanup, by "Owner-approved cleanup", area "Price book cleanup", on the business day open then.
+ViewTouch keeps its data in memory, so it is stopped first (it saves), the database is backed up, the rows
+are added, and ViewTouch is started again (vt-server) - the same steps as vt-pricebook-cleanup --apply.
+Run it again and it adds nothing (it looks for rows already imported).
+
+  vt-changes-import-cleanup               import the 2026-11-06_151030 cleanup
+  vt-changes-import-cleanup --dry-run     only count what it would add (reads the database, changes nothing)
+  vt-changes-import-cleanup --stamp S     another cleanup run (S as in applied-S.csv, e.g. 2026-11-06_151030)
+  vt-changes-import-cleanup --db FILE     another copy of viewtouch.db (the default: ViewTouch's own)
+  vt-changes-import-cleanup --dir DIR     where the applied CSV and the backup are (default ~/pricebook-cleanup)
+  vt-changes-import-cleanup --no-restart  don't stop or start ViewTouch (a copy of the database, tests)
+  vt-changes-import-cleanup --self-test   check it against a small database made here
+
+Only item names and sizes are read; nothing about customers.
+"""
+import csv, datetime, json, os, sqlite3, sys
+
+VT_DB = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+OUT_DIR = os.path.expanduser("~/pricebook-cleanup")
+STAMP = "2026-11-06_151030"
+AREA = "Price book cleanup"
+WHO = "Owner-approved cleanup"
+TZ = "America/New_York"   # the store's clock
+LENGTH_TEXT = {0: "", 1: " 1/8", 2: " 1/4", 3: " 3/8", 4: " 1/2", 5: " 5/8", 6: " 3/4", 7: " 7/8"}
+
+
+def zone():
+    from zoneinfo import ZoneInfo
+    return ZoneInfo(TZ)
+
+
+def stamp_ms(stamp):
+    """'2026-11-06_151030' (the store's clock) -> epoch ms."""
+    t = datetime.datetime.strptime(stamp, "%Y-%m-%d_%H%M%S").replace(tzinfo=zone())
+    return int(t.timestamp() * 1000)
+
+
+def clock(ms):
+    """ViewTouch's clock text (i18n::timeText, "h:mm AP"): 3:10 PM."""
+    t = datetime.datetime.fromtimestamp(ms / 1000, zone())
+    return f"{t.hour % 12 or 12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+
+
+def length_text(inches):
+    whole, e = int(inches), round((inches - int(inches)) * 8)
+    if e == 8:
+        whole, e = whole + 1, 0
+    if abs(whole + e / 8 - inches) > 1e-6:
+        return f"{inches:g}"
+    return f"{whole}{LENGTH_TEXT[e]}"
+
+
+def num(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def size_text(item):
+    """'6 1/8 x 52', '6 1/8 x 52/60', '6 1/8', '52'; '' when it has no size."""
+    length, g1, g2 = num(item.get("length")), int(num(item.get("ringGauge"))), int(num(item.get("ringGauge2")))
+    gauge = (str(g1) if g1 else "") + (f"/{g2}" if g2 else "")
+    parts = [p for p in (length_text(length) if length else "", gauge) if p]
+    return " x ".join(parts)
+
+
+def size_filled(before, after):
+    """True when a size field was empty before and has a value now."""
+    return any(not num(before.get(k)) and num(after.get(k)) for k in ("length", "ringGauge", "ringGauge2"))
+
+
+# --- the changes table -------------------------------------------------------------------------------------
+def business_day(con, at):
+    """The business day open at `at`; else the one that opened nearest to it; 0 when there are none."""
+    row = con.execute("SELECT id FROM business_days WHERE opened_at <= ? AND (closed_at = 0 OR closed_at > ?) "
+                      "ORDER BY opened_at DESC LIMIT 1", (at, at)).fetchone()
+    if row:
+        return row[0]
+    row = con.execute("SELECT id FROM business_days ORDER BY ABS(opened_at - ?) LIMIT 1", (at,)).fetchone()
+    return row[0] if row else 0
+
+
+def change_json(c):
+    # As PosService writes it (app/pos_json.cpp toJson(Change)); before/after cut to 300 like logChange.
+    return json.dumps({"id": c["id"], "at": c["at"], "day": c["day"], "who": c["who"], "area": c["area"],
+                       "item": c["item"], "field": c["field"], "before": c["before"][:300],
+                       "after": c["after"][:300]}, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def already(con, at, area):
+    """Change rows of `area` already at `at` (an import done before)."""
+    n = 0
+    for (raw,) in con.execute("SELECT json FROM changes WHERE at = ?", (at,)):
+        try:
+            n += json.loads(raw).get("area") == area
+        except ValueError:
+            pass
+    return n
+
+
+def insert_changes(con, rows, at, area=AREA, who=WHO):
+    """rows: [(item, field, before, after)] -> change rows at `at`, ids after the last. Returns the day."""
+    day = business_day(con, at)
+    next_id = (con.execute("SELECT COALESCE(MAX(id), 0) FROM changes").fetchone()[0] or 0) + 1
+    for item, field, before, after in rows:
+        c = {"id": next_id, "at": at, "day": day, "who": who, "area": area, "item": item, "field": field,
+             "before": before or "", "after": after or ""}
+        con.execute("INSERT INTO changes (id, at, day, json) VALUES (?, ?, ?, ?)", (next_id, at, day, change_json(c)))
+        next_id += 1
+    refresh_closed_day(con, day)
+    return day
+
+
+def refresh_closed_day(con, day):
+    """A day already closed keeps its reports as saved at End of Day: its Changes report is written again
+    from the changes table (as core/report.cpp changesReport does), so the added rows show there too."""
+    row = con.execute("SELECT closed_at, reports FROM business_days WHERE id = ?", (day,)).fetchone()
+    if not row or not row[0]:
+        return False   # still open (or none): ViewTouch reads its changes when it starts
+    try:
+        reports = json.loads(row[1] or "{}")
+    except ValueError:
+        reports = {}
+    changes = []
+    for (raw,) in con.execute("SELECT json FROM changes WHERE day = ? ORDER BY id", (day,)):
+        try:
+            changes.append(json.loads(raw))
+        except ValueError:
+            pass
+    old = reports.get("changes") or {}
+    rep = {"id": "changes", "title": "Changes", "subtitle": old.get("subtitle", ""),
+           "columns": ["", "Before", "After"], "rows": []}
+    if not changes:
+        rep["rows"].append({"kind": "note", "cells": ["Nothing was changed on the manager screens, the menu or the pages."]})
+    for c in reversed(changes):   # newest first
+        item, field = c.get("item", ""), c.get("field", "")
+        what = field if not item else item if not field else f"{item} · {field}"
+        rep["rows"].append({"kind": "line", "cells": [
+            f"{clock(int(c.get('at', 0)))} · {c.get('who', '')} · {c.get('area', '')}" + (f": {what}" if what else ""),
+            c.get("before", ""), c.get("after", "")]})
+    if changes:
+        rep["rows"].append({"kind": "total", "cells": ["All", str(len(changes)), ""]})
+    reports["changes"] = rep
+    con.execute("UPDATE business_days SET reports = ? WHERE id = ?",
+                (json.dumps(reports, ensure_ascii=False, separators=(",", ":")), day))
+    return True
+
+
+# --- what the cleanup did ----------------------------------------------------------------------------------
+def name_rows(applied_csv):
+    rows = []
+    with open(applied_csv, newline="", encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            if (r.get("before") or "") != (r.get("after") or ""):
+                rows.append((r.get("after") or "", "Name", r.get("before") or "", r.get("after") or ""))
+    return rows
+
+
+def items(path):
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=3.0)
+    try:
+        out = {}
+        for iid, raw in con.execute("SELECT id, json FROM menu_items"):
+            try:
+                out[iid] = json.loads(raw)
+            except ValueError:
+                pass
+        return out
+    finally:
+        con.close()
+
+
+def size_rows(backup_db, db):
+    before, now = items(backup_db), items(db)
+    rows = []
+    for iid, item in now.items():
+        was = before.get(iid)
+        if was is not None and size_filled(was, item):
+            rows.append((item.get("name") or "", "Size", size_text(was), size_text(item)))
+    return rows
+
+
+def plan(db, out_dir, stamp):
+    applied = os.path.join(out_dir, f"applied-{stamp}.csv")
+    backup = os.path.join(out_dir, f"viewtouch-before-cleanup-{stamp}.db")
+    for p in (applied, backup):
+        if not os.path.exists(p):
+            sys.exit(f"Can't find {p}; nothing was changed.")
+    return name_rows(applied), size_rows(backup, db)
+
+
+# --- stop, back up, add, start again (as vt-pricebook-cleanup --apply) -------------------------------------
+def stop_viewtouch():
+    import subprocess, time
+    print("Stopping ViewTouch (it saves first)...")
+    subprocess.run(["pkill", "-TERM", "-x", "vtmodern"])
+    for _ in range(40):
+        if subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode != 0:
+            return
+        time.sleep(0.5)
+    sys.exit("ViewTouch didn't stop; nothing was changed.")
+
+
+def start_viewtouch():
+    import subprocess
+    print("Starting ViewTouch again...")
+    return subprocess.call(["vt-server"])
+
+
+def run(db, out_dir, stamp, restart=True, dry=False):
+    import time
+    at = stamp_ms(stamp)
+    names, sizes = plan(db, out_dir, stamp)
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True) if dry else None
+    if dry:
+        have = already(con, at, AREA)
+        day = business_day(con, at)
+        con.close()
+        print(f"Would add {len(names):,} name changes and {len(sizes):,} size fills at {stamp} "
+              f"(business day {day})." if not have else f"Already imported ({have:,} rows at {stamp}); nothing to add.")
+        return 0
+    if restart:
+        stop_viewtouch()
+    backup = os.path.join(out_dir, f"viewtouch-before-changes-import-{time.strftime('%Y-%m-%d_%H%M%S')}.db")
+    src = sqlite3.connect(db)
+    try:
+        have = already(src, at, AREA)
+        if have:
+            print(f"Already imported ({have:,} change rows at {stamp}); nothing added.")
+            src.close()
+            return start_viewtouch() if restart else 0
+        dst = sqlite3.connect(backup)
+        src.backup(dst)   # a whole, consistent copy
+        dst.close()
+        print(f"Backup: {backup}")
+        src.execute("BEGIN IMMEDIATE")
+        day = insert_changes(src, names + sizes, at)
+        src.commit()
+    except Exception as e:
+        src.rollback()
+        src.close()
+        if restart:
+            import subprocess
+            subprocess.Popen(["vt-server"])
+        sys.exit(f"Nothing was changed ({e})." + (" ViewTouch is starting again." if restart else ""))
+    src.close()
+    when = datetime.datetime.fromtimestamp(at / 1000, zone()).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Added to the Changes report: {len(names):,} name changes and {len(sizes):,} size fills, "
+          f"at {when} (business day {day}), by \"{WHO}\".")
+    print(f"To undo: stop ViewTouch, copy {backup} over {db}, run vt-server.")
+    return start_viewtouch() if restart else 0
+
+
+# --- self-test ---------------------------------------------------------------------------------------------
+# The real CREATE statements (modern/storage/pos_store.cpp).
+SCHEMA = [
+    "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    "CREATE TABLE menu_items (id TEXT PRIMARY KEY, position INTEGER NOT NULL, json TEXT NOT NULL)",
+    "CREATE TABLE business_days (id INTEGER PRIMARY KEY, opened_at INTEGER NOT NULL, "
+    "closed_at INTEGER NOT NULL DEFAULT 0, reports TEXT)",
+    "CREATE TABLE IF NOT EXISTS changes (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, "
+    "day INTEGER NOT NULL, json TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS changes_day ON changes (day)",
+]
+
+
+def make_db(path, items_, days, changes=()):
+    con = sqlite3.connect(path)
+    for s in SCHEMA:
+        con.execute(s)
+    for i, (iid, item) in enumerate(items_):
+        con.execute("INSERT INTO menu_items (id, position, json) VALUES (?, ?, ?)", (iid, i, json.dumps(item)))
+    for d in days:
+        con.execute("INSERT INTO business_days (id, opened_at, closed_at, reports) VALUES (?, ?, ?, ?)", d)
+    for c in changes:
+        con.execute("INSERT INTO changes (id, at, day, json) VALUES (?, ?, ?, ?)", (c["id"], c["at"], c["day"], change_json(c)))
+    con.commit()
+    con.close()
+
+
+def self_test():
+    import tempfile
+    bad = total = 0
+
+    def check(what, ok):
+        nonlocal bad, total
+        bad += not ok
+        total += 1
+        print(f"{'ok  ' if ok else 'FAIL'} {what}")
+
+    at = stamp_ms(STAMP)
+    check("the cleanup's time: 2026-11-06 15:10:30 Eastern = 20:10:30 UTC",
+          at == int(datetime.datetime(2026, 11, 6, 20, 10, 30, tzinfo=datetime.timezone.utc).timestamp() * 1000))
+    check("clock text 3:10 PM", clock(at) == "3:10 PM")
+    check("size text 6 1/8 x 52", size_text({"length": 6.125, "ringGauge": 52}) == "6 1/8 x 52")
+    check("size text with a second gauge", size_text({"length": 6.125, "ringGauge": 52, "ringGauge2": 60}) == "6 1/8 x 52/60")
+    with tempfile.TemporaryDirectory() as d:
+        before = [("a", {"id": "a", "name": "TORO 6+ X 52"}),
+                  ("b", {"id": "b", "name": "PADRON 5X50 NAT"}),
+                  ("c", {"id": "c", "name": "ROBUSTO 5X50", "length": 5.0, "ringGauge": 50}),
+                  ("d", {"id": "d", "name": "DIADEMA 6+X52/60", "length": 6.125})]
+        after = [("a", {"id": "a", "name": "TORO 6⅛ X 52", "length": 6.125, "ringGauge": 52}),
+                 ("b", {"id": "b", "name": "PADRON 5X50 NAT", "length": 5.0, "ringGauge": 50}),
+                 ("c", {"id": "c", "name": "ROBUSTO 5X50", "length": 5.0, "ringGauge": 50}),   # had its size
+                 ("d", {"id": "d", "name": "DIADEMA 6⅛X52/60", "length": 6.125, "ringGauge": 52, "ringGauge2": 60})]
+        hour = 3_600_000
+        days = [(7, at - 30 * hour, at - 20 * hour, "{}"), (8, at - 9 * hour, 0, None)]   # day 8 open then
+        earlier = {"id": 41, "at": at - hour, "day": 8, "who": "Morgan", "area": "Menu", "item": "Coffee",
+                   "field": "Price", "before": "$2.50", "after": "$2.75"}
+        db, backup = os.path.join(d, "viewtouch.db"), os.path.join(d, f"viewtouch-before-cleanup-{STAMP}.db")
+        make_db(backup, before, days, [earlier])
+        make_db(db, after, days, [earlier])
+        with open(os.path.join(d, f"applied-{STAMP}.csv"), "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(["item_id", "before", "after"])
+            w.writerow(["a", "TORO 6+ X 52", "TORO 6⅛ X 52"])
+            w.writerow(["d", "DIADEMA 6+X52/60", "DIADEMA 6⅛X52/60"])
+
+        run(db, d, STAMP, restart=False)
+        con = sqlite3.connect(db)
+        rows = [json.loads(r) for (r,) in con.execute("SELECT json FROM changes WHERE at = ? ORDER BY id", (at,))]
+        names = [r for r in rows if r["field"] == "Name"]
+        sizes = [r for r in rows if r["field"] == "Size"]
+        check("2 name changes", len(names) == 2)
+        check("name row: item is the new name, before/after", names and names[0]["item"] == "TORO 6⅛ X 52"
+              and names[0]["before"] == "TORO 6+ X 52" and names[0]["after"] == "TORO 6⅛ X 52")
+        check("3 size fills (an item that had its size: none)", len(sizes) == 3)
+        check("size row 6 1/8 x 52", any(r["item"] == "TORO 6⅛ X 52" and r["before"] == "" and r["after"] == "6 1/8 x 52"
+                                        for r in sizes))
+        check("size row partly there before", any(r["item"] == "DIADEMA 6⅛X52/60" and r["before"] == "6 1/8"
+                                                 and r["after"] == "6 1/8 x 52/60" for r in sizes))
+        check("who, area, day (the day open then), ids after the last",
+              all(r["who"] == WHO and r["area"] == AREA and r["day"] == 8 for r in rows)
+              and [r["id"] for r in rows] == list(range(42, 42 + len(rows))))
+        check("the day column too", con.execute("SELECT COUNT(*) FROM changes WHERE day = 8").fetchone()[0] == 6)
+        con.close()
+
+        n = len(rows)
+        run(db, d, STAMP, restart=False)   # again: nothing more
+        con = sqlite3.connect(db)
+        check("run again: nothing added", con.execute("SELECT COUNT(*) FROM changes").fetchone()[0] == n + 1)
+        con.close()
+
+        # The cleanup on a day already closed: its saved Changes report shows the rows.
+        db2 = os.path.join(d, "closed.db")
+        make_db(db2, after, [(9, at - 9 * hour, at + 9 * hour, json.dumps({"sales": {"id": "sales"}}))], [])
+        con = sqlite3.connect(db2)
+        insert_changes(con, [("TORO 6⅛ X 52", "Name", "TORO 6+ X 52", "TORO 6⅛ X 52")], at)
+        con.commit()
+        reports = json.loads(con.execute("SELECT reports FROM business_days WHERE id = 9").fetchone()[0])
+        con.close()
+        lines = reports.get("changes", {}).get("rows", [])
+        check("closed day: its Changes report has the row, other reports kept",
+              "sales" in reports and lines and lines[0]["cells"][0]
+              == f"3:10 PM · {WHO} · {AREA}: TORO 6⅛ X 52 · Name" and lines[-1]["cells"][:2] == ["All", "1"])
+
+        # No day open then: the nearest.
+        db3 = os.path.join(d, "nearest.db")
+        make_db(db3, after, [(3, at - 50 * hour, at - 40 * hour, "{}"), (4, at + 2 * hour, 0, None)], [])
+        con = sqlite3.connect(db3)
+        check("no day open then: the nearest one", business_day(con, at) == 4)
+        con.close()
+    print(f"\n{total - bad} of {total} passed")
+    return 0 if bad == 0 else 1
+
+
+def main(argv):
+    if "--self-test" in argv:
+        return self_test()
+    arg = lambda name, default: os.path.expanduser(argv[argv.index(name) + 1]) if name in argv else default
+    db, out_dir, stamp = arg("--db", VT_DB), arg("--dir", OUT_DIR), arg("--stamp", STAMP)
+    if not os.path.exists(db):
+        sys.exit(f"Can't find ViewTouch's database: {db}")
+    return run(db, out_dir, stamp, restart="--no-restart" not in argv, dry="--dry-run" in argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
