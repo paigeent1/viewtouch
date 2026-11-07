@@ -495,10 +495,10 @@ std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &f
         QString where;
         if (!filter.trimmed().isEmpty()) {
             QString w = filter.trimmed();
-            w.replace(u'\', u"\\"_s).replace(u'%', u"\%"_s).replace(u'_', u"\_"_s);
+            w.replace(u'!', u"!!"_s).replace(u'%', u"!%"_s).replace(u'_', u"!_"_s);
             w = u'%' + w + u'%';
-            where = u" AND (l.name LIKE ? ESCAPE '\' OR l.upc LIKE ? ESCAPE '\' OR l.brand LIKE ? ESCAPE '\' "
-                    "OR l.dept IN (SELECT dept FROM legacy_depts WHERE name LIKE ? ESCAPE '\'))"_s;
+            where = u" AND (l.name LIKE ? ESCAPE '!' OR l.upc LIKE ? ESCAPE '!' OR l.brand LIKE ? ESCAPE '!' "
+                    "OR l.dept IN (SELECT dept FROM legacy_depts WHERE name LIKE ? ESCAPE '!'))"_s;
             args << w << w << w << w;
         }
         QSqlQuery q(db);
