@@ -1,0 +1,261 @@
+// PosService: ILSA's sales history (imported by scripts/bin/vt-ilsa-history into ilsa-history.db,
+// next to viewtouch.db; PosShared::legacyDb): the ILSA History reports (Daily Z, departments, item
+// movement, GP by month / year, ILSA vs ViewTouch, known differences) and its receipts, read-only,
+// in Receipt Lookup. Read with connections of their own, away from the screen; the answers come in
+// rangeReport like the other reports over a range ({id: "ilsa-...", loading, label, report} /
+// {id: "ilsa-receipts", results, selected}). Never in today's drawers, X/Z, end of day or cash.
+
+#include "app/i18n.hh"
+#include "app/legacy_history.hh"
+#include "app/pos_json.hh"
+#include "app/pos_service.hh"
+#include "core/legacy_sales.hh"
+
+#include <QDateTime>
+#include <QPointer>
+#include <QThreadPool>
+
+#include <algorithm>
+
+using namespace Qt::StringLiterals;
+using namespace vt::core;
+
+namespace vt::app {
+
+namespace {
+
+constexpr int kItemRows = 500;      // item movement: the biggest sellers shown (the CSV has those too)
+constexpr int kReceiptPage = 100;   // receipts found, a page at a time
+
+const QStringList kLegacyKinds = {u"z"_s, u"depts"_s, u"items"_s, u"gpMonth"_s, u"gpYear"_s, u"compare"_s, u"differences"_s};
+
+// What the worker thread read, for the report built on the screen's thread.
+struct LegacyRead {
+    legacy::Status status;
+    core::legacy::ZTotals ilsa, vt;
+    std::map<std::string, std::int64_t> z;
+    std::vector<core::legacy::GroupRow> rows, lottery;
+    std::vector<core::legacy::PeriodRow> periods;
+    std::vector<core::legacy::Variance> variances;
+    bool more = false;
+    QString error;
+};
+
+std::string historyNote(const legacy::Status &s)
+{
+    if (!s.present)
+        return "No ILSA history imported yet: on the Pi, run vt-ilsa-history with the ILSA export.";
+    return "ILSA history in ViewTouch: " + std::to_string(s.days) + " days, " + s.first.toStdString() + " to "
+           + s.last.toStdString() + ", " + std::to_string(s.receipts) + " receipts.";
+}
+
+} // namespace
+
+bool PosService::requestLegacyReport(const QString &kind, const QString &fromText, const QString &toText, const QString &by)
+{
+    if (!require(perm::Manager, tr("Reports")))
+        return false;
+    if (!kLegacyKinds.contains(kind))
+        return fail(tr("No such ILSA report."));
+    QDate from = QDate::fromString(fromText.trimmed(), u"yyyy-MM-dd"_s);
+    QDate to = toText.trimmed().isEmpty() ? from : QDate::fromString(toText.trimmed(), u"yyyy-MM-dd"_s);
+    if (!from.isValid() || !to.isValid())
+        return fail(tr("Dates are written like 2026-09-01."));
+    if (to < from)
+        std::swap(from, to);
+    const QString a = from.toString(u"yyyy-MM-dd"_s), b = to.toString(u"yyyy-MM-dd"_s);
+    const QString label = from == to ? i18n::locale().toString(from, u"ddd MMM d, yyyy"_s)
+                                     : tr("%1 - %2").arg(i18n::locale().toString(from, u"MMM d, yyyy"_s),
+                                                         i18n::locale().toString(to, u"MMM d, yyyy"_s));
+    const QString groupBy = QStringList{u"item"_s, u"upc"_s, u"brand"_s, u"dept"_s, u"current"_s}.contains(by)
+                                ? by : kind == u"depts" ? u"dept"_s : u"item"_s;
+    const QString path = s_->legacyDb;
+    const QString id = u"ilsa-"_s + kind;
+
+    // ViewTouch's own checks on those days too (Daily Z, and the side-by-side on parallel beta days).
+    const bool withVt = kind == u"z" || kind == u"compare";
+    const std::int64_t va = QDateTime(from, QTime(0, 0)).toMSecsSinceEpoch();
+    const std::int64_t vb = QDateTime(to.addDays(1), QTime(0, 0)).toMSecsSinceEpoch();
+    auto history = withVt ? s_->history : decltype(s_->history){};
+    std::vector<Check> today_;
+    if (withVt)
+        for (const Check &c : s_->closedToday)
+            if (c.closedAt >= va && c.closedAt < vb)
+                today_.push_back(c);
+    const TaxRates rates = s_->settings.tax;
+
+    const int request = ++rangeRequest_;
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"label"_s, label}};
+    emit sessionChanged();
+
+    QPointer<PosService> self(this);
+    QThreadPool::globalInstance()->start([=, today_ = std::move(today_)]() mutable {
+        LegacyRead got;
+        got.status = legacy::status(path);
+        if (got.status.present) {
+            QString *e = &got.error;
+            if (kind == u"z" || kind == u"compare") {
+                got.ilsa = legacy::totals(path, a, b, e);
+                got.z = legacy::ilsaZ(path, a, b, e);
+            } else if (kind == u"depts") {
+                const QString d = groupBy == u"current" ? u"current"_s : u"dept"_s;
+                got.rows = legacy::groups(path, a, b, d, false, 0, nullptr, e);
+                got.lottery = legacy::groups(path, a, b, d, true, 0, nullptr, e);
+            } else if (kind == u"items") {
+                got.rows = legacy::groups(path, a, b, groupBy, false, kItemRows, &got.more, e);
+            } else if (kind == u"gpMonth" || kind == u"gpYear") {
+                got.periods = legacy::periods(path, a, b, kind == u"gpYear", e);
+            } else if (kind == u"differences") {
+                got.variances = legacy::variances(path, a, b, e);
+            }
+        }
+        if (withVt) {
+            std::vector<Check> checks = history ? history(va, vb) : std::vector<Check>{};
+            for (Check &c : today_)   // today's may not be written yet
+                if (std::ranges::none_of(checks, [&](const Check &x) { return x.id == c.id; }))
+                    checks.push_back(std::move(c));
+            got.vt = core::legacy::fromChecks(checks, rates);
+        }
+        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, got = std::move(got)] {
+            if (!self || request != self->rangeRequest_)
+                return;   // a newer request replaced it
+            const ReportContext ctx = self->reportContext(label);
+            const bool haveIlsa = got.ilsa.receipts + got.ilsa.notSales > 0;
+            const bool haveVt = got.vt.receipts > 0;
+            Report r;
+            if (kind == u"z") {
+                if (haveIlsa)
+                    r = core::legacy::dailyZ(got.ilsa, "ILSA", ctx);
+                if (haveVt) {
+                    const Report v = core::legacy::dailyZ(got.vt, "ViewTouch", ctx);
+                    if (!haveIlsa) {
+                        r = v;
+                    } else {
+                        r.title = "Daily Z (ILSA and ViewTouch)";
+                        r.section("ViewTouch's own checks, the same days");
+                        r.rows.insert(r.rows.end(), v.rows.begin(), v.rows.end());
+                    }
+                }
+                if (!haveIlsa && !haveVt) {
+                    r.id = "ilsa-z";
+                    r.title = "Daily Z";
+                    r.subtitle = ctx.period;
+                    r.columns = {"", "Amount"};
+                    r.note("No sales on those days, in the ILSA history or in ViewTouch.");
+                }
+            } else if (kind == u"compare") {
+                r = core::legacy::sideBySide(got.z, got.ilsa, haveVt ? &got.vt : nullptr, ctx);
+            } else if (kind == u"depts") {
+                r = core::legacy::departmentSales(got.rows, got.lottery, ctx, groupBy == u"current");
+            } else if (kind == u"items") {
+                r = core::legacy::itemMovement(got.rows, groupBy.toStdString(), got.more, ctx);
+            } else if (kind == u"gpMonth" || kind == u"gpYear") {
+                r = core::legacy::gpByPeriod(got.periods, kind == u"gpYear", ctx);
+            } else {
+                r = core::legacy::differences(got.variances, ctx);
+            }
+            if (!got.error.isEmpty())
+                r.note("Couldn't read all of the ILSA history: " + got.error.toStdString());
+            r.note(historyNote(got.status));
+            self->legacyReport_ = r;
+            self->rangeReport_ = {{u"loading"_s, false}, {u"id"_s, id}, {u"label"_s, label},
+                                  {u"report"_s, self->reportVariant(r)}};
+            emit self->sessionChanged();
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool PosService::printLegacyReport()
+{
+    if (!require(perm::Manager, tr("Printing reports")))
+        return false;
+    if (!s_->printer)
+        return fail(tr("No printer is set up."));
+    if (legacyReport_.rows.empty())
+        return fail(tr("Show an ILSA report first."));
+    s_->printer->printReport(s_->settings, legacyReport_, receiptPrinter());
+    emit notice(tr("Printing %1").arg(qs(legacyReport_.title)));
+    return true;
+}
+
+bool PosService::findLegacyReceipts(const QString &query, int offset)
+{
+    if (!require(perm::Settle, tr("Finding checks")))
+        return false;
+    const QString q = query.trimmed();
+    offset = std::max(0, offset);
+    const QString path = s_->legacyDb;
+    const int request = ++rangeRequest_;
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset}};
+    emit sessionChanged();
+    QPointer<PosService> self(this);
+    QThreadPool::globalInstance()->start([=] {
+        QString error;
+        const legacy::Status status = legacy::status(path);
+        std::vector<core::legacy::Receipt> hits;
+        if (status.present)
+            hits = legacy::findReceipts(path, q, kReceiptPage + 1, offset, &error);
+        QMetaObject::invokeMethod(self, [self, request, q, offset, status, error, hits = std::move(hits)] {
+            if (!self || request != self->rangeRequest_)
+                return;
+            QVariantList results;
+            for (std::size_t i = 0; i < hits.size() && int(i) < kReceiptPage; ++i) {
+                const core::legacy::Receipt &h = hits[i];
+                const QDateTime at = QDateTime::fromString(qs(h.at), u"yyyy-MM-dd HH:mm:ss"_s);
+                results.append(QVariantMap{{u"id"_s, qint64(h.id)}, {u"number"_s, qint64(h.number)},
+                                           {u"when"_s, at.isValid() ? i18n::locale().toString(at, u"ddd MMM d yyyy, h:mm AP"_s) : qs(h.day)},
+                                           {u"day"_s, qs(h.day)}, {u"total"_s, self->format(h.total)},
+                                           {u"mode"_s, h.mode}, {u"source"_s, qs(h.source)}});
+            }
+            QVariantMap out{{u"loading"_s, false}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset},
+                            {u"results"_s, results}, {u"more"_s, int(hits.size()) > kReceiptPage},
+                            {u"nextOffset"_s, offset + kReceiptPage}, {u"history"_s, qs(historyNote(status))}};
+            if (!error.isEmpty())
+                out.insert(u"error"_s, error);
+            self->rangeReport_ = out;
+            emit self->sessionChanged();
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool PosService::selectLegacyReceipt(qint64 id)
+{
+    if (!require(perm::Settle, tr("Finding checks")))
+        return false;
+    QString error;
+    const auto r = legacy::receipt(s_->legacyDb, id, &error);
+    if (!r)
+        return fail(tr("That ILSA receipt isn't in the history."));
+    QVariantMap out = rangeReport_;
+    out.insert(u"selected"_s, QVariantMap{{u"id"_s, qint64(r->id)}, {u"number"_s, qint64(r->number)},
+                                          {u"text"_s, qs(core::legacy::receiptText(*r, false))},
+                                          {u"hasDob"_s, !r->dob.empty()}, {u"mode"_s, r->mode}});
+    rangeReport_ = out;
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::reprintLegacyReceipt(qint64 id, bool withDob)
+{
+    if (!require(perm::Settle, tr("Printing receipts")))
+        return false;
+    if (!s_->printer)
+        return fail(tr("No printer is set up."));
+    QString error;
+    const auto r = legacy::receipt(s_->legacyDb, id, &error);
+    if (!r)
+        return fail(tr("That ILSA receipt isn't in the history."));
+    if (withDob) {   // as ILSA printed it, with the buyer's date of birth: the store's copy
+        if (r->dob.empty())
+            return fail(tr("No date of birth on ILSA receipt #%1.").arg(r->number));
+        if (s_->settings.dobReprintNeedsManager && !require(perm::Manager, tr("Reprinting with the date of birth")))
+            return false;
+    }
+    s_->printer->printReport(s_->settings, core::legacy::receiptReport(*r, withDob), receiptPrinter());
+    emit notice(tr("Printing ILSA receipt #%1").arg(r->number));
+    return true;
+}
+
+} // namespace vt::app

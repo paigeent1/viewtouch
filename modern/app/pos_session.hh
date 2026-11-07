@@ -714,6 +714,15 @@ public:
     Q_INVOKABLE void expoBump(qint64 checkId, qint64 sentAt) { invoke(QStringLiteral("expoBump"), {checkId, sentAt}); }
     Q_INVOKABLE void expoRecall() { invoke(QStringLiteral("expoRecall")); }
     Q_INVOKABLE void requestForecast(int daysAhead) { invoke(QStringLiteral("requestForecast"), {daysAhead}); }
+    // ILSA's sales history (PosService::requestLegacyReport...): answers in rangeReport.
+    Q_INVOKABLE void requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {})
+    {
+        invoke(QStringLiteral("requestLegacyReport"), {kind, from, to, by});
+    }
+    Q_INVOKABLE void printLegacyReport() { invoke(QStringLiteral("printLegacyReport")); }
+    Q_INVOKABLE void findLegacyReceipts(const QString &query, int offset = 0) { invoke(QStringLiteral("findLegacyReceipts"), {query, offset}); }
+    Q_INVOKABLE void selectLegacyReceipt(qint64 id) { invoke(QStringLiteral("selectLegacyReceipt"), {id}); }
+    Q_INVOKABLE void reprintLegacyReceipt(qint64 id, bool withDob) { invoke(QStringLiteral("reprintLegacyReceipt"), {id, withDob}); }
     Q_INVOKABLE void requestRangeReport(const QString &id, const QString &period, const QString &from = {},
                                         const QString &to = {}, bool compare = false)
     {

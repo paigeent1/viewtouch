@@ -91,6 +91,15 @@ Item {
                         onClicked: { w.days = modelData[0]; w.offsets = [0]; w.index = -1; w.load(0) }
                     }
                 }
+                Button {
+                    // The receipts imported from ILSA (read-only), over this screen.
+                    objectName: "lookupIlsa"
+                    text: qsTr("ILSA history")
+                    implicitHeight: w.unit * 2.4
+                    font.pixelSize: w.unit * 0.8
+                    palette.button: "#6b4e16"; palette.buttonText: "white"
+                    onClicked: w.ilsa = true
+                }
                 Item { Layout.fillWidth: true }
                 Button { text: qsTr("‹ Newer"); implicitHeight: w.unit * 2.4; font.pixelSize: w.unit * 0.8; enabled: w.offsets.length > 1
                          onClicked: { const o = w.offsets.slice(0, -1); w.offsets = o; w.index = -1; w.load(o[o.length - 1]) } }
@@ -158,6 +167,16 @@ Item {
                 }
             }
         }
+    }
+
+    // ILSA history: the imported ILSA receipts, read-only (WidgetLegacyReceipts).
+    property bool ilsa: false
+    WidgetLegacyReceipts {
+        anchors.fill: parent
+        z: 5
+        visible: w.ilsa
+        zone: w.zone
+        onClosed: w.ilsa = false
     }
 
     // Which copy to reprint.

@@ -22,6 +22,7 @@ add_library(vtm_core STATIC
     core/money.hh core/tax.hh core/menu.hh core/employee.hh core/check.hh core/settings.hh
     core/day.hh core/report.hh core/customer.hh core/waitlist.hh core/inventory.hh
     core/core.cpp core/report.cpp
+    core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
 )
 target_include_directories(vtm_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -64,6 +65,7 @@ if(Qt6_FOUND)
         app/i18n.hh app/i18n.cpp
         app/pos_service.hh app/pos_service.cpp
         app/pos_day.cpp app/pos_admin.cpp app/pos_admin_shared.hh app/pos_admin_fields.cpp app/pos_admin_records.cpp app/pos_admin_save.cpp app/pos_changes.cpp app/pos_checks.cpp app/pos_menu.cpp app/pos_customers.cpp app/pos_waitlist.cpp app/pos_inventory.cpp app/pos_schedule.cpp app/pos_demo.cpp app/pos_loyalty.cpp app/pos_age.cpp app/pos_kiosk.cpp app/pos_search.cpp app/pos_images.cpp app/pos_setup.cpp app/pos_punches.cpp app/pos_dashboard.cpp app/pos_kitchen.cpp app/pos_commands.cpp app/pos_store_check.cpp app/pos_requests.cpp app/pos_phone_orders.cpp app/pos_cards.cpp app/pos_holds.cpp app/pos_forecast.cpp app/pos_refunds.cpp app/pos_receipts.cpp app/pos_menu_builder.cpp app/ilsa_sync.hh app/ilsa_sync.cpp app/menu_import.hh app/menu_import.cpp app/menu_templates.cpp
+        app/legacy_history.hh app/legacy_history.cpp app/pos_legacy.cpp   # ILSA's sales history (ilsa-history.db)
     )
     target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core Qt6::Sql)   # Sql: the Labels screen reads the ILSA price book
     # Phrase files for the screens' languages (see app/i18n.hh)
@@ -179,6 +181,8 @@ if(Qt6_FOUND)
             ui/qml/WidgetScreenCheck.qml
             ui/qml/WidgetBillboards.qml
             ui/qml/WidgetReceiptLookup.qml
+            ui/qml/WidgetLegacyReceipts.qml
+            ui/qml/WidgetLegacyReports.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml
             ui/qml/GuestPageView.qml

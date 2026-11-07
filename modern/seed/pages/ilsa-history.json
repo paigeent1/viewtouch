@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "ilsa-history",
+  "name": "ILSA History",
+  "kind": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "manager",
+  "zones": [
+    {
+      "id": "ilsa-reports",
+      "kind": "legacyReports",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1888,
+        "h": 916
+      },
+      "shape": "rect",
+      "behavior": "none"
+    },
+    {
+      "id": "back",
+      "kind": "button",
+      "rect": {
+        "x": 1472,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "‹ Reports",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    }
+  ]
+}

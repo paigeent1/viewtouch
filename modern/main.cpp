@@ -1,4 +1,5 @@
 #include "app/ilsa_sync.hh"
+#include "app/legacy_history.hh"
 #include "app/pos_json.hh"
 #include "billboard.hh"
 #include "joincontroller.hh"
@@ -1010,6 +1011,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"bluetooth"},      // Bluetooth scanner (pair one with a tablet)
                 {u"hardware-config", u"screen-check"},   // Screen check (which monitor is the register)
                 {u"hardware-config", u"billboards"},     // Billboards (TVs with the guest-screen slides)
+                {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {
@@ -1237,6 +1239,8 @@ int runStore(const Args &cli, const Options &o)
             return vt::storage::punchesBetween(dbPath, from, to);
         };
     }
+    // ILSA's sales history, beside the database (scripts/bin/vt-ilsa-history writes it): read-only.
+    shared->legacyDb = vt::app::legacy::historyPath(dbPath);
 
     // Printing: a worker thread delivers tickets; "file" printers write under
     // <app data>/printouts so tickets are visible without hardware.

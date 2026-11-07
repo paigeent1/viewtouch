@@ -373,6 +373,9 @@ public:
     std::function<std::vector<core::Check>(const CheckFind &)> findChecks;
     // Refunds made in [from, to), whatever day their check was (range reports).
     std::function<std::vector<core::Refund>(std::int64_t from, std::int64_t to)> refundHistory;
+    // ILSA's sales history file (ilsa-history.db beside the database; set by main): read-only, for
+    // the ILSA History reports and Receipt Lookup (pos_legacy.cpp). Empty: none.
+    QString legacyDb;
 
     // The terminal's open drawer / its most recent one today.
     core::DrawerSession *openDrawerFor(const std::string &terminal);
@@ -1299,6 +1302,19 @@ public:
     bool requestForecast(int daysAhead);
     core::Report forecastReport(QDate target, const std::vector<core::Check> &checks, const core::ReportContext &ctx) const;
     QVariantMap reportVariant(const core::Report &r) const;   // as the screen shows it
+    // ILSA's sales history (pos_legacy.cpp; PosShared::legacyDb): kind z | depts | items | gpMonth |
+    // gpYear | compare | differences over the business days from..to (yyyy-MM-dd; to empty: one
+    // day); by (items): item | upc | brand | dept; (depts) dept: the department each line was sold in
+    // (owner 2026-11-07), current: the items' departments now (as ILSA's printouts). The answer comes
+    // in rangeReport ({id: ilsa-<kind>}).
+    bool requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {});
+    bool printLegacyReport();   // the one last shown
+    // Its receipts, read-only (Receipt Lookup > ILSA): found (rangeReport {id: ilsa-receipts, results,
+    // more, nextOffset}), one shown (selected: {id, number, text, hasDob}), reprinted (withDob: as ILSA
+    // printed it, the buyer's date of birth on it: Store Settings' dobReprintNeedsManager applies).
+    bool findLegacyReceipts(const QString &query, int offset = 0);
+    bool selectLegacyReceipt(qint64 id);
+    bool reprintLegacyReceipt(qint64 id, bool withDob = false);
 
     // Tips after tip-outs and pools (see core::tipShares), everyone / one person.
     std::map<std::string, core::TipShare> allTipShares() const;
@@ -1338,6 +1354,7 @@ private:
     QVariantMap rangeReport_;
     int rangeRequest_ = 0;
     core::Report forecast_;   // the forecast last shown (Print)
+    core::Report legacyReport_;   // the ILSA History report last shown (Print)
     QVariantMap checkSearch_;
     std::vector<core::Check> searchHits_;
     qint64 selectedHit_ = 0;
