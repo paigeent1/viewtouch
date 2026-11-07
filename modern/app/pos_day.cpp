@@ -52,7 +52,11 @@ QVariantMap toVariant(const Report &r)
 const QStringList kReportIds = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s, u"tips"_s,
                                 u"labor"_s, u"drawer"_s, u"expenses"_s, u"purchases"_s, u"audit"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s, u"kitchen"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s,
                                 u"exceptions"_s, u"deposit"_s, u"customers"_s,
-                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s};
+                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s};
+
+// "employee_items|cohiba": the Sales by Employee and Item report, only items matching "cohiba".
+bool isEmployeeItems(const QString &id) { return id == u"employee_items" || id.startsWith(u"employee_items|"); }
+std::string reportFilter(const QString &id) { return id.section(u'|', 1).trimmed().toStdString(); }
 
 } // namespace
 
@@ -1454,6 +1458,8 @@ Report PosService::buildReport(const QString &id) const
     const ReportContext ctx = reportContext(tr("Today, since %1").arg(clockText(s_->day.openedAt)));
     if (id == u"items")
         return itemSales(s_->closedToday, s_->menu, ctx);
+    if (isEmployeeItems(id))
+        return employeeItemSales(s_->closedToday, s_->menu, categories(), reportFilter(id), ctx);
     if (id == u"checklists")
         return checklistReport(ctx);
     if (id == u"servers")
@@ -1532,7 +1538,10 @@ Report PosService::buildReport(const QString &id) const
 namespace {
 const QStringList kRangeReports = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s,
                                    u"kitchen"_s, u"audit"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s, u"exceptions"_s, u"customers"_s,
-                                   u"royalty"_s, u"accounting"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s};
+                                   u"royalty"_s, u"accounting"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s,
+                                   u"employee_items"_s};
+// Over a range: the report's own id, without a filter ("employee_items|cohiba" -> "employee_items").
+bool rangeCapable(const QString &id) { return kRangeReports.contains(id.section(u'|', 0, 0)); }
 } // namespace
 
 Report PosService::rangeCapableReport(const QString &id, const std::vector<Check> &closed, const ReportContext &ctx,
@@ -1543,6 +1552,8 @@ Report PosService::rangeCapableReport(const QString &id, const std::vector<Check
         ptrs.push_back(&c);
     if (id == u"items")
         return itemSales(closed, s_->menu, ctx);
+    if (isEmployeeItems(id))
+        return employeeItemSales(closed, s_->menu, categories(), reportFilter(id), ctx);
     if (id == u"categories")
         return categorySales(closed, s_->menu, ctx);
     if (id == u"hourly")
@@ -1656,13 +1667,13 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
             if (!self || request != self->rangeRequest_)
                 return;   // a newer request replaced it
             const ReportContext ctx = self->reportContext(label);
-            Report r = self->rangeCapableReport(kRangeReports.contains(id) ? id : u"sales"_s, now, ctx,
+            Report r = self->rangeCapableReport(rangeCapable(id) ? id : u"sales"_s, now, ctx,
                                                 byDate ? &refundsNow : nullptr);
-            if (!kRangeReports.contains(id))
+            if (!rangeCapable(id))
                 r.note(tr("That report is one day at a time (pick Day). Showing sales.").toStdString());
             if (compare) {
                 const ReportContext was = self->reportContext(beforeLabel);
-                r = compareReports(r, self->rangeCapableReport(kRangeReports.contains(id) ? id : u"sales"_s, before, was,
+                r = compareReports(r, self->rangeCapableReport(rangeCapable(id) ? id : u"sales"_s, before, was,
                                                                byDate ? &refundsBefore : nullptr),
                                    beforeLabel.toStdString());
             }
@@ -1688,10 +1699,15 @@ QVariantMap PosService::report(const QString &id, qint64 dayId)
         return toVariant(buildReport(id));
     for (const PastDay &p : s_->pastDays) {
         if (p.day.id == dayId) {
-            const QJsonObject stored = p.reports.value(id).toObject();
+            // A closed day's reports were saved at End of Day, unfiltered.
+            const QJsonObject stored = p.reports.value(isEmployeeItems(id) ? u"employee_items"_s : id).toObject();
             if (stored.isEmpty())
                 return {{u"title"_s, tr("No report")}, {u"rows"_s, QVariantList()}};
-            return toVariant(reportFromJson(stored));
+            Report r = reportFromJson(stored);
+            if (!reportFilter(id).empty())
+                r.rows.insert(r.rows.begin(), ReportRow{ReportRow::Kind::Note,
+                    {tr("A past day shows every item; to filter, pick Dates… (that day to that day).").toStdString()}});
+            return toVariant(r);
         }
     }
     return {{u"title"_s, tr("No such day")}, {u"rows"_s, QVariantList()}};

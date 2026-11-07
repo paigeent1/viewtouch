@@ -137,6 +137,7 @@ void PosService::applyPromotions(Check &c)
         pay.kind = TenderKind::Discount;
         pay.amount = off;
         pay.reference = "promo:" + p->id;
+        stampPayment(pay);
         c.payments.push_back(pay);
     }
 }
@@ -351,6 +352,7 @@ bool PosService::redeemReward(int index)
     pay.kind = TenderKind::Discount;
     pay.amount = off;
     pay.reference = "reward:" + std::to_string(reward.points);
+    stampPayment(pay);
     c->payments.push_back(pay);
     r->points -= reward.points;
     saveCustomerRecord(*r);

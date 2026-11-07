@@ -121,6 +121,7 @@ bool PosService::sameAsLastTime()
             mod.made = false;
             mod.madeAt = 0;
         }
+        stampNewLine(copy);   // a new sale: rung by whoever is here now, at today's cost
         c->lines.push_back(copy);
         selectedLine_ = copy.id;
         added += copy.isComment() ? 0 : copy.quantity;

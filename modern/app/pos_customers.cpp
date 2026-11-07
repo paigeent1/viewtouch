@@ -697,6 +697,7 @@ bool PosService::sellGiftCard(const QString &number, qint64 amountCents, const Q
     card.taxClass = TaxClass::None;
     card.family = "giftcards";
     OrderLine &l = c->addItem(card);
+    stampNewLine(l);   // who sold the card (no cost)
     if (GiftCard *g = s_->giftCard(ss(n))) {
         if (!purchasedBy.trimmed().isEmpty()) g->purchasedBy = ss(purchasedBy.trimmed());
         if (!issuedTo.trimmed().isEmpty()) g->issuedTo = ss(issuedTo.trimmed());
@@ -752,6 +753,7 @@ bool PosService::payWithGiftCard(const QString &number, qint64 amountCents)
     if (amount.cents() <= 0)
         return fail(tr("Enter an amount."));
     Payment &p = c->addPayment(tenderOfKind(TenderKind::GiftCard, "gift", tr("Gift Card")), amount);
+    stampPayment(p);
     p.reference = g->number;
     g->post(now(), -amount, ss(tr("Paid check #%1").arg(c->id)), c->id, "spend");
     saveGiftCardRecord(*g);
@@ -777,6 +779,7 @@ bool PosService::chargeHouseAccount(Check &c, const Tender &t, Money amount)
     if (amount > r->accountRoom())
         return fail(tr("That's over %1's limit: %2 left on the account.").arg(qs(r->name), format(r->accountRoom())));
     Payment &p = c.addPayment(t, amount);
+    stampPayment(p);
     p.reference = r->id;
     r->post(now(), amount, ss(tr("Check #%1").arg(c.id)), c.id, "charge");
     saveCustomerRecord(*r);

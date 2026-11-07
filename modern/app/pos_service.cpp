@@ -1375,6 +1375,7 @@ bool PosService::addItem(const QString &idOrName)
         sub.price = item->substitutePrice;
         if (!target || !c.addModifier(target->id, sub, q))
             return fail(tr("Order the item it goes with first."));
+        stampModifier(target->modifiers.back());   // its cost now, frozen
         selectedLine_ = target->id;
     } else if (item->isModifier) {
         OrderLine *target = c.line(selectedLine_);
@@ -1384,6 +1385,7 @@ bool PosService::addItem(const QString &idOrName)
         modifier.price = extra(item->price);
         if (!target || !c.addModifier(target->id, modifier, q))
             return fail(tr("Order an item before adding %1.").arg(qs(item->name)));
+        stampModifier(target->modifiers.back());   // its cost now, frozen
         selectedLine_ = target->id;
     } else if (item->byWeight && entry_.isEmpty()) {
         // Sold by weight: the Weigh page asks how much (then addWeighed).
@@ -1397,6 +1399,7 @@ bool PosService::addItem(const QString &idOrName)
             priced.name += " (" + ss(i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(item->eventAt),
                                                          u"ddd MMM d, h:mm AP"_s)) + ")";
         OrderLine &line = c.addItem(priced, q);
+        stampNewLine(line);   // who rang it, when, and its cost at the time of sale
         // Retail items go to the humidor's printer/screen for a runner, never to the kitchen; until the store
         // has a humidor printer or station, nowhere.
         if (isRetailItem(*item) && (line.printer.empty() || line.printer == "kitchen") && line.station.empty()) {
@@ -1653,6 +1656,7 @@ bool PosService::anotherRound()
         copy.unshare();   // another of it, whole
         copy.sent = copy.voided = copy.made = copy.served = false;
         copy.sentAt = copy.madeAt = copy.servedAt = 0;
+        stampNewLine(copy);   // a new sale: rung by whoever is here now, at today's cost
         c->lines.push_back(copy);
         selectedLine_ = copy.id;
         added += copy.quantity;
@@ -1732,6 +1736,7 @@ bool PosService::repeatLine(qint64 lineId)
     copy.unshare();
     copy.sent = copy.voided = copy.made = copy.served = false;
     copy.sentAt = copy.madeAt = copy.servedAt = 0;
+    stampNewLine(copy);   // a new sale: rung by whoever is here now, at today's cost
     c->lines.push_back(copy);
     selectedLine_ = copy.id;
     choosingLine_ = 0;
@@ -1937,6 +1942,7 @@ bool PosService::tender(const QString &tenderId, std::optional<std::int64_t> amo
     if (t->kind == TenderKind::Discount && !require(perm::Discount, tr("Discounts and comps")))
         return false;
     Payment &paid = c->addPayment(*t, amount);
+    stampPayment(paid);   // who took it on this terminal
     if (t->staffMeal) {   // whose meal: the person ringing it in
         paid.reference = user()->name;
         noteEvent(*c, tr("Staff meal: %1").arg(qs(user()->name)), "discount");
@@ -2004,6 +2010,7 @@ bool PosService::discountPercent(qint64 percentBp, bool item)
     t.name = ss(item ? (comp ? tr("Comp: %1").arg(qs(l->displayName())) : tr("%1 (%2)").arg(pct, qs(l->displayName())))
                      : (comp ? tr("Comp (sale)") : tr("%1 (sale)").arg(pct)));
     Payment &p = c->addPayment(t, Money());
+    stampPayment(p);
     if (l)
         p.lineId = l->id;
     entry_.clear();
@@ -2041,6 +2048,7 @@ bool PosService::customDiscount(bool percent)
     t.percentBp = percent ? typed * 100 : 0;
     t.name = ss(percent ? tr("%1% off").arg(typed) : tr("%1 off").arg(format(Money::fromCents(typed))));
     Payment &p = c->addPayment(t, Money());
+    stampPayment(p);
     if (!percent)
         p.amount = Money::fromCents(typed);
     entry_.clear();

@@ -176,6 +176,7 @@ bool PosService::chooseOption(const QString &groupId, int index)
             if (linked->kitchenHide || where(linked->printer) != where(l->printer))
                 m.kitchenHide = true;
         }
+        stampModifier(m);   // its cost now (the linked item's), frozen
         // Keep the group's choices together, in the order of the groups.
         l->modifiers.push_back(m);
     }

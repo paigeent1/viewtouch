@@ -8,6 +8,7 @@
 #include "core/menu.hh"
 #include "core/tax.hh"
 
+#include <cmath>
 #include <algorithm>
 #include <cstdlib>
 
@@ -256,6 +257,21 @@ Money OrderLine::wholeTotal() const
     for (const Modifier &m : modifiers)
         each += m.price();
     return each * quantity;
+}
+
+std::optional<Money> OrderLine::costAtSale() const
+{
+    bool known = costKnown;
+    double each = double(unitCost.cents());
+    for (const Modifier &m : modifiers) {
+        known = known || m.costKnown;
+        each += double(m.unitCost.cents());
+    }
+    if (!known)
+        return std::nullopt;
+    // As the stock it uses: the counted pieces, by weight the weight (the recipe is per unit).
+    const double times = double(counted()) * (weight > 0 ? double(weight) / 1000.0 : 1.0);
+    return Money::fromCents(std::llround(each * times));
 }
 
 OrderLine *Check::line(std::int64_t lineId)

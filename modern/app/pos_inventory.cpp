@@ -204,12 +204,111 @@ QVariantList PosService::overFoodCost() const
     return out;
 }
 
-Money PosService::lineCost(const OrderLine &l) const
+std::optional<Money> PosService::itemCostNow(const MenuItem &m) const
 {
+    // The Menu Builder's cost (retail: cigars, merchandise; ILSA's cost) first.
+    for (const RecipeLine &rl : m.recipe)
+        if (rl.ingredientId == "__cost__" && rl.quantity > 0.0)
+            return Money::fromCents(std::llround(rl.quantity * 100.0));
+    // Else its recipe, at today's ingredient costs (only real ingredients count).
+    bool any = false;
     double cents = 0;
-    for (const auto &[id, q] : stockUse(l))
-        if (const Ingredient *g = const_cast<PosShared *>(s_)->ingredient(id))
-            cents += q * double(g->cost.cents());
+    for (const RecipeLine &rl : m.recipe) {
+        if (rl.ingredientId.starts_with("__"))
+            continue;
+        if (const Ingredient *g = const_cast<PosShared *>(s_)->ingredient(rl.ingredientId)) {
+            any = true;
+            cents += rl.quantity * double(g->cost.cents());
+        }
+    }
+    if (!any)
+        return std::nullopt;
+    return Money::fromCents(std::llround(cents));
+}
+
+void PosService::stampModifier(Modifier &m) const
+{
+    m.costKnown = false;
+    m.unitCost = Money();
+    const MenuItem *item = m.itemId.empty() ? nullptr : findItem(qs(m.itemId));
+    if (!item)
+        return;
+    if (const std::optional<Money> cost = itemCostNow(*item)) {
+        m.costKnown = true;
+        m.unitCost = Money::fromCents(std::llround(double(cost->cents()) * qualifierFactor(m.qualifier)));
+    }
+}
+
+std::pair<std::string, std::string> PosService::ringer() const
+{
+    // The employee logged in on this terminal; the self-order kiosk has nobody.
+    const Employee *u = user();
+    if (selfOrder_ || (u && u->role == "kiosk"))
+        return {std::string(), std::string("Kiosk")};
+    return {u ? u->id : std::string(), u ? u->name : std::string()};
+}
+
+void PosService::stampPayment(Payment &p) const
+{
+    std::tie(p.takenById, p.takenByName) = ringer();
+    p.at = now();
+}
+
+void PosService::stampNewLine(OrderLine &l) const
+{
+    // Who rang it, and when.
+    std::tie(l.addedById, l.addedByName) = ringer();
+    l.addedAt = now();
+    // Its cost now, frozen: later cost changes never alter this sale.
+    l.costKnown = false;
+    l.unitCost = Money();
+    if (!l.isComment() && !l.isGiftCard() && !l.isFee()) {
+        if (const MenuItem *item = findItem(qs(l.itemId))) {
+            if (const std::optional<Money> cost = itemCostNow(*item)) {
+                l.costKnown = true;
+                l.unitCost = l.qualifier == Qualifier::No ? Money() : *cost;
+            }
+        }
+    }
+    for (Modifier &m : l.modifiers)
+        stampModifier(m);
+}
+
+Money PosService::lineCost(const OrderLine &l, int *source) const
+{
+    if (source)
+        *source = 0;
+    if (l.isComment() || l.isGiftCard() || l.isFee())
+        return Money();
+    // Cost at the time of sale (the owner's rule: reports build from what it cost when it was sold).
+    if (const std::optional<Money> atSale = l.costAtSale()) {
+        if (source)
+            *source = 2;
+        return *atSale;
+    }
+    // A line rung before costs were kept: its item's (and modifiers') cost today.
+    bool any = false;
+    double cents = 0;
+    const double qty = l.counted() * (l.weight > 0 ? l.weight / 1000.0 : 1.0);
+    if (const MenuItem *m = findItem(qs(l.itemId))) {
+        if (const std::optional<Money> c = itemCostNow(*m)) {
+            any = true;
+            cents += double(c->cents()) * qty * (l.qualifier == Qualifier::No ? 0 : 1);
+        }
+    }
+    for (const Modifier &mo : l.modifiers) {
+        const MenuItem *m = mo.itemId.empty() ? nullptr : findItem(qs(mo.itemId));
+        if (!m)
+            continue;
+        if (const std::optional<Money> c = itemCostNow(*m)) {
+            any = true;
+            cents += double(c->cents()) * qty * qualifierFactor(mo.qualifier);
+        }
+    }
+    if (!any)
+        return Money();
+    if (source)
+        *source = 1;
     return Money::fromCents(std::llround(cents));
 }
 
@@ -221,18 +320,33 @@ Report PosService::foodCostReport(const std::vector<Check> &closed, const Report
     r.subtitle = ctx.period;
     r.columns = {"Item", "Sold", "Sales", "Cost", "Cost %"};
 
-    struct Row { std::string name; int sold = 0; Money sales, cost; };
+    struct Row { std::string name; int sold = 0; Money sales, cost; bool today = false; };
     std::map<std::string, Row> rows;
-    const auto costOf = [&](const OrderLine &l) { return lineCost(l); };
+    // Cost at the time of sale (frozen on each line when it was rung); lines rung before that was
+    // kept: the item's cost today (marked); no cost at all: "-".
+    int todays = 0, noCost = 0;
+    const auto costOf = [&](const OrderLine &l, Row &row) {
+        int source = 0;
+        const Money cost = lineCost(l, &source);
+        if (source == 1) {
+            ++todays;
+            row.today = true;
+        } else if (source == 0) {
+            ++noCost;
+        }
+        return cost;
+    };
     for (const Check &c : closed) {
+        if (c.training)
+            continue;
         for (const OrderLine &l : c.lines) {
-            if (l.voided || l.isComment() || l.isGiftCard())
+            if (l.voided || l.isComment() || l.isGiftCard() || l.isFee())
                 continue;
             Row &row = rows[l.itemId];
             row.name = l.name;
             row.sold += l.counted();
             row.sales += l.total();
-            row.cost += costOf(l);
+            row.cost += costOf(l, row);
         }
     }
     const auto percent = [](Money part, Money whole) {
@@ -249,13 +363,19 @@ Report PosService::foodCostReport(const std::vector<Check> &closed, const Report
     else
         r.section("Sold");
     for (const Row *row : sorted) {
-        r.line({row->name, std::to_string(row->sold), ctx.money(row->sales),
+        r.line({row->name + (row->today ? " +" : ""), std::to_string(row->sold), ctx.money(row->sales),
                 row->cost.cents() ? ctx.money(row->cost) : "-", row->cost.cents() ? percent(row->cost, row->sales) : "-"});
         sales += row->sales;
         cost += row->cost;
     }
-    if (!sorted.empty())
+    if (!sorted.empty()) {
         r.total({"All", "", ctx.money(sales), ctx.money(cost), percent(cost, sales)});
+        r.note("Cost: what each item cost when it was sold (kept on the sale line).");
+        if (todays > 0)
+            r.note(std::to_string(todays) + " line(s) sold before costs were kept on the sale (marked +): their item's cost today.");
+        if (noCost > 0)
+            r.note(std::to_string(noCost) + " line(s) with no cost (no cost or recipe on the item): not counted in Cost.");
+    }
 
     if (const QVariantList over = overFoodCost(); !over.isEmpty()) {
         r.section("Prices to look at");
@@ -300,7 +420,7 @@ Report PosService::menuEngineeringReport(const std::vector<Check> &closed, const
             continue;
         Row &row = families[m.family][m.id];
         row.name = m.name;
-        row.costed = !m.recipe.empty();
+        row.costed = itemCostNow(m).has_value();
     }
     for (const Check &c : closed) {
         if (c.training)
@@ -314,10 +434,11 @@ Report PosService::menuEngineeringReport(const std::vector<Check> &closed, const
             Row &row = families[m->family.empty() ? std::string("other") : m->family][l.itemId];
             if (row.name.empty())
                 row.name = l.name;
-            row.costed = row.costed || !m->recipe.empty();
+            int source = 0;   // cost at the time of sale; old lines: today's
+            row.cost += lineCost(l, &source);
+            row.costed = row.costed || source != 0;
             row.sold += l.counted();
             row.sales += l.total();
-            row.cost += lineCost(l);
         }
     }
     std::map<std::string, std::string> names;
@@ -383,7 +504,8 @@ Report PosService::menuEngineeringReport(const std::vector<Check> &closed, const
         r.note("Sells well: at least 70% of an even share of its category. Earns well: at least the category's "
                "average, after food cost.");
         if (uncosted)
-            r.note("* No recipe: its food cost isn't counted (Manager -> Inventory).");
+            r.note("* No cost or recipe: its cost isn't counted (Manager -> Inventory, or the item's cost).");
+        r.note("Earned: sales less what each sold item cost when it was sold (older sales: its cost today).");
     }
     return r;
 }

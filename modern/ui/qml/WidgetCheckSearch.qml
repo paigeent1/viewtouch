@@ -297,9 +297,14 @@ Item {
                                 Label {
                                     Layout.fillWidth: true
                                     visible: text !== ""
-                                    text: detailRow.type === "line" ? (detailRow.modelData.modifiers ?? "")
+                                    // Who rang each line and who took each payment (older checks: not kept).
+                                    text: detailRow.type === "line"
+                                          ? [detailRow.modelData.modifiers ?? "",
+                                             detailRow.modelData.by ? qsTr("rung by %1 %2").arg(detailRow.modelData.by).arg(detailRow.modelData.byWhen ?? "") : ""]
+                                                .filter(x => x).join("  ·  ")
                                         : detailRow.type === "payment"
-                                          ? [detailRow.modelData.tip ? qsTr("tip %1").arg(detailRow.modelData.tip) : "",
+                                          ? [detailRow.modelData.by ? qsTr("taken by %1 %2").arg(detailRow.modelData.by).arg(detailRow.modelData.byWhen ?? "") : "",
+                                             detailRow.modelData.tip ? qsTr("tip %1").arg(detailRow.modelData.tip) : "",
                                              detailRow.modelData.change ? qsTr("change given %1").arg(detailRow.modelData.change) : "",
                                              detailRow.modelData.refunded ? qsTr("%1 refunded").arg(detailRow.modelData.refunded) : ""]
                                                 .filter(x => x).join("  ·  ")

@@ -38,7 +38,8 @@ Item {
     readonly property var reportIds: [
         { id: "sales", label: qsTr("Sales") }, { id: "items", label: qsTr("Items") },
         { id: "categories", label: qsTr("Categories") }, { id: "hourly", label: qsTr("By Hour") },
-        { id: "servers", label: qsTr("Servers") }, { id: "tips", label: qsTr("Tips") },
+        { id: "servers", label: qsTr("Servers") }, { id: "employee_items", label: qsTr("By Employee") },
+        { id: "tips", label: qsTr("Tips") },
         { id: "labor", label: qsTr("Labor") },
         { id: "drawer", label: qsTr("Drawer") }, { id: "expenses", label: qsTr("Expenses") }, { id: "purchases", label: qsTr("Purchases") }, { id: "stock", label: qsTr("Stock") }, { id: "audit", label: qsTr("Audit") },
         { id: "exceptions", label: qsTr("Exceptions") }, { id: "changes", label: qsTr("Changes") }, { id: "deposit", label: qsTr("Deposit") }, { id: "customers", label: qsTr("Customers") },
@@ -53,6 +54,12 @@ Item {
         { id: "drivers", label: qsTr("Drivers") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
+    // Sales by Employee and Item: only items whose name, UPC or category has this text.
+    property string itemFilter: ""
+    readonly property bool isEmployeeItems: reportId === "employee_items"
+    // What is asked of the server: "employee_items|cohiba" carries the filter.
+    readonly property string requestId: isEmployeeItems && itemFilter.trim() !== ""
+                                        ? "employee_items|" + itemFilter.trim() : reportId
     readonly property bool isGiftCardReport: reportId === "accounts" || reportId.indexOf("gc_") === 0
     readonly property var gcModes: [
         { id: "accounts", label: qsTr("Summary") },
@@ -91,7 +98,7 @@ Item {
             return
         if (period === "custom" && (fromDate === "" || toDate === ""))
             return
-        pos.requestRangeReport(reportId, period, fromDate, toDate, compare)
+        pos.requestRangeReport(requestId, period, fromDate, toDate, compare)
     }
     onReportIdChanged: refresh()
     onPeriodChanged: refresh()
@@ -108,7 +115,7 @@ Item {
         // terminals) the server's answer arrives. Compared, not just read:
         // an unused read is compiled away.
         if (!pos.day || !pos.drawer || pos.queryRevision < 0) return ({ rows: [] })
-        return pos.report(reportId, day.id)
+        return pos.report(requestId, day.id)
     }
 
     ColumnLayout {
@@ -226,6 +233,36 @@ Item {
             }
         }
 
+        // Sales by Employee and Item: an item, a category or any text (Enter or Show).
+        RowLayout {
+            visible: w.isEmployeeItems
+            Layout.fillWidth: true
+            Layout.fillHeight: false
+            spacing: w.unit * 0.4
+            Text { text: qsTr("Item, category or text"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
+            TextField {
+                id: itemFilterField
+                objectName: "employeeItemsFilter"
+                Layout.fillWidth: true
+                placeholderText: qsTr("all items")
+                onAccepted: { w.itemFilter = text; w.refresh() }
+            }
+            WidgetKey {
+                Layout.preferredWidth: w.unit * 5
+                Layout.preferredHeight: Math.max(w.unit * 2, w.zone ? w.zone.touch(46) : 0)
+                text: qsTr("Show")
+                fontScale: 0.34
+                onClicked: { w.itemFilter = itemFilterField.text; w.refresh() }
+            }
+            WidgetKey {
+                Layout.preferredWidth: w.unit * 5
+                Layout.preferredHeight: Math.max(w.unit * 2, w.zone ? w.zone.touch(46) : 0)
+                text: qsTr("Clear")
+                fontScale: 0.34
+                onClicked: { itemFilterField.text = ""; w.itemFilter = ""; w.refresh() }
+            }
+        }
+
         // Dates… : from and to.
         RowLayout {
             visible: w.period === "custom"
@@ -305,7 +342,7 @@ Item {
                 Layout.fillHeight: true
                 text: qsTr("Print")
                 fontScale: 0.36
-                onClicked: w.pos.printReport(w.reportId, w.day.id)
+                onClicked: w.pos.printReport(w.requestId, w.day.id)
             }
             WidgetKey {
                 Layout.preferredWidth: w.unit * 4

@@ -1252,8 +1252,22 @@ public:
     QVariantList lowStock() const;
     core::Report foodCostReport(const std::vector<core::Check> &closed, const core::ReportContext &ctx) const;
     core::Report menuEngineeringReport(const std::vector<core::Check> &closed, const core::ReportContext &ctx) const;
-    // What a line's recipe costs (its ingredients' cost; none without a recipe).
-    Money lineCost(const core::OrderLine &l) const;
+    // What a line cost: its cost at the time of sale when it has one (costAtSale), else (lines rung before
+    // costs were kept) its item's cost today. `source` (when given): 2 at the time of sale, 1 today's
+    // (an old line), 0 no cost at all.
+    Money lineCost(const core::OrderLine &l, int *source = nullptr) const;
+    // An item's cost today: the Menu Builder cost (__cost__, retail), else its recipe at today's
+    // ingredient costs; nullopt when it has neither.
+    std::optional<Money> itemCostNow(const core::MenuItem &m) const;
+    // A line just rung in (or another round of one): who rang it on this terminal and when, and its
+    // cost (and its modifiers') frozen from the menu as it is now.
+    void stampNewLine(core::OrderLine &l) const;
+    // A modifier just put on a line: its cost now (its linked item's), frozen.
+    void stampModifier(core::Modifier &m) const;
+    // A payment just added (tender, discount, gift card, card reader): who took it on this terminal, and when.
+    void stampPayment(core::Payment &p) const;
+    // Who is ringing on this terminal: {id, name}; the self-order kiosk: {"", "Kiosk"}.
+    std::pair<std::string, std::string> ringer() const;
     // A menu item's recipe at today's costs, and the items over the store's
     // food cost target: {name, price, cost, percent, suggested} (most over first).
     Money recipeCost(const core::MenuItem &m) const;

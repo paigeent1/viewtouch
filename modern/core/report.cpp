@@ -410,6 +410,136 @@ Report serverSales(const std::vector<Check> &closed, const ReportContext &ctx)
     return r;
 }
 
+Report employeeItemSales(const std::vector<Check> &closed, const std::vector<MenuItem> &menu,
+                         const std::vector<MenuCategory> &categories, const std::string &filter,
+                         const ReportContext &ctx)
+{
+    Report r;
+    r.id = "employee_items";
+    r.title = "Sales by Employee and Item";
+    r.subtitle = ctx.period;
+    r.columns = {"Item", "Qty", "Sales"};
+
+    const auto lower = [](std::string t) {
+        for (char &ch : t)
+            ch = char(std::tolower(static_cast<unsigned char>(ch)));
+        return t;
+    };
+    const std::string want = lower(filter);
+    std::map<std::string, const MenuItem *> items;
+    for (const MenuItem &m : menu)
+        items[m.id] = &m;
+    std::map<std::string, std::string> categoryName;
+    for (const MenuCategory &c : categories)
+        categoryName[c.id] = c.name;
+    // The filter: any part of the item's name, id, a UPC, or its category's id or name.
+    const auto matches = [&](const OrderLine &l) {
+        if (want.empty())
+            return true;
+        const auto has = [&](const std::string &text) { return lower(text).find(want) != std::string::npos; };
+        if (has(l.name) || has(l.itemId) || has(l.upc))
+            return true;
+        const auto it = items.find(l.itemId);
+        if (it == items.end())
+            return false;
+        const MenuItem &m = *it->second;
+        if (has(m.name) || has(m.family))
+            return true;
+        if (const auto c = categoryName.find(m.family); c != categoryName.end() && has(c->second))
+            return true;
+        return std::ranges::any_of(m.barcodes, has);
+    };
+
+    struct Tally { std::int64_t qty = 0; Money sales; };
+    struct Person { std::string name; std::map<std::string, Tally> items; Money sales; std::int64_t qty = 0; };
+    std::map<std::string, Person> people;   // key: employee id (or "server:<id>", "kiosk") -> what they rang
+    bool anyServer = false;
+    // Checks where someone besides the server rang a line or took the closing payment.
+    struct Shared { const Check *check; std::string cashier; std::set<std::string> others; };
+    std::vector<Shared> shared;
+    for (const Check &c : closed) {
+        if (c.training)
+            continue;
+        // Cashed out by: whoever took its last payment that pays (not a discount).
+        std::string cashier;
+        for (const Payment &p : c.payments)
+            if (p.kind != TenderKind::Discount)
+                cashier = p.takenByName.empty() && !p.takenById.empty() ? p.takenById : p.takenByName;
+        Shared mine{&c, cashier, {}};
+        bool counted = false;
+        for (const OrderLine &l : c.lines) {
+            if (l.voided || l.isComment() || l.isGiftCard() || l.isFee() || !matches(l))
+                continue;
+            counted = true;
+            if ((!l.addedById.empty() && l.addedById != c.serverId) || (l.addedById.empty() && !l.addedByName.empty()))
+                mine.others.insert(l.addedByName.empty() ? l.addedById : l.addedByName);
+            std::string key, name;
+            if (!l.addedById.empty()) {
+                key = l.addedById;
+                name = l.addedByName.empty() ? l.addedById : l.addedByName;
+            } else if (!l.addedByName.empty()) {   // the self-order kiosk
+                key = "~" + l.addedByName;
+                name = l.addedByName;
+            } else {   // rung before who rang it was kept: the check's server
+                key = c.serverId.empty() ? std::string("server:") + c.serverName : c.serverId;
+                name = (c.serverName.empty() ? std::string("(unknown)") : c.serverName) + " (server)";
+                anyServer = true;
+            }
+            Person &p = people[key];
+            if (p.name.empty() || l.addedById == key)   // their name as they rang it
+                p.name = name;
+            Tally &t = p.items[l.name];
+            t.qty += l.counted();
+            t.sales += l.total();
+            p.qty += l.counted();
+            p.sales += l.total();
+        }
+        if (counted && (!mine.others.empty() || (!cashier.empty() && cashier != c.serverName)))
+            shared.push_back(std::move(mine));
+    }
+    if (!want.empty())
+        r.note("Only items matching \"" + filter + "\" (name, UPC or category).");
+    if (people.empty()) {
+        r.note("No sales yet.");
+        return r;
+    }
+    std::vector<const Person *> sorted;
+    for (const auto &[key, p] : people)
+        sorted.push_back(&p);
+    std::ranges::sort(sorted, [](const Person *a, const Person *b) { return a->name < b->name; });
+    Money all;
+    std::int64_t allQty = 0;
+    for (const Person *p : sorted) {
+        r.section(p->name);
+        std::vector<std::pair<std::string, Tally>> rows(p->items.begin(), p->items.end());
+        std::ranges::stable_sort(rows, [](const auto &a, const auto &b) { return a.second.sales > b.second.sales; });
+        for (const auto &[item, t] : rows)
+            r.line({item, count(t.qty), ctx.money(t.sales)});
+        r.total({p->name + " total", count(p->qty), ctx.money(p->sales)});
+        all += p->sales;
+        allQty += p->qty;
+    }
+    r.total({"All employees", count(allQty), ctx.money(all)});
+    if (!shared.empty()) {
+        // Server: who opened it (or it was transferred to). Rung by: the others who added lines.
+        r.section("Checks worked by more than one person");
+        for (const Shared &s : shared) {
+            std::string others;
+            for (const std::string &o : s.others)
+                others += (others.empty() ? "" : ", ") + o;
+            r.line({s.check->label + " #" + std::to_string(s.check->id) + "  server " +
+                        (s.check->serverName.empty() ? std::string("(unknown)") : s.check->serverName) +
+                        (others.empty() ? std::string() : "  rung by " + others),
+                    "", s.cashier.empty() ? std::string("-") : "cashed out by " + s.cashier});
+        }
+    }
+    r.note("Sales: each line's own price with its choices (gross), before check discounts and tax. "
+           "Voided lines, gift cards and fees left out. Credit goes to whoever rang the line in.");
+    if (anyServer)
+        r.note("(server): lines rung before the register kept who rang each line, counted for the check's server.");
+    return r;
+}
+
 Report driverReport(const std::vector<Check> &closed, const ReportContext &ctx)
 {
     Report r;

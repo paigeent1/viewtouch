@@ -97,6 +97,8 @@ QJsonObject toJson(const Check &c)
                 mo.insert(u"made"_s, true);
                 mo.insert(u"madeAt"_s, qint64(m.madeAt));
             }
+            if (m.costKnown)   // cost at the time of sale; absent: unknown (not 0)
+                mo.insert(u"unitCost"_s, qint64(m.unitCost.cents()));
             mods.append(mo);
         }
         QJsonObject lo{
@@ -152,17 +154,35 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"shareOf"_s, l.shareOf);
             lo.insert(u"shareGroup"_s, qint64(l.shareGroup));
         }
+        // Cost at the time of sale: absent on old lines (unknown, not 0).
+        if (l.costKnown)
+            lo.insert(u"unitCost"_s, qint64(l.unitCost.cents()));
+        // Who rang it in, and when.
+        if (!l.addedById.empty())
+            lo.insert(u"addedById"_s, qs(l.addedById));
+        if (!l.addedByName.empty())
+            lo.insert(u"addedByName"_s, qs(l.addedByName));
+        if (l.addedAt != 0)
+            lo.insert(u"addedAt"_s, qint64(l.addedAt));
         lines.append(lo);
     }
     QJsonArray payments;
     for (const Payment &p : c.payments) {
-        payments.append(QJsonObject{
+        QJsonObject po{
             {u"id"_s, qint64(p.id)}, {u"tenderId"_s, qs(p.tenderId)}, {u"tenderName"_s, qs(p.tenderName)},
             {u"kind"_s, qs(toString(p.kind))}, {u"amount"_s, qint64(p.amount.cents())}, {u"percentBp"_s, qint64(p.percentBp)},
             {u"tip"_s, qint64(p.tip.cents())}, {u"reference"_s, qs(p.reference)}, {u"staffMeal"_s, p.staffMeal},
             {u"processor"_s, qs(p.processor)}, {u"cardBrand"_s, qs(p.cardBrand)}, {u"last4"_s, qs(p.last4)},
             {u"offline"_s, qs(p.offline)}, {u"lineId"_s, qint64(p.lineId)},
-        });
+        };
+        // Who took it and when: absent on old payments (unknown).
+        if (!p.takenById.empty())
+            po.insert(u"takenById"_s, qs(p.takenById));
+        if (!p.takenByName.empty())
+            po.insert(u"takenByName"_s, qs(p.takenByName));
+        if (p.at != 0)
+            po.insert(u"at"_s, qint64(p.at));
+        payments.append(po);
     }
     QJsonArray events;
     for (const CheckEvent &e : c.events) {
@@ -273,6 +293,11 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.share = lo.value(u"share").toInt();
         l.shareOf = lo.value(u"shareOf").toInt();
         l.shareGroup = i64(lo.value(u"shareGroup"));
+        l.costKnown = lo.contains(u"unitCost");
+        l.unitCost = l.costKnown ? money(lo.value(u"unitCost")) : Money();
+        l.addedById = ss(lo.value(u"addedById").toString());
+        l.addedByName = ss(lo.value(u"addedByName").toString());
+        l.addedAt = i64(lo.value(u"addedAt"));
         for (const QJsonValue &mv : lo.value(u"modifiers").toArray()) {
             const QJsonObject mo = mv.toObject();
             l.modifiers.push_back({ss(mo.value(u"itemId").toString()), ss(mo.value(u"name").toString()),
@@ -281,6 +306,10 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
                                    ss(mo.value(u"group").toString()), ss(mo.value(u"kitchenName").toString()),
                                    mo.value(u"kitchenHide").toBool(), ss(mo.value(u"station").toString()),
                                    mo.value(u"made").toBool(), i64(mo.value(u"madeAt"))});
+            if (mo.contains(u"unitCost")) {
+                l.modifiers.back().costKnown = true;
+                l.modifiers.back().unitCost = money(mo.value(u"unitCost"));
+            }
         }
         c.lines.push_back(l);
     }
@@ -301,6 +330,9 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         p.cardBrand = ss(po.value(u"cardBrand").toString());
         p.last4 = ss(po.value(u"last4").toString());
         p.offline = ss(po.value(u"offline").toString());
+        p.takenById = ss(po.value(u"takenById").toString());
+        p.takenByName = ss(po.value(u"takenByName").toString());
+        p.at = i64(po.value(u"at"));
         c.payments.push_back(p);
     }
     c.nextLineId = std::max<std::int64_t>(i64(o.value(u"nextLineId")), 1);

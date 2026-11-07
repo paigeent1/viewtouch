@@ -32,6 +32,9 @@ struct Modifier {
     std::string station;
     bool made = false;
     std::int64_t madeAt = 0;
+    // Its cost when it was chosen (the linked item's), frozen like OrderLine::unitCost.
+    Money unitCost;
+    bool costKnown = false;
 
     Money price() const { return qualifiedPrice(unitPrice, qualifier); }
     std::string displayName() const { return qualifierPrefix(qualifier) + name; }
@@ -84,6 +87,18 @@ struct OrderLine {
     int share = 0;
     int shareOf = 0;
     std::int64_t shareGroup = 0;
+    // Cost at the time of sale (the item's cost when it was rung: Menu Builder cost, else its recipe at
+    // that day's ingredient costs), one unit (by weight: per weightUnit), the item only (modifiers keep
+    // their own). Never changed afterwards (repricing, reopen, transfer, merge keep it). costKnown false:
+    // a line rung before costs were kept, or an item with no cost; reports say so.
+    Money unitCost;
+    bool costKnown = false;
+    // Who rang it in, on that terminal, and when (epoch ms). Kept through transfer, move, merge, split,
+    // reopen and void (spiffs: the humidor attendant who sold it on a server's check gets the credit).
+    // Self-order kiosk: no id, name "Kiosk". Old lines: empty (reports use the check's server). Not printed.
+    std::string addedById;
+    std::string addedByName;
+    std::int64_t addedAt = 0;
 
     bool isComment() const { return itemId.empty(); }
     std::string printerOf() const { return printer.empty() ? std::string("kitchen") : printer; }
@@ -115,6 +130,9 @@ struct OrderLine {
     Money total() const;
     // The whole item, before it was shared.
     Money wholeTotal() const;
+    // Cost at the time of sale for what this line counts (counted() x weight, modifiers included,
+    // "No" on the item leaves its own cost out); nullopt when neither it nor a modifier had a cost.
+    std::optional<Money> costAtSale() const;
     bool operator==(const OrderLine &) const = default;
 };
 
@@ -153,6 +171,12 @@ struct Payment {
     // reach Stripe (reference: "offline:<id>"), "declined" by the bank once
     // it did, "seen" when a manager has dealt with that. Empty: online.
     std::string offline;
+    // Who took it (the employee logged in on that terminal when it was added: a tender, a discount, a
+    // gift card, a card on a reader) and when (epoch ms). Kept through reopen and transfer. Old payments:
+    // empty / 0 (unknown). The self-order kiosk: no id, name "Kiosk".
+    std::string takenById;
+    std::string takenByName;
+    std::int64_t at = 0;
 
     bool operator==(const Payment &) const = default;
 };

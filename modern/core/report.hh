@@ -90,6 +90,13 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx,
                     const std::vector<Refund> *refunds = nullptr);
 Report itemSales(const std::vector<Check> &closed, const std::vector<MenuItem> &menu, const ReportContext &ctx);
 Report serverSales(const std::vector<Check> &closed, const ReportContext &ctx);
+// Sales by employee and item (spiffs): each line counted for whoever rang it in (OrderLine::addedBy; the
+// kiosk as "Kiosk"; lines from before that was kept: the check's server, marked "(server)"). Qty and gross
+// sales per line, voided lines, gift cards and fees left out, totals per employee. `filter`: empty, or text
+// matched (any case) against the item's name, id, UPCs and its category's id or name.
+Report employeeItemSales(const std::vector<Check> &closed, const std::vector<MenuItem> &menu,
+                         const std::vector<MenuCategory> &categories, const std::string &filter,
+                         const ReportContext &ctx);
 // Deliveries by driver: how many, their sales, delivery fees, tips, and how
 // long they were out on average.
 Report driverReport(const std::vector<Check> &closed, const ReportContext &ctx);

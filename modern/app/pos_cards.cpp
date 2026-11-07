@@ -123,6 +123,7 @@ bool PosService::addCardPayment(const QVariantMap &r)
     if (amount.cents() <= 0)
         return fail(tr("The card reader approved nothing."));
     Payment &paid = c.addPayment(*t, amount);
+    stampPayment(paid);   // who took it on this terminal
     paid.tip = tip;
     paid.reference = ss(reference);
     paid.processor = ss(r.value(u"processor"_s).toString());

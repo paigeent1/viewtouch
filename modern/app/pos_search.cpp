@@ -216,7 +216,9 @@ QVariantMap PosService::checkSearch() const
                 mods << qs(m.displayName());
             lines.append(QVariantMap{{u"name"_s, qs(l.displayName())}, {u"quantity"_s, l.quantity},
                                      {u"price"_s, l.isComment() ? QString() : format(l.voided ? Money() : l.total())},
-                                     {u"voided"_s, l.voided}, {u"modifiers"_s, mods.join(u", "_s)}});
+                                     {u"voided"_s, l.voided}, {u"modifiers"_s, mods.join(u", "_s)},
+                                     // who rang it in, and when (empty on old lines)
+                                     {u"by"_s, qs(l.addedByName)}, {u"byWhen"_s, l.addedAt ? when(l.addedAt) : QString()}});
         }
         QVariantList payments;
         for (const Payment &p : c.payments) {
@@ -239,7 +241,9 @@ QVariantMap PosService::checkSearch() const
                                         {u"refundable"_s, refundable}, {u"leftCents"_s, qint64(left.cents())},
                                         {u"left"_s, format(left)},
                                         {u"how"_s, p.processor == "stripe" ? u"stripe"_s
-                                                   : p.kind == TenderKind::Cash ? u"cash"_s : u"record"_s}});
+                                                   : p.kind == TenderKind::Cash ? u"cash"_s : u"record"_s},
+                                        // who took it, and when (empty on old payments)
+                                        {u"by"_s, qs(p.takenByName)}, {u"byWhen"_s, p.at ? when(p.at) : QString()}});
         }
         // Everything that happened to it, oldest first: the audit trail.
         QVariantList events;
