@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 12:16 ET — Bob (Claude) — Billboard: store ribbon with logo across the top
+- **What:** Billboard.qml: while showing, a ribbon across the top in the store's colour with its logo (or its name), as on the guest screen; slides fill the space below it.
+- **Why:** Owner 2026-11-07 on fire5: add the blue ribbon and logo to the top of the billboard.
+- **Files:** (none)
+
 ### 2026-11-07 12:12 ET — Bob (Claude) — Release: ILSA sales history import and ILSA History reports
 - **What:** main fast-forwarded to bob/ilsa-history: scripts/bin/vt-ilsa-history imports ILSA receipts (one copy per day, oldest copy first) into ~/ilsa-history/ilsa-history.db; Reports > ILSA History (Daily Z, Departments, Item Movement, GP by month/year, ILSA vs ViewTouch, ILSA Differences); Look Up Checks > ILSA history. Deleted items named from other copies' item lists. CI 42393400608: only main's known failing cases.
 - **Why:** Owner: full ILSA history 2006-2026 with reports to compare against his ILSA printouts.

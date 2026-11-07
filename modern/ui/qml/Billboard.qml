@@ -7,7 +7,8 @@ import QtQuick.Layouts
 // customer. The same timing as the guest screen (WidgetGuestMessages.qml): each message 7 seconds,
 // each picture 10, a video to its end (its sound only if its slide has #sound and this billboard
 // isn't muted). No slides: the store's logo (or its name). Outside its hours (Hardware
-// Configuration > Billboards, by the store's clock): black, nothing drawn, no video.
+// Configuration > Billboards, by the store's clock): black, nothing drawn, no video. Across the top
+// while showing: the store's ribbon (its colour and logo), as on the guest screen.
 // The only way out: five taps in the top-left corner, or five presses of the remote's Back or OK
 // within 4 seconds, then a manager's PIN (the remote's arrows and OK, or its number keys).
 ApplicationWindow {
@@ -88,9 +89,36 @@ ApplicationWindow {
         NumberAnimation { target: slide; property: "opacity"; to: 1; duration: 350 }
     }
 
+    // The store's ribbon across the top, as on the guest screen: its colour, its logo (or its name).
+    Rectangle {
+        id: ribbon
+        visible: !root.dark
+        anchors { left: parent.left; right: parent.right; top: parent.top }
+        height: root.u * 3.4
+        color: root.accent
+        Image {
+            id: ribbonLogo
+            visible: source != ""
+            anchors { left: parent.left; leftMargin: root.u; verticalCenter: parent.verticalCenter }
+            height: parent.height * 0.75
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            source: root.billboard.revision < 0 ? "" : root.billboard.logoUrl
+        }
+        Text {
+            visible: !ribbonLogo.visible
+            anchors { left: parent.left; leftMargin: root.u; verticalCenter: parent.verticalCenter }
+            text: root.billboard.storeName
+            color: "white"
+            font.family: "DejaVu Sans"
+            font.pixelSize: root.u * 1.6
+            font.bold: true
+        }
+    }
+
     Item {
         id: slide
-        anchors.fill: parent
+        anchors { left: parent.left; right: parent.right; top: ribbon.bottom; bottom: parent.bottom }
         visible: !root.dark
         readonly property string shown: root.slides.length ? root.slides[root.index % root.slides.length] : ""
         readonly property string current: shown !== "" && root.usable(shown) ? shown : ""
