@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 11:25 ET — Bob (Claude) — ILSA vs ViewTouch: ViewTouch's GP from each line's cost at the time of sale
+- **What:** On top of bob/audit (lines now keep their cost when rung): the Daily Z and ILSA vs ViewTouch for ViewTouch's own checks count each line's cost at the time of sale (OrderLine::costAtSale); lines without one count as no-cost lines, as in ILSA's history. Branch bob/ilsa-history rebased onto bob/audit.
+- **Why:** Owner 2026-11-07: GP from the cost at the time of sale for ViewTouch days too; coordinator: rebase onto bob/audit (its build fix).
+- **Files:** `modern/core/legacy_sales.cpp`
+- **Next person must know:** ViewTouch lines don't keep their department at the time of sale yet (owner 2026-11-07: departments when sold): a ViewTouch Departments report needs that field on the line first.
+
 ### 2026-11-07 11:24 ET — Bob (Claude) — ILSA History reports and ILSA receipts in Look Up Checks
 - **What:** Reports > ILSA History (new page ilsa-history; its button is added to existing stores' Reports page): Daily Z (an ILSA day; ViewTouch's own checks that day too), Departments (department when sold by default; 'As ILSA: item's current department' to match the printouts), Item Movement by item / UPC / brand / department, GP by month and by year, ILSA vs ViewTouch (ILSA's saved Z, the imported receipts, ViewTouch's checks, with variance columns), ILSA Differences; Print, CSV, PDF. GP twice: as ILSA (lines without a cost at cost = retail, Adjusted Cost = Cost + Buydowns) and without no-cost lines. Look Up Checks gets an 'ILSA history' button: old receipts by day, receipt #, UPC (with or without the lost leading 0), total or name, shown as ILSA printed them and marked ILSA; reprint as ILSA printed it (with the date of birth; the manager rule applies) or without. Tests in tests/test_legacy.cpp on the importer's made-up fixture.
 - **Why:** Owner 2026-11-07: compare ViewTouch's reports with his most-used ILSA reports (Daily Z, sales by department with GP, item movement, GP by month / year); ILSA's GP counts dept 260 open rings at 0% margin, so both GPs are shown and labelled.

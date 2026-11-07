@@ -166,7 +166,7 @@ std::string tenderGroup(const Payment &p)
 ZTotals fromChecks(const std::vector<Check> &closed, const TaxRates &rates)
 {
     ZTotals z;
-    z.costKnown = false;
+    z.costKnown = false;   // until a line has its cost at the time of sale
     std::map<std::string, Money> byTender;
     std::vector<std::string> order;
     Money change;
@@ -197,6 +197,13 @@ ZTotals fromChecks(const std::vector<Check> &closed, const TaxRates &rates)
             } else if (!l.itemId.empty() && !l.isGiftCard()) {
                 z.units += l.quantity;
                 ++z.itemLines;
+                // Cost at the time of sale (kept on each line since 2026-11-07); none: a no-cost line.
+                if (const std::optional<Money> c = l.costAtSale()) {
+                    z.cost += *c;
+                    z.costKnown = true;
+                } else {
+                    z.noCostSales += l.total();
+                }
             }
         }
         for (const Refund &r : c.refunds) {
@@ -269,7 +276,7 @@ Report dailyZ(const ZTotals &t, const std::string &source, const ReportContext &
         r.line({"No-cost retail (open rings)", ctx.money(t.noCostSales)});
         r.line({"GP% without no-cost lines", gpTrue(t.merchandise, t.cost, t.noCostSales, t.promotions, t.discounts)});
     } else {
-        r.note("No cost per line on ViewTouch's checks yet: GP comes with the cost kept at the time of sale.");
+        r.note("No cost at the time of sale on these checks (lines rung before costs were kept): no GP.");
     }
     if (source != "ViewTouch")
         r.note("From the imported ILSA history: not in today's drawers, X/Z or end of day.");
