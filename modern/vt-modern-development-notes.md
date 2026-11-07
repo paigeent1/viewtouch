@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 11:46 ET — Bob (Claude) — Release: ILSA price sync, sale-line audit trail, By Employee report
+- **What:** main fast-forwarded to bob/audit: ILSA price book sync every 15 minutes inside ViewTouch (prices, new items, barcodes, LAST_COST as cost; names never changed), sale lines keep cost at time of sale and who rang them, payments keep who took them, Reports > By Employee (Sales by Employee and Item, for spiffs), vt-changes-import-cleanup loads the 2026-11-06 cleanup into the Changes report, vt-server Qt Multimedia fixes. CI 42390739830: only main's 28 known failing cases.
+- **Why:** Owner asked for automatic ILSA sync and audit trail (who rang each line for spiff contests).
+- **Files:** (none)
+- **Next person must know:** Owner runs on the Pi: pull + vt-server, tablets, then vt-changes-import-cleanup between sales.
+
 ### 2026-11-07 11:19 ET — Bob (Claude) — Fix By Employee report build
 - **What:** The Sales by Employee and Item report now gets the menu's categories from the shared store (s_->categories()); the build stopped on two calls that couldn't find them.
 - **Why:** CI build of bob/audit failed to compile pos_day.cpp.
