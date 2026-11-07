@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace vt::print {
@@ -32,8 +33,16 @@ struct TicketContext {
     }
 };
 
+// The top of every receipt: the logo (when ctx has one), the store name, Store Settings' receipt
+// header lines, a blank line.
+void receiptHeader(Document &d, const TicketContext &ctx);
+
 // Customer receipt (legacy SubCheck::PrintReceipt).
 Document receipt(const core::Check &check, const TicketContext &ctx);
+
+// An ILSA receipt from the imported history (core::legacy::receiptRows: left, right; ("-", "-") a
+// rule), under the same header as ViewTouch's receipts.
+Document legacyReceipt(const std::vector<std::pair<std::string, std::string>> &rows, const TicketContext &ctx);
 
 // A self-order kiosk's slip: the order number, big, to show at the
 // counter; the name, what was ordered and the total; `sent`: being made.
