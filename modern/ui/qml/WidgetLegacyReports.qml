@@ -6,7 +6,8 @@ import QtQuick.Layouts
 // read-only. Daily Z (an ILSA day, or ViewTouch's own checks that day), sales by department, item
 // movement (by item, UPC, brand, department), GP by month and by year (as ILSA counted it, and
 // without the lines that have no cost), ILSA's own Z beside the imported receipts and ViewTouch's
-// days, and the days ILSA's Z and its receipts disagree. props.report picks the first report.
+// days, the days ILSA's Z and its receipts disagree, sales by employee and item (ILSA cashiers tied
+// to ViewTouch employees on Cashiers). props.report picks the first report.
 Item {
     id: w
     property ZoneItem zone
@@ -20,7 +21,8 @@ Item {
         { id: "z", label: qsTr("Daily Z") }, { id: "depts", label: qsTr("Departments") },
         { id: "items", label: qsTr("Item Movement") }, { id: "gpMonth", label: qsTr("GP by Month") },
         { id: "gpYear", label: qsTr("GP by Year") }, { id: "compare", label: qsTr("ILSA vs ViewTouch") },
-        { id: "differences", label: qsTr("ILSA Differences") }
+        { id: "differences", label: qsTr("ILSA Differences") }, { id: "employees", label: qsTr("By Employee") },
+        { id: "cashiers", label: qsTr("Cashiers") }
     ]
     readonly property var groupings: [
         { id: "item", label: qsTr("Item") }, { id: "upc", label: qsTr("UPC") },
@@ -33,6 +35,9 @@ Item {
     ]
     property string kind: zone && zone.props && zone.props.report ? zone.props.report : "z"
     property string by: "item"
+    // By Employee: an item, UPC, brand or department; with ViewTouch's own sales too.
+    property string employeeFilter: ""
+    property bool withViewTouch: true
     // Departments: the one each line was sold in (owner 2026-11-07), or as ILSA's printouts (the
     // items' departments now).
     property string deptBy: "dept"
@@ -61,13 +66,16 @@ Item {
     }
     function refresh() {
         if (w.pos && w.fromDate !== "")
-            w.pos.requestLegacyReport(w.kind, w.fromDate, w.toDate, w.kind === "depts" ? w.deptBy : w.by)
+            w.pos.requestLegacyReport(w.kind, w.fromDate, w.toDate,
+                                      w.kind === "depts" ? w.deptBy
+                                      : w.kind === "employees" ? (w.withViewTouch ? "vt|" : "|") + w.employeeFilter : w.by)
     }
     // Asked a moment later, not while the page is being built (the answer changes rangeReport,
     // which bindings here read: asking from inside a binding update is a binding loop).
     onKindChanged: Qt.callLater(refresh)
     onByChanged: Qt.callLater(refresh)
     onDeptByChanged: Qt.callLater(refresh)
+    onWithViewTouchChanged: Qt.callLater(refresh)
     Component.onCompleted: Qt.callLater(refresh)
 
     readonly property var range: pos ? pos.rangeReport : ({})
@@ -76,6 +84,9 @@ Item {
                                  : ({ title: mine && range.loading ? qsTr("Reading the ILSA history…") : "", rows: [] })
     readonly property int valueColumns: Math.max(1, (report.columns ?? []).length - 1)
     readonly property real valueWidth: Math.min(w.unit * 6.5, (w.width - w.unit * 12) / valueColumns)
+    readonly property var cashiers: mine && w.kind === "cashiers" ? (range.cashiers ?? []) : []
+    readonly property var staff: mine && w.kind === "cashiers" ? (range.employees ?? []) : []
+    property var picking: null   // the cashier whose employee is being chosen
 
     ColumnLayout {
         anchors.fill: parent
@@ -123,6 +134,42 @@ Item {
                     baseColor: w.by === modelData.id ? "#1f8a4c" : "#2b3340"
                     onClicked: w.by = modelData.id
                 }
+            }
+        }
+
+        // By Employee: which items, and ViewTouch's own sales beside ILSA's.
+        RowLayout {
+            visible: w.kind === "employees"
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.fillHeight: false
+            spacing: w.unit * 0.3
+            Text { text: qsTr("Item, UPC, brand or department"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
+            TextField {
+                id: employeeFilterField
+                objectName: "ilsaEmployeeFilter"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: w.zone ? w.zone.touch(48) : 48
+                font.pixelSize: w.unit * 0.8
+                placeholderText: qsTr("all items")
+                onAccepted: { w.employeeFilter = text; Qt.callLater(w.refresh) }
+            }
+            WidgetKey {
+                Layout.preferredWidth: w.unit * 4.5
+                Layout.fillHeight: true
+                text: qsTr("Show")
+                fontScale: 0.34
+                onClicked: { w.employeeFilter = employeeFilterField.text; Qt.callLater(w.refresh) }
+            }
+            WidgetKey {
+                objectName: "ilsaWithViewTouch"
+                Layout.preferredWidth: w.unit * 9
+                Layout.fillHeight: true
+                text: qsTr("+ ViewTouch sales")
+                fontScale: 0.32
+                baseColor: w.withViewTouch ? "#1f8a4c" : "#2b3340"
+                onClicked: w.withViewTouch = !w.withViewTouch
             }
         }
 
@@ -266,9 +313,63 @@ Item {
             }
         }
 
+        // Cashiers: each ILSA cashier, and the ViewTouch employee they are (touch to choose).
+        ListView {
+            id: cashierList
+            objectName: "ilsaCashiers"
+            visible: w.kind === "cashiers"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            spacing: 4
+            ScrollBar.vertical: TouchScrollBar { id: cashierBar }
+            model: w.cashiers
+            delegate: Rectangle {
+                id: crow
+                required property var modelData
+                width: ListView.view.width - Math.max(28, cashierBar.room + 14)
+                height: w.keyH * 1.3
+                radius: 4
+                color: "#2b3340"
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: w.unit * 0.6
+                    anchors.rightMargin: w.unit * 0.4
+                    spacing: w.unit * 0.5
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Text { text: crow.modelData.label ?? ""; color: w.ink; font.family: w.face; font.bold: true; font.pixelSize: w.unit * 0.9; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Text {
+                            text: qsTr("%1 receipts, %2, %3 to %4 (%5)").arg(crow.modelData.receipts ?? 0).arg(crow.modelData.sales ?? "")
+                                      .arg(crow.modelData.first ?? "").arg(crow.modelData.last ?? "").arg(crow.modelData.source ?? "")
+                            color: "#a9b4c6"; font.family: w.face; font.pixelSize: w.unit * 0.7; elide: Text.ElideRight; Layout.fillWidth: true
+                        }
+                    }
+                    WidgetKey {
+                        objectName: "ilsaCashierPick-" + (crow.modelData.sourceId ?? 0) + "-" + (crow.modelData.number ?? 0)
+                        Layout.preferredWidth: w.unit * 14
+                        Layout.preferredHeight: w.keyH
+                        text: (crow.modelData.employeeId ?? "") !== "" ? crow.modelData.employeeName : qsTr("Former employee")
+                        fontScale: 0.32
+                        baseColor: (crow.modelData.employeeId ?? "") !== "" ? "#1f8a4c" : "#5b4a2a"
+                        onClicked: { w.picking = crow.modelData; pickEmployee.open() }
+                    }
+                }
+            }
+            Label {
+                anchors.centerIn: parent
+                visible: cashierList.count === 0
+                text: w.mine && w.range.loading ? qsTr("Reading the ILSA history…") : qsTr("No ILSA cashiers yet (import the history first).")
+                font.pixelSize: w.unit
+                opacity: 0.7
+            }
+        }
+
         ListView {
             id: rows
             objectName: "ilsaRows"
+            visible: w.kind !== "cashiers"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -330,6 +431,67 @@ Item {
                 text: w.mine && w.range.loading ? qsTr("Reading the ILSA history…") : ""
                 font.pixelSize: w.unit
                 opacity: 0.7
+            }
+        }
+    }
+
+    // Which ViewTouch employee an ILSA cashier is.
+    Popup {
+        id: pickEmployee
+        objectName: "ilsaPickEmployee"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        padding: w.unit
+        width: Math.min(w.width * 0.8, w.unit * 30)
+        height: Math.min(w.height * 0.9, w.unit * 34)
+        contentItem: ColumnLayout {
+            spacing: w.unit * 0.5
+            Label {
+                Layout.fillWidth: true
+                text: w.picking ? qsTr("Who is %1 in ViewTouch?").arg(w.picking.label) : ""
+                font.pixelSize: w.unit * 1.0; font.bold: true
+                wrapMode: Text.WordWrap
+            }
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 4
+                model: w.staff
+                delegate: WidgetKey {
+                    required property var modelData
+                    width: ListView.view.width
+                    height: w.keyH
+                    text: (modelData.name ?? "") + ((modelData.active ?? true) ? "" : qsTr(" (inactive)"))
+                    fontScale: 0.34
+                    baseColor: w.picking && w.picking.employeeId === modelData.id ? "#1f8a4c" : "#343c49"
+                    onClicked: {
+                        const c = w.picking
+                        pickEmployee.close()
+                        if (c) w.pos.setLegacyCashier(c.sourceId, c.number, modelData.id)
+                    }
+                }
+            }
+            WidgetKey {
+                objectName: "ilsaFormerEmployee"
+                Layout.fillWidth: true
+                Layout.preferredHeight: w.keyH
+                text: qsTr("Former employee (not in ViewTouch)")
+                fontScale: 0.32
+                baseColor: "#5b4a2a"
+                onClicked: {
+                    const c = w.picking
+                    pickEmployee.close()
+                    if (c) w.pos.setLegacyCashier(c.sourceId, c.number, "")
+                }
+            }
+            WidgetKey {
+                Layout.fillWidth: true
+                Layout.preferredHeight: w.keyH
+                text: qsTr("Cancel")
+                fontScale: 0.32
+                onClicked: pickEmployee.close()
             }
         }
     }

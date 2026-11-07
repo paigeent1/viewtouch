@@ -1304,11 +1304,15 @@ public:
     QVariantMap reportVariant(const core::Report &r) const;   // as the screen shows it
     // ILSA's sales history (pos_legacy.cpp; PosShared::legacyDb): kind z | depts | items | gpMonth |
     // gpYear | compare | differences over the business days from..to (yyyy-MM-dd; to empty: one
-    // day); by (items): item | upc | brand | dept; (depts) dept: the department each line was sold in
+    // day; or week | lastWeek | month | lastMonth | year | day:<business day id>); kinds employees (by:
+    // "vt|<filter>" with ViewTouch's sales, "|<filter>" without) and cashiers too; by (items): item | upc | brand | dept; (depts) dept: the department each line was sold in
     // (owner 2026-11-07), current: the items' departments now (as ILSA's printouts). The answer comes
     // in rangeReport ({id: ilsa-<kind>}).
     bool requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {});
     bool printLegacyReport();   // the one last shown
+    // Reports > ILSA History > Cashiers: ILSA cashier `number` of copy `sourceId` is ViewTouch employee
+    // `employeeId` (empty: a former employee); their ILSA sales then show under that name in By Employee.
+    bool setLegacyCashier(int sourceId, int number, const QString &employeeId);
     // Its receipts, read-only (Receipt Lookup > ILSA): found (rangeReport {id: ilsa-receipts, results,
     // more, nextOffset}), one shown (selected: {id, number, text, hasDob}), reprinted (withDob: as ILSA
     // printed it, the buyer's date of birth on it: Store Settings' dobReprintNeedsManager applies).

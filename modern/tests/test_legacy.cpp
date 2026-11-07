@@ -272,3 +272,101 @@ TEST_CASE("ILSA History on the Reports screen and in Receipt Lookup", "[legacy][
     // History only: nothing of it in today's sales.
     CHECK(pos.shared()->closedToday.empty());
 }
+
+TEST_CASE("ILSA history: cashiers tied to ViewTouch employees, sales by employee and item", "[legacy]")
+{
+    QTemporaryDir dir;
+    const QString path = makeHistory(dir);
+    // Made-up cashiers: 3 and 4 in the newer copy, 2 in the older one.
+    auto list = app::legacy::cashiers(path);
+    REQUIRE(list.size() == 3);
+    CHECK(list[0].number == 2);
+    CHECK(list[0].name == "Test Cashier Two");
+    const auto three = std::ranges::find_if(list, [](const auto &c) { return c.number == 3; });
+    REQUIRE(three != list.end());
+    const int source = three->sourceId;
+    CHECK(three->receipts == 2);                         // 9001, 9002 (Oct 27)
+    CHECK(three->sales == Money::fromCents(1500));       // net of tax
+    CHECK(three->employeeId.empty());                    // not tied yet: a former employee
+    CHECK(core::legacy::cashierLabel(*three) == "Test Cashier Three (ILSA cashier 3)");
+
+    // Not tied: shown as the ILSA cashier.
+    auto rows = app::legacy::employeeItems(path, u"2026-10-27"_s, u"2026-10-27"_s, {});
+    REQUIRE(rows.size() == 1);                           // the cigar (lottery left out)
+    CHECK(rows[0].who == "Test Cashier Three (ILSA cashier 3) (former employee)");
+
+    QString error;
+    REQUIRE(app::legacy::setCashier(path, source, 3, "emp-7", "Pat Example", &error));
+    list = app::legacy::cashiers(path);
+    CHECK(std::ranges::find_if(list, [](const auto &c) { return c.number == 3; })->employeeName == "Pat Example");
+    rows = app::legacy::employeeItems(path, u"2026-10-27"_s, u"2026-10-28"_s, {});
+    // Cashier 3 on Oct 27 (the cigar, $10), cashier 4 on Oct 28.
+    const auto pat = std::ranges::find_if(rows, [](const auto &r) { return r.key == "emp-7"; });
+    REQUIRE(pat != rows.end());
+    CHECK(pat->who == "Pat Example");
+    CHECK(pat->item == "MADE UP CIGAR ROBUSTO");
+    CHECK(pat->sales == Money::fromCents(1000));
+    CHECK(app::legacy::employeeItems(path, u"2026-10-27"_s, u"2026-10-28"_s, u"lighter"_s).empty());   // voided: left out
+    CHECK(app::legacy::employeeItems(path, u"2026-10-27"_s, u"2026-10-28"_s, u"cigars"_s).size() == 2); // by department
+
+    // The same employee's ViewTouch sales go with theirs.
+    core::Check c;
+    c.status = core::CheckStatus::Closed;
+    core::OrderLine l;
+    l.itemId = "robusto";
+    l.name = "Robusto";
+    l.unitPrice = Money::fromCents(1200);
+    l.quantity = 2;
+    l.addedById = "emp-7";
+    l.addedByName = "Pat Example";
+    c.lines.push_back(l);
+    const std::vector<core::Check> checks{c};
+    core::PosSettings settings;
+    const core::ReportContext ctx{settings, "Oct 27 - Oct 28, 2026"};
+    const core::Report r = core::legacy::employeeSales({*pat}, &checks, "", ctx);
+    CHECK(r.find("Pat Example total") == std::vector<std::string>{"Pat Example total", "3", "$34.00"});
+    CHECK(r.find("  of which in ILSA").back() == "$10.00");
+    CHECK(r.find("Robusto") == std::vector<std::string>{"Robusto", "2", "$24.00"});
+
+    // Untied again: a former employee.
+    REQUIRE(app::legacy::setCashier(path, source, 3, "", "", &error));
+    list = app::legacy::cashiers(path);
+    CHECK(std::ranges::find_if(list, [](const auto &x) { return x.number == 3; })->employeeId.empty());
+}
+
+TEST_CASE("ILSA History > Cashiers and By Employee on the screen", "[legacy][reports]")
+{
+    QTemporaryDir dir;
+    PosService pos(test::seedPosData(), nullptr);
+    pos.shared()->legacyDb = makeHistory(dir);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.requestLegacyReport(u"cashiers"_s, u"2000-01-01"_s, u"2026-12-31"_s));
+    REQUIRE(waitFor(pos));
+    const QVariantList cashiers = pos.rangeReport()[u"cashiers"_s].toList();
+    REQUIRE(cashiers.size() == 3);
+    const QVariantList staff = pos.rangeReport()[u"employees"_s].toList();
+    REQUIRE_FALSE(staff.isEmpty());
+    const QVariantMap who = staff.first().toMap();
+    QVariantMap three;
+    for (const QVariant &v : cashiers)
+        if (v.toMap()[u"number"_s].toInt() == 3)
+            three = v.toMap();
+    REQUIRE(pos.setLegacyCashier(three[u"sourceId"_s].toInt(), 3, who[u"id"_s].toString()));
+    REQUIRE(waitFor(pos));
+    bool tied = false;
+    for (const QVariant &v : pos.rangeReport()[u"cashiers"_s].toList())
+        tied = tied || (v.toMap()[u"number"_s].toInt() == 3 && v.toMap()[u"employeeId"_s] == who[u"id"_s]);
+    CHECK(tied);
+    CHECK_FALSE(pos.setLegacyCashier(1, 3, u"no-such-employee"_s));
+
+    REQUIRE(pos.requestLegacyReport(u"employees"_s, u"2026-10-27"_s, u"2026-10-28"_s, u"vt|"_s));
+    REQUIRE(waitFor(pos));
+    const QVariantMap report = pos.rangeReport()[u"report"_s].toMap();
+    CHECK(pos.rangeReport()[u"id"_s] == u"ilsa-employees"_s);
+    CHECK(cells(report, who[u"name"_s].toString() + u" total"_s).value(2) == u"$10.00"_s);
+    // The Reports screen's By Employee asks with its period.
+    CHECK(pos.requestLegacyReport(u"employees"_s, u"month"_s, {}, u"vt|"_s));
+    REQUIRE(waitFor(pos));
+    CHECK(pos.requestLegacyReport(u"employees"_s, u"day:0"_s, {}, u"vt|"_s));
+    REQUIRE(waitFor(pos));
+}

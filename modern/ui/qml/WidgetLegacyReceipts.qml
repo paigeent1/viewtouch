@@ -139,7 +139,7 @@ Rectangle {
                         Item { Layout.fillWidth: true }
                         Label { text: row.modelData.when ?? ""; color: row.index === w.index ? "#ffe066" : "white"; font.pixelSize: w.unit * 0.95; font.bold: true }
                     }
-                    TapHandler { onTapped: w.choose(row.index) }
+                    TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.choose(row.index) } }
                 }
                 Label {
                     anchors.centerIn: parent

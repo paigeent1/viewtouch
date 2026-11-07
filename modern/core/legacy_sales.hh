@@ -99,6 +99,29 @@ struct UnnamedItem {
     std::string first, last;   // days
 };
 
+// An ILSA cashier of one imported copy, and the ViewTouch employee they are (empty: a former employee).
+struct Cashier {
+    int sourceId = 0;
+    std::string source;          // the ILSA copy
+    int number = 0;              // ILSA's cashier number
+    std::string name;            // as ILSA had it (empty: the copy had no cashier list)
+    std::int64_t receipts = 0;   // sales receipts
+    Money sales;                 // net of tax
+    std::string first, last;     // days
+    std::string employeeId, employeeName;
+};
+// How a cashier is shown when not mapped: "Name (ILSA cashier 3)", or "ILSA cashier 3".
+std::string cashierLabel(const Cashier &c);
+
+// What an ILSA cashier sold of one item (By Employee). key: the ViewTouch employee id when mapped
+// (their ViewTouch sales go with it), else "ilsa:<source>:<number>".
+struct EmployeeItemRow {
+    std::string key, who;
+    std::string item, upc;
+    double qty = 0;
+    Money sales;
+};
+
 // An old receipt, read-only, as ILSA rang it.
 struct ReceiptLine {
     std::string name, upc, kind;   // kind: item | entry | promo | payout | other
@@ -156,6 +179,15 @@ Report gpByPeriod(const std::vector<PeriodRow> &rows, bool byYear, const ReportC
 // imported receipts and, when given, ViewTouch's own checks on the same days.
 Report sideBySide(const std::map<std::string, std::int64_t> &ilsaZ, const ZTotals &imported,
                   const ZTotals *viewtouch, const ReportContext &ctx);
+// ILSA's cashiers and who they are in ViewTouch (Reports > ILSA History > Cashiers).
+Report cashiersReport(const std::vector<Cashier> &cashiers, const ReportContext &ctx);
+// Sales by Employee and Item over ILSA's history (`ilsa`) and, when given, ViewTouch's own checks
+// (`viewtouch`: each line for whoever rang it in, as employeeItemSales): a mapped ILSA cashier's sales
+// go with their ViewTouch sales. `filter`: what the ILSA rows were chosen by (also matched against
+// ViewTouch lines' name, UPC and item id).
+Report employeeSales(const std::vector<EmployeeItemRow> &ilsa, const std::vector<Check> *viewtouch,
+                     const std::string &filter, const ReportContext &ctx);
+
 // The days ILSA's Z and its receipts disagree, then the sale lines no item list names.
 Report differences(const std::vector<Variance> &list, const ReportContext &ctx,
                    const std::vector<UnnamedItem> &unnamed = {});

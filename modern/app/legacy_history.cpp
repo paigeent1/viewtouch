@@ -73,6 +73,31 @@ std::string text(const QSqlQuery &q, int i) { return q.value(i).toString().toStd
 const QString kReceiptColumns = u"r.id, r.receipt_num, r.at, r.day, r.total_cents, r.tax_cents, r.mode, r.reg_num, "
                                 "r.cashier, r.age_verified, r.dob, COALESCE(s.name, '')"_s;
 
+bool hasTable(QSqlDatabase &db, const QString &name)
+{
+    QSqlQuery q(db);
+    return run(q, u"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"_s, {name}, nullptr) && q.next();
+}
+
+// Cashier names and ties, or nothing, for a history file from before they were kept.
+QString cashierJoins(QSqlDatabase &db, QString *name, QString *employeeId, QString *employeeName)
+{
+    QString joins;
+    *name = u"''"_s;
+    *employeeId = u"''"_s;
+    *employeeName = u"''"_s;
+    if (hasTable(db, u"legacy_cashiers"_s)) {
+        joins += u" LEFT JOIN legacy_cashiers c ON c.source_id = r.source_id AND c.cashier_num = r.cashier"_s;
+        *name = u"COALESCE(MAX(c.name), '')"_s;
+    }
+    if (hasTable(db, u"legacy_cashier_map"_s)) {
+        joins += u" LEFT JOIN legacy_cashier_map m ON m.source_id = r.source_id AND m.cashier_num = r.cashier"_s;
+        *employeeId = u"COALESCE(MAX(m.employee_id), '')"_s;
+        *employeeName = u"COALESCE(MAX(m.employee_name), '')"_s;
+    }
+    return joins;
+}
+
 Receipt receiptOf(const QSqlQuery &q)
 {
     Receipt r;
@@ -370,6 +395,131 @@ std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, 
                 u.first = text(q, 4);
                 u.last = text(q, 5);
                 out.push_back(std::move(u));
+            }
+        }
+        return out;
+    });
+}
+
+std::vector<Cashier> cashiers(const QString &path, QString *error)
+{
+    using Rows = std::vector<Cashier>;
+    return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
+        Rows out;
+        QString name, id, ename;
+        const QString joins = cashierJoins(db, &name, &id, &ename);
+        QSqlQuery q(db);
+        if (run(q, u"SELECT r.source_id, COALESCE(MAX(s.name), ''), r.cashier, %1, %2, %3, "
+                    "SUM(CASE WHEN r.mode = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN r.mode = 0 THEN r.total_cents - r.tax_cents ELSE 0 END), "
+                    "MIN(r.day), MAX(r.day) FROM legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id%4 "
+                    "GROUP BY r.source_id, r.cashier ORDER BY r.cashier, r.source_id"_s.arg(name, id, ename, joins), {}, error)) {
+            while (q.next()) {
+                Cashier c;
+                c.sourceId = q.value(0).toInt();
+                c.source = text(q, 1);
+                c.number = q.value(2).toInt();
+                c.name = text(q, 3);
+                c.employeeId = text(q, 4);
+                c.employeeName = text(q, 5);
+                c.receipts = q.value(6).toLongLong();
+                c.sales = cents(q, 7);
+                c.first = text(q, 8);
+                c.last = text(q, 9);
+                out.push_back(std::move(c));
+            }
+        }
+        return out;
+    });
+}
+
+bool setCashier(const QString &path, int sourceId, int number, const std::string &employeeId,
+                const std::string &employeeName, QString *error)
+{
+    if (path.isEmpty() || !QFileInfo::exists(path)) {
+        if (error)
+            *error = u"No ILSA history has been imported yet (vt-ilsa-history)."_s;
+        return false;
+    }
+    static QAtomicInt counter;
+    const QString conn = u"vt-legacy-write-%1"_s.arg(counter.fetchAndAddRelaxed(1));
+    bool ok = false;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, conn);
+        db.setDatabaseName(path);
+        db.setConnectOptions(u"QSQLITE_BUSY_TIMEOUT=5000"_s);
+        if (!db.open()) {
+            if (error)
+                *error = db.lastError().text();
+        } else {
+            QSqlQuery q(db);
+            ok = run(q, u"CREATE TABLE IF NOT EXISTS legacy_cashier_map (source_id INTEGER NOT NULL, cashier_num INTEGER NOT NULL, "
+                        "employee_id TEXT NOT NULL, employee_name TEXT NOT NULL DEFAULT '', PRIMARY KEY (source_id, cashier_num))"_s,
+                     {}, error)
+                 && db.transaction();
+            if (ok) {
+                QSqlQuery w(db);
+                if (employeeId.empty()) {
+                    ok = run(w, u"DELETE FROM legacy_cashier_map WHERE source_id = ? AND cashier_num = ?"_s, {sourceId, number}, error);
+                } else {
+                    ok = run(w, u"INSERT OR REPLACE INTO legacy_cashier_map VALUES (?, ?, ?, ?)"_s,
+                             {sourceId, number, QString::fromStdString(employeeId), QString::fromStdString(employeeName)}, error);
+                    // The same person in the other copies: the same number and name, not tied yet.
+                    if (ok && hasTable(db, u"legacy_cashiers"_s)) {
+                        QSqlQuery same(db);
+                        ok = run(same, u"INSERT OR IGNORE INTO legacy_cashier_map "
+                                        "SELECT o.source_id, o.cashier_num, ?, ? FROM legacy_cashiers o "
+                                        "JOIN legacy_cashiers me ON me.source_id = ? AND me.cashier_num = ? "
+                                        "WHERE o.cashier_num = me.cashier_num AND o.source_id <> me.source_id "
+                                        "AND lower(trim(o.name)) = lower(trim(me.name))"_s,
+                                 {QString::fromStdString(employeeId), QString::fromStdString(employeeName), sourceId, number}, error);
+                    }
+                }
+                ok = ok ? db.commit() : (db.rollback(), false);
+            }
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(conn);
+    return ok;
+}
+
+std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &from, const QString &to, const QString &filter,
+                                           QString *error)
+{
+    using Rows = std::vector<EmployeeItemRow>;
+    return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
+        Rows out;
+        QString name, id, ename;
+        const QString joins = cashierJoins(db, &name, &id, &ename);
+        QVariantList args{from, to};
+        QString where;
+        if (!filter.trimmed().isEmpty()) {
+            QString w = filter.trimmed();
+            w.replace(u'\', u"\\"_s).replace(u'%', u"\%"_s).replace(u'_', u"\_"_s);
+            w = u'%' + w + u'%';
+            where = u" AND (l.name LIKE ? ESCAPE '\' OR l.upc LIKE ? ESCAPE '\' OR l.brand LIKE ? ESCAPE '\' "
+                    "OR l.dept IN (SELECT dept FROM legacy_depts WHERE name LIKE ? ESCAPE '\'))"_s;
+            args << w << w << w << w;
+        }
+        QSqlQuery q(db);
+        if (run(q, u"SELECT r.source_id, r.cashier, %1, %2, %3, l.upc, l.name, SUM(l.qty), SUM(l.amount_cents) "
+                    "FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id%4 "
+                    "WHERE l.day BETWEEN ? AND ? AND l.kind = 'item' AND l.mode = 0 AND l.lottery = 0 AND l.voided = 0%5 "
+                    "GROUP BY r.source_id, r.cashier, l.upc, l.name"_s.arg(name, id, ename, joins, where), args, error)) {
+            while (q.next()) {
+                EmployeeItemRow e;
+                Cashier c;
+                c.sourceId = q.value(0).toInt();
+                c.number = q.value(1).toInt();
+                c.name = text(q, 2);
+                const std::string employee = text(q, 3);
+                e.key = employee.empty() ? "ilsa:" + std::to_string(c.sourceId) + ":" + std::to_string(c.number) : employee;
+                e.who = employee.empty() ? cashierLabel(c) + " (former employee)" : text(q, 4);
+                e.upc = text(q, 5);
+                e.item = text(q, 6);
+                e.qty = q.value(7).toDouble();
+                e.sales = cents(q, 8);
+                out.push_back(std::move(e));
             }
         }
         return out;

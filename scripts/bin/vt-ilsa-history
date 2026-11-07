@@ -86,6 +86,11 @@ SCHEMA = [
     # bare: the UPC without leading zeros (ILSA kept codes as numbers).
     "CREATE TABLE IF NOT EXISTS legacy_items (source_id INTEGER NOT NULL, upc TEXT NOT NULL, bare TEXT NOT NULL, name TEXT NOT NULL, brand TEXT NOT NULL DEFAULT '', dept INTEGER, PRIMARY KEY (source_id, upc))",
     "CREATE INDEX IF NOT EXISTS legacy_items_bare ON legacy_items (bare)",
+    # Each copy's cashiers (number and name only: never PINs, pay or anything else of theirs).
+    "CREATE TABLE IF NOT EXISTS legacy_cashiers (source_id INTEGER NOT NULL, cashier_num INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY (source_id, cashier_num))",
+    # Which ViewTouch employee an ILSA cashier is (set on Reports > ILSA History > Cashiers; the
+    # importer never changes it). No row: a former employee.
+    "CREATE TABLE IF NOT EXISTS legacy_cashier_map (source_id INTEGER NOT NULL, cashier_num INTEGER NOT NULL, employee_id TEXT NOT NULL, employee_name TEXT NOT NULL DEFAULT '', PRIMARY KEY (source_id, cashier_num))",
 ]
 # Columns added after the first version (an older history file gets them when opened).
 ADDED_COLUMNS = [
@@ -96,7 +101,7 @@ ADDED_COLUMNS = [
 LATE_SCHEMA = [
     "CREATE INDEX IF NOT EXISTS legacy_lines_unnamed ON legacy_lines (upc) WHERE name_src = 'dept'",
 ]
-DATA_TABLES = ["legacy_meta", "legacy_sources", "legacy_depts", "legacy_items", "legacy_z", "legacy_z_values", "legacy_receipts",
+DATA_TABLES = ["legacy_meta", "legacy_sources", "legacy_depts", "legacy_items", "legacy_cashiers", "legacy_z", "legacy_z_values", "legacy_receipts",
                "legacy_lines", "legacy_tenders", "legacy_days", "legacy_variances"]
 
 
@@ -262,6 +267,39 @@ def z_rows(export, table):
         yield h, r
 
 
+NUMBER_COLS = ("CSHR_NUM", "CASHIER_NUM", "CSHR_ID", "EMP_NUM", "EMPLOYEE_NUM", "EMP_ID", "CLERK_NUM")
+# Columns never read from a cashier table (only the number and the name are kept).
+PRIVATE = re.compile(r"PIN|PASS|PWD|SSN|SOC|PAY|RATE|WAGE|SALARY|ADDR|PHONE|DOB|BIRTH|SECUR|CARD|LICEN|EMAIL|ZIP|CITY", re.I)
+
+
+def cashier_table(export):
+    """(table, number column, name columns) of the export's cashier list, or None: a table with a cashier
+    number column and a name column (CSHR_NAME, NAME... or FIRST + LAST), its name saying cashier /
+    employee / clerk when several have both. Tables of totals by cashier (Z_...) have no name column."""
+    found = []
+    for f in sorted(os.listdir(export)):
+        if not f.lower().endswith(".csv"):
+            continue
+        with open(os.path.join(export, f), "rb") as fh:
+            head = fh.readline().decode("utf-8-sig", errors="replace")
+        cols = [c.strip().upper() for c in next(csv.reader([head]), [])]
+        num = next((c for c in NUMBER_COLS if c in cols), None)
+        names = [c for c in cols if re.search(r"NAME|FIRST|LAST", c) and not PRIVATE.search(c) and c != num
+                 and not re.search(r"LOGIN|USER|FILE|TENDER|DEPT|STORE|REG", c)]
+        if not num or not names:
+            continue
+        whole = next((c for c in names if c in ("CSHR_NAME", "CASHIER_NAME", "EMP_NAME", "EMPLOYEE_NAME", "NAME", "FULL_NAME")), None)
+        first = next((c for c in names if "FIRST" in c), None)
+        last = next((c for c in names if "LAST" in c and "LAST_" not in c.replace("LAST_NAME", "")), None)
+        use = [whole] if whole else [c for c in (first, last) if c] or names[:1]
+        score = (bool(re.search(r"CSHR|CASH|EMP|CLERK|STAFF", f, re.I)), bool(whole or first))
+        found.append((score, f[:-4], num, use))
+    if not found:
+        return None
+    found.sort(key=lambda x: x[0], reverse=True)
+    return found[0][1:]
+
+
 def stage(db, export, day_from, day_to, done, say, source_id=0):
     """The export into temp tables; returns the business days to import (ordered)."""
     for s in STAGE:
@@ -329,6 +367,22 @@ def stage(db, export, day_from, day_to, done, say, source_id=0):
     db.executemany("INSERT OR REPLACE INTO legacy_depts VALUES (?, ?, ?)" if not newest or (last or "") >= newest
                    else "INSERT OR IGNORE INTO legacy_depts VALUES (?, ?, ?)",
                    [(d, n, int(d in LOTTERY)) for d, n in dept_name.items()])
+    # Cashiers: number and name only.
+    ct = cashier_table(export)
+    if ct:
+        table, numcol, namecols = ct
+        h, it = rows(export, table); r = Row(h); cashiers = {}
+        for r.r in it:
+            n = integer(r(numcol), -1)
+            name = " ".join(r(c).strip() for c in namecols if r(c).strip())
+            if n >= 0 and name:
+                cashiers[n] = name
+        db.execute("DELETE FROM legacy_cashiers WHERE source_id = ?", (source_id,))
+        db.executemany("INSERT INTO legacy_cashiers VALUES (?, ?, ?)", [(source_id, n, nm) for n, nm in cashiers.items()])
+        say(f"  cashiers: {len(cashiers)} from {table} ({numcol}, {' + '.join(namecols)}): "
+            + ", ".join(f"{n} {nm}" for n, nm in sorted(cashiers.items())))
+    else:
+        say("  cashiers: no table with a cashier number and a name in this export (receipts keep the number)")
     if not days:
         return days, last
     promo = {}
@@ -775,6 +829,8 @@ def made_up_export(d):
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"], [20, "ACCESSORIES"], [30, "LIGHTERS"], [260, "OPEN RING"],
                                                      [275, "INSTANT LOTTERY"], [0, "PAID OUT"]])
     write_csv(d, "PRC_ADJ", ["ID", "PRC_NAME"], [[7, "BUY 2 SAVE 1"]])
+    write_csv(d, "Cashier", ["CSHR_NUM", "CSHR_NAME", "CSHR_PIN", "PAY_RATE"],
+              [[3, "Test Cashier Three", "9999", "1.00"], [4, "Test Cashier Four", "8888", "1.00"]])
 
 
 def older_export(d):
@@ -793,6 +849,7 @@ def older_export(d):
     write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 401, 0, "0.32"]])
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["11111111111", "OLD ITEM NEVER SOLD", 20, "Old Co"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[20, "OLD ACCESSORIES NAME"]])
+    write_csv(d, "Employee", ["EMP_NUM", "FIRST_NAME", "LAST_NAME", "SSN"], [[2, "Test", "Cashier Two", "000-00-0000"]])
 
 
 def fixture_sql(db):
@@ -872,6 +929,10 @@ def self_test(write_fixture=False):
         check("an item in no list keeps its department's name, marked",
               q("SELECT name, name_src FROM legacy_lines WHERE upc = '077777777777'") == ("OLD ACCESSORIES NAME", "dept"))
         check("the older copy doesn't rename departments", q("SELECT name FROM legacy_depts WHERE dept = 20") == ("ACCESSORIES",))
+        check("each copy's cashiers: number and name only",
+              db.execute("SELECT source_id, cashier_num, name FROM legacy_cashiers ORDER BY 1, 2").fetchall()
+              == [(1, 3, "Test Cashier Three"), (1, 4, "Test Cashier Four"), (2, 2, "Test Cashier Two")]
+              and [c[1] for c in db.execute("PRAGMA table_info(legacy_cashiers)")] == ["source_id", "cashier_num", "name"])
         check("the older day matches its Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-20'") == (0,))
         check("readable by ViewTouch read-only (no WAL left)", db.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
         text = fixture_sql(db)

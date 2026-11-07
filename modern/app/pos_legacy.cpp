@@ -27,7 +27,8 @@ namespace {
 constexpr int kItemRows = 500;      // item movement: the biggest sellers shown (the CSV has those too)
 constexpr int kReceiptPage = 100;   // receipts found, a page at a time
 
-const QStringList kLegacyKinds = {u"z"_s, u"depts"_s, u"items"_s, u"gpMonth"_s, u"gpYear"_s, u"compare"_s, u"differences"_s};
+const QStringList kLegacyKinds = {u"z"_s, u"depts"_s, u"items"_s, u"gpMonth"_s, u"gpYear"_s, u"compare"_s, u"differences"_s,
+                                   u"employees"_s, u"cashiers"_s};
 
 // What the worker thread read, for the report built on the screen's thread.
 struct LegacyRead {
@@ -38,6 +39,9 @@ struct LegacyRead {
     std::vector<core::legacy::PeriodRow> periods;
     std::vector<core::legacy::Variance> variances;
     std::vector<core::legacy::UnnamedItem> unnamed;
+    std::vector<core::legacy::EmployeeItemRow> people;
+    std::vector<core::legacy::Cashier> cashiers;
+    std::vector<Check> vtChecks;   // By Employee with ViewTouch's sales
     bool more = false;
     QString error;
 };
@@ -58,25 +62,63 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
         return false;
     if (!kLegacyKinds.contains(kind))
         return fail(tr("No such ILSA report."));
-    QDate from = QDate::fromString(fromText.trimmed(), u"yyyy-MM-dd"_s);
-    QDate to = toText.trimmed().isEmpty() ? from : QDate::fromString(toText.trimmed(), u"yyyy-MM-dd"_s);
+    // Days: yyyy-MM-dd (to empty: one day), or as the Reports screen picks them (By Employee with the
+    // ILSA history): week | lastWeek | month | lastMonth | year, or day:<business day id> (0: today's).
+    const QString f = fromText.trimmed();
+    const QDate today = QDateTime::fromMSecsSinceEpoch(now()).date();
+    QDate from, to = today;
+    std::int64_t va = 0, vb = 0;   // ViewTouch's checks: closed in [va, vb)
+    const int back = (today.dayOfWeek() % 7 - s_->settings.weekStartsOn + 7) % 7;
+    if (f == u"week") {
+        from = today.addDays(-back);
+    } else if (f == u"lastWeek") {
+        to = today.addDays(-back - 1);
+        from = to.addDays(-6);
+    } else if (f == u"month") {
+        from = QDate(today.year(), today.month(), 1);
+    } else if (f == u"lastMonth") {
+        from = QDate(today.year(), today.month(), 1).addMonths(-1);
+        to = QDate(today.year(), today.month(), 1).addDays(-1);
+    } else if (f == u"year") {
+        from = QDate(today.year(), 1, 1);
+    } else if (f.startsWith(u"day:")) {   // a business day: its own hours
+        const qint64 dayId = f.mid(4).toLongLong();
+        const BusinessDay *d = dayId == 0 || dayId == s_->day.id ? &s_->day : nullptr;
+        for (const PastDay &p : s_->pastDays)
+            if (!d && p.day.id == dayId)
+                d = &p.day;
+        if (!d)
+            return fail(tr("No such day."));
+        va = d->openedAt;
+        vb = d->closedAt ? d->closedAt : now() + 1;
+        from = QDateTime::fromMSecsSinceEpoch(va).date();
+        to = QDateTime::fromMSecsSinceEpoch(vb - 1).date();
+    } else {
+        from = QDate::fromString(f, u"yyyy-MM-dd"_s);
+        to = toText.trimmed().isEmpty() ? from : QDate::fromString(toText.trimmed(), u"yyyy-MM-dd"_s);
+    }
     if (!from.isValid() || !to.isValid())
         return fail(tr("Dates are written like 2026-09-01."));
     if (to < from)
         std::swap(from, to);
+    if (va == 0) {
+        va = QDateTime(from, QTime(0, 0)).toMSecsSinceEpoch();
+        vb = QDateTime(to.addDays(1), QTime(0, 0)).toMSecsSinceEpoch();
+    }
     const QString a = from.toString(u"yyyy-MM-dd"_s), b = to.toString(u"yyyy-MM-dd"_s);
     const QString label = from == to ? i18n::locale().toString(from, u"ddd MMM d, yyyy"_s)
                                      : tr("%1 - %2").arg(i18n::locale().toString(from, u"MMM d, yyyy"_s),
                                                          i18n::locale().toString(to, u"MMM d, yyyy"_s));
     const QString groupBy = QStringList{u"item"_s, u"upc"_s, u"brand"_s, u"dept"_s, u"current"_s}.contains(by)
                                 ? by : kind == u"depts" ? u"dept"_s : u"item"_s;
+    // By Employee: by = "vt|<filter>" (with ViewTouch's sales) or "|<filter>" (ILSA only).
+    const bool employeesWithVt = kind == u"employees" && by.startsWith(u"vt");
+    const QString filter = kind == u"employees" ? by.section(u'|', 1).trimmed() : QString();
     const QString path = s_->legacyDb;
     const QString id = u"ilsa-"_s + kind;
 
     // ViewTouch's own checks on those days too (Daily Z, and the side-by-side on parallel beta days).
-    const bool withVt = kind == u"z" || kind == u"compare";
-    const std::int64_t va = QDateTime(from, QTime(0, 0)).toMSecsSinceEpoch();
-    const std::int64_t vb = QDateTime(to.addDays(1), QTime(0, 0)).toMSecsSinceEpoch();
+    const bool withVt = kind == u"z" || kind == u"compare" || employeesWithVt;
     auto history = withVt ? s_->history : decltype(s_->history){};
     std::vector<Check> today_;
     if (withVt)
@@ -109,6 +151,10 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             } else if (kind == u"differences") {
                 got.variances = legacy::variances(path, a, b, e);
                 got.unnamed = legacy::unnamedItems(path, a, b, e);
+            } else if (kind == u"employees") {
+                got.people = legacy::employeeItems(path, a, b, filter, e);
+            } else if (kind == u"cashiers") {
+                got.cashiers = legacy::cashiers(path, e);
             }
         }
         if (withVt) {
@@ -117,8 +163,10 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
                 if (std::ranges::none_of(checks, [&](const Check &x) { return x.id == c.id; }))
                     checks.push_back(std::move(c));
             got.vt = core::legacy::fromChecks(checks, rates);
+            if (employeesWithVt)
+                got.vtChecks = std::move(checks);
         }
-        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, got = std::move(got)] {
+        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, filter, employeesWithVt, got = std::move(got)] {
             if (!self || request != self->rangeRequest_)
                 return;   // a newer request replaced it
             const ReportContext ctx = self->reportContext(label);
@@ -153,6 +201,10 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
                 r = core::legacy::itemMovement(got.rows, groupBy.toStdString(), got.more, ctx);
             } else if (kind == u"gpMonth" || kind == u"gpYear") {
                 r = core::legacy::gpByPeriod(got.periods, kind == u"gpYear", ctx);
+            } else if (kind == u"employees") {
+                r = core::legacy::employeeSales(got.people, employeesWithVt ? &got.vtChecks : nullptr, filter.toStdString(), ctx);
+            } else if (kind == u"cashiers") {
+                r = core::legacy::cashiersReport(got.cashiers, ctx);
             } else {
                 r = core::legacy::differences(got.variances, ctx, got.unnamed);
             }
@@ -162,10 +214,42 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             self->legacyReport_ = r;
             self->rangeReport_ = {{u"loading"_s, false}, {u"id"_s, id}, {u"label"_s, label},
                                   {u"report"_s, self->reportVariant(r)}};
+            if (kind == u"cashiers") {   // the Cashiers screen: each cashier and the employees to tie them to
+                QVariantList list;
+                for (const core::legacy::Cashier &c : got.cashiers)
+                    list.append(QVariantMap{{u"sourceId"_s, c.sourceId}, {u"source"_s, qs(c.source)}, {u"number"_s, c.number},
+                                            {u"label"_s, qs(core::legacy::cashierLabel(c))}, {u"receipts"_s, qint64(c.receipts)},
+                                            {u"sales"_s, self->format(c.sales)}, {u"first"_s, qs(c.first)}, {u"last"_s, qs(c.last)},
+                                            {u"employeeId"_s, qs(c.employeeId)}, {u"employeeName"_s, qs(c.employeeName)}});
+                QVariantList staff;
+                for (const Employee &e : self->s_->employees)
+                staff.append(QVariantMap{{u"id"_s, qs(e.id)}, {u"name"_s, qs(e.name)}, {u"active"_s, e.active}});
+                self->rangeReport_.insert(u"cashiers"_s, list);
+                self->rangeReport_.insert(u"employees"_s, staff);
+            }
             emit self->sessionChanged();
         }, Qt::QueuedConnection);
     });
     return true;
+}
+
+bool PosService::setLegacyCashier(int sourceId, int number, const QString &employeeId)
+{
+    if (!require(perm::Manager, tr("ILSA cashiers")))
+        return false;
+    std::string name;
+    if (!employeeId.isEmpty()) {
+        const auto it = std::ranges::find_if(s_->employees, [&](const Employee &e) { return qs(e.id) == employeeId; });
+        if (it == s_->employees.end())
+            return fail(tr("No such employee."));
+        name = it->name;
+    }
+    QString error;
+    if (!legacy::setCashier(s_->legacyDb, sourceId, number, ss(employeeId), name, &error))
+        return fail(tr("Couldn't save it: %1").arg(error));
+    emit notice(employeeId.isEmpty() ? tr("ILSA cashier %1: a former employee").arg(number)
+                                     : tr("ILSA cashier %1 is %2").arg(number).arg(qs(name)));
+    return requestLegacyReport(u"cashiers"_s, u"2000-01-01"_s, QDateTime::fromMSecsSinceEpoch(now()).date().toString(u"yyyy-MM-dd"_s));
 }
 
 bool PosService::printLegacyReport()
