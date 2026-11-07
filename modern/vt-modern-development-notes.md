@@ -119,6 +119,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 17:25 ET — Bob (Claude) — Store Settings: 'ILSA history store' in The store section
+- **What:** The new ILSA history store setting is listed in Store Settings > The store (it fell into More).
+- **Why:** CI 42419256739: 'Store Settings: every setting is in a section'.
+- **Files:** `modern/app/pos_admin_shared.hh`
+
 ### 2026-11-07 17:09 ET — Bob (Claude) — ILSA history by store: BHDAN-836100, days per store, store choice, Sys_Pram check
 - **What:** Every ILSA copy belongs to a store (legacy_sources.store, its check prefix: BHDAN by default; existing files get it when vt-ilsa-history opens them). ILSA receipts show as BHDAN-836100 everywhere: the receipt view and reprint ('Receipt BHDAN-836100'), the list, the reprint popup and notices. The ILSA search takes 'BHDAN-836100', 'bhdan836100' or '836100'. Days are per store (legacy_days keyed by store and day; an older file is migrated when opened): a BHNM copy never replaces or skips a BHDAN day, and --replace only replaces that store's day. vt-ilsa-history EXPORT --prefix BHNM imports a store's copy, refused (with what its Sys_Pram says) when Sys_Pram names another store, unless --force; --prefix X alone sets every copy's store; --recheck --store X checks one store's days. Reports > ILSA History (all its reports, Daily Z, Cashiers, By Employee) and Look Up Checks > ILSA history get a Store row (each store in the history, All stores), starting with Store Settings' new 'ILSA history store' (default BHDAN). Notes: store prefixes HCA, BHDAN, BHNM (New Milford = Gaylordsville) in the synchronized-transactions backlog item.
 - **Why:** Owner 2026-11-07 17:00: every imported ILSA transaction carries its store's prefix; the Gaylordsville store's ILSA databases come next (BHNM) into the same history file.
