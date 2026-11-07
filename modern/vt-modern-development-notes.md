@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 11:10 ET — Bob (Claude) — vt-ilsa-deptcheck: ILSA Department Sales and Z rebuilt from the export
+- **What:** New read-only scripts/bin/vt-ilsa-deptcheck EXPORT dept FROM TO / z FROM TO: per department qty, retail (item lines), other line codes, cost (ITEM_COST x qty), GP; per register Z: ILSA's saved Z tenders and tax beside the receipts' totals, plus department detail.
+- **Why:** Owner 2026-11-07 sent ILSA's Department Sales (Sept 2026, YTD to 9/30) and All Register Z's (9/24-9/30) printouts to check against the data the history importer will bring in.
+- **Files:** `scripts/bin/vt-ilsa-deptcheck`
+
 ### 2026-11-07 09:09 ET — Bob (Claude) — vt-server: no false 'without video' message
 - **What:** vt-server only installs a Qt Multimedia playback package when no plugin is in /usr/lib/*/qt6/plugins/multimedia; its failure message no longer claims ViewTouch builds without video.
 - **Why:** HCA Pi 2026-11-07 09:10: videos played with sound and muted during an open check, yet vt-server said it couldn't install qt6-ffmpeg-multimedia-plugin and that ViewTouch builds without video (that package doesn't exist on Debian trixie; Qt Multimedia brings its own backend).

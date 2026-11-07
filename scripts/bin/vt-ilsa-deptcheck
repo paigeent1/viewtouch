@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""ILSA's Department Sales and register Z reports rebuilt from the CSV export, to check the history
+importer against the owner's ILSA printouts (read-only; writes nothing; counts and dollars only).
+  vt-ilsa-deptcheck EXPORT_DIR dept 2026-09-01 2026-10-01     departments, from <= day < to
+  vt-ilsa-deptcheck EXPORT_DIR z    2026-09-24 2026-10-01     each register Z in the range
+Department rows: quantity (DETAIL_FOR_QTY), retail (item lines DETAIL_LINE_AMT), other line codes
+per department (discounts, promotions/buydowns...), cost (ITEM_COST x qty). Z rows: what ILSA saved
+(Z_Tender, Z_Taxes) beside what the receipts add up to, and the department detail.
+"""
+import csv, os, re, sys
+from collections import defaultdict
+csv.field_size_limit(1 << 30)
+if len(sys.argv) != 5 or sys.argv[2] not in ("dept", "z"):
+    sys.exit(__doc__)
+D, WHAT, FROM, TO = sys.argv[1:]
+if not os.path.isdir(D):
+    sys.exit("No export at " + D)
+def rows(t):
+    for f in os.listdir(D):
+        if f.lower() == (t + ".csv").lower():
+            with open(os.path.join(D, f), newline="", errors="replace") as fh:
+                yield from csv.DictReader(fh)
+            return
+def num(s):
+    try: return float((s or "").replace("$", "").replace(",", ""))
+    except ValueError: return 0.0
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})")
+def day(s):
+    s = (s or "").strip()
+    if len(s) >= 10 and s[4] == "-": return s[:10]
+    m = US.match(s)
+    if not m: return "?"
+    mo, d, y = m.groups(); y = int(y); y += 2000 if y < 70 else (1900 if y < 100 else 0)
+    return f"{y:04d}-{int(mo):02d}-{int(d):02d}"
+inrange = lambda d: FROM <= d < TO
+names = {}
+for r in rows("Dept"):
+    names[(r.get("DEPT_NUM") or "").strip()] = (r.get("DEPT_NAME") or "").strip()
+zday = {(r.get("REG_NUM"), r.get("REG_Z_COUNTER")): day(r.get("REG_Z_DATETIME")) for r in rows("RegZCnt")}
+mode, rz = {}, {}
+for r in rows("RegSale"):
+    k = (r.get("REG_NUM"), r.get("RECEIPT_NUM"))
+    mode[k] = r.get("Z_MODE"); rz[k] = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+key = lambda t: int(t) if t.lstrip("-").isdigit() else 10**9
+
+# Department figures from the receipt lines (mode-0 receipts; others counted separately).
+dept = defaultdict(lambda: defaultdict(float))
+zdept = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+other_modes = defaultdict(float)
+for r in rows("PDetail"):
+    k = (r.get("REG_NUM"), r.get("RECEIPT_NUM"))
+    z = rz.get(k)
+    d = day(r.get("TIME_STAMP"))
+    if WHAT == "z":
+        if z is None or not inrange(zday.get(z, "?")):
+            continue
+    elif not inrange(d):
+        continue
+    m = mode.get(k, "?")
+    cls, typ = r.get("DETAIL_CLASS"), r.get("DETAIL_TYPE")
+    dn = (r.get("DEPT") or "").strip()
+    amt, qty, cost = num(r.get("DETAIL_LINE_AMT")), num(r.get("DETAIL_FOR_QTY")), num(r.get("ITEM_COST"))
+    if m != "0":
+        other_modes[f"mode {m} class {cls},{typ}"] += amt
+        continue
+    t = dept[dn] if WHAT == "dept" else zdept[z][dn]
+    if (cls, typ) == ("1", "1"):
+        t["qty"] += qty; t["retail"] += amt; t["cost"] += cost * qty
+        if cost == 0: t["no-cost retail"] += amt
+    else:
+        t[f"code {cls},{'*' if cls in ('15', '16') else typ}"] += amt
+
+def print_depts(ds, indent="  "):
+    tot = defaultdict(float)
+    codes = sorted({c for t in ds.values() for c in t if c.startswith("code")})
+    print(indent + f"{'Dept':>5} {'Name':<22}{'Qty':>8}{'Retail':>13}{'Cost':>13}{'GP%':>8}  " + "  ".join(codes))
+    for dn in sorted(ds, key=key):
+        t = ds[dn]
+        for k, v in t.items(): tot[k] += v
+        gp = (1 - t["cost"] / t["retail"]) * 100 if t["retail"] else 0
+        extra = "  ".join(f"{t[c]:>10,.2f}" for c in codes)
+        print(indent + f"{dn:>5} {names.get(dn, '?')[:21]:<22}{t['qty']:>8,.0f}{t['retail']:>13,.2f}{t['cost']:>13,.2f}{gp:>7.2f}%  {extra}"
+              + (f"  (no-cost retail {t['no-cost retail']:,.2f})" if t["no-cost retail"] else ""))
+    gp = (1 - tot["cost"] / tot["retail"]) * 100 if tot["retail"] else 0
+    print(indent + f"{'':>5} {'All departments':<22}{tot['qty']:>8,.0f}{tot['retail']:>13,.2f}{tot['cost']:>13,.2f}{gp:>7.2f}%  "
+          + "  ".join(f"{tot[c]:>10,.2f}" for c in codes))
+
+if WHAT == "dept":
+    print(f"Department sales {FROM} to {TO} (not including {TO}), mode-0 receipts:")
+    print_depts(dept)
+else:
+    zt = defaultdict(lambda: defaultdict(float)); ztax = defaultdict(float)
+    for r in rows("Z_Tender"):
+        if (r.get("CSHR_NUM") or "0").strip() not in ("", "0") or r.get("Z_MODE") != "0": continue
+        z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+        if inrange(zday.get(z, "?")): zt[z][r.get("TENDER_TYPE")] += num(r.get("TENDER_AMT")) - num(r.get("REFUND_AMT"))
+    for r in rows("Z_Taxes"):
+        if (r.get("CSHR_NUM") or "0").strip() not in ("", "0") or r.get("Z_MODE") != "0": continue
+        z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+        if inrange(zday.get(z, "?")):
+            ztax[z] += sum(num(r.get(f"TAX{i}_AMT")) - num(r.get(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+    rt = defaultdict(lambda: defaultdict(float)); rsale = defaultdict(float); rtax = defaultdict(float); count = defaultdict(int)
+    for r in rows("RegSale"):
+        z = (r.get("REG_NUM"), r.get("REG_Z_COUNTER"))
+        if r.get("Z_MODE") != "0" or not inrange(zday.get(z, "?")): continue
+        rsale[z] += num(r.get("SALE_TOTAL")); count[z] += 1
+        rtax[z] += sum(num(r.get(f"TAX{i}_AMT")) - num(r.get(f"TAX{i}_REFUND_AMT")) for i in range(1, 9))
+    for r in rows("TENDSALE"):
+        k = (r.get("REG_NUM"), r.get("RECEIPT_NUM")); z = rz.get(k)
+        if z and mode.get(k) == "0" and inrange(zday.get(z, "?")): rt[z][r.get("TENDER_TYPE")] += num(r.get("SALE_AMT"))
+    for z in sorted(set(zt) | set(rt) | set(zdept), key=lambda z: (zday.get(z, "?"), z)):
+        print(f"\n== Z {z[1]} (register {z[0]}) {zday.get(z, '?')}: {count[z]} receipts")
+        print(f"  receipts: sale total {rsale[z]:,.2f} (tax {rtax[z]:,.2f}, net of tax {rsale[z] - rtax[z]:,.2f}) | ILSA Z tax {ztax[z]:,.2f}")
+        for t in sorted(set(zt[z]) | set(rt[z]), key=key):
+            print(f"  tender type {t}: ILSA Z {zt[z][t]:,.2f} | receipts {rt[z][t]:,.2f}"
+                  + ("" if abs(zt[z][t] - rt[z][t]) < 0.015 else "   <-- differs"))
+        print_depts(zdept[z], "    ")
+if other_modes:
+    print("\nNot counted (receipts of other modes): " + ", ".join(f"{k} {v:,.2f}" for k, v in sorted(other_modes.items())))
