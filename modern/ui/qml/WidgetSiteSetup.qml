@@ -195,6 +195,62 @@ Item {
                     }
                 }
 
+                // --- the ILSA price book, kept in step by itself (on the Pi that serves the store) ---
+                Box {
+                    id: ilsaBox
+                    objectName: "ilsaBox"
+                    title: qsTr("ILSA price book")
+                    readonly property var info: w.controller && w.controller.siteRevision >= 0 ? w.controller.ilsaSync() : ({})
+                    readonly property bool here: info.available ?? false
+                    ColumnLayout {
+                        anchors.fill: parent
+                        Caption {
+                            text: ilsaBox.here ? qsTr("Every 15 minutes: new items are added and prices follow ILSA. Names, sizes and departments set here are never changed (differences are only logged).")
+                                               : qsTr("Runs on the Pi that serves the store.")
+                        }
+                        Switch {
+                            objectName: "ilsaSyncOn"
+                            Layout.fillWidth: true
+                            implicitHeight: 64
+                            font.pixelSize: 16; font.bold: false
+                            visible: ilsaBox.here
+                            enabled: w.admin
+                            text: checked ? qsTr("On: syncs by itself") : qsTr("Off")
+                            checked: ilsaBox.info.on ?? true
+                            onToggled: w.controller.setIlsaSyncOn(checked)
+                        }
+                        Label {
+                            objectName: "ilsaSyncResult"
+                            Layout.fillWidth: true
+                            visible: ilsaBox.here
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 15; font.bold: false
+                            text: (ilsaBox.info.busy ?? false) ? (ilsaBox.info.step || qsTr("Syncing…"))
+                                : (ilsaBox.info.lastRun ?? 0) ? qsTr("Last run %1: %2").arg(Qt.locale().toString(new Date(ilsaBox.info.lastRun), "ddd h:mm AP"))
+                                                                                      .arg(ilsaBox.info.result ?? "")
+                                : qsTr("Not run yet (the first run is a minute after ViewTouch starts).")
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: ilsaBox.here
+                            Button {
+                                objectName: "ilsaSyncNow"
+                                Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 15; font.bold: false
+                                text: qsTr("Sync now")
+                                enabled: w.admin && !(ilsaBox.info.busy ?? false)
+                                onClicked: w.controller.ilsaSyncNow()
+                            }
+                            Button {
+                                objectName: "ilsaShowLog"
+                                Layout.fillWidth: true; implicitHeight: 64; font.pixelSize: 15; font.bold: false
+                                text: qsTr("Show log")
+                                onClicked: { ilsaLog.lines = w.controller.ilsaSyncLog(); ilsaLog.open() }
+                            }
+                        }
+                        Caption { visible: ilsaBox.here; text: qsTr("Logs: ~/ilsa-sync on this Pi (sync-log.csv, runs.log, price-changes-*.csv).") }
+                    }
+                }
+
                 // --- printers and receipts: store-wide, in their own screens ---
                 Box {
                     title: qsTr("Printers and receipts")
@@ -363,6 +419,42 @@ Item {
                 enabled: w.dirty && w.admin
                 highlighted: true
                 onClicked: w.save()
+            }
+        }
+    }
+
+    // The ILSA sync's last runs and changes (Show log); closed until asked for.
+    Popup {
+        id: ilsaLog
+        objectName: "ilsaLog"
+        property var lines: []
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 32 : 900, 1100)
+        height: Math.min(parent ? parent.height - 32 : 700, 760)
+        modal: true
+        visible: false
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 8
+            Label { text: qsTr("ILSA price book: last runs and changes"); font.pixelSize: 18; font.bold: true }
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                Label {
+                    width: ilsaLog.availableWidth - 16
+                    wrapMode: Text.WrapAnywhere
+                    font.family: "monospace"; font.pixelSize: 13
+                    text: ilsaLog.lines.length ? ilsaLog.lines.join("\n") : qsTr("Nothing logged yet.")
+                }
+            }
+            Button {
+                Layout.alignment: Qt.AlignRight
+                implicitWidth: 180; implicitHeight: 64; font.pixelSize: 16
+                text: qsTr("Close")
+                onClicked: ilsaLog.close()
             }
         }
     }

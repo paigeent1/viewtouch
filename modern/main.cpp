@@ -1,3 +1,4 @@
+#include "app/ilsa_sync.hh"
 #include "app/pos_json.hh"
 #include "billboard.hh"
 #include "joincontroller.hh"
@@ -1673,11 +1674,19 @@ int runStore(const Args &cli, const Options &o)
             *standbyThere = now;
         });
     }
+    // The ILSA price book kept in step by itself (every 15 minutes): only on the computer that serves the
+    // store (vt-server runs it with --serve), never on a tablet or billboard.
+    std::unique_ptr<vt::app::IlsaSync> ilsaSync;
+    if (server) {
+        ilsaSync = std::make_unique<vt::app::IlsaSync>(&pos);
+        ilsaSync->start();
+    }
     if (cli.isSet(o.headless) || gServeHeadless)
         return qApp->exec();
 
     LayoutController controller(*layout);
     controller.setPos(&pos);
+    controller.setIlsaSync(ilsaSync.get());
 #ifndef Q_OS_ANDROID
     // A serial barcode scanner (USB-serial adapter) rings items in like a keyboard scanner.
     SerialScanner serialScanner;

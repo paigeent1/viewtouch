@@ -1103,6 +1103,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"receiptFreeChoices"_s, s.receiptFreeChoices},
         {u"receiptShowVoids"_s, s.receiptShowVoids},
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
+        {u"ilsaSyncOn"_s, s.ilsaSyncOn},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
         {u"dobReprintNeedsManager"_s, s.dobReprintNeedsManager},
         {u"minimumAge"_s, QJsonObject{{u"alcohol"_s, s.ageAlcohol}, {u"tobacco"_s, s.ageTobacco}}},
@@ -1514,6 +1515,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         s.privacyUpdatedAt = privacy.value(u"updatedAt").toInteger();
     }
     s.soldOutBackNextDay = o.value(u"soldOutBackNextDay").toBool(true);
+    s.ilsaSyncOn = o.value(u"ilsaSyncOn").toBool(true);
     s.displayAccent = ss(display.value(u"accent").toString(u"#2f6fd6"_s));
     for (const QJsonValue &v : display.value(u"slides").toArray())
         if (!v.toString().trimmed().isEmpty()) s.displaySlides.push_back(ss(v.toString().trimmed()));

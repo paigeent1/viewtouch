@@ -4,6 +4,9 @@ ilsa-pricebook) to ~/ilsa-pricebook/latest, keeps the previous one, and reports:
 counts, how ILSA's two price fields agree, and what changed since the previous one.
   vt-ilsa-pricebook          pull from Dropbox and report
   vt-ilsa-pricebook --local  report on what's already here
+  vt-ilsa-pricebook --exit-status   the same, and the exit code says what came in (ViewTouch's
+                             automatic sync uses it): 0 a new price book, 3 the same one as last time
+                             (then no report), 1 couldn't get it
 """
 import csv, os, shutil, subprocess, sys
 from collections import Counter
@@ -12,6 +15,7 @@ csv.field_size_limit(1 << 30)
 BASE = os.path.expanduser("~/ilsa-pricebook")
 LATEST, PREV, INCOMING = (os.path.join(BASE, d) for d in ("latest", "previous", "incoming"))
 os.makedirs(BASE, exist_ok=True)
+SAME = 3   # --exit-status: the same export as last time
 
 def manifest(d):
     p = os.path.join(d, "manifest.txt")
@@ -30,6 +34,8 @@ if "--local" not in sys.argv:
     else:
         shutil.rmtree(INCOMING, ignore_errors=True)
         print("(Same price book as last time.)")
+        if "--exit-status" in sys.argv:
+            sys.exit(SAME)
 
 def rows(d, t):
     p = os.path.join(d, t + ".csv")

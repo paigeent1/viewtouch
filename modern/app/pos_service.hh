@@ -1001,6 +1001,12 @@ public:
     bool undoMenuChange();
     QString putMenuPicture(const QString &fileName, const QByteArray &data);
     int importMenuFile(const QVariantMap &file);
+    // The ILSA price book's automatic sync (the store's own job: no login needed): new items added, prices
+    // and new barcodes of the items here updated, nothing else changed (names, sizes, categories kept);
+    // what differs is reported. {ok, error, items, added, prices, barcodes, names, departments, taxes,
+    // gone, conflicts, skipped, rows: [{kind (added | price | barcode | name | department | tax | gone |
+    // conflict | skipped), id, item, upc, before, after}]}. One save, one new menu for every screen.
+    QVariantMap syncPriceBook(const QVariantMap &file);
     bool applyMenuTemplate(const QString &id);
     // {id ("" new), name, min, max, askHow, options: [{name, price, included, kitchenName}]}
     bool saveChoiceGroup(const QVariantMap &record);

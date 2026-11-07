@@ -12,9 +12,11 @@
 #include <QJsonDocument>
 #include <QMap>
 #include <QRegularExpression>
+#include <QSet>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <ranges>
 #include <unordered_map>
 #include <unordered_set>
@@ -1633,6 +1635,237 @@ int PosService::importMenuFile(const QVariantMap &file)
         said += tr("; maker and groups filled in on %n item(s)", nullptr, filled);
     emit notice(said);
     return added;
+}
+
+// The ILSA price book's automatic sync (app/ilsa_sync.cpp, every 15 minutes on the Pi): the store's own
+// job, so no one needs to be logged in. Owner's rules (2026-11-07): new ILSA items are added (into their
+// department's category); an existing item's PRICE follows ILSA, and ILSA's new barcodes for it are added;
+// nothing else of an existing item changes (its name, sizes, category, tax...): differences are only
+// reported, like items gone from ILSA. Matched by any of its barcodes, then by its "ilsa-<PLU>" id, never
+// by name. Nothing merged or removed. Open checks keep their prices (each line has its own).
+QVariantMap PosService::syncPriceBook(const QVariantMap &file)
+{
+    if (file.value(u"format"_s).toString() != u"viewtouch-menu"_s)
+        return {{u"ok"_s, false}, {u"error"_s, tr("That isn't a ViewTouch menu file.")}};
+    const PosSettings read = settingsFromJson(QJsonObject{
+        {u"menuCategories"_s, QJsonArray::fromVariantList(file.value(u"categories"_s).toList())}});
+    const QVariantList fileItems = file.value(u"items"_s).toList();
+    const std::size_t had = s_->menu.size();
+
+    // Everything looked up once (tens of thousands of items): codes and ids to items, category names.
+    std::unordered_map<std::string, std::size_t> byCode, byId;
+    std::unordered_set<std::string> ids, categoryIds;
+    for (std::size_t i = 0; i < had; ++i) {
+        const MenuItem &m = s_->menu[i];
+        for (const std::string &b : m.barcodes)
+            byCode.emplace(b, i);
+        byId.emplace(m.id, i);
+        ids.insert(m.id);
+        categoryIds.insert(m.family);
+    }
+    std::vector<MenuCategory> here = s_->categories();
+    QHash<std::string, QString> categoryName;   // id here -> name
+    QHash<QString, std::string> categoryByName; // folded name -> id here
+    for (const MenuCategory &c : here) {
+        categoryName.insert(c.id, qs(c.name));
+        categoryByName.insert(qs(c.name).toCaseFolded(), c.id);
+        categoryIds.insert(c.id);
+    }
+    QHash<std::string, const MenuCategory *> fileCategory;   // the file's id -> its department
+    QSet<QString> fileDepartments;                           // folded names
+    for (const MenuCategory &c : read.menuCategories) {
+        fileCategory.insert(c.id, &c);
+        fileDepartments.insert(qs(c.name).toCaseFolded());
+    }
+    std::unordered_set<std::string> idCheck;   // the file's departments with ID-check items
+    for (const QVariant &v : file.value(u"categories"_s).toList())
+        if (v.toMap().value(u"idCheck"_s).toBool())
+            idCheck.insert(ss(v.toMap().value(u"id"_s).toString()));
+
+    QVariantList rows;
+    int added = 0, prices = 0, barcodes = 0, names = 0, departments = 0, taxes = 0, gone = 0, conflicts = 0, skipped = 0;
+    const auto row = [&](const QString &kind, const MenuItem &m, const QString &upc, const QString &before, const QString &after) {
+        rows << QVariantMap{{u"kind"_s, kind}, {u"id"_s, qs(m.id)}, {u"item"_s, qs(m.name)}, {u"upc"_s, upc},
+                            {u"before"_s, before}, {u"after"_s, after}};
+    };
+    const auto upcOf = [](const MenuItem &f) {
+        return f.id.starts_with("ilsa-") ? qs(f.id.substr(5)) : f.barcodes.empty() ? QString() : qs(f.barcodes.front());
+    };
+    bool settingsDirty = false;
+    // A department's category here: by name, or new (as Menu Builder > Import makes it).
+    const auto categoryFor = [&](const std::string &fileId) -> std::string {
+        const MenuCategory *c = fileCategory.value(fileId);
+        if (!c)
+            return fileId;
+        const QString folded = qs(c->name).toCaseFolded();
+        std::string id = categoryByName.value(folded);
+        if (id.empty()) {
+            MenuCategory made;
+            made.name = c->name;
+            made.taxClass = c->taxClass;
+            made.group = c->group;
+            made.retailOnly = c->retailOnly || !c->group.empty();
+            made.id = freeId(qs(c->name), [&](const std::string &x) { return categoryIds.contains(x); });
+            id = made.id;
+            categoryIds.insert(id);
+            categoryByName.insert(folded, id);
+            categoryName.insert(id, qs(made.name));
+            s_->settings.menuCategories.push_back(std::move(made));
+            settingsDirty = true;
+        }
+        auto &list = s_->settings.tobaccoCategories;
+        if (idCheck.contains(fileId) && std::ranges::find(list, id) == list.end()) {
+            list.push_back(id);
+            settingsDirty = true;
+        }
+        return id;
+    };
+
+    // Each ILSA item: the item here it is, or a new one.
+    std::vector<MenuItem> fromFile;
+    fromFile.reserve(std::size_t(fileItems.size()));
+    std::vector<std::vector<std::size_t>> filesFor(had);   // item here -> the ILSA items that are it
+    for (const QVariant &v : fileItems) {
+        MenuItem f = menuItemFromJson(QJsonObject::fromVariantMap(v.toMap()));
+        const std::size_t at = fromFile.size();
+        std::size_t match = SIZE_MAX;
+        for (const std::string &b : f.barcodes)
+            if (const auto it = byCode.find(b); it != byCode.end()) {
+                match = it->second;
+                break;
+            }
+        if (match == SIZE_MAX)
+            if (const auto it = byId.find(f.id); it != byId.end())
+                match = it->second;
+        if (match != SIZE_MAX) {
+            if (match < had)
+                filesFor[match].push_back(at);
+            fromFile.push_back(std::move(f));
+            continue;
+        }
+        if (f.barcodes.empty()) {   // nothing to know it by next time: not added (no duplicates)
+            ++skipped;
+            row(u"skipped"_s, f, upcOf(f), QString(), tr("no barcode of its own"));
+            fromFile.push_back(std::move(f));
+            continue;
+        }
+        MenuItem item = f;
+        item.id = !f.id.empty() && !ids.contains(f.id) ? f.id
+                                                        : freeId(qs(f.name), [&](const std::string &x) { return ids.contains(x); });
+        item.family = categoryFor(f.family);
+        item.soldOutToday = false;
+        item.image.clear();
+        item.modifierGroups.clear();
+        ids.insert(item.id);
+        byId.emplace(item.id, s_->menu.size());
+        for (const std::string &b : item.barcodes)
+            byCode.emplace(b, s_->menu.size());
+        ++added;
+        row(u"added"_s, item, upcOf(f), QString(), format(item.price));
+        s_->menu.push_back(std::move(item));
+        if (s_->sink)
+            s_->sink->saveMenuItem(s_->menu.back(), int(s_->menu.size()) - 1);
+        fromFile.push_back(std::move(f));
+    }
+
+    // The items here that ILSA has: price and new barcodes; the rest only reported.
+    for (std::size_t i = 0; i < had; ++i) {
+        MenuItem &m = s_->menu[i];
+        const auto &hits = filesFor[i];
+        if (hits.empty()) {
+            // Gone from ILSA: one of its departments' items (with a barcode) no ILSA item is now.
+            if (!m.isModifier && !m.barcodes.empty() && fileDepartments.contains(categoryName.value(m.family).toCaseFolded())) {
+                ++gone;
+                row(u"gone"_s, m, qs(m.barcodes.front()), QString(), QString());
+            }
+            continue;
+        }
+        const MenuItem &first = fromFile[hits.front()];
+        const QString upc = upcOf(first);
+        bool changed = false;
+        // Several ILSA items on this one item (merged here): its price only when they agree.
+        if (std::ranges::all_of(hits, [&](std::size_t h) { return fromFile[h].price == first.price; })) {
+            if (m.price != first.price) {
+                ++prices;
+                row(u"price"_s, m, upc, format(m.price), format(first.price));
+                m.price = first.price;
+                changed = true;
+            }
+        } else {
+            ++conflicts;
+            QStringList each;
+            for (std::size_t h : hits)
+                each << upcOf(fromFile[h]) + u' ' + format(fromFile[h].price);
+            row(u"conflict"_s, m, upc, format(m.price), each.join(u", "_s));
+        }
+        for (std::size_t h : hits) {
+            const MenuItem &f = fromFile[h];
+            for (const std::string &b : f.barcodes) {
+                const auto it = byCode.find(b);
+                if (it != byCode.end())
+                    continue;   // its own already, or another item's: left there
+                m.barcodes.push_back(b);
+                byCode.emplace(b, i);
+                ++barcodes;
+                row(u"barcode"_s, m, upcOf(f), QString(), qs(b));
+                changed = true;
+            }
+            if (qs(m.name) != qs(f.name)) {
+                ++names;
+                row(u"name"_s, m, upcOf(f), qs(m.name), qs(f.name));
+            }
+            const MenuCategory *dept = fileCategory.value(f.family);
+            const QString deptName = dept ? qs(dept->name) : qs(f.family);
+            if (categoryName.value(m.family).toCaseFolded() != deptName.toCaseFolded()) {
+                ++departments;
+                row(u"department"_s, m, upcOf(f), categoryName.value(m.family, qs(m.family)), deptName);
+            }
+            if (m.taxClass != f.taxClass) {
+                ++taxes;
+                row(u"tax"_s, m, upcOf(f), qs(toString(m.taxClass)), qs(toString(f.taxClass)));
+            }
+        }
+        if (changed && s_->sink)
+            s_->sink->saveMenuItem(m, int(i));
+    }
+
+    // The Changes report: by "ILSA sync" (the first 40, then how many more).
+    int logged = 0;
+    const auto change = [&](const QString &item, const QString &field, const QString &before, const QString &after) {
+        Change c{++s_->lastChangeId, now(), s_->day.id, "ILSA sync", ss(tr("Menu")), ss(item), ss(field),
+                 ss(before.left(300)), ss(after.left(300))};
+        s_->changesToday.push_back(c);
+        if (s_->sink)
+            s_->sink->saveChange(c);
+    };
+    for (const QVariant &v : rows) {
+        const QVariantMap r = v.toMap();
+        const QString kind = r.value(u"kind"_s).toString();
+        if (kind != u"added" && kind != u"price" && kind != u"barcode")
+            continue;
+        if (++logged > 40)
+            continue;
+        if (kind == u"added")
+            change(r.value(u"item"_s).toString(), QString(), QString(), tr("Added, %1").arg(r.value(u"after"_s).toString()));
+        else if (kind == u"price")
+            change(r.value(u"item"_s).toString(), tr("Price"), r.value(u"before"_s).toString(), r.value(u"after"_s).toString());
+        else
+            change(r.value(u"item"_s).toString(), tr("Barcode"), QString(), tr("Added %1").arg(r.value(u"after"_s).toString()));
+    }
+    if (logged > 40)
+        change(QString(), QString(), QString(), tr("ILSA sync (and %1 more changes)").arg(logged - 40));
+
+    // One save of what changed, one new menu for every screen.
+    if (settingsDirty)
+        settingsChanged();
+    if (added || prices || barcodes) {
+        menuChanged();
+        emit notice(tr("ILSA price book: %1 new items, %2 price changes.").arg(added).arg(prices));
+    }
+    return {{u"ok"_s, true}, {u"exported"_s, file.value(u"exported"_s)}, {u"items"_s, int(fileItems.size())},
+            {u"added"_s, added}, {u"prices"_s, prices}, {u"barcodes"_s, barcodes}, {u"names"_s, names},
+            {u"departments"_s, departments}, {u"taxes"_s, taxes}, {u"gone"_s, gone}, {u"conflicts"_s, conflicts},
+            {u"skipped"_s, skipped}, {u"rows"_s, rows}};
 }
 
 // Several items at once (the Menu Builder's Select): the same change to

@@ -183,6 +183,8 @@ struct PosSettings {
     bool receiptShowVoids = false;
     // Items 86'd during service are back on the menu after End of Day.
     bool soldOutBackNextDay = true;
+    // The ILSA price book's automatic sync on the Pi (every 15 minutes; Site Setup > ILSA price book).
+    bool ilsaSyncOn = true;
     std::string receiptFooter;
     // Reprint with the buyer's date of birth (Reprint Receipt): only with a manager's PIN when on.
     bool dobReprintNeedsManager = true;

@@ -5,6 +5,7 @@
 //   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
 // Per Pi, never in Git and not in the database: the store-wide settings (printers, receipts, taxes)
 // stay in Store Settings.
+#include "app/ilsa_sync.hh"
 #include "guestslides.hh"
 #include "layoutcontroller.hh"
 
@@ -466,6 +467,53 @@ void LayoutController::startScreenSelfCheck()
     connect(&screenCheckTimer_, &QTimer::timeout, this, &LayoutController::refreshScreens, Qt::UniqueConnection);
     screenCheckTimer_.start();
 #endif
+}
+
+// --- ILSA price book: the automatic sync (app/ilsa_sync.cpp), on the computer that serves the store ---
+
+void LayoutController::setIlsaSync(vt::app::IlsaSync *sync)
+{
+    ilsaSync_ = sync;
+    if (sync)
+        connect(sync, &vt::app::IlsaSync::changed, this, [this] {
+            ++siteRevision_;
+            emit siteChanged();
+        });
+}
+
+QVariantMap LayoutController::ilsaSync() const
+{
+    return ilsaSync_ ? ilsaSync_->info() : QVariantMap{{u"available"_s, false}};
+}
+
+void LayoutController::ilsaSyncNow()
+{
+    if (!ilsaSync_)
+        return;
+    if (pos_ && !pos_->can(u"admin"_s)) {
+        setStatus(tr("Admin required."));
+        return;
+    }
+    if (!ilsaSync_->runNow())
+        setStatus(tr("The ILSA price book sync is running already."));
+}
+
+void LayoutController::setIlsaSyncOn(bool on)
+{
+    if (!ilsaSync_)
+        return;
+    if (pos_ && !pos_->can(u"admin"_s)) {
+        setStatus(tr("Admin required."));
+        ++siteRevision_;   // the switch goes back
+        emit siteChanged();
+        return;
+    }
+    ilsaSync_->setOn(on);
+}
+
+QStringList LayoutController::ilsaSyncLog() const
+{
+    return ilsaSync_ ? ilsaSync_->logTail(50) : QStringList();
 }
 
 // --- Guest screen pictures: from Dropbox > POS project > Guest Screen (vt-guest-pictures) ---

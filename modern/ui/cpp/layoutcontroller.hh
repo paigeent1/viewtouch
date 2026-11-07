@@ -28,6 +28,7 @@
 #include <functional>
 
 namespace vt::storage { class LayoutStore; }
+namespace vt::app { class IlsaSync; }
 
 // Drives the page UI: owns the running layout and the navigator, publishes
 // the current page to QML, and runs zone actions when touched. In edit mode
@@ -135,6 +136,14 @@ public:
     Q_INVOKABLE QString addGuestVideo(const QString &fileOrUrl);
     // A video slide's line with its sound on or off (Store Settings' Sound switch); others as they are.
     Q_INVOKABLE QString guestVideoSound(const QString &slide, bool sound) const;
+    // The ILSA price book's automatic sync (Site Setup > ILSA price book; app/ilsa_sync.hh), on the
+    // computer that serves the store (setIlsaSync from main): {available, on, busy, step, lastRun (ms),
+    // result}; available false elsewhere. Sync now and On/Off: admins. siteChanged when it moves.
+    Q_INVOKABLE QVariantMap ilsaSync() const;
+    Q_INVOKABLE void ilsaSyncNow();
+    Q_INVOKABLE void setIlsaSyncOn(bool on);
+    Q_INVOKABLE QStringList ilsaSyncLog() const;
+    void setIlsaSync(vt::app::IlsaSync *sync);
     int siteRevision() const { return siteRevision_; }
 
     // Persists a layout; false (with a message) when it could not.
@@ -430,6 +439,7 @@ private:
     QVariantMap screens_;        // vt-screens --json, last look
     bool screensBusy_ = false;
     QTimer screenCheckTimer_;
+    vt::app::IlsaSync *ilsaSync_ = nullptr;
     QString screenProblemsSaid_;   // the problems last put on the status line (said once each)
     QVariantMap guestPictures_;    // vt-guest-pictures list, last look
     bool guestPicturesBusy_ = false;
