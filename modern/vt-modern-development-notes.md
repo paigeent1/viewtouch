@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 10:32 ET — Bob (Claude) — ILSA sync test: Money is vt::Money
+- **What:** test_ilsa_sync.cpp used core::Money; it lives in namespace vt.
+- **Why:** CI 42385748518 didn't compile the new test.
+- **Files:** `modern/tests/test_ilsa_sync.cpp`
+
 ### 2026-11-07 09:23 ET — Bob (Claude) — ILSA price book syncs by itself every 15 minutes
 - **What:** The Pi's ViewTouch (the one serving the store) now keeps the ILSA price book in step by itself: every 15 minutes (first run a minute after start) it runs vt-ilsa-pricebook --exit-status, and when a new export came in it runs vt-ilsa-items and applies the converted file with the new PosService::syncPriceBook. New ILSA items are added into their department (id ilsa-<PLU>); prices of existing items follow ILSA; new barcodes ILSA has for an item are added. Names, sizes, category, tax and anything else set in ViewTouch are never changed: ILSA name, department and tax differences, items gone from ILSA, and two ILSA items on one item that disagree on price are only logged (once each). Items are matched by any barcode, then by the ilsa-<PLU> id, never by name. Nothing is merged or deleted. No login needed; it shows in the Changes report as ILSA sync; one menu revision per run. Logs in ~/ilsa-sync: sync-log.csv, runs.log, price-changes-<time>.csv. Site Setup has a new ILSA price book box: On/Off (default on, kept in the store settings as ilsaSyncOn), last run and result, Sync now, Show log. vt-ilsa-pricebook --exit-status exits 3 when the export is the same as last time (normal output unchanged without the flag). Tests: tests/test_ilsa_sync.cpp, including a 33,000-item timing test.
 - **Why:** Owner 2026-11-07, top priority: the price book must sync automatically with no action by anyone. Prices only (no cost): the ILSA export carries no cost the owner keeps there; system cost comes from his own worksheet.

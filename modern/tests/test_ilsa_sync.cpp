@@ -43,7 +43,7 @@ core::MenuItem here(const std::string &id, const std::string &name, std::int64_t
     m.id = id;
     m.name = name;
     m.family = "cigars";
-    m.price = core::Money::fromCents(cents);
+    m.price = vt::Money::fromCents(cents);
     m.taxClass = core::TaxClass::Merchandise;
     m.barcodes = std::move(codes);
     return m;
