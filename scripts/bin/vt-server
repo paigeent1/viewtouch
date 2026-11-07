@@ -21,7 +21,10 @@ if command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; the
         || need+=(qt6-ffmpeg-multimedia-plugin)
     if [ ${#need[@]} -gt 0 ]; then
         echo "Installing ${need[*]} (video on the customer display)..."
-        sudo apt-get install -y "${need[@]}" >/dev/null 2>&1 && touch modern/CMakeLists.txt \
+        # --fresh: the build folder remembers "Qt Multimedia not found" from before the install
+        # (2026-11-06 on the HCA Pi: a fresh project found it, the old build folder didn't).
+        sudo apt-get install -y "${need[@]}" >/dev/null 2>&1 \
+            && cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null \
             || echo "Couldn't install ${need[*]}; ViewTouch builds without video (pictures and GIFs still work)."
     fi
 fi
@@ -35,6 +38,12 @@ if command -v dpkg >/dev/null && ! dpkg -s fonts-noto-color-emoji >/dev/null 2>&
     echo "Installing the emoji font (the top bar's icons)..."
     sudo apt-get install -y fonts-noto-color-emoji >/dev/null 2>&1 && fc-cache -f >/dev/null 2>&1 \
         || echo "Couldn't install the emoji font; the top bar shows boxes for its icons."
+fi
+# Qt Multimedia installed but this build folder still says it isn't there: look again, once.
+if grep -q "Qt6Multimedia_DIR:PATH=.*NOTFOUND" modern/build/CMakeCache.txt 2>/dev/null \
+        && [ -f /usr/lib/aarch64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake -o -f /usr/lib/x86_64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake ]; then
+    echo "Looking for Qt Multimedia again (video on the customer display)..."
+    cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null
 fi
 cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
 # A vt-* command added since this Pi linked them (e.g. vt-screens): linked now, so it runs by name.

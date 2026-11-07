@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 09:08 ET — Bob (Claude) — vt-server: looks for Qt Multimedia again from a clean slate
+- **What:** vt-server: after installing Qt Multimedia's companions it reconfigures with cmake --fresh; and before each build, if CMakeCache.txt still has Qt6Multimedia_DIR NOTFOUND while Qt6MultimediaConfig.cmake exists, it reconfigures with --fresh once.
+- **Why:** HCA Pi 2026-11-06 23:52: a fresh project found Qt Multimedia, but ViewTouch's build folder kept its old 'not found' (no video on the guest screen).
+- **Files:** `scripts/bin/vt-server`
+
 ### 2026-11-06 18:28 ET — Bob (Claude) — Release 2026-11-06 (f): billboards, fast Item Look Up and Find, Menu Builder new-item fix
 - **What:** bob/release-1106f = main 23a50e0 + Menu Builder new-item card fix + Item Look Up speed (1 ms per keystroke on 33,000 items) + order-screen Find as word search on the server, shown as bars with up/down (2 ms) + billboards (signage only, Fire TV / Android TV app, 32-bit APK, Billboards page with hours and mute) + vt-server installs Qt Multimedia's companions. CI 42310230378: main's 28 known failing test cases only. Linear.
 - **Why:** One Pi update and one app build for the evening's work.
