@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 16:18 ET — Bob (Claude) — Find a check: ILSA history button
+- **What:** WidgetCheckSearch.qml (Find a check) gets the same ILSA history button as Look Up Checks, opening the imported ILSA receipts over the screen.
+- **Why:** Owner 2026-11-07 16:17: looked for ILSA receipts on Find a check; the button was only on Cashier Duty's Look Up Checks.
+- **Files:** (none)
+
 ### 2026-11-07 14:29 ET — Bob (Claude) — Billboards: power the TV off outside its hours (adb sleep / wake)
 - **What:** New billboard setting 'Power the TV off outside its hours' (Billboard defaults: on, for Fire TVs; a TV of another known make is off unless set). The store's server checks every 30 s (and at once after a change): outside its hours or Off now it runs vt-add-billboard --sleep (adb KEYCODE_SLEEP); at their start or On now --wake (KEYCODE_WAKEUP, 5 s, am start of the billboard). Not connected 60 s after waking: woken once more, then its row says "Didn't come back: check the TV's Wake on Wi-Fi setting" (On now tries again). Setting off or wake failed: the screen just goes black as before. Rows say asleep / waking / dark / on; Off now and On now buttons on its form. Each power step is logged (journal: 'Billboard power: ...') and shown in its job box. A failed sleep is tried again 10 minutes later.
 - **Why:** Owner tested on fire5 (Insignia Fire TV): adb's sleep key puts the TV in standby and the wake key brings it back on the Fire home screen, so the app must be started again.

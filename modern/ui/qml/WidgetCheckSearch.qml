@@ -7,7 +7,7 @@ import QtQuick.Layouts
 // gift card - or Show All for every check in the range, a page at a time.
 // Touch one to see it: its items, payments, refunds and its whole history
 // (the audit trail). Refund… gives money back (a manager's); Reprint
-// Receipt prints a copy.
+// Receipt prints a copy. ILSA history opens the imported ILSA receipts.
 Item {
     id: w
     property ZoneItem zone
@@ -111,6 +111,15 @@ Item {
                                 w.fresh(w.asked)
                         }
                     }
+                }
+                Button {
+                    // The receipts imported from ILSA (read-only), over this screen.
+                    objectName: "findIlsa"
+                    text: qsTr("ILSA history")
+                    implicitHeight: 38
+                    font.pixelSize: 14
+                    palette.button: "#6b4e16"; palette.buttonText: "white"
+                    onClicked: w.ilsa = true
                 }
             }
             RowLayout {
@@ -445,5 +454,15 @@ Item {
                 }
             }
         }
+    }
+
+    // ILSA history: the imported ILSA receipts, read-only (WidgetLegacyReceipts), as on Look Up Checks.
+    property bool ilsa: false
+    WidgetLegacyReceipts {
+        anchors.fill: parent
+        z: 5
+        visible: w.ilsa
+        zone: w.zone
+        onClosed: w.ilsa = false
     }
 }
