@@ -118,6 +118,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 12:33 ET — Bob (Claude) — ILSA By Employee filter: build fix
+- **What:** legacy_history.cpp: the item filter's LIKE escape uses '!' instead of a backslash (the backslashes had been lost, so the file didn't compile).
+- **Why:** CI 42395822857 failed to build bob/ilsa-cashiers.
+- **Files:** (none)
+
 ### 2026-11-07 12:20 ET — Bob (Claude) — ILSA cashiers tied to ViewTouch employees; By Employee with the ILSA history
 - **What:** vt-ilsa-history finds the export's cashier list (a table with a cashier number and a name column; PIN, pay, SSN and other private columns are never read), prints it in the run and keeps legacy_cashiers (copy, number, name) in ilsa-history.db. Reports > ILSA History > Cashiers lists each ILSA cashier with receipts, sales and first/last day; touching one picks the ViewTouch employee they are, or Former employee (kept in ilsa-history.db, legacy_cashier_map; the same number and name in the other ILSA copies follow). ILSA History > By Employee: sales by employee and item over the days chosen, tied cashiers under their ViewTouch name, with their ViewTouch sales beside (switch '+ ViewTouch sales'). The Reports screen's By Employee gets '+ ILSA history': the same report over its period. Also: the ILSA receipts list's tap ignores the pop-up keyboard's touches (TouchGuard).
 - **Why:** Owner 2026-11-07: tie ILSA sales to employees (spiffs: an employee's ILSA years together with their ViewTouch sales).
