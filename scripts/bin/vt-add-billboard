@@ -67,7 +67,7 @@ sleep 2
 STATE=$(timeout 10 adb -s "$DEV" get-state 2>&1 | tr -d '\r')
 if [ "$STATE" != device ]; then
     if echo "$STATE $OUT" | grep -qi unauthorized; then
-        echo "@vt refused"
+        echo "@vt asking"
         echo "The TV is asking whether to let the store's computer in. On the TV: choose 'Always allow from this computer', then OK. Then tap Try again."
         exit 1
     fi

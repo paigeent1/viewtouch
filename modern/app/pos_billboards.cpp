@@ -473,7 +473,8 @@ bool PosService::saveBillboardRecord(int index, const QVariantMap &record)
             return fail(tr("%1 is already a screen's name.").arg(name));
     const QString ip = record.value(u"ip"_s).toString().trimmed();
     static const QRegularExpression address(uR"(^[A-Za-z0-9][A-Za-z0-9.:\-]*$)"_s);
-    if (!address.match(ip).hasMatch() || ip.size() > 100)
+    // Empty: one that isn't deployed from here (a computer with --screen billboard); Deploy asks for it.
+    if (!ip.isEmpty() && (!address.match(ip).hasMatch() || ip.size() > 100))
         return fail(tr("Type the TV's IP address, like 192.168.1.60."));
     const QString portText = record.value(u"port"_s).toString().trimmed();
     const int port = portText.isEmpty() ? 0 : portText.toInt();

@@ -443,7 +443,7 @@ TEST_CASE("Billboards page: listed like Terminals, edited there, the TV follows 
     bad[u"day3"_s] = u"soon"_s;
     CHECK_FALSE(manager.adminSave(u"billboards"_s, boardIndex(manager, u"Bar TV"_s), bad));
     bad = r;
-    bad[u"ip"_s] = QString();
+    bad[u"ip"_s] = u"192.0.2.10; reboot"_s;
     CHECK_FALSE(manager.adminSave(u"billboards"_s, boardIndex(manager, u"Bar TV"_s), bad));
     bad = r;
     bad[u"name"_s] = u"Office"_s;   // a screen of the store (listed: adminRecords("terminals") adds this one)
