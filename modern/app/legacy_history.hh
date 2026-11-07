@@ -44,6 +44,18 @@ std::vector<core::legacy::Variance> variances(const QString &path, const QString
 // Sale lines no imported copy's item list names (vt-ilsa-history: name_src 'dept'), by UPC, the most sold first.
 std::vector<core::legacy::UnnamedItem> unnamedItems(const QString &path, const QString &from, const QString &to,
                                                     QString *error = nullptr);
+// ILSA's cashiers (every copy's, with or without a cashier list) with their sales and who they are in
+// ViewTouch.
+std::vector<core::legacy::Cashier> cashiers(const QString &path, QString *error = nullptr);
+// Ties ILSA cashier `number` of copy `sourceId` to ViewTouch employee `employeeId` (empty: a former
+// employee, untied); also the same number with the same name in the other copies when they aren't
+// tied yet. Writes the history file (Reports > ILSA History > Cashiers).
+bool setCashier(const QString &path, int sourceId, int number, const std::string &employeeId,
+                const std::string &employeeName, QString *error = nullptr);
+// What each cashier sold of each item (sales receipts; voided lines and lottery out); `filter`: an
+// item name, UPC or department name containing it (empty: all).
+std::vector<core::legacy::EmployeeItemRow> employeeItems(const QString &path, const QString &from, const QString &to,
+                                                         const QString &filter, QString *error = nullptr);
 // Receipts (without their lines), the newest first: `query` empty: all; "2026-10-28": that day;
 // "#412345" or up to 7 digits: that receipt number; 8 digits or more: a UPC sold on it; "12.34":
 // that total; else a word in an item's name.

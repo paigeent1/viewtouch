@@ -725,6 +725,10 @@ public:
         invoke(QStringLiteral("requestLegacyReport"), {kind, from, to, by});
     }
     Q_INVOKABLE void printLegacyReport() { invoke(QStringLiteral("printLegacyReport")); }
+    Q_INVOKABLE void setLegacyCashier(int sourceId, int number, const QString &employeeId)
+    {
+        invoke(QStringLiteral("setLegacyCashier"), {sourceId, number, employeeId});
+    }
     Q_INVOKABLE void findLegacyReceipts(const QString &query, int offset = 0) { invoke(QStringLiteral("findLegacyReceipts"), {query, offset}); }
     Q_INVOKABLE void selectLegacyReceipt(qint64 id) { invoke(QStringLiteral("selectLegacyReceipt"), {id}); }
     Q_INVOKABLE void reprintLegacyReceipt(qint64 id, bool withDob) { invoke(QStringLiteral("reprintLegacyReceipt"), {id, withDob}); }

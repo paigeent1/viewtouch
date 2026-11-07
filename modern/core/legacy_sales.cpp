@@ -139,6 +139,126 @@ std::string gpTrue(Money sales, Money cost, Money noCostSales, Money buydowns, M
     return gp(sales - noCostSales + discounts, cost + buydowns);
 }
 
+std::string cashierLabel(const Cashier &c)
+{
+    const std::string n = "ILSA cashier " + std::to_string(c.number);
+    return c.name.empty() ? n : c.name + " (" + n + ")";
+}
+
+Report cashiersReport(const std::vector<Cashier> &cashiers, const ReportContext &ctx)
+{
+    Report r;
+    r.id = "ilsa-cashiers";
+    r.title = "ILSA Cashiers";
+    r.subtitle = ctx.period;
+    r.columns = {"Cashier", "ILSA copy", "Receipts", "Sales", "First day", "Last day", "ViewTouch employee"};
+    std::int64_t receipts = 0;
+    Money sales;
+    for (const Cashier &c : cashiers) {
+        r.line({cashierLabel(c), c.source, count(c.receipts), ctx.money(c.sales), c.first, c.last,
+                c.employeeId.empty() ? "(former employee)" : c.employeeName});
+        receipts += c.receipts;
+        sales += c.sales;
+    }
+    r.total({count(std::int64_t(cashiers.size())) + " cashier(s)", "", count(receipts), ctx.money(sales), "", "", ""});
+    r.note("Sales: net of tax, sales receipts only. A cashier tied to a ViewTouch employee shows under that employee's name "
+           "in By Employee, with their ViewTouch sales.");
+    return r;
+}
+
+Report employeeSales(const std::vector<EmployeeItemRow> &ilsa, const std::vector<Check> *viewtouch,
+                     const std::string &filter, const ReportContext &ctx)
+{
+    Report r;
+    r.id = "ilsa-employees";
+    r.title = viewtouch ? "Sales by Employee and Item (ILSA and ViewTouch)" : "Sales by Employee and Item (ILSA)";
+    r.subtitle = ctx.period;
+    r.columns = {"Item", "Qty", "Sales"};
+    struct Tally { double qty = 0; Money sales; };
+    struct Person {
+        std::string name;
+        bool named = false;   // the ViewTouch name (theirs as they rang) wins over the mapping's
+        std::map<std::string, Tally> items;
+        double qty = 0;
+        Money sales, fromIlsa, fromVt;
+    };
+    std::map<std::string, Person> people;
+    for (const EmployeeItemRow &e : ilsa) {
+        Person &p = people[e.key];
+        if (p.name.empty())
+            p.name = e.who;
+        Tally &t = p.items[e.item.empty() ? "UPC " + e.upc : e.item];
+        t.qty += e.qty;
+        t.sales += e.sales;
+        p.qty += e.qty;
+        p.sales += e.sales;
+        p.fromIlsa += e.sales;
+    }
+    if (viewtouch) {
+        const std::string want = lower(filter);
+        const auto has = [&](const std::string &t) { return want.empty() || lower(t).find(want) != std::string::npos; };
+        for (const Check &c : *viewtouch) {
+            if (c.training || c.status != CheckStatus::Closed)
+                continue;
+            for (const OrderLine &l : c.lines) {
+                if (l.voided || l.isComment() || l.isGiftCard() || l.isFee() || !(has(l.name) || has(l.upc) || has(l.itemId)))
+                    continue;
+                std::string key, name;
+                if (!l.addedById.empty()) {
+                    key = l.addedById;
+                    name = l.addedByName.empty() ? l.addedById : l.addedByName;
+                } else if (!l.addedByName.empty()) {   // the self-order kiosk
+                    key = "~" + l.addedByName;
+                    name = l.addedByName;
+                } else {   // rung before who rang it was kept: the check's server
+                    key = c.serverId.empty() ? "server:" + c.serverName : c.serverId;
+                    name = (c.serverName.empty() ? std::string("(unknown)") : c.serverName) + " (server)";
+                }
+                Person &p = people[key];
+                if (!p.named) {
+                    p.name = name;
+                    p.named = !l.addedById.empty();
+                }
+                Tally &t = p.items[l.name];
+                t.qty += double(l.counted());
+                t.sales += l.total();
+                p.qty += double(l.counted());
+                p.sales += l.total();
+                p.fromVt += l.total();
+            }
+        }
+    }
+    if (!filter.empty())
+        r.note("Only items matching \"" + filter + "\".");
+    if (people.empty()) {
+        r.note("No sales on those days.");
+        return r;
+    }
+    std::vector<const Person *> sorted;
+    for (const auto &[key, p] : people)
+        sorted.push_back(&p);
+    std::ranges::sort(sorted, [](const Person *a, const Person *b) { return a->name < b->name; });
+    Money all;
+    double allQty = 0;
+    for (const Person *p : sorted) {
+        r.section(p->name);
+        std::vector<std::pair<std::string, Tally>> rows(p->items.begin(), p->items.end());
+        std::ranges::stable_sort(rows, [](const auto &a, const auto &b) { return a.second.sales > b.second.sales; });
+        for (const auto &[item, t] : rows)
+            r.line({item, units(t.qty), ctx.money(t.sales)});
+        if (viewtouch && p->fromIlsa.cents() != 0 && p->fromVt.cents() != 0) {
+            r.line({"  of which in ILSA", "", ctx.money(p->fromIlsa)});
+            r.line({"  of which in ViewTouch", "", ctx.money(p->fromVt)});
+        }
+        r.total({p->name + " total", units(p->qty), ctx.money(p->sales)});
+        all += p->sales;
+        allQty += p->qty;
+    }
+    r.total({"All employees", units(allQty), ctx.money(all)});
+    r.note("ILSA: each receipt's cashier (tie cashiers to ViewTouch employees on Cashiers). Voided lines, gift cards and lottery left out.");
+    return r;
+}
+
 std::string tenderGroup(int ilsaType)
 {
     switch (ilsaType) {

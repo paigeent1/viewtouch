@@ -12,6 +12,8 @@ CREATE TABLE legacy_tenders (id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL
 CREATE TABLE legacy_days (day TEXT PRIMARY KEY, source_id INTEGER NOT NULL, partial INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0, variances INTEGER NOT NULL DEFAULT 0, imported_at TEXT);
 CREATE TABLE legacy_variances (id INTEGER PRIMARY KEY, day TEXT NOT NULL, z_id INTEGER, what TEXT NOT NULL, ilsa_cents INTEGER NOT NULL, ours_cents INTEGER NOT NULL);
 CREATE TABLE legacy_items (source_id INTEGER NOT NULL, upc TEXT NOT NULL, bare TEXT NOT NULL, name TEXT NOT NULL, brand TEXT NOT NULL DEFAULT '', dept INTEGER, PRIMARY KEY (source_id, upc));
+CREATE TABLE legacy_cashiers (source_id INTEGER NOT NULL, cashier_num INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY (source_id, cashier_num));
+CREATE TABLE legacy_cashier_map (source_id INTEGER NOT NULL, cashier_num INTEGER NOT NULL, employee_id TEXT NOT NULL, employee_name TEXT NOT NULL DEFAULT '', PRIMARY KEY (source_id, cashier_num));
 CREATE INDEX legacy_z_day ON legacy_z (day);
 CREATE INDEX legacy_receipts_day ON legacy_receipts (day);
 CREATE INDEX legacy_receipts_num ON legacy_receipts (receipt_num);
@@ -37,6 +39,9 @@ INSERT INTO legacy_items (source_id, upc, bare, name, brand, dept) VALUES (1, '0
 INSERT INTO legacy_items (source_id, upc, bare, name, brand, dept) VALUES (1, '098765432109', '98765432109', 'MADE UP LIGHTER', 'SPARKY', 30);
 INSERT INTO legacy_items (source_id, upc, bare, name, brand, dept) VALUES (1, '12345678905', '12345678905', 'MADE UP CIGAR ROBUSTO', 'ACME CIGARS', 10);
 INSERT INTO legacy_items (source_id, upc, bare, name, brand, dept) VALUES (2, '11111111111', '11111111111', 'OLD ITEM NEVER SOLD', 'OLD CO', 20);
+INSERT INTO legacy_cashiers (source_id, cashier_num, name) VALUES (1, 3, 'Test Cashier Three');
+INSERT INTO legacy_cashiers (source_id, cashier_num, name) VALUES (1, 4, 'Test Cashier Four');
+INSERT INTO legacy_cashiers (source_id, cashier_num, name) VALUES (2, 2, 'Test Cashier Two');
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (1, 1, 1, 501, '2026-10-27', '2026-10-27 21:05:00');
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (2, 1, 1, 502, '2026-10-28', '2026-10-28 21:10:00');
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (3, 2, 1, 401, '2026-10-20', '2026-10-20 21:00:00');

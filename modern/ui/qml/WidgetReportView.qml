@@ -89,7 +89,16 @@ Item {
     // The forecast: a coming day (0 today ... 6), from past weeks.
     readonly property bool forecasting: reportId === "forecast"
     property int forecastDay: 1
+    // By Employee with the ILSA history too: ILSA cashiers tied to these employees (Reports > ILSA
+    // History > Cashiers), over the same days (pos_legacy.cpp).
+    property bool withIlsa: false
+    readonly property bool ilsaEmployees: isEmployeeItems && withIlsa
     function refresh() {
+        if (ilsaEmployees && pos) {
+            pos.requestLegacyReport("employees", period === "day" ? "day:" + day.id : period === "custom" ? fromDate : period,
+                                    toDate, "vt|" + itemFilter.trim())
+            return
+        }
         if (forecasting && pos) {
             pos.requestForecast(forecastDay)
             return
@@ -103,9 +112,14 @@ Item {
     onReportIdChanged: refresh()
     onPeriodChanged: refresh()
     onCompareChanged: refresh()
+    onWithIlsaChanged: Qt.callLater(refresh)
+    onDayIndexChanged: if (ilsaEmployees) Qt.callLater(refresh)
     onForecastDayChanged: refresh()
     readonly property var report: {
         if (!pos) return ({ rows: [] })
+        if (ilsaEmployees)
+            return range.id === "ilsa-employees" && range.report ? range.report
+                 : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
         if (forecasting)
             return range.id === "forecast" && range.report ? range.report
                  : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
@@ -260,6 +274,15 @@ Item {
                 text: qsTr("Clear")
                 fontScale: 0.34
                 onClicked: { itemFilterField.text = ""; w.itemFilter = ""; w.refresh() }
+            }
+            WidgetKey {
+                objectName: "employeeItemsIlsa"
+                Layout.preferredWidth: w.unit * 8
+                Layout.preferredHeight: Math.max(w.unit * 2, w.zone ? w.zone.touch(46) : 0)
+                text: qsTr("+ ILSA history")
+                fontScale: 0.32
+                baseColor: w.withIlsa ? "#1f8a4c" : "#343c49"
+                onClicked: w.withIlsa = !w.withIlsa
             }
         }
 
