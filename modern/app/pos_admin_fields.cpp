@@ -315,6 +315,8 @@ QVariantList PosService::adminFields(const QString &panel)
             with(with(field(u"startPage.host"_s, tr("Hosts start on"), u"page"_s), u"emptyText"_s, tr("(the seating screen)")), u"pages"_s, u"floor"_s),
             with(with(field(u"startPage.manager"_s, tr("Managers start on"), u"page"_s), u"emptyText"_s, tr("(the floor plan)")), u"pages"_s, u"floor"_s),
             field(u"currencySymbol"_s, tr("Currency symbol"), u"string"_s),
+            field(u"ilsaHistoryStore"_s, tr("ILSA history store"), u"string"_s,
+                  tr("The store whose ILSA sales history this site shows first: its check prefix, e.g. BHDAN (Danbury) or BHNM (New Milford).")),
             field(u"receiptHeader"_s, tr("Receipt header"), u"text"_s, tr("Address, phone… one per line")),
             field(u"receiptFooter"_s, tr("Receipt footer"), u"text"_s),
             field(u"dobReprintNeedsManager"_s, tr("Reprint with date of birth: manager only"), u"bool"_s,

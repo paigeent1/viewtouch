@@ -720,16 +720,20 @@ public:
     Q_INVOKABLE void expoRecall() { invoke(QStringLiteral("expoRecall")); }
     Q_INVOKABLE void requestForecast(int daysAhead) { invoke(QStringLiteral("requestForecast"), {daysAhead}); }
     // ILSA's sales history (PosService::requestLegacyReport...): answers in rangeReport.
-    Q_INVOKABLE void requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {})
+    Q_INVOKABLE void requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {},
+                                         const QString &store = {})
     {
-        invoke(QStringLiteral("requestLegacyReport"), {kind, from, to, by});
+        invoke(QStringLiteral("requestLegacyReport"), {kind, from, to, by, store});
     }
     Q_INVOKABLE void printLegacyReport() { invoke(QStringLiteral("printLegacyReport")); }
     Q_INVOKABLE void setLegacyCashier(int sourceId, int number, const QString &employeeId)
     {
         invoke(QStringLiteral("setLegacyCashier"), {sourceId, number, employeeId});
     }
-    Q_INVOKABLE void findLegacyReceipts(const QString &query, int offset = 0) { invoke(QStringLiteral("findLegacyReceipts"), {query, offset}); }
+    Q_INVOKABLE void findLegacyReceipts(const QString &query, int offset = 0, const QString &store = {})
+    {
+        invoke(QStringLiteral("findLegacyReceipts"), {query, offset, store});
+    }
     Q_INVOKABLE void selectLegacyReceipt(qint64 id) { invoke(QStringLiteral("selectLegacyReceipt"), {id}); }
     Q_INVOKABLE void reprintLegacyReceipt(qint64 id, bool withDob) { invoke(QStringLiteral("reprintLegacyReceipt"), {id, withDob}); }
     Q_INVOKABLE void requestRangeReport(const QString &id, const QString &period, const QString &from = {},

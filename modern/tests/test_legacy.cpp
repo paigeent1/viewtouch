@@ -77,9 +77,15 @@ TEST_CASE("ILSA history: a day's totals as its Daily Z, both GPs", "[legacy]")
     const QString path = makeHistory(dir);
     const auto st = app::legacy::status(path);
     CHECK(st.present);
-    CHECK(st.days == 3);           // two days of the made-up copy, one of an older made-up copy
-    CHECK(st.receipts == 8);
-    CHECK(st.first == u"2026-10-20"_s);
+    CHECK(st.days == 4);           // BHDAN: two days of the made-up copy, one of an older one; BHNM: one day
+    CHECK(st.receipts == 9);
+    CHECK(st.first == u"2026-10-15"_s);
+    // One store's history (BHDAN, BHNM: the store's check prefix).
+    const auto dan = app::legacy::status(path, nullptr, u"BHDAN"_s);
+    CHECK(dan.days == 3);
+    CHECK(dan.first == u"2026-10-20"_s);
+    CHECK(app::legacy::status(path, nullptr, u"bhnm"_s).days == 1);
+    CHECK(app::legacy::stores(path) == QStringList{u"BHDAN"_s, u"BHNM"_s});
 
     QString error;
     const core::legacy::ZTotals z = app::legacy::totals(path, u"2026-10-28"_s, u"2026-10-28"_s, &error);
@@ -209,11 +215,18 @@ TEST_CASE("ILSA history: receipts found and shown read-only", "[legacy]")
     QTemporaryDir dir;
     const QString path = makeHistory(dir);
     CHECK(app::legacy::findReceipts(path, u"2026-10-27"_s, 50, 0).size() == 2);
-    const auto byNumber = app::legacy::findReceipts(path, u"#9003"_s, 50, 0);
+    // Receipt 9003 is in both stores' history: BHDAN-9003 and BHNM-9003.
+    CHECK(app::legacy::findReceipts(path, u"#9003"_s, 50, 0).size() == 2);
+    CHECK(app::legacy::findReceipts(path, u"9003"_s, 50, 0, nullptr, u"BHDAN"_s).size() == 1);
+    CHECK(app::legacy::findReceipts(path, u"bhnm9003"_s, 50, 0).size() == 1);
+    CHECK(app::legacy::findReceipts(path, u"HCA-9003"_s, 50, 0).empty());
+    const auto byNumber = app::legacy::findReceipts(path, u"BHDAN-9003"_s, 50, 0);
     REQUIRE(byNumber.size() == 1);
+    CHECK(byNumber[0].prefix == "BHDAN");
+    CHECK(core::legacy::receiptLabel(byNumber[0]) == "BHDAN-9003");
     // ILSA kept UPCs as numbers: found with or without the leading 0.
-    CHECK(app::legacy::findReceipts(path, u"12345678905"_s, 50, 0).size() == 3);
-    CHECK(app::legacy::findReceipts(path, u"012345678905"_s, 50, 0).size() == 3);
+    CHECK(app::legacy::findReceipts(path, u"12345678905"_s, 50, 0).size() == 4);   // BHNM's too
+    CHECK(app::legacy::findReceipts(path, u"012345678905"_s, 50, 0, nullptr, u"BHDAN"_s).size() == 3);
     CHECK(app::legacy::findReceipts(path, u"lighter"_s, 50, 0).size() == 2);
     CHECK(app::legacy::findReceipts(path, u"26.58"_s, 50, 0).size() == 1);
 
@@ -225,6 +238,7 @@ TEST_CASE("ILSA history: receipts found and shown read-only", "[legacy]")
     const std::string text = core::legacy::receiptText(*r, false);
     CHECK(text.find("2 MADE UP CIGAR ROBUSTO") != std::string::npos);
     CHECK(text.find("VOID") != std::string::npos);
+    CHECK(text.find("Receipt BHDAN-9003") != std::string::npos);
     CHECK(text.find("Cashier 4 Test Cashier Four") != std::string::npos);
     CHECK(text.find("UPC 012345678905") != std::string::npos);
     CHECK(text.find("Age checked: 21+") != std::string::npos);
@@ -263,6 +277,18 @@ TEST_CASE("ILSA History on the Reports screen and in Receipt Lookup", "[legacy][
 
     CHECK_FALSE(pos.requestLegacyReport(u"z"_s, u"28 Oct"_s));   // dates like 2026-10-28
 
+    REQUIRE(pos.findLegacyReceipts(u"9003"_s, 0, u"*"_s));            // every store's
+    REQUIRE(waitFor(pos));
+    CHECK(pos.rangeReport()[u"results"_s].toList().size() == 2);
+    REQUIRE(pos.findLegacyReceipts(u"9003"_s));                       // this site's store's
+    REQUIRE(waitFor(pos));
+    REQUIRE(pos.rangeReport()[u"results"_s].toList().size() == 1);
+    CHECK(pos.rangeReport()[u"results"_s].toList().value(0).toMap()[u"label"_s] == u"BHDAN-9003"_s);
+    pos.shared()->settings.ilsaHistoryStore = "BHNM";                 // the New Milford site
+    REQUIRE(pos.requestLegacyReport(u"z"_s, u"2026-10-15"_s));
+    REQUIRE(waitFor(pos));
+    CHECK(cells(pos.rangeReport()[u"report"_s].toMap(), u"Receipts"_s).value(1) == u"1"_s);
+    pos.shared()->settings.ilsaHistoryStore = "BHDAN";
     REQUIRE(pos.findLegacyReceipts(u"2026-10-28"_s));
     REQUIRE(waitFor(pos));
     const QVariantList results = pos.rangeReport()[u"results"_s].toList();
@@ -282,7 +308,8 @@ TEST_CASE("ILSA history: cashiers tied to ViewTouch employees, sales by employee
     QTemporaryDir dir;
     const QString path = makeHistory(dir);
     // Made-up cashiers: 3 and 4 in the newer copy, 2 in the older one.
-    auto list = app::legacy::cashiers(path);
+    CHECK(app::legacy::cashiers(path).size() == 4);          // every store's: BHNM's cashier 9 too
+    auto list = app::legacy::cashiers(path, nullptr, u"BHDAN"_s);
     REQUIRE(list.size() == 3);
     CHECK(list[0].number == 2);
     CHECK(list[0].name == "Test Cashier Two");
@@ -301,7 +328,7 @@ TEST_CASE("ILSA history: cashiers tied to ViewTouch employees, sales by employee
 
     QString error;
     REQUIRE(app::legacy::setCashier(path, source, 3, "emp-7", "Pat Example", &error));
-    list = app::legacy::cashiers(path);
+    list = app::legacy::cashiers(path, nullptr, u"BHDAN"_s);
     CHECK(std::ranges::find_if(list, [](const auto &c) { return c.number == 3; })->employeeName == "Pat Example");
     rows = app::legacy::employeeItems(path, u"2026-10-27"_s, u"2026-10-28"_s, {});
     // Cashier 3 on Oct 27 (the cigar, $10), cashier 4 on Oct 28.
@@ -334,7 +361,7 @@ TEST_CASE("ILSA history: cashiers tied to ViewTouch employees, sales by employee
 
     // Untied again: a former employee.
     REQUIRE(app::legacy::setCashier(path, source, 3, "", "", &error));
-    list = app::legacy::cashiers(path);
+    list = app::legacy::cashiers(path, nullptr, u"BHDAN"_s);
     CHECK(std::ranges::find_if(list, [](const auto &x) { return x.number == 3; })->employeeId.empty());
 }
 
@@ -347,7 +374,9 @@ TEST_CASE("ILSA History > Cashiers and By Employee on the screen", "[legacy][rep
     REQUIRE(pos.requestLegacyReport(u"cashiers"_s, u"2000-01-01"_s, u"2026-12-31"_s));
     REQUIRE(waitFor(pos));
     const QVariantList cashiers = pos.rangeReport()[u"cashiers"_s].toList();
-    REQUIRE(cashiers.size() == 3);
+    REQUIRE(cashiers.size() == 3);                                   // this site's store: BHDAN (Store Settings)
+    CHECK(pos.rangeReport()[u"store"_s] == u"BHDAN"_s);
+    CHECK(pos.rangeReport()[u"stores"_s].toStringList() == QStringList{u"BHDAN"_s, u"BHNM"_s});
     const QVariantList staff = pos.rangeReport()[u"employees"_s].toList();
     REQUIRE_FALSE(staff.isEmpty());
     const QVariantMap who = staff.first().toMap();

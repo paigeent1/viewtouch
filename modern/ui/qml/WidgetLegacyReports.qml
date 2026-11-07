@@ -37,6 +37,8 @@ Item {
     property string by: "item"
     // By Employee: an item, UPC, brand or department; with ViewTouch's own sales too.
     property string employeeFilter: ""
+    // The ILSA store: "" this site's (Store Settings), BHDAN / BHNM..., "*" every store's.
+    property string store: ""
     property bool withViewTouch: true
     // Departments: the one each line was sold in (owner 2026-11-07), or as ILSA's printouts (the
     // items' departments now).
@@ -68,7 +70,8 @@ Item {
         if (w.pos && w.fromDate !== "")
             w.pos.requestLegacyReport(w.kind, w.fromDate, w.toDate,
                                       w.kind === "depts" ? w.deptBy
-                                      : w.kind === "employees" ? (w.withViewTouch ? "vt|" : "|") + w.employeeFilter : w.by)
+                                      : w.kind === "employees" ? (w.withViewTouch ? "vt|" : "|") + w.employeeFilter : w.by,
+                                      w.store)
     }
     // Asked a moment later, not while the page is being built (the answer changes rangeReport,
     // which bindings here read: asking from inside a binding update is a binding loop).
@@ -113,6 +116,30 @@ Item {
                     onClicked: w.kind = modelData.id
                 }
             }
+        }
+
+        // Which store's ILSA history (Store Settings' ILSA history store first), or every store's.
+        RowLayout {
+            visible: (w.range.stores ?? []).length > 0
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.fillHeight: false
+            spacing: w.unit * 0.3
+            Text { text: qsTr("Store"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
+            Repeater {
+                model: (w.range.stores ?? []).concat(["*"])
+                delegate: WidgetKey {
+                    required property string modelData
+                    objectName: "ilsaStore-" + modelData
+                    Layout.preferredWidth: w.unit * 6
+                    Layout.fillHeight: true
+                    text: modelData === "*" ? qsTr("All stores") : modelData
+                    fontScale: 0.34
+                    baseColor: (w.range.store ?? "") === modelData ? "#1f8a4c" : "#2b3340"
+                    onClicked: { w.store = modelData; Qt.callLater(w.refresh) }
+                }
+            }
+            Item { Layout.fillWidth: true }
         }
 
         // Item movement: by what.

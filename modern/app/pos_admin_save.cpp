@@ -250,6 +250,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         if (record.contains(u"giftCardLocation"_s)) s_->settings.giftCardLocation = ss(record.value(u"giftCardLocation"_s).toString().trimmed());
         if (record.contains(u"topRibbonShowWeather"_s)) s_->settings.topRibbonShowWeather = record.value(u"topRibbonShowWeather"_s).toBool();
         s_->settings.currencySymbol = ss(record.value(u"currencySymbol"_s).toString());
+        if (record.contains(u"ilsaHistoryStore"_s))
+            s_->settings.ilsaHistoryStore = ss(record.value(u"ilsaHistoryStore"_s).toString().trimmed().toUpper());
         s_->settings.receiptHeader = ss(record.value(u"receiptHeader"_s).toString());
         s_->settings.receiptFooter = ss(record.value(u"receiptFooter"_s).toString());
         if (record.contains(u"dobReprintNeedsManager"_s))

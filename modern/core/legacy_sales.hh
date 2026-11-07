@@ -138,6 +138,7 @@ struct ReceiptTender {
 struct Receipt {
     std::int64_t id = 0;        // in the history file
     std::string source;         // the ILSA database it came from
+    std::string prefix;         // its store's check prefix ("BHDAN"): shown as BHDAN-836100
     int reg = 0;
     std::int64_t number = 0;    // ILSA's receipt number
     std::string day, at;        // business day; when it was rung (YYYY-MM-DD HH:MM:SS)
@@ -150,6 +151,11 @@ struct Receipt {
     std::vector<ReceiptLine> lines;
     std::vector<ReceiptTender> tenders;
 };
+// An ILSA receipt's number as shown everywhere: its store's prefix, a dash, ILSA's number
+// ("BHDAN-836100"); just the number when its copy has no prefix.
+std::string receiptLabel(const std::string &prefix, std::int64_t number);
+inline std::string receiptLabel(const Receipt &r) { return receiptLabel(r.prefix, r.number); }
+
 
 // "31.2%" (part of whole); "—" when whole is 0.
 std::string percent(Money part, Money whole);

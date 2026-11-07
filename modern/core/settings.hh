@@ -208,6 +208,9 @@ struct PosSettings {
     bool soldOutBackNextDay = true;
     // The ILSA price book's automatic sync on the Pi (every 15 minutes; Site Setup > ILSA price book).
     bool ilsaSyncOn = true;
+    // Whose ILSA history this site shows first (Reports > ILSA History, Look Up Checks > ILSA history):
+    // its store's check prefix (BHDAN, BHNM; HCA has none). Its receipts show as BHDAN-836100.
+    std::string ilsaHistoryStore = "BHDAN";
     std::string receiptFooter;
     // Reprint with the buyer's date of birth (Reprint Receipt): only with a manager's PIN when on.
     bool dobReprintNeedsManager = true;
