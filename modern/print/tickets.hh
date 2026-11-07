@@ -68,6 +68,9 @@ Document noSaleTicket(const core::CashMovement &noSale, int number, const std::s
 Document privacyNoticeTicket(const TicketContext &ctx);
 // A gift receipt: what was bought (names and quantities), no prices or payments.
 Document giftReceipt(const core::Check &check, const TicketContext &ctx);
+// Store Settings > Receipts > Print a barcode on receipts: the check's reference ("R-42", "RHCA-42") as a
+// Code 128 barcode at the bottom (receipt and giftReceipt end with it); off: nothing.
+void receiptBarcode(Document &d, const core::Check &check, const TicketContext &ctx);
 // A receipt carries the short notice when the check has a customer's details.
 bool receiptNeedsPrivacy(const core::Check &check, const core::PosSettings &settings);
 

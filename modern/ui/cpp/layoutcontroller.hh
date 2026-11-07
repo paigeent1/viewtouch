@@ -334,7 +334,8 @@ public:
     Q_INVOKABLE bool numberKey(const QString &key);
     // What a barcode scanner read (keys too fast for a person, then Enter):
     // an item's barcode or number rings it in on the order screens; else a
-    // coupon or a gift card (PosService::scanCode).
+    // coupon or a gift card (PosService::scanCode). A receipt's barcode ("R-5012") opens that check on
+    // Find a check (PosService::openReceiptCode), never an item.
     bool takeCameraToField() { return std::exchange(cameraToField_, false); }
     Q_INVOKABLE void scanned(const QString &code);
     Q_INVOKABLE void openNewItemWithBarcode(const QString &code, const QString &itemType = QStringLiteral("retail"));

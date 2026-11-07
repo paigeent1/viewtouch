@@ -20,7 +20,7 @@ set(VTM_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # ---------------------------------------------------------------------------
 add_library(vtm_core STATIC
     core/money.hh core/tax.hh core/menu.hh core/employee.hh core/check.hh core/settings.hh
-    core/day.hh core/report.hh core/customer.hh core/waitlist.hh core/inventory.hh
+    core/day.hh core/report.hh core/customer.hh core/waitlist.hh core/inventory.hh core/receipt_ref.hh
     core/core.cpp core/report.cpp
     core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
 )

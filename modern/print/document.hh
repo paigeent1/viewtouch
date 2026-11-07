@@ -21,11 +21,11 @@ struct Raster {
 
 struct Document {
     enum class Align { Left, Center, Right };
-    enum class Kind { Text, Columns, Rule, Blank, Image };
+    enum class Kind { Text, Columns, Rule, Blank, Image, Barcode };
 
     struct Line {
         Kind kind = Kind::Text;
-        std::string text;      // Text; left side of Columns
+        std::string text;      // Text; left side of Columns; Barcode: what it reads (printed under it too)
         std::string right;     // Columns
         Align align = Align::Left;
         bool bold = false;
@@ -43,7 +43,13 @@ struct Document {
     Document &rule();
     Document &blank();
     Document &image(std::shared_ptr<const Raster> raster);
+    // A Code 128 barcode, centered, its text under it (letters, digits and - . space only; others dropped).
+    Document &barcode(std::string data);
 };
+
+// Code 128 (code set B) for `data` (printable ASCII): the bars and spaces, one entry a module
+// (true = black): start, data, check symbol, stop. No quiet zone.
+std::vector<bool> code128Modules(const std::string &data);
 
 // Plain letters a printer without accents can show (é -> e, € -> EUR, no control characters).
 std::string plainLetters(const std::string &s);

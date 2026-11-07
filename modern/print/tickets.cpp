@@ -258,7 +258,16 @@ Document receipt(const Check &check, const TicketContext &ctx)
         for (const std::string &l : splitLines(privacyText(ctx.settings, false)))
             d.text(l);
     }
+    receiptBarcode(d, check, ctx);
     return d;
+}
+
+void receiptBarcode(Document &d, const Check &check, const TicketContext &ctx)
+{
+    if (!ctx.settings.receiptBarcode || check.id <= 0)
+        return;
+    d.blank();
+    d.barcode(receiptReference(ctx.settings.checkPrefix, check.id));
 }
 
 Document giftReceipt(const Check &check, const TicketContext &ctx)
@@ -284,6 +293,7 @@ Document giftReceipt(const Check &check, const TicketContext &ctx)
         d.center(ctx.tr("Thank you!"));
     for (const std::string &l : footer)
         d.center(l);
+    receiptBarcode(d, check, ctx);
     return d;
 }
 

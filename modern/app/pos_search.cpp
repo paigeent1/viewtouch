@@ -63,16 +63,27 @@ bool PosService::searchChecks(const QString &query, int days, int offset)
 {
     if (!require(perm::Settle, tr("Finding checks")))
         return false;
-    const QString q = query.trimmed();
+    QString q = query.trimmed();
     if (q.size() == 1)
         return fail(tr("Type at least two letters or digits."));
+    const QString asked = q;
+    // A receipt's barcode, scanned or typed ("R-5012", "RHCA-5012"): that check, from any day, shown.
+    qint64 select = 0;
+    if (const auto ref = parseReceiptReference(ss(q))) {
+        if (!receiptIsOurs(*ref))
+            return false;
+        select = ref->checkId;
+        q = u"#%1"_s.arg(select);
+        days = 0;
+        offset = 0;
+    }
     // 0: every check ever; else the last `days` days (up to a century).
     days = days <= 0 ? 0 : std::clamp(days, 1, 36600);
     offset = std::max(0, offset);
     const int request = ++searchRequest_;
     searchHits_.clear();
     selectedHit_ = 0;
-    checkSearch_ = {{u"query"_s, q}, {u"loading"_s, true}, {u"days"_s, days}, {u"offset"_s, offset}};
+    checkSearch_ = {{u"query"_s, asked}, {u"loading"_s, true}, {u"days"_s, days}, {u"offset"_s, offset}};
     emit sessionChanged();
 
     // Open checks (and today's, if there's no database) are here; the rest
@@ -128,9 +139,15 @@ bool PosService::searchChecks(const QString &query, int days, int offset)
                     hits.push_back(std::move(c));
         }
         std::ranges::stable_sort(hits, std::greater{}, [](const Check &c) { return c.closedAt ? c.closedAt : c.openedAt; });
-        QMetaObject::invokeMethod(self, [self, request, more, next = offset + range.limit, hits = std::move(hits)]() mutable {
+        QMetaObject::invokeMethod(self, [self, request, more, select, next = offset + range.limit, hits = std::move(hits)]() mutable {
             if (!self || request != self->searchRequest_)
                 return;   // a newer search replaced it
+            if (select) {   // a receipt's barcode: that check, open on the screen
+                if (std::ranges::any_of(hits, [&](const Check &c) { return c.id == select; }))
+                    self->selectedHit_ = select;
+                else
+                    emit self->notice(tr("No check #%1 here.").arg(select));
+            }
             self->searchHits_ = std::move(hits);
             self->checkSearch_.insert(u"loading"_s, false);
             self->checkSearch_.insert(u"more"_s, more);
@@ -139,6 +156,23 @@ bool PosService::searchChecks(const QString &query, int days, int offset)
         }, Qt::QueuedConnection);
     });
     return true;
+}
+
+bool PosService::receiptIsOurs(const ReceiptReference &ref)
+{
+    const std::string ours = normalCheckPrefix(s_->settings.checkPrefix);
+    if (ref.prefix == ours)
+        return true;
+    if (ref.prefix.empty())   // printed before this store had a prefix, or at a store without one
+        return fail(tr("That receipt has no store prefix: check the store's name on it, then type #%1 here.").arg(ref.checkId));
+    return fail(tr("That receipt is from %1; look it up there.").arg(qs(ref.prefix)));
+}
+
+bool PosService::openReceiptCode(const QString &code)
+{
+    if (!parseReceiptReference(ss(code)))
+        return fail(tr("That isn't a receipt's barcode."));
+    return searchChecks(code, 0, 0);
 }
 
 void PosService::selectFoundCheck(qint64 id)
