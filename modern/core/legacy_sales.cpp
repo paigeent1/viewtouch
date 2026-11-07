@@ -139,6 +139,11 @@ std::string gpTrue(Money sales, Money cost, Money noCostSales, Money buydowns, M
     return gp(sales - noCostSales + discounts, cost + buydowns);
 }
 
+std::string receiptLabel(const std::string &prefix, std::int64_t number)
+{
+    return prefix.empty() ? std::to_string(number) : prefix + "-" + std::to_string(number);
+}
+
 std::string cashierLabel(const Cashier &c)
 {
     const std::string n = "ILSA cashier " + std::to_string(c.number);
@@ -658,7 +663,7 @@ std::vector<std::pair<std::string, std::string>> receiptRows(const Receipt &rc, 
 {
     std::vector<std::pair<std::string, std::string>> out;
     const auto rule = [&] { out.emplace_back("-", "-"); };
-    out.emplace_back("Receipt " + std::to_string(rc.number), rc.at.substr(0, 16));
+    out.emplace_back("Receipt " + receiptLabel(rc), rc.at.substr(0, 16));
     out.emplace_back("Register " + std::to_string(rc.reg),
                      "Cashier " + std::to_string(rc.cashier) + (rc.cashierName.empty() ? "" : " " + rc.cashierName));
     rule();
@@ -725,7 +730,7 @@ Report receiptReport(const Receipt &rc, bool withDob)
 {
     Report r;
     r.id = "ilsa-receipt";
-    r.title = "ILSA receipt #" + std::to_string(rc.number);
+    r.title = "ILSA receipt " + receiptLabel(rc);
     r.subtitle = withDob ? "Reprint, store's copy" : "Reprint";
     for (const auto &[left, right] : receiptRows(rc, withDob)) {
         if (left == "-" && right == "-")

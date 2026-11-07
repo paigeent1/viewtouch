@@ -16,11 +16,16 @@ Rectangle {
     readonly property var found: info.results ?? []
     readonly property var picked: info.selected ?? null
     property string query: ""
+    property string store: ""   // "" this site's ILSA store, BHDAN / BHNM..., "*" every store's
+    readonly property var range: info
+    readonly property string face: "DejaVu Sans"
+    readonly property color ink: "white"
     property var offsets: [0]
     property int index: -1
     readonly property real unit: Math.max(14, Math.min(width / 50, height / 26))
     readonly property real keyH: Math.max(w.unit * 2.4, w.zone ? w.zone.touch(48) : 48)
-    function load(offset) { if (w.pos) w.pos.findLegacyReceipts(w.query, offset) }
+    function load(offset) { if (w.pos) w.pos.findLegacyReceipts(w.query, offset, w.store) }
+    function reload() { w.offsets = [0]; w.index = -1; w.load(0) }
     function choose(i) {
         if (i < 0 || i >= found.length) return
         index = i
@@ -87,6 +92,29 @@ Rectangle {
                 font.pixelSize: w.unit * 1.1
                 font.bold: true
             }
+            // Which store's ILSA history (Store Settings' ILSA history store first), or every store's.
+        RowLayout {
+            visible: (w.range.stores ?? []).length > 0
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.fillHeight: false
+            spacing: w.unit * 0.3
+            Text { text: qsTr("Store"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
+            Repeater {
+                model: (w.range.stores ?? []).concat(["*"])
+                delegate: WidgetKey {
+                    required property string modelData
+                    objectName: "ilsaStore-" + modelData
+                    Layout.preferredWidth: w.unit * 6
+                    Layout.fillHeight: true
+                    text: modelData === "*" ? qsTr("All stores") : modelData
+                    fontScale: 0.34
+                    baseColor: (w.range.store ?? "") === modelData ? "#1f8a4c" : "#2b3340"
+                    onClicked: { w.store = modelData; Qt.callLater(w.reload) }
+                }
+            }
+            Item { Layout.fillWidth: true }
+        }
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6
@@ -96,7 +124,7 @@ Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: w.keyH
                     font.pixelSize: w.unit * 0.8
-                    placeholderText: qsTr("Day (2026-10-28), #receipt, UPC, 12.34 or a name")
+                    placeholderText: qsTr("Day (2026-10-28), BHDAN-836100, UPC, 12.34 or a name")
                     onAccepted: { w.query = text; w.offsets = [0]; w.index = -1; w.load(0) }
                 }
                 Button {
@@ -133,7 +161,7 @@ Rectangle {
                         anchors.rightMargin: w.unit
                         ColumnLayout {
                             spacing: 0
-                            Label { text: qsTr("ILSA  Rcpt #  %1").arg(row.modelData.number ?? ""); color: row.index === w.index ? "#ffe066" : "white"; font.pixelSize: w.unit * 1.05; font.bold: true }
+                            Label { text: qsTr("ILSA  Rcpt  %1").arg(row.modelData.label ?? row.modelData.number ?? ""); color: row.index === w.index ? "#ffe066" : "white"; font.pixelSize: w.unit * 1.05; font.bold: true }
                             Label { text: qsTr("Total  %1").arg(row.modelData.total ?? "") + ((row.modelData.mode ?? 0) !== 0 ? qsTr("  (not a sale)") : "")
                                           + "   " + qsTr("Cashier %1").arg(((row.modelData.cashier ?? "") + " " + (row.modelData.cashierName ?? "")).trim())
                                     color: "white"; font.pixelSize: w.unit * 0.95 }
@@ -191,7 +219,7 @@ Rectangle {
         contentItem: ColumnLayout {
             spacing: w.unit * 0.6
             Label {
-                text: w.picked ? qsTr("Reprint ILSA receipt #%1").arg(w.picked.number ?? "") : ""
+                text: w.picked ? qsTr("Reprint ILSA receipt %1").arg(w.picked.label ?? w.picked.number ?? "") : ""
                 font.pixelSize: w.unit * 1.1; font.bold: true
                 Layout.alignment: Qt.AlignHCenter
             }

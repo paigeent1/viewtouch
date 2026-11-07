@@ -103,7 +103,7 @@ QVariantList PosService::adminRecords(const QString &panel)
                     l << u"%1 %2"_s.arg(QLatin1StringView(role)).arg(it->second);
             return l.join(u'\n');
         }();
-        add({{u"storeName"_s, qs(s_->settings.storeName)}, {u"storeZip"_s, qs(s_->settings.storeZip)}, {u"giftCardLocation"_s, qs(s_->settings.giftCardLocation)}, {u"topRibbonShowWeather"_s, s_->settings.topRibbonShowWeather}, {u"language"_s, qs(s_->settings.language)}, {u"currencySymbol"_s, qs(s_->settings.currencySymbol)},
+        add({{u"storeName"_s, qs(s_->settings.storeName)}, {u"storeZip"_s, qs(s_->settings.storeZip)}, {u"giftCardLocation"_s, qs(s_->settings.giftCardLocation)}, {u"topRibbonShowWeather"_s, s_->settings.topRibbonShowWeather}, {u"language"_s, qs(s_->settings.language)}, {u"currencySymbol"_s, qs(s_->settings.currencySymbol)}, {u"ilsaHistoryStore"_s, qs(s_->settings.ilsaHistoryStore)},
              {u"receiptHeader"_s, qs(s_->settings.receiptHeader)}, {u"receiptFooter"_s, qs(s_->settings.receiptFooter)},
              {u"dobReprintNeedsManager"_s, s_->settings.dobReprintNeedsManager},
              {u"receiptFreeChoices"_s, s_->settings.receiptFreeChoices},

@@ -71,13 +71,41 @@ std::string text(const QSqlQuery &q, int i) { return q.value(i).toString().toStd
 
 // Receipts' columns, in this order, for findReceipts and receipt.
 const QString kReceiptColumns = u"r.id, r.receipt_num, r.at, r.day, r.total_cents, r.tax_cents, r.mode, r.reg_num, "
-                                "r.cashier, r.age_verified, r.dob, COALESCE(s.name, ''), COALESCE(c.name, '')"_s;
+                                "r.cashier, r.age_verified, r.dob, COALESCE(s.name, ''), COALESCE(c.name, ''), %1"_s;
 
 bool hasTable(QSqlDatabase &db, const QString &name)
 {
     QSqlQuery q(db);
     return run(q, u"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"_s, {name}, nullptr) && q.next();
 }
+
+bool hasColumn(QSqlDatabase &db, const QString &table, const QString &column)
+{
+    QSqlQuery q(db);
+    return run(q, u"SELECT 1 FROM pragma_table_info('%1') WHERE name = ?"_s.arg(table), {column}, nullptr) && q.next();
+}
+
+// The copy's store (its check prefix): legacy_sources.store, or BHDAN for a history file from before
+// it was kept (all ILSA data then came from Butthead's Danbury).
+QString prefixColumn(QSqlDatabase &db)
+{
+    return hasColumn(db, u"legacy_sources"_s, u"store"_s) ? u"COALESCE(s.store, '')"_s : u"'BHDAN'"_s;
+}
+
+// Only one store's copies (`store` empty: every store's): " AND <sourceExpr> IN (...)" and its argument.
+struct Scope {
+    QString sql;
+    QVariantList args;
+};
+Scope storeScope(QSqlDatabase &db, const QString &store, const QString &sourceExpr)
+{
+    if (store.trimmed().isEmpty())
+        return {};
+    if (!hasColumn(db, u"legacy_sources"_s, u"store"_s))   // before stores were kept: everything is BHDAN's
+        return {store.compare(u"BHDAN"_s, Qt::CaseInsensitive) == 0 ? QString() : u" AND 0"_s, {}};
+    return {u" AND %1 IN (SELECT id FROM legacy_sources WHERE store = ?)"_s.arg(sourceExpr), {store.trimmed().toUpper()}};
+}
+
 
 // Receipts with their copy's name and their cashier's name (when the history file keeps cashiers).
 QString receiptFrom(QSqlDatabase &db)
@@ -124,6 +152,7 @@ Receipt receiptOf(const QSqlQuery &q)
     r.dob = text(q, 10);
     r.source = text(q, 11);
     r.cashierName = text(q, 12);
+    r.prefix = text(q, 13);
     return r;
 }
 
@@ -134,12 +163,23 @@ QString historyPath(const QString &posDatabase)
     return QFileInfo(posDatabase).absoluteDir().filePath(u"ilsa-history.db"_s);
 }
 
-Status status(const QString &path, QString *error)
+Status status(const QString &path, QString *error, const QString &store)
 {
     return withHistory<Status>(path, error, Status{}, [&](QSqlDatabase &db) {
         Status s;
         QSqlQuery q(db);
-        if (run(q, u"SELECT MIN(day), MAX(day), COUNT(*), COALESCE(SUM(receipts), 0) FROM legacy_days"_s, {}, error) && q.next()) {
+        QString where;
+        QVariantList args;
+        if (!store.trimmed().isEmpty()) {
+            if (hasColumn(db, u"legacy_days"_s, u"store"_s)) {
+                where = u" WHERE store = ?"_s;
+                args << store.trimmed().toUpper();
+            } else if (store.compare(u"BHDAN"_s, Qt::CaseInsensitive) != 0) {
+                where = u" WHERE 0"_s;
+            }
+        }
+        if (run(q, u"SELECT MIN(day), MAX(day), COUNT(*), COALESCE(SUM(receipts), 0) FROM legacy_days%1"_s.arg(where), args, error)
+            && q.next()) {
             s.first = q.value(0).toString();
             s.last = q.value(1).toString();
             s.days = q.value(2).toLongLong();
@@ -150,17 +190,35 @@ Status status(const QString &path, QString *error)
     });
 }
 
-ZTotals totals(const QString &path, const QString &from, const QString &to, QString *error)
+QStringList stores(const QString &path, QString *error)
+{
+    return withHistory<QStringList>(path, error, QStringList{}, [&](QSqlDatabase &db) {
+        QStringList out;
+        if (!hasColumn(db, u"legacy_sources"_s, u"store"_s))
+            return QStringList{u"BHDAN"_s};
+        QSqlQuery q(db);
+        if (run(q, u"SELECT DISTINCT store FROM legacy_sources WHERE store <> '' ORDER BY store"_s, {}, error))
+            while (q.next())
+                out << q.value(0).toString();
+        return out;
+    });
+}
+
+ZTotals totals(const QString &path, const QString &from, const QString &to, QString *error, const QString &store)
 {
     return withHistory<ZTotals>(path, error, ZTotals{}, [&](QSqlDatabase &db) {
         ZTotals z;
+        const Scope rs = storeScope(db, store, u"source_id"_s);
+        const Scope ls = storeScope(db, store, u"(SELECT source_id FROM legacy_receipts WHERE id = legacy_lines.receipt_id)"_s);
+        const Scope ts = storeScope(db, store, u"r.source_id"_s);
         {
             QSqlQuery q(db);
             if (run(q, u"SELECT COUNT(*), COALESCE(SUM(CASE WHEN mode = 0 THEN 1 ELSE 0 END), 0), "
                         "COALESCE(SUM(CASE WHEN mode = 0 THEN tax_cents ELSE 0 END), 0), "
                         "COALESCE(SUM(CASE WHEN mode = 0 THEN total_cents ELSE 0 END), 0), "
                         "COALESCE(SUM(CASE WHEN mode = 0 THEN disc_cents ELSE 0 END), 0) "
-                        "FROM legacy_receipts WHERE day BETWEEN ? AND ?"_s, {from, to}, error) && q.next()) {
+                        "FROM legacy_receipts WHERE day BETWEEN ? AND ?%1"_s.arg(rs.sql), QVariantList{from, to} + rs.args, error)
+                && q.next()) {
                 z.receipts = q.value(1).toLongLong();
                 z.notSales = q.value(0).toLongLong() - z.receipts;
                 z.tax = cents(q, 2);
@@ -176,8 +234,8 @@ ZTotals totals(const QString &path, const QString &from, const QString &to, QStr
                         "SUM(voided), SUM(CASE WHEN voided = 1 AND amount_cents > 0 THEN amount_cents ELSE 0 END), "
                         "SUM(CASE WHEN returned = 1 AND voided = 0 THEN 1 ELSE 0 END), "
                         "SUM(CASE WHEN returned = 1 AND voided = 0 THEN amount_cents ELSE 0 END), SUM(disc_cents) "
-                        "FROM legacy_lines WHERE day BETWEEN ? AND ? AND (mode = 0 OR kind = 'payout') "
-                        "GROUP BY kind, lottery"_s, {from, to}, error)) {
+                        "FROM legacy_lines WHERE day BETWEEN ? AND ? AND (mode = 0 OR kind = 'payout')%1 "
+                        "GROUP BY kind, lottery"_s.arg(ls.sql), QVariantList{from, to} + ls.args, error)) {
                 Money lineDiscounts;
                 while (q.next()) {
                     const QString kind = q.value(0).toString();
@@ -217,8 +275,8 @@ ZTotals totals(const QString &path, const QString &from, const QString &to, QStr
             std::vector<std::pair<std::string, Money>> list;
             Money change;
             if (run(q, u"SELECT t.type, SUM(t.amount_cents), SUM(t.change_cents) FROM legacy_tenders t "
-                        "JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day BETWEEN ? AND ? "
-                        "GROUP BY t.type ORDER BY t.type"_s, {from, to}, error)) {
+                        "JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day BETWEEN ? AND ?%1 "
+                        "GROUP BY t.type ORDER BY t.type"_s.arg(ts.sql), QVariantList{from, to} + ts.args, error)) {
                 while (q.next()) {
                     const std::string name = tenderGroup(q.value(0).toInt());
                     auto it = std::ranges::find_if(list, [&](const auto &p) { return p.first == name; });
@@ -243,14 +301,17 @@ ZTotals totals(const QString &path, const QString &from, const QString &to, QStr
     });
 }
 
-std::map<std::string, std::int64_t> ilsaZ(const QString &path, const QString &from, const QString &to, QString *error)
+std::map<std::string, std::int64_t> ilsaZ(const QString &path, const QString &from, const QString &to, QString *error,
+                                          const QString &store)
 {
     using Map = std::map<std::string, std::int64_t>;
     return withHistory<Map>(path, error, Map{}, [&](QSqlDatabase &db) {
         Map out;
         QSqlQuery q(db);
+        const Scope zs = storeScope(db, store, u"z.source_id"_s);
         if (run(q, u"SELECT v.name, SUM(v.cents) FROM legacy_z z JOIN legacy_z_values v ON v.z_id = z.id "
-                    "WHERE z.day BETWEEN ? AND ? AND v.name LIKE 'ilsa:%' GROUP BY v.name"_s, {from, to}, error)) {
+                    "WHERE z.day BETWEEN ? AND ? AND v.name LIKE 'ilsa:%'%1 GROUP BY v.name"_s.arg(zs.sql),
+                QVariantList{from, to} + zs.args, error)) {
             while (q.next())
                 out[text(q, 0).substr(5)] = q.value(1).toLongLong();
         }
@@ -259,7 +320,7 @@ std::map<std::string, std::int64_t> ilsaZ(const QString &path, const QString &fr
 }
 
 std::vector<GroupRow> groups(const QString &path, const QString &from, const QString &to, const QString &by, bool lottery,
-                             int limit, bool *more, QString *error)
+                             int limit, bool *more, QString *error, const QString &store)
 {
     if (more)
         *more = false;
@@ -289,6 +350,7 @@ std::vector<GroupRow> groups(const QString &path, const QString &from, const QSt
             group = u"l.upc, l.name"_s;
         }
         const int cap = limit > 0 ? limit : 1000000;
+        const Scope ls = storeScope(db, store, u"(SELECT source_id FROM legacy_receipts WHERE id = l.receipt_id)"_s);
         // Item lines; by department also its promotions (ILSA's buydowns) and line discounts.
         const QString sql = u"SELECT %1, SUM(CASE WHEN l.kind = 'item' THEN l.qty ELSE 0 END), "
                             "SUM(CASE WHEN l.kind = 'item' THEN l.amount_cents ELSE 0 END), "
@@ -297,12 +359,12 @@ std::vector<GroupRow> groups(const QString &path, const QString &from, const QSt
                             "SUM(CASE WHEN l.kind = 'item' THEN 1 ELSE 0 END), "
                             "SUM(CASE WHEN l.kind = 'promo' THEN l.amount_cents ELSE 0 END), SUM(l.disc_cents) "
                             "FROM legacy_lines l LEFT JOIN legacy_depts d ON %4 "
-                            "WHERE l.day BETWEEN ? AND ? AND l.kind IN (%5) AND l.mode = 0 AND l.lottery = ? "
+                            "WHERE l.day BETWEEN ? AND ? AND l.kind IN (%5) AND l.mode = 0 AND l.lottery = ?%6 "
                             "GROUP BY %2 ORDER BY %3 LIMIT ?"_s.arg(select, group, order, join,
-                                                                     depts ? u"'item', 'promo'"_s : u"'item'"_s);
+                                                                     depts ? u"'item', 'promo'"_s : u"'item'"_s, ls.sql);
         Rows out;
         QSqlQuery q(db);
-        if (run(q, sql, {from, to, lottery ? 1 : 0, cap + 1}, error)) {
+        if (run(q, sql, QVariantList{from, to, lottery ? 1 : 0} + ls.args + QVariantList{cap + 1}, error)) {
             while (q.next()) {
                 if (int(out.size()) == cap) {
                     if (more)
@@ -327,12 +389,14 @@ std::vector<GroupRow> groups(const QString &path, const QString &from, const QSt
     });
 }
 
-std::vector<PeriodRow> periods(const QString &path, const QString &from, const QString &to, bool byYear, QString *error)
+std::vector<PeriodRow> periods(const QString &path, const QString &from, const QString &to, bool byYear, QString *error,
+                               const QString &store)
 {
     using Rows = std::vector<PeriodRow>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
         Rows out;
         QSqlQuery q(db);
+        const Scope ls = storeScope(db, store, u"(SELECT source_id FROM legacy_receipts WHERE id = legacy_lines.receipt_id)"_s);
         const QString sql = u"SELECT substr(day, 1, %1), "
                             "SUM(CASE WHEN lottery = 0 AND kind = 'item' THEN qty ELSE 0 END), "
                             "SUM(CASE WHEN lottery = 0 AND kind = 'item' THEN amount_cents ELSE 0 END), "
@@ -341,9 +405,9 @@ std::vector<PeriodRow> periods(const QString &path, const QString &from, const Q
                             "SUM(CASE WHEN lottery = 1 AND kind = 'item' THEN amount_cents ELSE 0 END), "
                             "SUM(CASE WHEN lottery = 0 AND kind = 'promo' THEN amount_cents ELSE 0 END), "
                             "SUM(CASE WHEN lottery = 0 THEN disc_cents ELSE 0 END) "
-                            "FROM legacy_lines WHERE day BETWEEN ? AND ? AND kind IN ('item', 'promo') AND mode = 0 "
-                            "GROUP BY 1 ORDER BY 1"_s.arg(byYear ? 4 : 7);
-        if (run(q, sql, {from, to}, error)) {
+                            "FROM legacy_lines WHERE day BETWEEN ? AND ? AND kind IN ('item', 'promo') AND mode = 0%2 "
+                            "GROUP BY 1 ORDER BY 1"_s.arg(byYear ? 4 : 7).arg(ls.sql);
+        if (run(q, sql, QVariantList{from, to} + ls.args, error)) {
             while (q.next()) {
                 PeriodRow p;
                 p.period = text(q, 0);
@@ -361,15 +425,17 @@ std::vector<PeriodRow> periods(const QString &path, const QString &from, const Q
     });
 }
 
-std::vector<Variance> variances(const QString &path, const QString &from, const QString &to, QString *error)
+std::vector<Variance> variances(const QString &path, const QString &from, const QString &to, QString *error,
+                                const QString &store)
 {
     using Rows = std::vector<Variance>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
         Rows out;
         QSqlQuery q(db);
+        const Scope vs = storeScope(db, store, u"z.source_id"_s);
         if (run(q, u"SELECT v.day, COALESCE(z.reg_num, 0), COALESCE(z.z_counter, 0), v.what, v.ilsa_cents, v.ours_cents "
                     "FROM legacy_variances v LEFT JOIN legacy_z z ON z.id = v.z_id "
-                    "WHERE v.day BETWEEN ? AND ? ORDER BY v.day, v.what"_s, {from, to}, error)) {
+                    "WHERE v.day BETWEEN ? AND ?%1 ORDER BY v.day, v.what"_s.arg(vs.sql), QVariantList{from, to} + vs.args, error)) {
             while (q.next()) {
                 Variance v;
                 v.day = text(q, 0);
@@ -385,7 +451,8 @@ std::vector<Variance> variances(const QString &path, const QString &from, const 
     });
 }
 
-std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, const QString &to, QString *error)
+std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, const QString &to, QString *error,
+                                      const QString &store)
 {
     using Rows = std::vector<UnnamedItem>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
@@ -394,9 +461,10 @@ std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, 
         if (!run(probe, u"SELECT name_src FROM legacy_lines LIMIT 1"_s, {}, nullptr))
             return out;
         QSqlQuery q(db);
+        const Scope us = storeScope(db, store, u"(SELECT source_id FROM legacy_receipts WHERE id = legacy_lines.receipt_id)"_s);
         if (run(q, u"SELECT upc, MAX(name), COUNT(*), SUM(amount_cents), MIN(day), MAX(day) FROM legacy_lines "
-                    "WHERE name_src = 'dept' AND upc <> '' AND kind = 'item' AND day BETWEEN ? AND ? "
-                    "GROUP BY upc ORDER BY SUM(amount_cents) DESC LIMIT 2000"_s, {from, to}, error)) {
+                    "WHERE name_src = 'dept' AND upc <> '' AND kind = 'item' AND day BETWEEN ? AND ?%1 "
+                    "GROUP BY upc ORDER BY SUM(amount_cents) DESC LIMIT 2000"_s.arg(us.sql), QVariantList{from, to} + us.args, error)) {
             while (q.next()) {
                 UnnamedItem u;
                 u.upc = text(q, 0);
@@ -412,18 +480,19 @@ std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, 
     });
 }
 
-std::vector<Cashier> cashiers(const QString &path, QString *error)
+std::vector<Cashier> cashiers(const QString &path, QString *error, const QString &store)
 {
     using Rows = std::vector<Cashier>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
         Rows out;
         QString name, id, ename;
         const QString joins = cashierJoins(db, &name, &id, &ename);
+        const Scope cs = storeScope(db, store, u"r.source_id"_s);
         QSqlQuery q(db);
         if (run(q, u"SELECT r.source_id, COALESCE(MAX(s.name), ''), r.cashier, %1, %2, %3, "
                     "SUM(CASE WHEN r.mode = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN r.mode = 0 THEN r.total_cents - r.tax_cents ELSE 0 END), "
-                    "MIN(r.day), MAX(r.day) FROM legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id%4 "
-                    "GROUP BY r.source_id, r.cashier ORDER BY r.cashier, r.source_id"_s.arg(name, id, ename, joins), {}, error)) {
+                    "MIN(r.day), MAX(r.day) FROM legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id%4 WHERE 1%5 "
+                    "GROUP BY r.source_id, r.cashier ORDER BY r.cashier, r.source_id"_s.arg(name, id, ename, joins, cs.sql), cs.args, error)) {
             while (q.next()) {
                 Cashier c;
                 c.sourceId = q.value(0).toInt();
@@ -495,7 +564,7 @@ bool setCashier(const QString &path, int sourceId, int number, const std::string
 }
 
 std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &from, const QString &to, const QString &filter,
-                                           QString *error)
+                                           QString *error, const QString &store)
 {
     using Rows = std::vector<EmployeeItemRow>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
@@ -503,6 +572,7 @@ std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &f
         QString name, id, ename;
         const QString joins = cashierJoins(db, &name, &id, &ename);
         QVariantList args{from, to};
+        const Scope es = storeScope(db, store, u"r.source_id"_s);
         QString where;
         if (!filter.trimmed().isEmpty()) {
             QString w = filter.trimmed();
@@ -516,7 +586,7 @@ std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &f
         if (run(q, u"SELECT r.source_id, r.cashier, %1, %2, %3, l.upc, l.name, SUM(l.qty), SUM(l.amount_cents) "
                     "FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id%4 "
                     "WHERE l.day BETWEEN ? AND ? AND l.kind = 'item' AND l.mode = 0 AND l.lottery = 0 AND l.voided = 0%5 "
-                    "GROUP BY r.source_id, r.cashier, l.upc, l.name"_s.arg(name, id, ename, joins, where), args, error)) {
+                    "GROUP BY r.source_id, r.cashier, l.upc, l.name"_s.arg(name, id, ename, joins, where + es.sql), args + es.args, error)) {
             while (q.next()) {
                 EmployeeItemRow e;
                 Cashier c;
@@ -537,12 +607,14 @@ std::vector<EmployeeItemRow> employeeItems(const QString &path, const QString &f
     });
 }
 
-std::vector<Receipt> findReceipts(const QString &path, const QString &query, int limit, int offset, QString *error)
+std::vector<Receipt> findReceipts(const QString &path, const QString &query, int limit, int offset, QString *error,
+                                  const QString &store)
 {
     using Rows = std::vector<Receipt>;
     return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
         static const QRegularExpression day(u"^\\d{4}-\\d{2}-\\d{2}$"_s);
-        static const QRegularExpression number(u"^#?(\\d{1,7})$"_s);
+        // "836100", "#836100", "BHDAN-836100", "bhdan836100": that receipt (of that store's copies).
+        static const QRegularExpression number(u"^#?([A-Za-z]{2,8})?[- ]?(\\d{1,7})$"_s);
         static const QRegularExpression upc(u"^\\d{8,14}$"_s);
         static const QRegularExpression amount(u"^\\$?(\\d+)\\.(\\d\\d)$"_s);
         const QString qy = query.trimmed();
@@ -554,7 +626,11 @@ std::vector<Receipt> findReceipts(const QString &path, const QString &query, int
             args << qy;
         } else if (const auto m = number.match(qy); m.hasMatch()) {
             where = u"r.receipt_num = ?"_s;
-            args << m.captured(1).toLongLong();
+            args << m.captured(2).toLongLong();
+            if (!m.captured(1).isEmpty()) {
+                where += u" AND upper(%1) = ?"_s.arg(prefixColumn(db));
+                args << m.captured(1).toUpper();
+            }
         } else if (upc.match(qy).hasMatch()) {
             // ILSA kept codes as numbers (a UPC's leading 0 lost): either way.
             QString bare = qy;
@@ -571,11 +647,15 @@ std::vector<Receipt> findReceipts(const QString &path, const QString &query, int
             where = u"r.id IN (SELECT receipt_id FROM legacy_lines WHERE name LIKE ? ESCAPE '\\')"_s;
             args << (u'%' + w + u'%');
         }
+        const Scope fs = storeScope(db, store, u"r.source_id"_s);
+        where += fs.sql;
+        args += fs.args;
         args << limit << offset;
         Rows out;
         QSqlQuery q(db);
         if (run(q, u"SELECT %1 FROM %3 WHERE %2 "
-                    "ORDER BY r.day DESC, r.at DESC, r.receipt_num DESC LIMIT ? OFFSET ?"_s.arg(kReceiptColumns, where, receiptFrom(db)),
+                    "ORDER BY r.day DESC, r.at DESC, r.receipt_num DESC LIMIT ? OFFSET ?"_s.arg(kReceiptColumns.arg(prefixColumn(db)), where,
+                                                                                         receiptFrom(db)),
                 args, error)) {
             while (q.next())
                 out.push_back(receiptOf(q));
@@ -591,7 +671,7 @@ std::optional<Receipt> receipt(const QString &path, std::int64_t id, QString *er
         Receipt r;
         {
             QSqlQuery q(db);
-            if (!run(q, u"SELECT %1 FROM %2 WHERE r.id = ?"_s.arg(kReceiptColumns, receiptFrom(db)), {qint64(id)}, error)
+            if (!run(q, u"SELECT %1 FROM %2 WHERE r.id = ?"_s.arg(kReceiptColumns.arg(prefixColumn(db)), receiptFrom(db)), {qint64(id)}, error)
                 || !q.next())
                 return std::nullopt;
             r = receiptOf(q);

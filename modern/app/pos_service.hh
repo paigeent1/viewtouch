@@ -1392,7 +1392,10 @@ public:
     // "vt|<filter>" with ViewTouch's sales, "|<filter>" without) and cashiers too; by (items): item | upc | brand | dept; (depts) dept: the department each line was sold in
     // (owner 2026-11-07), current: the items' departments now (as ILSA's printouts). The answer comes
     // in rangeReport ({id: ilsa-<kind>}).
-    bool requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {});
+    // store: an ILSA store (BHDAN, BHNM), "*" every store's, empty this site's (Store Settings' ILSA history store).
+    bool requestLegacyReport(const QString &kind, const QString &from, const QString &to = {}, const QString &by = {},
+                             const QString &store = {});
+    QString legacyStore(const QString &asked) const;   // the store asked for: empty = every store's
     bool printLegacyReport();   // the one last shown
     // Reports > ILSA History > Cashiers: ILSA cashier `number` of copy `sourceId` is ViewTouch employee
     // `employeeId` (empty: a former employee); their ILSA sales then show under that name in By Employee.
@@ -1400,7 +1403,7 @@ public:
     // Its receipts, read-only (Receipt Lookup > ILSA): found (rangeReport {id: ilsa-receipts, results,
     // more, nextOffset}), one shown (selected: {id, number, text, hasDob}), reprinted (withDob: as ILSA
     // printed it, the buyer's date of birth on it: Store Settings' dobReprintNeedsManager applies).
-    bool findLegacyReceipts(const QString &query, int offset = 0);
+    bool findLegacyReceipts(const QString &query, int offset = 0, const QString &store = {});
     bool selectLegacyReceipt(qint64 id);
     bool reprintLegacyReceipt(qint64 id, bool withDob = false);
     QString legacyText(const core::legacy::Receipt &r) const;   // an ILSA receipt as it prints

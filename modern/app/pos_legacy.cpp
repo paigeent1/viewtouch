@@ -42,6 +42,7 @@ struct LegacyRead {
     std::vector<core::legacy::EmployeeItemRow> people;
     std::vector<core::legacy::Cashier> cashiers;
     std::vector<Check> vtChecks;   // By Employee with ViewTouch's sales
+    QStringList stores;            // the stores the history has
     bool more = false;
     QString error;
 };
@@ -56,7 +57,15 @@ std::string historyNote(const legacy::Status &s)
 
 } // namespace
 
-bool PosService::requestLegacyReport(const QString &kind, const QString &fromText, const QString &toText, const QString &by)
+QString PosService::legacyStore(const QString &asked) const
+{
+    if (asked.trimmed() == u"*")
+        return {};   // every store's
+    return asked.trimmed().isEmpty() ? qs(s_->settings.ilsaHistoryStore).toUpper() : asked.trimmed().toUpper();
+}
+
+bool PosService::requestLegacyReport(const QString &kind, const QString &fromText, const QString &toText, const QString &by,
+                                     const QString &storeAsked)
 {
     if (!require(perm::Manager, tr("Reports")))
         return false;
@@ -116,6 +125,8 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
     const QString filter = kind == u"employees" ? by.section(u'|', 1).trimmed() : QString();
     const QString path = s_->legacyDb;
     const QString id = u"ilsa-"_s + kind;
+    const QString store = legacyStore(storeAsked);   // empty: every store's
+    const QString storeShown = store.isEmpty() ? u"*"_s : store;
 
     // ViewTouch's own checks on those days too (Daily Z, and the side-by-side on parallel beta days).
     const bool withVt = kind == u"z" || kind == u"compare" || employeesWithVt;
@@ -128,33 +139,34 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
     const TaxRates rates = s_->settings.tax;
 
     const int request = ++rangeRequest_;
-    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"label"_s, label}};
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"label"_s, label}, {u"store"_s, storeShown}};
     emit sessionChanged();
 
     QPointer<PosService> self(this);
     QThreadPool::globalInstance()->start([=, today_ = std::move(today_)]() mutable {
         LegacyRead got;
-        got.status = legacy::status(path);
+        got.status = legacy::status(path, nullptr, store);
+        got.stores = legacy::stores(path);
         if (got.status.present) {
             QString *e = &got.error;
             if (kind == u"z" || kind == u"compare") {
-                got.ilsa = legacy::totals(path, a, b, e);
-                got.z = legacy::ilsaZ(path, a, b, e);
+                got.ilsa = legacy::totals(path, a, b, e, store);
+                got.z = legacy::ilsaZ(path, a, b, e, store);
             } else if (kind == u"depts") {
                 const QString d = groupBy == u"current" ? u"current"_s : u"dept"_s;
-                got.rows = legacy::groups(path, a, b, d, false, 0, nullptr, e);
-                got.lottery = legacy::groups(path, a, b, d, true, 0, nullptr, e);
+                got.rows = legacy::groups(path, a, b, d, false, 0, nullptr, e, store);
+                got.lottery = legacy::groups(path, a, b, d, true, 0, nullptr, e, store);
             } else if (kind == u"items") {
-                got.rows = legacy::groups(path, a, b, groupBy, false, kItemRows, &got.more, e);
+                got.rows = legacy::groups(path, a, b, groupBy, false, kItemRows, &got.more, e, store);
             } else if (kind == u"gpMonth" || kind == u"gpYear") {
-                got.periods = legacy::periods(path, a, b, kind == u"gpYear", e);
+                got.periods = legacy::periods(path, a, b, kind == u"gpYear", e, store);
             } else if (kind == u"differences") {
-                got.variances = legacy::variances(path, a, b, e);
-                got.unnamed = legacy::unnamedItems(path, a, b, e);
+                got.variances = legacy::variances(path, a, b, e, store);
+                got.unnamed = legacy::unnamedItems(path, a, b, e, store);
             } else if (kind == u"employees") {
-                got.people = legacy::employeeItems(path, a, b, filter, e);
+                got.people = legacy::employeeItems(path, a, b, filter, e, store);
             } else if (kind == u"cashiers") {
-                got.cashiers = legacy::cashiers(path, e);
+                got.cashiers = legacy::cashiers(path, e, store);
             }
         }
         if (withVt) {
@@ -166,7 +178,8 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             if (employeesWithVt)
                 got.vtChecks = std::move(checks);
         }
-        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, filter, employeesWithVt, got = std::move(got)] {
+        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, filter, employeesWithVt, store, storeShown,
+                                         got = std::move(got)] {
             if (!self || request != self->rangeRequest_)
                 return;   // a newer request replaced it
             const ReportContext ctx = self->reportContext(label);
@@ -210,10 +223,11 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             }
             if (!got.error.isEmpty())
                 r.note("Couldn't read all of the ILSA history: " + got.error.toStdString());
-            r.note(historyNote(got.status));
+            r.note((store.isEmpty() ? std::string("Every store's ILSA history. ") : "Store " + store.toStdString() + ". ")
+                   + historyNote(got.status));
             self->legacyReport_ = r;
             self->rangeReport_ = {{u"loading"_s, false}, {u"id"_s, id}, {u"label"_s, label},
-                                  {u"report"_s, self->reportVariant(r)}};
+                                  {u"report"_s, self->reportVariant(r)}, {u"store"_s, storeShown}, {u"stores"_s, got.stores}};
             if (kind == u"cashiers") {   // the Cashiers screen: each cashier and the employees to tie them to
                 QVariantList list;
                 for (const core::legacy::Cashier &c : got.cashiers)
@@ -249,7 +263,8 @@ bool PosService::setLegacyCashier(int sourceId, int number, const QString &emplo
         return fail(tr("Couldn't save it: %1").arg(error));
     emit notice(employeeId.isEmpty() ? tr("ILSA cashier %1: a former employee").arg(number)
                                      : tr("ILSA cashier %1 is %2").arg(number).arg(qs(name)));
-    return requestLegacyReport(u"cashiers"_s, u"2000-01-01"_s, QDateTime::fromMSecsSinceEpoch(now()).date().toString(u"yyyy-MM-dd"_s));
+    return requestLegacyReport(u"cashiers"_s, u"2000-01-01"_s, QDateTime::fromMSecsSinceEpoch(now()).date().toString(u"yyyy-MM-dd"_s),
+                               {}, rangeReport_.value(u"store"_s).toString());
 }
 
 bool PosService::printLegacyReport()
@@ -265,7 +280,7 @@ bool PosService::printLegacyReport()
     return true;
 }
 
-bool PosService::findLegacyReceipts(const QString &query, int offset)
+bool PosService::findLegacyReceipts(const QString &query, int offset, const QString &storeAsked)
 {
     if (!require(perm::Settle, tr("Finding checks")))
         return false;
@@ -273,16 +288,19 @@ bool PosService::findLegacyReceipts(const QString &query, int offset)
     offset = std::max(0, offset);
     const QString path = s_->legacyDb;
     const int request = ++rangeRequest_;
-    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset}};
+    const QString store = legacyStore(storeAsked);
+    const QString storeShown = store.isEmpty() ? u"*"_s : store;
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset}, {u"store"_s, storeShown}};
     emit sessionChanged();
     QPointer<PosService> self(this);
     QThreadPool::globalInstance()->start([=] {
         QString error;
-        const legacy::Status status = legacy::status(path);
+        const legacy::Status status = legacy::status(path, nullptr, store);
+        const QStringList stores = legacy::stores(path);
         std::vector<core::legacy::Receipt> hits;
         if (status.present)
-            hits = legacy::findReceipts(path, q, kReceiptPage + 1, offset, &error);
-        QMetaObject::invokeMethod(self, [self, request, q, offset, status, error, hits = std::move(hits)] {
+            hits = legacy::findReceipts(path, q, kReceiptPage + 1, offset, &error, store);
+        QMetaObject::invokeMethod(self, [self, request, q, offset, status, error, storeShown, stores, hits = std::move(hits)] {
             if (!self || request != self->rangeRequest_)
                 return;
             QVariantList results;
@@ -290,6 +308,7 @@ bool PosService::findLegacyReceipts(const QString &query, int offset)
                 const core::legacy::Receipt &h = hits[i];
                 const QDateTime at = QDateTime::fromString(qs(h.at), u"yyyy-MM-dd HH:mm:ss"_s);
                 results.append(QVariantMap{{u"id"_s, qint64(h.id)}, {u"number"_s, qint64(h.number)},
+                                           {u"label"_s, qs(core::legacy::receiptLabel(h))},
                                            {u"when"_s, at.isValid() ? i18n::locale().toString(at, u"ddd MMM d yyyy, h:mm AP"_s) : qs(h.day)},
                                            {u"day"_s, qs(h.day)}, {u"total"_s, self->format(h.total)},
                                            {u"mode"_s, h.mode}, {u"source"_s, qs(h.source)},
@@ -297,7 +316,8 @@ bool PosService::findLegacyReceipts(const QString &query, int offset)
             }
             QVariantMap out{{u"loading"_s, false}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset},
                             {u"results"_s, results}, {u"more"_s, int(hits.size()) > kReceiptPage},
-                            {u"nextOffset"_s, offset + kReceiptPage}, {u"history"_s, qs(historyNote(status))}};
+                            {u"nextOffset"_s, offset + kReceiptPage}, {u"history"_s, qs(historyNote(status))},
+                            {u"store"_s, storeShown}, {u"stores"_s, stores}};
             if (!error.isEmpty())
                 out.insert(u"error"_s, error);
             self->rangeReport_ = out;
@@ -329,6 +349,7 @@ bool PosService::selectLegacyReceipt(qint64 id)
         return fail(tr("That ILSA receipt isn't in the history."));
     QVariantMap out = rangeReport_;
     out.insert(u"selected"_s, QVariantMap{{u"id"_s, qint64(r->id)}, {u"number"_s, qint64(r->number)},
+                                          {u"label"_s, qs(core::legacy::receiptLabel(*r))},
                                           {u"text"_s, legacyText(*r)},
                                           {u"hasDob"_s, !r->dob.empty()}, {u"mode"_s, r->mode}});
     rangeReport_ = out;
@@ -348,13 +369,13 @@ bool PosService::reprintLegacyReceipt(qint64 id, bool withDob)
         return fail(tr("That ILSA receipt isn't in the history."));
     if (withDob) {   // as ILSA printed it, with the buyer's date of birth: the store's copy
         if (r->dob.empty())
-            return fail(tr("No date of birth on ILSA receipt #%1.").arg(r->number));
+            return fail(tr("No date of birth on ILSA receipt %1.").arg(qs(core::legacy::receiptLabel(*r))));
         if (s_->settings.dobReprintNeedsManager && !require(perm::Manager, tr("Reprinting with the date of birth")))
             return false;
     }
     s_->printer->printLegacyReceipt(s_->settings, core::legacy::receiptReport(*r, withDob),
                                     core::legacy::receiptRows(*r, withDob), receiptPrinter());
-    emit notice(tr("Printing ILSA receipt #%1").arg(r->number));
+    emit notice(tr("Printing ILSA receipt %1").arg(qs(core::legacy::receiptLabel(*r))));
     return true;
 }
 

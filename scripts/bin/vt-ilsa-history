@@ -14,6 +14,12 @@ day by day against ILSA's own Z reports.
                                                                   the buyers' birth dates into receipts already
                                                                   imported from EXPORT (found by looking at
                                                                   every column; counts printed, never dates)
+  vt-ilsa-history EXPORT --prefix BHNM [--force]                  import a store's copy: BHDAN (default: Danbury)
+                                                                  or BHNM (New Milford = Gaylordsville); refused
+                                                                  when its Sys_Pram names another store; days are
+                                                                  per store (one store never replaces another's)
+  vt-ilsa-history --prefix BHDAN                                  set every copy's store (receipts: BHDAN-836100)
+  vt-ilsa-history --recheck --store BHNM                          the self-check of one store's days
   vt-ilsa-history --self-test                                     check the importer on made-up data
 
 What it does
@@ -87,7 +93,8 @@ SCHEMA = [
     "CREATE INDEX IF NOT EXISTS legacy_lines_upc ON legacy_lines (upc)",
     "CREATE TABLE IF NOT EXISTS legacy_tenders (id INTEGER PRIMARY KEY, receipt_id INTEGER NOT NULL, seq INTEGER NOT NULL, type INTEGER NOT NULL, name TEXT NOT NULL, amount_cents INTEGER NOT NULL DEFAULT 0, change_cents INTEGER NOT NULL DEFAULT 0, sale_cents INTEGER NOT NULL DEFAULT 0)",
     "CREATE INDEX IF NOT EXISTS legacy_tenders_receipt ON legacy_tenders (receipt_id)",
-    "CREATE TABLE IF NOT EXISTS legacy_days (day TEXT PRIMARY KEY, source_id INTEGER NOT NULL, partial INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0, variances INTEGER NOT NULL DEFAULT 0, imported_at TEXT)",
+    # One copy per store and day: another store's day never replaces or skips this one.
+    "CREATE TABLE IF NOT EXISTS legacy_days (store TEXT NOT NULL DEFAULT 'BHDAN', day TEXT NOT NULL, source_id INTEGER NOT NULL, partial INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0, variances INTEGER NOT NULL DEFAULT 0, imported_at TEXT, PRIMARY KEY (store, day))",
     "CREATE TABLE IF NOT EXISTS legacy_variances (id INTEGER PRIMARY KEY, day TEXT NOT NULL, z_id INTEGER, what TEXT NOT NULL, ilsa_cents INTEGER NOT NULL, ours_cents INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS legacy_variances_day ON legacy_variances (day)",
     # Each imported copy's item list (PLU): names for lines whose item a later copy no longer has.
@@ -108,6 +115,9 @@ ADDED_COLUMNS = [
     ("legacy_lines", "cur_dept", "INTEGER"),
     ("legacy_lines", "disc_cents", "INTEGER NOT NULL DEFAULT 0"),
     ("legacy_receipts", "disc_cents", "INTEGER NOT NULL DEFAULT 0"),
+    # The copy's store, its check prefix (BHDAN Butthead's Danbury, BHNM Butthead's New Milford =
+    # Gaylordsville; HCA has no ILSA): ILSA receipts show as BHDAN-836100.
+    ("legacy_sources", "store", "TEXT NOT NULL DEFAULT 'BHDAN'"),
 ]
 LATE_SCHEMA = [
     "CREATE INDEX IF NOT EXISTS legacy_lines_unnamed ON legacy_lines (upc) WHERE name_src = 'dept'",
@@ -343,6 +353,13 @@ def open_db(path):
     for table, col, decl in ADDED_COLUMNS:
         if col not in [c[1] for c in db.execute(f"PRAGMA table_info({table})")]:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    if "store" not in [c[1] for c in db.execute("PRAGMA table_info(legacy_days)")]:   # days were one for all stores
+        db.execute("ALTER TABLE legacy_days RENAME TO legacy_days_old")
+        db.execute([x for x in SCHEMA if "TABLE IF NOT EXISTS legacy_days " in x][0])
+        db.execute("""INSERT INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at)
+                      SELECT COALESCE((SELECT store FROM legacy_sources s WHERE s.id = o.source_id), 'BHDAN'), o.day, o.source_id,
+                             o.partial, o.receipts, o.variances, o.imported_at FROM legacy_days_old o""")
+        db.execute("DROP TABLE legacy_days_old")
     for s in LATE_SCHEMA:
         db.execute(s)
     db.execute("INSERT OR REPLACE INTO legacy_meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
@@ -704,21 +721,25 @@ def check_day(db, day):
                 if z == zid and d == kd and zc == kz and what.startswith(kw) and "known:" not in what:
                     var[i] = (d, z, f"{what} ({why})", a, b)
     db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) VALUES (?, ?, ?, ?, ?)", var)
-    db.execute("UPDATE legacy_days SET variances = ? WHERE day = ?", (len(var), day))
+    db.execute("""UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v JOIN legacy_z z ON z.id = v.z_id
+                       JOIN legacy_sources s ON s.id = z.source_id WHERE v.day = legacy_days.day AND s.store = legacy_days.store) WHERE day = ?""", (day,))
     return var
 
 
-def import_day(db, source_id, day, partial, replace_old, now):
+def import_day(db, source_id, store, day, partial, replace_old, now):
     """One business day, in one transaction. Returns (receipts, variances)."""
     db.execute("BEGIN")
     try:
-        if replace_old:
-            db.execute("DELETE FROM legacy_lines WHERE day = ?", (day,))
-            db.execute("DELETE FROM legacy_tenders WHERE receipt_id IN (SELECT id FROM legacy_receipts WHERE day = ?)", (day,))
-            db.execute("DELETE FROM legacy_receipts WHERE day = ?", (day,))
-            db.execute("DELETE FROM legacy_z_values WHERE z_id IN (SELECT id FROM legacy_z WHERE day = ?)", (day,))
-            db.execute("DELETE FROM legacy_variances WHERE day = ?", (day,))
-            db.execute("DELETE FROM legacy_z WHERE day = ?", (day,))
+        if replace_old:   # this store's copy of the day (another store's stays)
+            mine = "SELECT id FROM legacy_sources WHERE store = ?"
+            rec = f"SELECT id FROM legacy_receipts WHERE day = ? AND source_id IN ({mine})"
+            zs = f"SELECT id FROM legacy_z WHERE day = ? AND source_id IN ({mine})"
+            db.execute(f"DELETE FROM legacy_lines WHERE receipt_id IN ({rec})", (day, store))
+            db.execute(f"DELETE FROM legacy_tenders WHERE receipt_id IN ({rec})", (day, store))
+            db.execute(f"DELETE FROM legacy_receipts WHERE id IN ({rec})", (day, store))
+            db.execute(f"DELETE FROM legacy_z_values WHERE z_id IN ({zs})", (day, store))
+            db.execute(f"DELETE FROM legacy_variances WHERE z_id IN ({zs})", (day, store))
+            db.execute(f"DELETE FROM legacy_z WHERE id IN ({zs})", (day, store))
         db.execute("INSERT OR IGNORE INTO legacy_z (source_id, reg_num, z_counter, day, z_at) SELECT ?, reg, z, day, z_at FROM sz WHERE day = ?",
                    (source_id, day))
         db.execute("""INSERT OR IGNORE INTO legacy_receipts (source_id, reg_num, receipt_num, z_id, day, at, mode, cashier,
@@ -742,11 +763,14 @@ def import_day(db, source_id, day, partial, replace_old, now):
         db.execute("""INSERT OR REPLACE INTO legacy_z_values (z_id, name, cents)
                       SELECT lz.id, sv.name, sv.cents FROM legacy_z lz CROSS JOIN sv ON sv.reg = lz.reg_num AND sv.z = lz.z_counter
                       WHERE lz.day = ? AND lz.source_id = ?""", (day, source_id))
-        var = check_day(db, day)
-        n = db.execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = ?", (day,)).fetchone()[0]
-        db.execute("INSERT OR REPLACE INTO legacy_days VALUES (?, ?, ?, ?, ?, ?)", (day, source_id, int(partial), n, len(var), now))
+        n = db.execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = ? AND source_id IN "
+                       "(SELECT id FROM legacy_sources WHERE store = ?)", (day, store)).fetchone()[0]
+        db.execute("INSERT OR REPLACE INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at) "
+                   "VALUES (?, ?, ?, ?, ?, 0, ?)", (store, day, source_id, int(partial), n, now))
+        check_day(db, day)
+        v = db.execute("SELECT variances FROM legacy_days WHERE store = ? AND day = ?", (store, day)).fetchone()[0]
         db.execute("COMMIT")
-        return n, len(var)
+        return n, v
     except BaseException:
         db.execute("ROLLBACK")
         raise
@@ -813,7 +837,8 @@ def learn_z_totals(db, tx=True):
                 var.append((z, f"Z_Totals {col[12:]} vs {bucket_text(b)}", v[col], v.get(b, 0)))
     db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) SELECT day, ?, ?, ?, ? FROM legacy_z WHERE id = ?",
                    [(z, w, a, b, z) for z, w, a, b in var])
-    db.execute("UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v WHERE v.day = legacy_days.day)")
+    db.execute("""UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v JOIN legacy_z z ON z.id = v.z_id
+                       JOIN legacy_sources s ON s.id = z.source_id WHERE v.day = legacy_days.day AND s.store = legacy_days.store)""")
     if tx:
         db.execute("COMMIT")
     return mapping
@@ -880,7 +905,52 @@ def stop_viewtouch():
     sys.exit("ViewTouch didn't stop; nothing was changed.")
 
 
-def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, now=None, manage=True):
+def set_prefix(db, prefix, source=None):
+    """The store (its check prefix: receipts show as BHDAN-836100) of one copy, or of every copy; its
+    days move with it."""
+    prefix = re.sub(r"[^A-Za-z0-9]", "", prefix or "").upper()
+    if not prefix:
+        sys.exit("--prefix: letters, like BHDAN")
+    where, args = ("WHERE name = ?", (source,)) if source else ("", ())
+    db.execute(f"UPDATE legacy_sources SET store = ? {where}", (prefix,) + args)
+    db.execute(f"UPDATE OR REPLACE legacy_days SET store = ? WHERE source_id IN (SELECT id FROM legacy_sources {where})", (prefix,) + args)
+    db.commit()
+    return prefix
+
+
+# What a store's ILSA copy calls itself (Sys_Pram: store name, city): words that must be there.
+STORE_WORDS = {"BHDAN": ["DANBURY"], "BHNM": ["GAYLORDSVILLE", "NEW MILFORD"], "HCA": ["HAT CITY"]}
+
+
+def check_store(export, store, force, say):
+    """Refuses (exit) an export whose own store name / city (Sys_Pram) doesn't fit `store`, unless force."""
+    table = next((f[:-4] for f in os.listdir(export) if f.lower() in ("sys_pram.csv", "syspram.csv", "sys_param.csv")), None)
+    words = STORE_WORDS.get(store)
+    if not table:
+        say(f"  store: no Sys_Pram table to check the export is {store}'s")
+        return
+    h, it = rows(export, table); r = Row(h)
+    shown, text = [], []
+    for r.r in it:
+        for c in h:
+            v = r(c).strip()
+            if v and not re.search(r"PIN|PASS|PWD|SSN|KEY|LICEN|SERIAL|ACCT|MERCH|TERM_ID", c):
+                text.append(v.upper())
+                if re.search(r"STORE|NAME|CITY|TOWN|ADDR|STATE", c) and len(shown) < 6 and not v.replace(".", "").isdigit():
+                    shown.append(f"{c}={v}")
+    say(f"  store: {table} says " + ("; ".join(shown) or "(no store name or city found)"))
+    if not words:
+        say(f"  store {store}: no words known for it; not checked")
+        return
+    if not any(w in t for w in words for t in text):
+        msg = f"This export doesn't look like {store}'s ({' / '.join(words)} not found in {table})."
+        if force:
+            say("  " + msg + " Imported anyway (--force).")
+        else:
+            sys.exit(msg + " Give the right --prefix, or --force if it is.")
+
+
+def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, now=None, manage=True, prefix=None, force=False):
     say = (lambda *a: None) if quiet else print
     t0 = time.time()
     now = now or time.strftime("%Y-%m-%d %H:%M:%S")
@@ -910,15 +980,26 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
         db.execute("INSERT OR IGNORE INTO legacy_sources (name) VALUES (?)", (source,))
         source_id = db.execute("SELECT id FROM legacy_sources WHERE name = ?", (source,)).fetchone()[0]
         db.commit()
-        done = set() if replace else {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 0")}
-        partial_in = {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 1")}
+        if prefix:
+            set_prefix(db, prefix, source)
+        store = db.execute("SELECT store FROM legacy_sources WHERE id = ?", (source_id,)).fetchone()[0]
+        say(f"Store {store} (receipts show as {store}-<number>)")
+        try:
+            check_store(export, store, force, say)
+        except SystemExit:   # nothing imported: the file as it was
+            if prefix:
+                db.rollback()
+            db.close()
+            raise
+        done = set() if replace else {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 0 AND store = ?", (store,))}
+        partial_in = {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 1 AND store = ?", (store,))}
         days, last = stage(db, export, day_from, day_to, done, say, source_id)
         db.commit()
         if not days:
             say("Nothing to import: every day in that range is in already (--replace imports them again).")
         receipts = variances = 0
         for i, d in enumerate(days):
-            n, v = import_day(db, source_id, d, d == last, replace or d in partial_in, now)
+            n, v = import_day(db, source_id, store, d, d == last, replace or d in partial_in, now)
             receipts += n; variances += v
             if not quiet and (i % 100 == 99 or i == len(days) - 1):
                 print(f"  {i + 1:,}/{len(days):,} days ({d}), {receipts:,} receipts, {time.time() - t0:,.0f} s", flush=True)
@@ -1034,7 +1115,7 @@ RECHECK_CANDIDATES = {
 }
 
 
-def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False):
+def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
     """The self-check again over the history file's days (no export, nothing imported): our totals
     rebuilt, the differences rewritten, then what explains each kind and the dates that look wrong.
     --dry-run prints it all and keeps the file as it was."""
@@ -1051,8 +1132,8 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False):
         src.backup(dst); dst.close(); src.close()
         say(f"Backup: {backup}")
     db = open_db(db_path)
-    days = [d for (d,) in db.execute("SELECT day FROM legacy_days WHERE day BETWEEN ? AND ? ORDER BY day",
-                                     (day_from or "0000", day_to or "9999"))]
+    days = [d for (d,) in db.execute("SELECT DISTINCT day FROM legacy_days WHERE day BETWEEN ? AND ? AND (? = '' OR store = ?) ORDER BY day",
+                                     (day_from or "0000", day_to or "9999", (store or "").upper(), (store or "").upper()))]
     say(("DRY RUN (nothing kept): " if dry else "") + f"rechecking {len(days):,} day(s) in {db_path}")
     db.execute("BEGIN")
     try:
@@ -1144,6 +1225,7 @@ def made_up_export(d):
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"], [20, "ACCESSORIES"], [30, "LIGHTERS"], [260, "OPEN RING"],
                                                      [275, "INSTANT LOTTERY"], [0, "PAID OUT"]])
     write_csv(d, "PRC_ADJ", ["ID", "PRC_NAME"], [[7, "BUY 2 SAVE 1"]])
+    write_csv(d, "Sys_Pram", ["STORE_NAME", "STORE_CITY", "STORE_STATE"], [["MADE UP TOBACCO", "DANBURY", "CT"]])
     write_csv(d, "Cashier", ["CSHR_NUM", "CSHR_NAME", "CSHR_PIN", "PAY_RATE"],
               [[3, "Test Cashier Three", "9999", "1.00"], [4, "Test Cashier Four", "8888", "1.00"]])
 
@@ -1167,10 +1249,29 @@ def older_export(d):
     write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 401, 0, "0.89"]])
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["11111111111", "OLD ITEM NEVER SOLD", 20, "Old Co"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[20, "OLD ACCESSORIES NAME"]])
+    write_csv(d, "Sys_Pram", ["STORE_NAME", "STORE_CITY"], [["MADE UP TOBACCO", "DANBURY"]])
     write_csv(d, "Employee", ["EMP_NUM", "FIRST_NAME", "LAST_NAME", "SSN"], [[2, "Test", "Cashier Two", "000-00-0000"]])
     # made-up birth dates, in a table of their own (as some ILSA copies may keep them)
     write_csv(d, "AgeCheck", ["REG_NUM", "RECEIPT_NUM", "CHECKED_AT", "ID_VALUE"],
               [[1, 8001, "10/20/26 10:00:00", "07/04/76"]] + [[1, 7000 + i, "10/20/26 09:00:00", f"01/01/{50 + i:02d}"] for i in range(30)])
+
+
+def other_store_export(d):
+    """A made-up copy of another store (BHNM): one receipt on 2026-10-15 (in the C++ tests' history) or
+    on `day`."""
+    write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"], [[1, 77, "10/15/26 21:00:00"]])
+    write_csv(d, "RegSale", ["REG_NUM", "RECEIPT_NUM", "REG_Z_COUNTER", "START_TIME", "Z_MODE", "CSHR_NUM", "SALE_TOTAL", "TAX1_AMT"],
+              [[1, 9003, 77, "10/15/26 12:00:00", 0, 9, "10.63", "0.63"]])   # the same receipt number as a BHDAN one
+    write_csv(d, "PDetail", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "DETAIL_CLASS", "DETAIL_TYPE", "MODE_FLAGS", "DEPT", "PLU",
+                             "DETAIL_ITEM_PRC", "DETAIL_FOR_QTY", "DETAIL_LINE_AMT", "ITEM_COST", "TIME_STAMP"],
+              [[1, 77, 9003, 1, 1, 0, 10, "012345678905", "10.00", 1, "10.00", "7.00", "10/15/26 12:00:00"]])
+    write_csv(d, "TendSale", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "TENDER_TYPE", "SALE_AMT", "AMT_TEND", "CHANGE_DUE"],
+              [[1, 77, 9003, 1, "10.63", "10.63", "0"]])
+    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 77, 0, 1, "10.63"]])
+    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 77, 0, "0.63"]])
+    write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["12345678905", "MADE UP CIGAR ROBUSTO", 10, "Acme Cigars"]])
+    write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"]])
+    write_csv(d, "Sys_Pram", ["STORE_NAME", "STORE_CITY"], [["MADE UP TOBACCO", "GAYLORDSVILLE"]])
 
 
 def fixture_sql(db):
@@ -1250,6 +1351,8 @@ def self_test(write_fixture=False):
         check("an item in no list keeps its department's name, marked",
               q("SELECT name, name_src FROM legacy_lines WHERE upc = '077777777777'") == ("OLD ACCESSORIES NAME", "dept"))
         check("the older copy doesn't rename departments", q("SELECT name FROM legacy_depts WHERE dept = 20") == ("ACCESSORIES",))
+        check("every copy's check prefix: BHDAN unless set",
+              [r[0] for r in db.execute("SELECT store FROM legacy_sources ORDER BY id")] == ["BHDAN", "BHDAN"])
         check("each copy's cashiers: number and name only",
               db.execute("SELECT source_id, cashier_num, name FROM legacy_cashiers ORDER BY 1, 2").fetchall()
               == [(1, 3, "Test Cashier Three"), (1, 4, "Test Cashier Four"), (2, 2, "Test Cashier Two")]
@@ -1281,6 +1384,37 @@ def self_test(write_fixture=False):
               stats.get("unexplained") == 1 and db.execute("SELECT COUNT(*) FROM legacy_variances WHERE what LIKE 'Receipts%'").fetchone() == (0,))
         db.execute("UPDATE legacy_receipts SET total_cents = total_cents - 5 WHERE receipt_num = 8001")
         db.commit()
+        db.close()
+        # Another store's copy: refused under the wrong store, imported under its own, its days its own.
+        nm = os.path.join(tmp, "made up other store"); os.makedirs(nm); other_store_export(nm)
+        try:
+            run(nm, dbp, None, None, False, False, out, quiet=True, now=now, manage=False, prefix="BHDAN")
+            refused = False
+        except SystemExit:
+            refused = True
+        db = sqlite3.connect(dbp)
+        db.execute("DELETE FROM legacy_sources WHERE name = 'made up other store'"); db.commit(); db.close()
+        check("another store's export is refused under the wrong store", refused)
+        bhnm = run(nm, dbp, None, None, False, False, out, quiet=True, now=now, manage=False, prefix="BHNM")
+        db = sqlite3.connect(dbp)
+        q = lambda s, *a: db.execute(s, a).fetchone()
+        check("another store's copy imported under its own store",
+              bhnm["days"] == ["2026-10-15"] and q("SELECT store FROM legacy_days WHERE day = '2026-10-15'") == ("BHNM",))
+        # The same day in two stores: on a copy of the file, a BHNM copy of 2026-10-28 neither skips nor replaces BHDAN's.
+        side = os.path.join(tmp, "side.db"); shutil.copyfile(dbp, side)
+        nm2 = os.path.join(tmp, "made up other store 2"); os.makedirs(nm2); other_store_export(nm2)
+        for t in ("RegZCnt", "RegSale", "PDetail"):
+            path = os.path.join(nm2, t + ".csv")
+            text = open(path).read().replace("10/15/26", "10/28/26")
+            open(path, "w").write(text)
+        before28 = sqlite3.connect(side).execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = '2026-10-28'").fetchone()[0]
+        res2 = run(nm2, side, None, None, False, False, out, quiet=True, now=now, manage=False, prefix="BHNM")
+        sd = sqlite3.connect(side)
+        check("the same day in two stores: both kept",
+              res2["days"] == ["2026-10-28"]
+              and sd.execute("SELECT COUNT(*) FROM legacy_receipts WHERE day = '2026-10-28'").fetchone()[0] == before28 + 1
+              and sd.execute("SELECT GROUP_CONCAT(store) FROM (SELECT store FROM legacy_days WHERE day = '2026-10-28' ORDER BY store)").fetchone()[0] == "BHDAN,BHNM")
+        sd.close()
         check("readable by ViewTouch read-only (no WAL left)", db.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
         text = fixture_sql(db)
         db.close()
@@ -1303,7 +1437,7 @@ def main(argv):
     args, opts = [], {}
     it = iter(argv)
     for a in it:
-        if a in ("--from", "--to", "--db", "--out", "--dob"):
+        if a in ("--from", "--to", "--db", "--out", "--dob", "--prefix", "--store"):
             opts[a] = next(it, "")
         elif a.startswith("--"):
             opts[a] = True
@@ -1314,9 +1448,19 @@ def main(argv):
     for k in ("--from", "--to"):
         if k in opts and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", opts[k]):
             sys.exit(f"{k}: write the date like 2026-10-28")
+    if "--prefix" in opts and not args:   # every copy's
+        dbp = os.path.expanduser(opts.get("--db", DEFAULT_DB))
+        if not os.path.exists(dbp):
+            sys.exit(f"No history file at {dbp}: import first.")
+        db = open_db(dbp)
+        print(f"Check prefix for every ILSA copy: {set_prefix(db, opts['--prefix'])}")
+        close_db(db)
+        if "--recheck" not in opts:
+            return 0
     if "--recheck" in opts:
         recheck(os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--from"), opts.get("--to"),
-                bool(opts.get("--dry-run")), os.path.expanduser(opts.get("--out", OUT_DIR)))
+                bool(opts.get("--dry-run")), os.path.expanduser(opts.get("--out", OUT_DIR)),
+                store=opts.get("--store") if isinstance(opts.get("--store"), str) else None)
         return 0
     export = os.path.expanduser(args[0]) if args else None
     if export and not os.path.isdir(export) and os.path.isdir(os.path.join(EXPORT, args[0])):
@@ -1331,7 +1475,8 @@ def main(argv):
                          bool(opts.get("--dry-run")), os.path.expanduser(opts.get("--out", OUT_DIR)))
         return 0
     run(export, os.path.expanduser(opts.get("--db", DEFAULT_DB)), opts.get("--from"), opts.get("--to"),
-        bool(opts.get("--dry-run")), bool(opts.get("--replace")), os.path.expanduser(opts.get("--out", OUT_DIR)))
+        bool(opts.get("--dry-run")), bool(opts.get("--replace")), os.path.expanduser(opts.get("--out", OUT_DIR)),
+        prefix=opts.get("--prefix") if isinstance(opts.get("--prefix"), str) else None, force=bool(opts.get("--force")))
     return 0
 
 
