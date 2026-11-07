@@ -90,6 +90,15 @@ struct Variance {
     std::int64_t ilsa = 0, ours = 0;   // cents (a count when `what` ends with "(count)")
 };
 
+// Sale lines whose UPC no imported copy's item list has (an item deleted in ILSA before any copy we
+// have): named after their department. One row per UPC.
+struct UnnamedItem {
+    std::string upc, name;   // name: the department name it carries
+    std::int64_t lines = 0;
+    Money sales;
+    std::string first, last;   // days
+};
+
 // An old receipt, read-only, as ILSA rang it.
 struct ReceiptLine {
     std::string name, upc, kind;   // kind: item | entry | promo | payout | other
@@ -147,7 +156,9 @@ Report gpByPeriod(const std::vector<PeriodRow> &rows, bool byYear, const ReportC
 // imported receipts and, when given, ViewTouch's own checks on the same days.
 Report sideBySide(const std::map<std::string, std::int64_t> &ilsaZ, const ZTotals &imported,
                   const ZTotals *viewtouch, const ReportContext &ctx);
-Report differences(const std::vector<Variance> &list, const ReportContext &ctx);
+// The days ILSA's Z and its receipts disagree, then the sale lines no item list names.
+Report differences(const std::vector<Variance> &list, const ReportContext &ctx,
+                   const std::vector<UnnamedItem> &unnamed = {});
 
 // The receipt as ILSA printed it, `width` characters wide (vt-ilsa-receipt's layout); the buyer's
 // date of birth only on the store's copy (`withDob`), as ILSA printed it.

@@ -77,9 +77,9 @@ TEST_CASE("ILSA history: a day's totals as its Daily Z, both GPs", "[legacy]")
     const QString path = makeHistory(dir);
     const auto st = app::legacy::status(path);
     CHECK(st.present);
-    CHECK(st.days == 2);
-    CHECK(st.receipts == 6);
-    CHECK(st.first == u"2026-10-27"_s);
+    CHECK(st.days == 3);           // two days of the made-up copy, one of an older made-up copy
+    CHECK(st.receipts == 7);
+    CHECK(st.first == u"2026-10-20"_s);
 
     QString error;
     const core::legacy::ZTotals z = app::legacy::totals(path, u"2026-10-28"_s, u"2026-10-28"_s, &error);
@@ -161,7 +161,7 @@ TEST_CASE("ILSA history: departments when sold or as ILSA, items, GP by month", 
     const auto brands = app::legacy::groups(path, u"2026-10-27"_s, u"2026-10-28"_s, u"brand"_s, false, 0);
     CHECK(std::ranges::any_of(brands, [](const auto &g) { return g.label == "ACME CIGARS" && g.sales == Money::fromCents(2000); }));
 
-    const auto months = app::legacy::periods(path, u"2026-01-01"_s, u"2026-12-31"_s, false);
+    const auto months = app::legacy::periods(path, u"2026-10-27"_s, u"2026-10-28"_s, false);
     REQUIRE(months.size() == 1);
     CHECK(months[0].period == "2026-10");
     CHECK(months[0].sales == Money::fromCents(2600));
@@ -193,6 +193,15 @@ TEST_CASE("ILSA history: its Z beside the receipts, and the days that differ", "
     CHECK(diffs[0].day == "2026-10-28");
     CHECK(diffs[0].ilsa == -2305);
     CHECK(diffs[0].ours == -2405);
+
+    // The older copy's lines: one item named from the newer copy's list, one no list has.
+    const auto unnamed = app::legacy::unnamedItems(path, u"2026-10-01"_s, u"2026-10-31"_s);
+    REQUIRE(unnamed.size() == 1);
+    CHECK(unnamed[0].upc == "077777777777");
+    CHECK(unnamed[0].sales == Money::fromCents(200));
+    CHECK(app::legacy::findReceipts(path, u"cutter"_s, 50, 0).size() == 1);
+    const core::Report d = core::legacy::differences(diffs, ctx, unnamed);
+    CHECK(d.find("2026-10-20").at(2) == "UPC 077777777777 (OLD ACCESSORIES NAME)");
 }
 
 TEST_CASE("ILSA history: receipts found and shown read-only", "[legacy]")

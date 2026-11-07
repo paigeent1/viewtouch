@@ -47,7 +47,7 @@ Item {
         toDate = b
         fromField.text = a
         toField.text = b
-        refresh()
+        Qt.callLater(refresh)
     }
     function setPeriod(id) {
         const now = new Date()
@@ -63,10 +63,12 @@ Item {
         if (w.pos && w.fromDate !== "")
             w.pos.requestLegacyReport(w.kind, w.fromDate, w.toDate, w.kind === "depts" ? w.deptBy : w.by)
     }
-    onKindChanged: refresh()
-    onByChanged: refresh()
-    onDeptByChanged: refresh()
-    Component.onCompleted: refresh()
+    // Asked a moment later, not while the page is being built (the answer changes rangeReport,
+    // which bindings here read: asking from inside a binding update is a binding loop).
+    onKindChanged: Qt.callLater(refresh)
+    onByChanged: Qt.callLater(refresh)
+    onDeptByChanged: Qt.callLater(refresh)
+    Component.onCompleted: Qt.callLater(refresh)
 
     readonly property var range: pos ? pos.rangeReport : ({})
     readonly property bool mine: (range.id ?? "") === "ilsa-" + kind
@@ -169,6 +171,9 @@ Item {
                 id: fromField
                 objectName: "ilsaFrom"
                 implicitWidth: w.unit * 7
+                Layout.fillHeight: true
+                Layout.minimumHeight: w.zone ? w.zone.touch(48) : 48
+                font.pixelSize: w.unit * 0.8
                 text: w.fromDate
                 placeholderText: "2026-10-28"
                 inputMethodHints: Qt.ImhPreferNumbers
@@ -180,6 +185,9 @@ Item {
                 id: toField
                 objectName: "ilsaTo"
                 implicitWidth: w.unit * 7
+                Layout.fillHeight: true
+                Layout.minimumHeight: w.zone ? w.zone.touch(48) : 48
+                font.pixelSize: w.unit * 0.8
                 text: w.toDate
                 placeholderText: "2026-10-28"
                 inputMethodHints: Qt.ImhPreferNumbers

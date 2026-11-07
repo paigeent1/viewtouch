@@ -349,6 +349,33 @@ std::vector<Variance> variances(const QString &path, const QString &from, const 
     });
 }
 
+std::vector<UnnamedItem> unnamedItems(const QString &path, const QString &from, const QString &to, QString *error)
+{
+    using Rows = std::vector<UnnamedItem>;
+    return withHistory<Rows>(path, error, Rows{}, [&](QSqlDatabase &db) {
+        Rows out;
+        QSqlQuery probe(db);   // a history file from before names were looked up in the other copies
+        if (!run(probe, u"SELECT name_src FROM legacy_lines LIMIT 1"_s, {}, nullptr))
+            return out;
+        QSqlQuery q(db);
+        if (run(q, u"SELECT upc, MAX(name), COUNT(*), SUM(amount_cents), MIN(day), MAX(day) FROM legacy_lines "
+                    "WHERE name_src = 'dept' AND upc <> '' AND kind = 'item' AND day BETWEEN ? AND ? "
+                    "GROUP BY upc ORDER BY SUM(amount_cents) DESC LIMIT 2000"_s, {from, to}, error)) {
+            while (q.next()) {
+                UnnamedItem u;
+                u.upc = text(q, 0);
+                u.name = text(q, 1);
+                u.lines = q.value(2).toLongLong();
+                u.sales = cents(q, 3);
+                u.first = text(q, 4);
+                u.last = text(q, 5);
+                out.push_back(std::move(u));
+            }
+        }
+        return out;
+    });
+}
+
 std::vector<Receipt> findReceipts(const QString &path, const QString &query, int limit, int offset, QString *error)
 {
     using Rows = std::vector<Receipt>;

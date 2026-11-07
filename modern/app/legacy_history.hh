@@ -41,6 +41,9 @@ std::vector<core::legacy::PeriodRow> periods(const QString &path, const QString 
                                              QString *error = nullptr);
 std::vector<core::legacy::Variance> variances(const QString &path, const QString &from, const QString &to,
                                               QString *error = nullptr);
+// Sale lines no imported copy's item list names (vt-ilsa-history: name_src 'dept'), by UPC, the most sold first.
+std::vector<core::legacy::UnnamedItem> unnamedItems(const QString &path, const QString &from, const QString &to,
+                                                    QString *error = nullptr);
 // Receipts (without their lines), the newest first: `query` empty: all; "2026-10-28": that day;
 // "#412345" or up to 7 digits: that receipt number; 8 digits or more: a UPC sold on it; "12.34":
 // that total; else a word in an item's name.

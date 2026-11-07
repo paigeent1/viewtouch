@@ -19,6 +19,7 @@ Rectangle {
     property var offsets: [0]
     property int index: -1
     readonly property real unit: Math.max(14, Math.min(width / 50, height / 26))
+    readonly property real keyH: Math.max(w.unit * 2.4, w.zone ? w.zone.touch(48) : 48)
     function load(offset) { if (w.pos) w.pos.findLegacyReceipts(w.query, offset) }
     function choose(i) {
         if (i < 0 || i >= found.length) return
@@ -27,7 +28,7 @@ Rectangle {
         w.pos.selectLegacyReceipt(found[i].id)
     }
     onFoundChanged: if (visible && found.length && (index < 0 || index >= found.length)) choose(0)
-    onVisibleChanged: if (visible) { offsets = [0]; index = -1; load(0) }
+    onVisibleChanged: if (visible) { offsets = [0]; index = -1; Qt.callLater(load, 0) }
 
     RowLayout {
         anchors.fill: parent
@@ -68,9 +69,9 @@ Rectangle {
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 6
-                Button { text: "▲"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3; font.pixelSize: w.unit * 1.4
+                Button { text: "▲"; implicitWidth: w.unit * 5; implicitHeight: Math.max(w.unit * 3, w.keyH); font.pixelSize: w.unit * 1.4
                          onClicked: paper.contentY = Math.max(0, paper.contentY - paper.height * 0.8) }
-                Button { text: "▼"; implicitWidth: w.unit * 5; implicitHeight: w.unit * 3; font.pixelSize: w.unit * 1.4
+                Button { text: "▼"; implicitWidth: w.unit * 5; implicitHeight: Math.max(w.unit * 3, w.keyH); font.pixelSize: w.unit * 1.4
                          onClicked: paper.contentY = Math.min(Math.max(0, paper.contentHeight - paper.height), paper.contentY + paper.height * 0.8) }
             }
         }
@@ -93,7 +94,7 @@ Rectangle {
                     id: search
                     objectName: "ilsaSearch"
                     Layout.fillWidth: true
-                    implicitHeight: w.unit * 2.4
+                    implicitHeight: w.keyH
                     font.pixelSize: w.unit * 0.8
                     placeholderText: qsTr("Day (2026-10-28), #receipt, UPC, 12.34 or a name")
                     onAccepted: { w.query = text; w.offsets = [0]; w.index = -1; w.load(0) }
@@ -101,13 +102,13 @@ Rectangle {
                 Button {
                     objectName: "ilsaFind"
                     text: qsTr("Find")
-                    implicitHeight: w.unit * 2.4
+                    implicitHeight: w.keyH
                     font.pixelSize: w.unit * 0.8
                     onClicked: { w.query = search.text; w.offsets = [0]; w.index = -1; w.load(0) }
                 }
-                Button { text: qsTr("‹ Newer"); implicitHeight: w.unit * 2.4; font.pixelSize: w.unit * 0.8; enabled: w.offsets.length > 1
+                Button { text: qsTr("‹ Newer"); implicitHeight: w.keyH; font.pixelSize: w.unit * 0.8; enabled: w.offsets.length > 1
                          onClicked: { const o = w.offsets.slice(0, -1); w.offsets = o; w.index = -1; w.load(o[o.length - 1]) } }
-                Button { text: qsTr("Older ›"); implicitHeight: w.unit * 2.4; font.pixelSize: w.unit * 0.8; enabled: w.info.more === true
+                Button { text: qsTr("Older ›"); implicitHeight: w.keyH; font.pixelSize: w.unit * 0.8; enabled: w.info.more === true
                          onClicked: { const o = w.offsets.concat([w.info.nextOffset ?? 0]); w.offsets = o; w.index = -1; w.load(o[o.length - 1]) } }
             }
             ListView {
@@ -208,7 +209,7 @@ Rectangle {
                 onClicked: { whichCopy.close(); w.pos.reprintLegacyReceipt(w.picked.id, false) }
             }
             Button {
-                Layout.fillWidth: true; implicitHeight: w.unit * 2.6; font.pixelSize: w.unit * 0.9
+                Layout.fillWidth: true; implicitHeight: Math.max(w.unit * 2.6, w.keyH); font.pixelSize: w.unit * 0.9
                 text: qsTr("Cancel")
                 onClicked: whichCopy.close()
             }

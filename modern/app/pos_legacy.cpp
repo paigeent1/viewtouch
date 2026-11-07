@@ -37,6 +37,7 @@ struct LegacyRead {
     std::vector<core::legacy::GroupRow> rows, lottery;
     std::vector<core::legacy::PeriodRow> periods;
     std::vector<core::legacy::Variance> variances;
+    std::vector<core::legacy::UnnamedItem> unnamed;
     bool more = false;
     QString error;
 };
@@ -107,6 +108,7 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
                 got.periods = legacy::periods(path, a, b, kind == u"gpYear", e);
             } else if (kind == u"differences") {
                 got.variances = legacy::variances(path, a, b, e);
+                got.unnamed = legacy::unnamedItems(path, a, b, e);
             }
         }
         if (withVt) {
@@ -152,7 +154,7 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             } else if (kind == u"gpMonth" || kind == u"gpYear") {
                 r = core::legacy::gpByPeriod(got.periods, kind == u"gpYear", ctx);
             } else {
-                r = core::legacy::differences(got.variances, ctx);
+                r = core::legacy::differences(got.variances, ctx, got.unnamed);
             }
             if (!got.error.isEmpty())
                 r.note("Couldn't read all of the ILSA history: " + got.error.toStdString());

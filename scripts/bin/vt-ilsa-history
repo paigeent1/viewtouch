@@ -82,8 +82,21 @@ SCHEMA = [
     "CREATE TABLE IF NOT EXISTS legacy_days (day TEXT PRIMARY KEY, source_id INTEGER NOT NULL, partial INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0, variances INTEGER NOT NULL DEFAULT 0, imported_at TEXT)",
     "CREATE TABLE IF NOT EXISTS legacy_variances (id INTEGER PRIMARY KEY, day TEXT NOT NULL, z_id INTEGER, what TEXT NOT NULL, ilsa_cents INTEGER NOT NULL, ours_cents INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS legacy_variances_day ON legacy_variances (day)",
+    # Each imported copy's item list (PLU): names for lines whose item a later copy no longer has.
+    # bare: the UPC without leading zeros (ILSA kept codes as numbers).
+    "CREATE TABLE IF NOT EXISTS legacy_items (source_id INTEGER NOT NULL, upc TEXT NOT NULL, bare TEXT NOT NULL, name TEXT NOT NULL, brand TEXT NOT NULL DEFAULT '', dept INTEGER, PRIMARY KEY (source_id, upc))",
+    "CREATE INDEX IF NOT EXISTS legacy_items_bare ON legacy_items (bare)",
 ]
-DATA_TABLES = ["legacy_meta", "legacy_sources", "legacy_depts", "legacy_z", "legacy_z_values", "legacy_receipts",
+# Columns added after the first version (an older history file gets them when opened).
+ADDED_COLUMNS = [
+    # name_src: export (its copy's item list or the line itself) | other (another copy's item list) |
+    # dept (no item list had its UPC: named after its department) | fixed (promotion, paid out...)
+    ("legacy_lines", "name_src", "TEXT NOT NULL DEFAULT 'export'"),
+]
+LATE_SCHEMA = [
+    "CREATE INDEX IF NOT EXISTS legacy_lines_unnamed ON legacy_lines (upc) WHERE name_src = 'dept'",
+]
+DATA_TABLES = ["legacy_meta", "legacy_sources", "legacy_depts", "legacy_items", "legacy_z", "legacy_z_values", "legacy_receipts",
                "legacy_lines", "legacy_tenders", "legacy_days", "legacy_variances"]
 
 
@@ -205,6 +218,11 @@ def open_db(path):
     db.execute("PRAGMA temp_store=FILE")
     for s in SCHEMA:
         db.execute(s)
+    for table, col, decl in ADDED_COLUMNS:
+        if col not in [c[1] for c in db.execute(f"PRAGMA table_info({table})")]:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    for s in LATE_SCHEMA:
+        db.execute(s)
     db.execute("INSERT OR REPLACE INTO legacy_meta VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
     db.commit()
     return db
@@ -221,7 +239,7 @@ def close_db(db):
 STAGE = [
     "CREATE TEMP TABLE sz (reg INTEGER, z INTEGER, z_at TEXT, day TEXT, PRIMARY KEY (reg, z))",
     "CREATE TEMP TABLE sr (reg INTEGER, num INTEGER, z INTEGER, at TEXT, mode INTEGER, cashier INTEGER, total INTEGER, tax INTEGER, age INTEGER, dob TEXT, disc INTEGER, PRIMARY KEY (reg, num))",
-    "CREATE TEMP TABLE sl (reg INTEGER, num INTEGER, seq INTEGER, cls INTEGER, type INTEGER, flags INTEGER, kind TEXT, dept INTEGER, lottery INTEGER, upc TEXT, name TEXT, brand TEXT, qty REAL, unit INTEGER, amount INTEGER, cost4 INTEGER, cost INTEGER, has_cost INTEGER, voided INTEGER, returned INTEGER, cur_dept INTEGER, disc INTEGER)",
+    "CREATE TEMP TABLE sl (reg INTEGER, num INTEGER, seq INTEGER, cls INTEGER, type INTEGER, flags INTEGER, kind TEXT, dept INTEGER, lottery INTEGER, upc TEXT, name TEXT, brand TEXT, qty REAL, unit INTEGER, amount INTEGER, cost4 INTEGER, cost INTEGER, has_cost INTEGER, voided INTEGER, returned INTEGER, cur_dept INTEGER, disc INTEGER, name_src TEXT)",
     "CREATE TEMP TABLE st (reg INTEGER, num INTEGER, seq INTEGER, type INTEGER, name TEXT, amount INTEGER, change INTEGER, sale INTEGER)",
     "CREATE TEMP TABLE sv (reg INTEGER, z INTEGER, name TEXT, cents INTEGER, PRIMARY KEY (reg, z, name))",
 ]
@@ -244,7 +262,7 @@ def z_rows(export, table):
         yield h, r
 
 
-def stage(db, export, day_from, day_to, done, say):
+def stage(db, export, day_from, day_to, done, say, source_id=0):
     """The export into temp tables; returns the business days to import (ordered)."""
     for s in STAGE:
         db.execute(s)
@@ -291,21 +309,28 @@ def stage(db, export, day_from, day_to, done, say):
     db.execute("DELETE FROM sr WHERE NOT EXISTS (SELECT 1 FROM wz WHERE wz.reg = sr.reg AND wz.z = sr.z)")
     db.execute("DELETE FROM sz WHERE NOT EXISTS (SELECT 1 FROM wz WHERE wz.reg = sz.reg AND wz.z = sz.z)")
     db.execute("CREATE INDEX sz_day ON sz (day)")
-    if not days:
-        return days, last
 
-    # Names: items and departments as ILSA has them now; promotions by their id.
+    # Names: this copy's items (kept in the history file for the other copies' lines too) and
+    # departments (the newest copy's names win); promotions by their id.
     h, it = rows(export, "PLU"); r = Row(h); item = {}
     for r.r in it:
-        item[code(r("PLU_NUM"))] = ((r("PLU_DESC") or r("POS_DESC")).strip(), r("MANUF").strip().upper(),
-                                     integer(r("DEPT_NUM"), -1))
+        u = code(r("PLU_NUM"))
+        if u:
+            item[u] = ((r("PLU_DESC") or r("POS_DESC")).strip(), r("MANUF").strip().upper(), integer(r("DEPT_NUM"), -1))
+    db.execute("DELETE FROM legacy_items WHERE source_id = ?", (source_id,))
+    db.executemany("INSERT OR REPLACE INTO legacy_items VALUES (?, ?, ?, ?, ?, ?)",
+                   [(source_id, u, u.lstrip("0") or u, n, b, d) for u, (n, b, d) in item.items() if n])
     h, it = rows(export, "Dept"); r = Row(h); dept_name = {}
     for r.r in it:
         d = integer(r("DEPT_NUM"), -1)
         if d >= 0:
             dept_name[d] = (r("DEPT_NAME") or r("POS_DESC")).strip()
-    db.executemany("INSERT OR REPLACE INTO legacy_depts VALUES (?, ?, ?)",
+    newest = db.execute("SELECT MAX(last_day) FROM legacy_sources WHERE id <> ?", (source_id,)).fetchone()[0]
+    db.executemany("INSERT OR REPLACE INTO legacy_depts VALUES (?, ?, ?)" if not newest or (last or "") >= newest
+                   else "INSERT OR IGNORE INTO legacy_depts VALUES (?, ?, ?)",
                    [(d, n, int(d in LOTTERY)) for d, n in dept_name.items()])
+    if not days:
+        return days, last
     promo = {}
     for t in ("PRC_ADJ", "PRC_ADJ_ARCHIVE", "SYSDISCOUNT", "SYSDISCOUNT_ARCHIVE"):
         h, it = rows(export, t); r = Row(h)
@@ -344,18 +369,20 @@ def stage(db, export, day_from, day_to, done, say):
         name, brand, cur = item.get(upc, ("", "", -1))
         if desc_col and r(desc_col).strip():
             name = r(desc_col).strip()
+        src = "export"
         if kind == "promo":
             name = ("Promotion reversed" if cls == 16 else "Promotion") + (f": {promo[typ]}" if typ in promo else "")
+            src = "fixed"
         elif kind == "payout":
-            name = "Paid out"
-        elif not name:
-            name = dept_name.get(dept) or f"Dept {dept}"
+            name, src = "Paid out", "fixed"
+        elif not name:   # an item this copy no longer has: another copy's list may (name_backfill)
+            name, src = dept_name.get(dept) or f"Dept {dept}", "dept"
         batch.append((key[0], key[1], seq, cls, typ, flags, kind, dept, int(dept in LOTTERY), upc, name, brand,
                       qty, unit, amount, cost4, cost, int(cost4 != 0), int(bool(flags & VOID_FLAGS)),
-                      int(bool(flags & RETURN_FLAG)), cur if cur >= 0 else dept, sum(cents(r(c)) for c in line_disc)))
+                      int(bool(flags & RETURN_FLAG)), cur if cur >= 0 else dept, sum(cents(r(c)) for c in line_disc), src))
         if len(batch) >= 20000:
-            db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 22)})", batch); n += len(batch); batch = []
-    db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 22)})", batch); n += len(batch)
+            db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 23)})", batch); n += len(batch); batch = []
+    db.executemany(f"INSERT INTO sl VALUES ({','.join('?' * 23)})", batch); n += len(batch)
     say(f"  lines to import: {n:,}")
     db.execute("CREATE INDEX sl_key ON sl (reg, num)")
 
@@ -464,9 +491,10 @@ def import_day(db, source_id, day, partial, replace_old, now):
                       CROSS JOIN legacy_z lz ON lz.source_id = ? AND lz.reg_num = sr.reg AND lz.z_counter = sr.z
                       WHERE sz.day = ? ORDER BY sr.at, sr.num""", (source_id, day, source_id, day))
         db.execute("""INSERT INTO legacy_lines (receipt_id, seq, day, mode, cls, type, flags, kind, dept, lottery, upc, name, brand,
-                        qty, unit_cents, amount_cents, unit_cost_c4, cost_cents, has_cost, voided, returned, cur_dept, disc_cents)
+                        qty, unit_cents, amount_cents, unit_cost_c4, cost_cents, has_cost, voided, returned, cur_dept, disc_cents, name_src)
                       SELECT r.id, sl.seq, ?, r.mode, sl.cls, sl.type, sl.flags, sl.kind, sl.dept, sl.lottery, sl.upc, sl.name,
-                        sl.brand, sl.qty, sl.unit, sl.amount, sl.cost4, sl.cost, sl.has_cost, sl.voided, sl.returned, sl.cur_dept, sl.disc
+                        sl.brand, sl.qty, sl.unit, sl.amount, sl.cost4, sl.cost, sl.has_cost, sl.voided, sl.returned, sl.cur_dept, sl.disc,
+                        sl.name_src
                       FROM legacy_receipts r CROSS JOIN sl ON sl.reg = r.reg_num AND sl.num = r.receipt_num
                       WHERE r.day = ? AND r.source_id = ? ORDER BY r.id, sl.seq""", (day, day, source_id))
         db.execute("""INSERT INTO legacy_tenders (receipt_id, seq, type, name, amount_cents, change_cents, sale_cents)
@@ -513,6 +541,21 @@ BUCKET_TEXT = {"ours:merchandise": "item sales (lottery out)", "ours:items": "it
                "ours:entrys": "dept entries", "ours:promos": "promotions", "ours:others": "other lines",
                "ours:net": "net sales", "ours:gross": "sales with tax", "ours:sale_totals": "receipt totals",
                "ours:tax": "tax", "ours:payouts": "paid outs", "ours:lottery": "lottery item sales"}
+
+
+def name_backfill(db):
+    """Lines named after their department (no item list had their UPC) take the name and brand from
+    any imported copy's item list that has it (the newest copy's first). Returns (named now, still unnamed)."""
+    db.execute("BEGIN")
+    cur = db.execute("""UPDATE legacy_lines SET (name, brand, name_src) =
+                          (SELECT i.name, i.brand, 'other' FROM legacy_items i JOIN legacy_sources s ON s.id = i.source_id
+                           WHERE i.bare = ltrim(legacy_lines.upc, '0') ORDER BY s.last_day DESC, s.id DESC LIMIT 1)
+                        WHERE name_src = 'dept' AND upc <> '' AND kind = 'item'
+                          AND EXISTS (SELECT 1 FROM legacy_items i WHERE i.bare = ltrim(legacy_lines.upc, '0'))""")
+    named = cur.rowcount
+    db.execute("COMMIT")
+    left = db.execute("SELECT COUNT(DISTINCT upc), COUNT(*) FROM legacy_lines WHERE name_src = 'dept' AND upc <> '' AND kind = 'item'").fetchone()
+    return named, left
 
 
 def learn_z_totals(db):
@@ -634,7 +677,7 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
         db.commit()
         done = set() if replace else {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 0")}
         partial_in = {d for (d,) in db.execute("SELECT day FROM legacy_days WHERE partial = 1")}
-        days, last = stage(db, export, day_from, day_to, done, say)
+        days, last = stage(db, export, day_from, day_to, done, say, source_id)
         db.commit()
         if not days:
             say("Nothing to import: every day in that range is in already (--replace imports them again).")
@@ -655,6 +698,10 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
                 say("\n== ILSA Z_Totals amounts (meaning learned from the days: equal to one of ours on most days)")
                 for col, (b, hits, n) in sorted(mapping.items()):
                     say(f"  {col[12:]}: = {BUCKET_TEXT[b]} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+        named, (codes, lines) = name_backfill(db)
+        if named or codes:
+            say(f"\nItems no longer in their copy's list: {named:,} line(s) named from another copy's list;"
+                f" {lines:,} line(s) on {codes:,} UPC(s) still named after their department (ILSA Differences lists them).")
         path = report(db, days, out_dir, stamp, say)
         totals = db.execute("SELECT COUNT(*), MIN(day), MAX(day) FROM legacy_days").fetchone()
         close_db(db)
@@ -723,15 +770,36 @@ def made_up_export(d):
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "POS_DESC", "DEPT_NUM", "MANUF"],
               [["12345678905", "MADE UP CIGAR ROBUSTO", "", 10, "Acme Cigars"],
                ["012345678905", "MADE UP CIGAR ROBUSTO", "", 10, "Acme Cigars"],
-               ["098765432109", "MADE UP LIGHTER", "", 30, "Sparky"]])
+               ["098765432109", "MADE UP LIGHTER", "", 30, "Sparky"],
+               ["055555555555", "MADE UP CUTTER", "", 20, "Sparky"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"], [20, "ACCESSORIES"], [30, "LIGHTERS"], [260, "OPEN RING"],
                                                      [275, "INSTANT LOTTERY"], [0, "PAID OUT"]])
     write_csv(d, "PRC_ADJ", ["ID", "PRC_NAME"], [[7, "BUY 2 SAVE 1"]])
 
 
+def older_export(d):
+    """A made-up older copy: one day (2026-10-20) selling an item its own list no longer has (the newer
+    copy's list does: MADE UP CUTTER) and one no list has."""
+    write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"], [[1, 401, "10/20/26 21:00:00"]])
+    write_csv(d, "RegSale", ["REG_NUM", "RECEIPT_NUM", "REG_Z_COUNTER", "START_TIME", "Z_MODE", "CSHR_NUM", "SALE_TOTAL",
+                             "TAX1_AMT", "TAX1_REFUND_AMT"], [[1, 8001, 401, "10/20/26 10:00:00", 0, 2, "5.32", "0.32", "0"]])
+    write_csv(d, "PDetail", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "DETAIL_CLASS", "DETAIL_TYPE", "MODE_FLAGS", "DEPT", "PLU",
+                             "DETAIL_ITEM_PRC", "DETAIL_FOR_QTY", "DETAIL_LINE_AMT", "ITEM_COST", "TIME_STAMP"],
+              [[1, 401, 8001, 1, 1, 0, 20, "55555555555", "3.00", 1, "3.00", "1.00", "10/20/26 10:00:00"],
+               [1, 401, 8001, 1, 1, 0, 20, "077777777777", "2.00", 1, "2.00", "0.50", "10/20/26 10:00:00"]])
+    write_csv(d, "TendSale", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "TENDER_TYPE", "SALE_AMT", "AMT_TEND", "CHANGE_DUE"],
+              [[1, 401, 8001, 1, "5.32", "5.32", "0"]])
+    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 401, 0, 1, "5.32"]])
+    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 401, 0, "0.32"]])
+    write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["11111111111", "OLD ITEM NEVER SOLD", 20, "Old Co"]])
+    write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[20, "OLD ACCESSORIES NAME"]])
+
+
 def fixture_sql(db):
     """The file's tables and rows, one statement per line (the C++ tests' fixture)."""
-    out = [s + ";" for s in SCHEMA]
+    # The tables as the file has them (columns added later included), then their indexes.
+    out = [" ".join(sql.split()) + ";" for (sql,) in db.execute(
+        "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name LIKE 'legacy%' ORDER BY type DESC, rowid")]
     for t in DATA_TABLES:
         cols = [c[1] for c in db.execute(f"PRAGMA table_info({t})")]
         for r in db.execute(f"SELECT * FROM {t} ORDER BY 1, 2"):
@@ -793,6 +861,18 @@ def self_test(write_fixture=False):
         db = sqlite3.connect(dbp)
         check("re-run: the complete day is skipped, the partial day replaced, nothing doubled",
               again["days"] == ["2026-10-28"] and db.execute("SELECT COUNT(*), SUM(amount_cents) FROM legacy_lines").fetchone() == before)
+        db.close()
+        old = os.path.join(tmp, "older made up export"); os.makedirs(old); older_export(old)
+        third = run(old, dbp, None, "2026-10-26", False, False, out, quiet=True, now=now, manage=False)
+        db = sqlite3.connect(dbp)
+        q = lambda s, *a: db.execute(s, a).fetchone()
+        check("an older copy's day, up to --to", third["days"] == ["2026-10-20"])
+        check("an item gone from its copy's list named from another copy's list",
+              q("SELECT name, brand, name_src FROM legacy_lines WHERE upc = '55555555555'") == ("MADE UP CUTTER", "SPARKY", "other"))
+        check("an item in no list keeps its department's name, marked",
+              q("SELECT name, name_src FROM legacy_lines WHERE upc = '077777777777'") == ("OLD ACCESSORIES NAME", "dept"))
+        check("the older copy doesn't rename departments", q("SELECT name FROM legacy_depts WHERE dept = 20") == ("ACCESSORIES",))
+        check("the older day matches its Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-20'") == (0,))
         check("readable by ViewTouch read-only (no WAL left)", db.execute("PRAGMA journal_mode").fetchone()[0] == "delete")
         text = fixture_sql(db)
         db.close()

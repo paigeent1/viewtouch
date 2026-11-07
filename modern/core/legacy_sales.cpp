@@ -499,7 +499,7 @@ Report sideBySide(const std::map<std::string, std::int64_t> &ilsaZ, const ZTotal
     return r;
 }
 
-Report differences(const std::vector<Variance> &list, const ReportContext &ctx)
+Report differences(const std::vector<Variance> &list, const ReportContext &ctx, const std::vector<UnnamedItem> &unnamed)
 {
     Report r;
     r.id = "ilsa-differences";
@@ -518,6 +518,19 @@ Report differences(const std::vector<Variance> &list, const ReportContext &ctx)
         r.note("None: every imported day matches ILSA's own Z on tax, tenders and paid outs.");
     else
         r.note("Days where ILSA's own Z and its receipts disagree (crash days, a mistyped amount): the receipts are kept as they are.");
+    if (!unnamed.empty()) {
+        r.section("Items no ILSA copy names (deleted before the oldest copy): shown under their department");
+        std::int64_t lines = 0;
+        Money sales;
+        for (const UnnamedItem &u : unnamed) {
+            r.line({u.first == u.last ? u.first : u.first + " - " + u.last, count(u.lines), "UPC " + u.upc + " (" + u.name + ")",
+                    "", ctx.money(u.sales), ""});
+            lines += u.lines;
+            sales += u.sales;
+        }
+        r.total({count(std::int64_t(unnamed.size())) + " UPC(s)", count(lines), "lines", "", ctx.money(sales), ""});
+        r.note("Their Z column is the number of lines; Imported is what they sold for.");
+    }
     return r;
 }
 

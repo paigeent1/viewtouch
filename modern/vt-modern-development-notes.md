@@ -118,6 +118,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-07 11:50 ET — Bob (Claude) — ILSA history: three copies, names of deleted items from the other copies; ILSA History page fits a finger
+- **What:** vt-ilsa-history keeps each imported copy's item list (legacy_items) and, after every run, names lines whose UPC their own copy no longer has from any other copy's list (newest copy first), whichever copy was imported first; lines no list names keep their department's name and are listed on ILSA Differences ('Items no ILSA copy names'). An older copy no longer renames departments. The three copies import one after the other with --from/--to (one source per day, as in the notes). ILSA History page: date fields as tall as the keys; reports asked a moment later (Qt.callLater), not while the page is built (fixes a binding loop); ILSA receipts' buttons at least 48 px.
+- **Why:** CI 42391301213: 'every control big enough for a finger' failed on the ILSA History date fields. Owner: the full history is three ILSA copies; items deleted in ILSA must still show their names.
+- **Files:** `modern/app/legacy_history.cpp`, `modern/app/legacy_history.hh`, `modern/app/pos_legacy.cpp`, `modern/core/legacy_sales.cpp`, `modern/core/legacy_sales.hh`, `modern/tests/legacy_fixture.inc`, `modern/tests/test_legacy.cpp`, `modern/ui/qml/WidgetLegacyReceipts.qml`, `modern/ui/qml/WidgetLegacyReports.qml`, `scripts/bin/vt-ilsa-history`
+- **Next person must know:** Import order on the Pi: ILSA (--to 2008-11-05), ILSA-kpbhdanmissing (--from 2008-11-06 --to 2014-03-20), then copy bhdan.
+
 ### 2026-11-07 11:25 ET — Bob (Claude) — ILSA vs ViewTouch: ViewTouch's GP from each line's cost at the time of sale
 - **What:** On top of bob/audit (lines now keep their cost when rung): the Daily Z and ILSA vs ViewTouch for ViewTouch's own checks count each line's cost at the time of sale (OrderLine::costAtSale); lines without one count as no-cost lines, as in ILSA's history. Branch bob/ilsa-history rebased onto bob/audit.
 - **Why:** Owner 2026-11-07: GP from the cost at the time of sale for ViewTouch days too; coordinator: rebase onto bob/audit (its build fix).
