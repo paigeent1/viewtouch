@@ -659,7 +659,8 @@ std::vector<std::pair<std::string, std::string>> receiptRows(const Receipt &rc, 
     std::vector<std::pair<std::string, std::string>> out;
     const auto rule = [&] { out.emplace_back("-", "-"); };
     out.emplace_back("Receipt " + std::to_string(rc.number), rc.at.substr(0, 16));
-    out.emplace_back("Register " + std::to_string(rc.reg), "Cashier " + std::to_string(rc.cashier));
+    out.emplace_back("Register " + std::to_string(rc.reg),
+                     "Cashier " + std::to_string(rc.cashier) + (rc.cashierName.empty() ? "" : " " + rc.cashierName));
     rule();
     Money subtotal;
     for (const ReceiptLine &l : rc.lines) {

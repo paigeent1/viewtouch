@@ -71,12 +71,22 @@ std::string text(const QSqlQuery &q, int i) { return q.value(i).toString().toStd
 
 // Receipts' columns, in this order, for findReceipts and receipt.
 const QString kReceiptColumns = u"r.id, r.receipt_num, r.at, r.day, r.total_cents, r.tax_cents, r.mode, r.reg_num, "
-                                "r.cashier, r.age_verified, r.dob, COALESCE(s.name, '')"_s;
+                                "r.cashier, r.age_verified, r.dob, COALESCE(s.name, ''), COALESCE(c.name, '')"_s;
 
 bool hasTable(QSqlDatabase &db, const QString &name)
 {
     QSqlQuery q(db);
     return run(q, u"SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"_s, {name}, nullptr) && q.next();
+}
+
+// Receipts with their copy's name and their cashier's name (when the history file keeps cashiers).
+QString receiptFrom(QSqlDatabase &db)
+{
+    return hasTable(db, u"legacy_cashiers"_s)
+               ? u"legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id "
+                 "LEFT JOIN legacy_cashiers c ON c.source_id = r.source_id AND c.cashier_num = r.cashier"_s
+               : u"legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id "
+                 "LEFT JOIN (SELECT NULL AS name) c ON 0"_s;
 }
 
 // Cashier names and ties, or nothing, for a history file from before they were kept.
@@ -113,6 +123,7 @@ Receipt receiptOf(const QSqlQuery &q)
     r.ageVerified = q.value(9).toInt();
     r.dob = text(q, 10);
     r.source = text(q, 11);
+    r.cashierName = text(q, 12);
     return r;
 }
 
@@ -563,8 +574,8 @@ std::vector<Receipt> findReceipts(const QString &path, const QString &query, int
         args << limit << offset;
         Rows out;
         QSqlQuery q(db);
-        if (run(q, u"SELECT %1 FROM legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id WHERE %2 "
-                    "ORDER BY r.day DESC, r.at DESC, r.receipt_num DESC LIMIT ? OFFSET ?"_s.arg(kReceiptColumns, where),
+        if (run(q, u"SELECT %1 FROM %3 WHERE %2 "
+                    "ORDER BY r.day DESC, r.at DESC, r.receipt_num DESC LIMIT ? OFFSET ?"_s.arg(kReceiptColumns, where, receiptFrom(db)),
                 args, error)) {
             while (q.next())
                 out.push_back(receiptOf(q));
@@ -580,8 +591,8 @@ std::optional<Receipt> receipt(const QString &path, std::int64_t id, QString *er
         Receipt r;
         {
             QSqlQuery q(db);
-            if (!run(q, u"SELECT %1 FROM legacy_receipts r LEFT JOIN legacy_sources s ON s.id = r.source_id WHERE r.id = ?"_s
-                            .arg(kReceiptColumns), {qint64(id)}, error) || !q.next())
+            if (!run(q, u"SELECT %1 FROM %2 WHERE r.id = ?"_s.arg(kReceiptColumns, receiptFrom(db)), {qint64(id)}, error)
+                || !q.next())
                 return std::nullopt;
             r = receiptOf(q);
         }

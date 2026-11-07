@@ -134,7 +134,9 @@ Rectangle {
                         ColumnLayout {
                             spacing: 0
                             Label { text: qsTr("ILSA  Rcpt #  %1").arg(row.modelData.number ?? ""); color: row.index === w.index ? "#ffe066" : "white"; font.pixelSize: w.unit * 1.05; font.bold: true }
-                            Label { text: qsTr("Total  %1").arg(row.modelData.total ?? "") + ((row.modelData.mode ?? 0) !== 0 ? qsTr("  (not a sale)") : ""); color: "white"; font.pixelSize: w.unit * 0.95 }
+                            Label { text: qsTr("Total  %1").arg(row.modelData.total ?? "") + ((row.modelData.mode ?? 0) !== 0 ? qsTr("  (not a sale)") : "")
+                                          + "   " + qsTr("Cashier %1").arg(((row.modelData.cashier ?? "") + " " + (row.modelData.cashierName ?? "")).trim())
+                                    color: "white"; font.pixelSize: w.unit * 0.95 }
                         }
                         Item { Layout.fillWidth: true }
                         Label { text: row.modelData.when ?? ""; color: row.index === w.index ? "#ffe066" : "white"; font.pixelSize: w.unit * 0.95; font.bold: true }

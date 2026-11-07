@@ -172,6 +172,25 @@ void TicketPrinter::printGiftReceipt(const PosSettings &settings, const Check &c
     }
 }
 
+void TicketPrinter::printLegacyReceipt(const PosSettings &settings, const Report &asReport,
+                                       const std::vector<std::pair<std::string, std::string>> &rows, const std::string &printerId)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    if (const PrinterConfig *p = receiptPrinter(settings, printerId)) {
+        TicketContext ctx = context(settings);
+        if (settings.receiptLogo && p->effectiveFormat() == "escpos")
+            ctx.logo = logoFor(settings, p->width);
+        send(settings, *p, legacyReceipt(rows, ctx), QString::fromStdString(asReport.title));
+    }
+}
+
+QString TicketPrinter::legacyReceiptText(const PosSettings &settings, const std::vector<std::pair<std::string, std::string>> &rows)
+{
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    const PrinterConfig *p = receiptPrinter(settings, {});
+    return QString::fromStdString(renderText(legacyReceipt(rows, context(settings)), p ? p->width : 42));
+}
+
 void TicketPrinter::printPrivacyNotice(const PosSettings &settings, const std::string &printerId)
 {
     const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
