@@ -403,3 +403,65 @@ TEST_CASE("ILSA History > Cashiers and By Employee on the screen", "[legacy][rep
     CHECK(pos.requestLegacyReport(u"employees"_s, u"day:0"_s, {}, u"vt|"_s));
     REQUIRE(waitFor(pos));
 }
+
+TEST_CASE("ILSA history: several stores ticked, by store or rolled up; a cashier tied in all stores", "[legacy][stores]")
+{
+    QTemporaryDir dir;
+    const QString path = makeHistory(dir);
+    CHECK(app::legacy::status(path, nullptr, u"BHDAN,BHNM"_s).days == 4);
+    CHECK(app::legacy::status(path, nullptr, u"-"_s).days == 0);   // none ticked
+    CHECK(app::legacy::totals(path, u"2026-10-15"_s, u"2026-10-28"_s, nullptr, u"BHNM"_s).receipts == 1);
+
+    PosService pos(test::seedPosData(), nullptr);
+    pos.shared()->legacyDb = path;
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    // By store: a section per store with its own totals.
+    REQUIRE(pos.requestLegacyReport(u"z"_s, u"2026-10-15"_s, u"2026-10-28"_s, {}, u"BHDAN,BHNM"_s));
+    REQUIRE(waitFor(pos));
+    QVariantMap report = pos.rangeReport()[u"report"_s].toMap();
+    CHECK(report[u"title"_s].toString().contains(u"by store"_s));
+    CHECK(pos.rangeReport()[u"ticked"_s].toStringList() == QStringList{u"BHDAN"_s, u"BHNM"_s});
+    CHECK(pos.rangeReport()[u"byStore"_s].toBool());
+    CHECK(cells(report, u"Store BHNM"_s).size() == 1);
+    CHECK(cells(report, u"Receipts"_s).value(1) == u"7"_s);   // BHDAN's section first
+    // Corp roll-up: one total.
+    REQUIRE(pos.requestLegacyReport(u"z"_s, u"2026-10-15"_s, u"2026-10-28"_s, {}, u"BHDAN,BHNM|rollup"_s));
+    REQUIRE(waitFor(pos));
+    report = pos.rangeReport()[u"report"_s].toMap();
+    CHECK(report[u"title"_s].toString().contains(u"roll-up"_s));
+    CHECK(cells(report, u"Receipts"_s).value(1) == u"8"_s);
+    CHECK(cells(report, u"Store BHNM"_s).isEmpty());
+    // None ticked: nothing.
+    REQUIRE(pos.requestLegacyReport(u"z"_s, u"2026-10-15"_s, u"2026-10-28"_s, {}, u"-"_s));
+    REQUIRE(waitFor(pos));
+    CHECK(pos.rangeReport()[u"ticked"_s].toStringList().isEmpty());
+
+    // The same cashier (number and name) in both stores: tied in all stores at once, or in one.
+    int bhnm = 0, dan = 0;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, u"legacy-stores"_s);
+        db.setDatabaseName(path);
+        REQUIRE(db.open());
+        QSqlQuery q(db);
+        REQUIRE(q.exec(u"SELECT id FROM legacy_sources WHERE store = 'BHNM'"_s));
+        REQUIRE(q.next());
+        bhnm = q.value(0).toInt();
+        REQUIRE(q.exec(u"SELECT id FROM legacy_sources WHERE name = 'made up export'"_s));
+        REQUIRE(q.next());
+        dan = q.value(0).toInt();
+        REQUIRE(q.exec(u"INSERT INTO legacy_cashiers VALUES (%1, 3, 'Test Cashier Three')"_s.arg(bhnm)));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(u"legacy-stores"_s);
+    const auto tiedIn = [&](int source) {
+        for (const auto &c : app::legacy::cashiers(path))
+            if (c.sourceId == source && c.number == 3)
+                return c.employeeId;
+        return std::string("(none)");
+    };
+    REQUIRE(app::legacy::setCashier(path, dan, 3, "emp-7", "Pat Example"));
+    CHECK(tiedIn(dan) == "emp-7");
+    CHECK(tiedIn(bhnm).empty());                                   // this store's copies only
+    REQUIRE(app::legacy::setCashier(path, dan, 3, "emp-7", "Pat Example", nullptr, true));
+    CHECK(tiedIn(bhnm) == "emp-7");                                // the same cashier in all stores
+}

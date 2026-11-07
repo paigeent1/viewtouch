@@ -90,6 +90,8 @@ Item {
     readonly property var cashiers: mine && w.kind === "cashiers" ? (range.cashiers ?? []) : []
     readonly property var staff: mine && w.kind === "cashiers" ? (range.employees ?? []) : []
     property var picking: null   // the cashier whose employee is being chosen
+    // Ties are per ILSA copy; the same cashier (number and name) in the other stores' copies too when on.
+    property bool tieAllStores: true
 
     ColumnLayout {
         anchors.fill: parent
@@ -118,28 +120,21 @@ Item {
             }
         }
 
-        // Which store's ILSA history (Store Settings' ILSA history store first), or every store's.
-        RowLayout {
-            visible: (w.range.stores ?? []).length > 0
+        // Which stores: one, several or all (Store Settings' ILSA history store first); by store or rolled up.
+        StorePicker {
+            objectName: "ilsaStores"
             Layout.fillWidth: true
             Layout.preferredHeight: w.keyH
             Layout.fillHeight: false
-            spacing: w.unit * 0.3
-            Text { text: qsTr("Store"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            Repeater {
-                model: (w.range.stores ?? []).concat(["*"])
-                delegate: WidgetKey {
-                    required property string modelData
-                    objectName: "ilsaStore-" + modelData
-                    Layout.preferredWidth: w.unit * 6
-                    Layout.fillHeight: true
-                    text: modelData === "*" ? qsTr("All stores") : modelData
-                    fontScale: 0.34
-                    baseColor: (w.range.store ?? "") === modelData ? "#1f8a4c" : "#2b3340"
-                    onClicked: { w.store = modelData; Qt.callLater(w.refresh) }
-                }
-            }
-            Item { Layout.fillWidth: true }
+            stores: w.range.stores ?? []
+            ticked: w.range.ticked ?? []
+            byStore: w.range.byStore ?? true
+            showMode: true
+            unit: w.unit
+            keyH: w.keyH
+            ink: w.ink
+            face: w.face
+            onChosen: function(arg) { w.store = arg; Qt.callLater(w.refresh) }
         }
 
         // Item movement: by what.
@@ -496,9 +491,18 @@ Item {
                     onClicked: {
                         const c = w.picking
                         pickEmployee.close()
-                        if (c) w.pos.setLegacyCashier(c.sourceId, c.number, modelData.id)
+                        if (c) w.pos.setLegacyCashier(c.sourceId, c.number, modelData.id, w.tieAllStores)
                     }
                 }
+            }
+            WidgetKey {
+                objectName: "ilsaTieAllStores"
+                Layout.fillWidth: true
+                Layout.preferredHeight: w.keyH
+                text: (w.tieAllStores ? "☑ " : "☐ ") + qsTr("Tie the same cashier in all stores")
+                fontScale: 0.32
+                baseColor: w.tieAllStores ? "#1f8a4c" : "#2b3340"
+                onClicked: w.tieAllStores = !w.tieAllStores
             }
             WidgetKey {
                 objectName: "ilsaFormerEmployee"
@@ -510,7 +514,7 @@ Item {
                 onClicked: {
                     const c = w.picking
                     pickEmployee.close()
-                    if (c) w.pos.setLegacyCashier(c.sourceId, c.number, "")
+                    if (c) w.pos.setLegacyCashier(c.sourceId, c.number, "", w.tieAllStores)
                 }
             }
             WidgetKey {

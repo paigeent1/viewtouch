@@ -59,9 +59,25 @@ std::string historyNote(const legacy::Status &s)
 
 QString PosService::legacyStore(const QString &asked) const
 {
-    if (asked.trimmed() == u"*")
+    // asked: "" this site's store; "*" every store's; "-" none; "BHDAN,BHNM" those (a "|rollup" after
+    // it is the report's: see legacyByStore).
+    const QString list = asked.section(u'|', 0, 0).trimmed();
+    if (list == u"*")
         return {};   // every store's
-    return asked.trimmed().isEmpty() ? qs(s_->settings.ilsaHistoryStore).toUpper() : asked.trimmed().toUpper();
+    if (list == u"-")
+        return u"-"_s;
+    if (list.isEmpty())
+        return qs(s_->settings.ilsaHistoryStore).toUpper();
+    QStringList stores;
+    for (const QString &x : list.split(u',', Qt::SkipEmptyParts))
+        if (!stores.contains(x.trimmed().toUpper()))
+            stores << x.trimmed().toUpper();
+    return stores.join(u',');
+}
+
+bool PosService::legacyByStore(const QString &asked)
+{
+    return asked.section(u'|', 1).trimmed() != u"rollup";
 }
 
 bool PosService::requestLegacyReport(const QString &kind, const QString &fromText, const QString &toText, const QString &by,
@@ -125,8 +141,10 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
     const QString filter = kind == u"employees" ? by.section(u'|', 1).trimmed() : QString();
     const QString path = s_->legacyDb;
     const QString id = u"ilsa-"_s + kind;
-    const QString store = legacyStore(storeAsked);   // empty: every store's
+    const QString store = legacyStore(storeAsked);   // empty: every store's; "-": none
     const QString storeShown = store.isEmpty() ? u"*"_s : store;
+    const bool byStore = legacyByStore(storeAsked) && kind != u"cashiers";
+    const QString siteStore = qs(s_->settings.ilsaHistoryStore).toUpper();   // ViewTouch's own checks are this store's
 
     // ViewTouch's own checks on those days too (Daily Z, and the side-by-side on parallel beta days).
     const bool withVt = kind == u"z" || kind == u"compare" || employeesWithVt;
@@ -139,50 +157,60 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
     const TaxRates rates = s_->settings.tax;
 
     const int request = ++rangeRequest_;
-    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"label"_s, label}, {u"store"_s, storeShown}};
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"label"_s, label}, {u"store"_s, storeShown}, {u"byStore"_s, byStore}};
     emit sessionChanged();
 
     QPointer<PosService> self(this);
     QThreadPool::globalInstance()->start([=, today_ = std::move(today_)]() mutable {
+      const QStringList allStores = legacy::stores(path);
+      const QStringList ticked = store.isEmpty() ? allStores : store == u"-" ? QStringList{} : store.split(u',');
+      // By store: each ticked store's own read; else one read of every ticked store together.
+      QStringList parts = byStore && ticked.size() > 1 ? ticked : QStringList{store};
+      std::vector<std::pair<QString, LegacyRead>> reads;
+      for (const QString &one : parts) {
         LegacyRead got;
-        got.status = legacy::status(path, nullptr, store);
-        got.stores = legacy::stores(path);
+        got.status = legacy::status(path, nullptr, one);
+        got.stores = allStores;
         if (got.status.present) {
             QString *e = &got.error;
             if (kind == u"z" || kind == u"compare") {
-                got.ilsa = legacy::totals(path, a, b, e, store);
-                got.z = legacy::ilsaZ(path, a, b, e, store);
+                got.ilsa = legacy::totals(path, a, b, e, one);
+                got.z = legacy::ilsaZ(path, a, b, e, one);
             } else if (kind == u"depts") {
                 const QString d = groupBy == u"current" ? u"current"_s : u"dept"_s;
-                got.rows = legacy::groups(path, a, b, d, false, 0, nullptr, e, store);
-                got.lottery = legacy::groups(path, a, b, d, true, 0, nullptr, e, store);
+                got.rows = legacy::groups(path, a, b, d, false, 0, nullptr, e, one);
+                got.lottery = legacy::groups(path, a, b, d, true, 0, nullptr, e, one);
             } else if (kind == u"items") {
-                got.rows = legacy::groups(path, a, b, groupBy, false, kItemRows, &got.more, e, store);
+                got.rows = legacy::groups(path, a, b, groupBy, false, kItemRows, &got.more, e, one);
             } else if (kind == u"gpMonth" || kind == u"gpYear") {
-                got.periods = legacy::periods(path, a, b, kind == u"gpYear", e, store);
+                got.periods = legacy::periods(path, a, b, kind == u"gpYear", e, one);
             } else if (kind == u"differences") {
-                got.variances = legacy::variances(path, a, b, e, store);
-                got.unnamed = legacy::unnamedItems(path, a, b, e, store);
+                got.variances = legacy::variances(path, a, b, e, one);
+                got.unnamed = legacy::unnamedItems(path, a, b, e, one);
             } else if (kind == u"employees") {
-                got.people = legacy::employeeItems(path, a, b, filter, e, store);
+                got.people = legacy::employeeItems(path, a, b, filter, e, one);
             } else if (kind == u"cashiers") {
-                got.cashiers = legacy::cashiers(path, e, store);
+                got.cashiers = legacy::cashiers(path, e, one);
             }
         }
-        if (withVt) {
+        // ViewTouch's own checks: this site's store's (by store, only beside that store's ILSA history).
+        if (withVt && (parts.size() == 1 || one == siteStore)) {
             std::vector<Check> checks = history ? history(va, vb) : std::vector<Check>{};
-            for (Check &c : today_)   // today's may not be written yet
+            for (const Check &c : today_)   // today's may not be written yet
                 if (std::ranges::none_of(checks, [&](const Check &x) { return x.id == c.id; }))
-                    checks.push_back(std::move(c));
+                    checks.push_back(c);
             got.vt = core::legacy::fromChecks(checks, rates);
             if (employeesWithVt)
                 got.vtChecks = std::move(checks);
         }
-        QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, filter, employeesWithVt, store, storeShown,
-                                         got = std::move(got)] {
-            if (!self || request != self->rangeRequest_)
-                return;   // a newer request replaced it
-            const ReportContext ctx = self->reportContext(label);
+        reads.emplace_back(one, std::move(got));
+      }
+      QMetaObject::invokeMethod(self, [self, request, kind, id, label, groupBy, filter, employeesWithVt, storeShown, byStore,
+                                       ticked, allStores, reads = std::move(reads)] {
+        if (!self || request != self->rangeRequest_)
+            return;   // a newer request replaced it
+        const ReportContext ctx = self->reportContext(label);
+        const auto build = [&](const LegacyRead &got, const QString &part) {
             const bool haveIlsa = got.ilsa.receipts + got.ilsa.notSales > 0;
             const bool haveVt = got.vt.receipts > 0;
             Report r;
@@ -223,11 +251,35 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
             }
             if (!got.error.isEmpty())
                 r.note("Couldn't read all of the ILSA history: " + got.error.toStdString());
-            r.note((store.isEmpty() ? std::string("Every store's ILSA history. ") : "Store " + store.toStdString() + ". ")
+            r.note((part.isEmpty() ? std::string("Every store's ILSA history. ")
+                    : part == u"-" ? std::string("No store ticked. ") : "Stores: " + part.toStdString() + ". ")
                    + historyNote(got.status));
+            return r;
+        };
+        Report r;
+        if (reads.size() == 1) {   // one store, or the ticked stores rolled up together
+            r = build(reads[0].second, reads[0].first);
+            if (ticked.size() > 1)
+                r.title += " (roll-up: " + ticked.join(u", "_s).toStdString() + ")";
+        } else {   // by store: each store's own section, with its own totals
+            for (const auto &[one, got] : reads) {
+                const Report part = build(got, one);
+                if (r.title.empty()) {
+                    r.id = part.id;
+                    r.title = part.title + " (by store)";
+                    r.subtitle = part.subtitle;
+                    r.columns = part.columns;
+                }
+                r.section("Store " + one.toStdString());
+                r.rows.insert(r.rows.end(), part.rows.begin(), part.rows.end());
+            }
+        }
+        const LegacyRead &got = reads.front().second;
+        {
             self->legacyReport_ = r;
             self->rangeReport_ = {{u"loading"_s, false}, {u"id"_s, id}, {u"label"_s, label},
-                                  {u"report"_s, self->reportVariant(r)}, {u"store"_s, storeShown}, {u"stores"_s, got.stores}};
+                                  {u"report"_s, self->reportVariant(r)}, {u"store"_s, storeShown}, {u"stores"_s, allStores},
+                                  {u"ticked"_s, ticked}, {u"byStore"_s, byStore}};
             if (kind == u"cashiers") {   // the Cashiers screen: each cashier and the employees to tie them to
                 QVariantList list;
                 for (const core::legacy::Cashier &c : got.cashiers)
@@ -242,12 +294,13 @@ bool PosService::requestLegacyReport(const QString &kind, const QString &fromTex
                 self->rangeReport_.insert(u"employees"_s, staff);
             }
             emit self->sessionChanged();
-        }, Qt::QueuedConnection);
+        }
+      }, Qt::QueuedConnection);
     });
     return true;
 }
 
-bool PosService::setLegacyCashier(int sourceId, int number, const QString &employeeId)
+bool PosService::setLegacyCashier(int sourceId, int number, const QString &employeeId, bool allStores)
 {
     if (!require(perm::Manager, tr("ILSA cashiers")))
         return false;
@@ -259,7 +312,7 @@ bool PosService::setLegacyCashier(int sourceId, int number, const QString &emplo
         name = it->name;
     }
     QString error;
-    if (!legacy::setCashier(s_->legacyDb, sourceId, number, ss(employeeId), name, &error))
+    if (!legacy::setCashier(s_->legacyDb, sourceId, number, ss(employeeId), name, &error, allStores))
         return fail(tr("Couldn't save it: %1").arg(error));
     emit notice(employeeId.isEmpty() ? tr("ILSA cashier %1: a former employee").arg(number)
                                      : tr("ILSA cashier %1 is %2").arg(number).arg(qs(name)));
@@ -317,7 +370,8 @@ bool PosService::findLegacyReceipts(const QString &query, int offset, const QStr
             QVariantMap out{{u"loading"_s, false}, {u"id"_s, u"ilsa-receipts"_s}, {u"query"_s, q}, {u"offset"_s, offset},
                             {u"results"_s, results}, {u"more"_s, int(hits.size()) > kReceiptPage},
                             {u"nextOffset"_s, offset + kReceiptPage}, {u"history"_s, qs(historyNote(status))},
-                            {u"store"_s, storeShown}, {u"stores"_s, stores}};
+                            {u"store"_s, storeShown}, {u"stores"_s, stores},
+                            {u"ticked"_s, storeShown == u"*" ? stores : storeShown == u"-" ? QStringList{} : storeShown.split(u',')}};
             if (!error.isEmpty())
                 out.insert(u"error"_s, error);
             self->rangeReport_ = out;
