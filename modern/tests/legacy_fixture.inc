@@ -47,7 +47,7 @@ INSERT INTO legacy_cashiers (source_id, cashier_num, name) VALUES (2, 2, 'Test C
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (1, 1, 1, 501, '2026-10-27', '2026-10-27 21:05:00');
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (2, 1, 1, 502, '2026-10-28', '2026-10-28 21:10:00');
 INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (3, 2, 1, 401, '2026-10-20', '2026-10-20 21:00:00');
-INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (4, 3, 1, 77, '2026-10-15', '2026-10-15 21:00:00');
+INSERT INTO legacy_z (id, source_id, reg_num, z_counter, day, z_at) VALUES (4, 3, 1, 502, '2026-10-15', '2026-10-15 21:00:00');
 INSERT INTO legacy_z_values (z_id, name, cents) VALUES (1, 'ilsa:payouts', 0);
 INSERT INTO legacy_z_values (z_id, name, cents) VALUES (1, 'ilsa:tax', 63);
 INSERT INTO legacy_z_values (z_id, name, cents) VALUES (1, 'ilsa:tender:1', 1063);

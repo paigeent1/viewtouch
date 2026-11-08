@@ -718,8 +718,9 @@ def receipt_explained(total, tax, disc, lines):
     return False
 
 
-def ours_for_day(db, day):
-    """z_id -> {name: cents} rebuilt from the imported rows of `day`."""
+def ours_for_day(db, day, zset=None):
+    """z_id -> {name: cents} rebuilt from the imported rows of `day` (the receipts check counted for the
+    Z's in `zset` only: one store's)."""
     out = defaultdict(lambda: defaultdict(int))
     for z, tax, total, n, disc in db.execute(OURS_SQL, (day,)):
         o = out[z]; o["ours:tax"] += tax or 0; o["ours:sale_totals"] += total or 0; o["ours:receipts"] += n or 0
@@ -738,12 +739,17 @@ def ours_for_day(db, day):
     for z, ch in change.items():   # all change given comes out of cash (also on card / gift overtenders)
         out[z]["ours:tender:1"] = out[z].get("ours:tender:1", 0) - ch
     for z, total, tax, disc, lines in db.execute(RECEIPT_SUMS_SQL, (day,)):
+        if zset is not None and z not in zset:
+            continue
         if not receipt_explained(total, tax, disc or 0, lines):
             out[z]["ours:receipts_off"] += 1
     for o in out.values():
         o["ours:gross"] = o.get("ours:net", 0) + o.get("ours:tax", 0)
     return out
 
+
+# One store's Z's (a Z number is its copy's own: BHNM Z 259 is never BHDAN Z 259).
+STORE_ZS = "SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?)"
 
 # Differences known and left as ILSA recorded them (owner): (day, Z, what it starts with) -> why.
 KNOWN = {
@@ -780,16 +786,18 @@ def explain_cash(db, day, zid, diff, cache):
     return None
 
 
-def check_day(db, day):
-    """ILSA's own Z against the imported receipts, for one business day (inside the caller's
-    transaction): our totals rebuilt and kept (ours:...), the day's differences rewritten (the Z_Totals
-    ones are learn_z_totals'). Returns the differences."""
-    ours = ours_for_day(db, day)
-    zs = db.execute("SELECT id, z_counter FROM legacy_z WHERE day = ?", (day,)).fetchall()
-    db.execute("DELETE FROM legacy_z_values WHERE name LIKE 'ours:%' AND z_id IN (SELECT id FROM legacy_z WHERE day = ?)", (day,))
+def check_day(db, day, store):
+    """ILSA's own Z against the imported receipts, for one store's business day (inside the caller's
+    transaction; Z's are each copy's own, never another store's): our totals rebuilt and kept (ours:...),
+    the day's differences rewritten (the Z_Totals ones are learn_z_totals'). Returns the differences."""
+    zs = db.execute(f"SELECT id, z_counter FROM legacy_z WHERE day = ? AND id IN ({STORE_ZS})", (day, store)).fetchall()
+    zset = {z for z, _ in zs}
+    ours = {z: o for z, o in ours_for_day(db, day, zset).items() if z in zset}
+    marks = ",".join(str(z) for z in zset) or "NULL"
+    db.execute(f"DELETE FROM legacy_z_values WHERE name LIKE 'ours:%' AND z_id IN ({marks})")
     db.executemany("INSERT OR REPLACE INTO legacy_z_values VALUES (?, ?, ?)",
                    [(z, k, v) for z, o in ours.items() for k, v in o.items()])
-    db.execute("DELETE FROM legacy_variances WHERE day = ? AND what NOT LIKE 'Z_Totals %'", (day,))
+    db.execute(f"DELETE FROM legacy_variances WHERE z_id IN ({marks}) AND what NOT LIKE 'Z_Totals %'")
     var = []
     cache = {}
     for zid, zc in zs:
@@ -831,7 +839,8 @@ def check_day(db, day):
                     var[i] = (d, z, f"{what} ({why})", a, b)
     db.executemany("INSERT INTO legacy_variances (day, z_id, what, ilsa_cents, ours_cents) VALUES (?, ?, ?, ?, ?)", var)
     db.execute("""UPDATE legacy_days SET variances = (SELECT COUNT(*) FROM legacy_variances v JOIN legacy_z z ON z.id = v.z_id
-                       JOIN legacy_sources s ON s.id = z.source_id WHERE v.day = legacy_days.day AND s.store = legacy_days.store) WHERE day = ?""", (day,))
+                       JOIN legacy_sources s ON s.id = z.source_id WHERE v.day = legacy_days.day AND s.store = legacy_days.store)
+                  WHERE day = ? AND store = ?""", (day, store))
     return var
 
 
@@ -878,7 +887,7 @@ def import_day(db, source_id, store, day, partial, replace_old, now):
                        "(SELECT id FROM legacy_sources WHERE store = ?)", (day, store)).fetchone()[0]
         db.execute("INSERT OR REPLACE INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at) "
                    "VALUES (?, ?, ?, ?, ?, 0, ?)", (store, day, source_id, int(partial), n, now))
-        check_day(db, day)
+        check_day(db, day, store)
         v = db.execute("SELECT variances FROM legacy_days WHERE store = ? AND day = ?", (store, day)).fetchone()[0]
         db.execute("COMMIT")
         return n, v
@@ -915,11 +924,12 @@ def name_backfill(db):
     return named, left
 
 
-def learn_z_totals(db, tx=True):
-    """Matches Z_Totals columns to our totals over every day in the file (either sign: ILSA keeps some
-    amounts positive that its receipts keep negative); rewrites their variances."""
+def learn_z_totals(db, tx=True, store="BHDAN"):
+    """Matches Z_Totals columns to our totals over one store's days (either sign: ILSA keeps some
+    amounts positive that its receipts keep negative); rewrites that store's Z_Totals differences."""
     vals = defaultdict(dict)
-    for z, name, c in db.execute("SELECT z_id, name, cents FROM legacy_z_values WHERE name LIKE 'ilsa:totals:%' OR name LIKE 'ours:%'"):
+    for z, name, c in db.execute("SELECT z_id, name, cents FROM legacy_z_values WHERE (name LIKE 'ilsa:totals:%' OR name LIKE 'ours:%') "
+                                 "AND z_id IN (SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?))", (store,)):
         vals[z][name] = c
     for v in vals.values():
         v["ours:promos+discounts"] = v.get("ours:promos", 0) + v.get("ours:discounts", 0)
@@ -938,7 +948,7 @@ def learn_z_totals(db, tx=True):
         mapping[col] = (best, hits, len(days))
     if tx:
         db.execute("BEGIN")
-    db.execute("DELETE FROM legacy_variances WHERE what LIKE 'Z_Totals %'")
+    db.execute("DELETE FROM legacy_variances WHERE what LIKE 'Z_Totals %' AND z_id IN (SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?))", (store,))
     var = []
     for col, (b, hits, n) in mapping.items():
         if hits < 0.9 * n:
@@ -963,25 +973,26 @@ def money(c):
     return f"-${-c / 100:,.2f}" if c < 0 else f"${c / 100:,.2f}"
 
 
-def report(db, days, out_dir, stamp, say):
-    """The self-check: what matched, and every difference (also saved as a CSV)."""
+def report(db, days, out_dir, stamp, say, store="BHDAN"):
+    """The self-check of one store's days: what matched, and every difference (also saved as a CSV)."""
     if not days:
         return None
-    marks = ",".join("?" * len(days)) if len(days) < 900 else None
-    where = f"v.day IN ({marks})" if marks else "v.day BETWEEN ? AND ?"
-    args = days if marks else [days[0], days[-1]]
-    var = db.execute(f"""SELECT v.day, z.reg_num, z.z_counter, v.what, v.ilsa_cents, v.ours_cents FROM legacy_variances v
-                         LEFT JOIN legacy_z z ON z.id = v.z_id WHERE {where} ORDER BY v.day, v.what""", args).fetchall()
-    zs = db.execute(f"SELECT COUNT(*) FROM legacy_z v WHERE {where}", args).fetchone()[0]
-    by = Counter(w if not w.startswith("Tender") else w for _, _, _, w, _, _ in var)
+    dayset = set(days)
+    var = [v for v in db.execute(f"""SELECT v.day, z.reg_num, z.z_counter, v.what, v.ilsa_cents, v.ours_cents FROM legacy_variances v
+                                    JOIN legacy_z z ON z.id = v.z_id WHERE v.day BETWEEN ? AND ? AND z.id IN (SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?))
+                                    ORDER BY v.day, v.what""", (min(days), max(days), store)) if v[0] in dayset]
+    zs = sum(1 for (d,) in db.execute(f"SELECT day FROM legacy_z WHERE day BETWEEN ? AND ? AND id IN (SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?))",
+                                      (min(days), max(days), store)) if d in dayset)
+    by = Counter(w for _, _, _, w, _, _ in var)
     bad_days = {d for d, *_ in var}
-    say(f"\n== Self-check: {len(days):,} day(s), {zs:,} ILSA Z(s); {len(days) - len(bad_days):,} day(s) match ILSA's Z on everything checked")
+    say(f"\n== Self-check, store {store}: {len(days):,} day(s), {zs:,} ILSA Z(s); "
+        f"{len(days) - len(bad_days):,} day(s) match ILSA's Z on everything checked")
     for w, n in by.most_common():
         say(f"  differs on {n:,} Z(s): {w}")
     path = None
     if var:
         os.makedirs(out_dir, exist_ok=True)
-        path = os.path.join(out_dir, f"variances-{stamp}.csv")
+        path = os.path.join(out_dir, f"variances-{store}-{stamp}.csv")
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             w = csv.writer(f)
             w.writerow(["day", "register", "z", "what", "ilsa", "imported", "difference"])
@@ -1125,19 +1136,20 @@ def run(export, db_path, day_from, day_to, dry, replace, out_dir, quiet=False, n
                        (first_all, last_all, now, source_id))
             db.execute("INSERT OR REPLACE INTO legacy_meta VALUES ('last_import', ?)", (now,))
             db.commit()
-            mapping = learn_z_totals(db)
+            db.execute("BEGIN")
+            mapping = learn_z_totals(db, tx=False, store=store)
+            db.execute("COMMIT")
             if mapping and not quiet:
                 say("\n== ILSA Z_Totals amounts (meaning learned from the days: equal to one of ours on most days)")
                 for col, (b, hits, n) in sorted(mapping.items()):
                     say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
         if days and not db.execute("SELECT 1 FROM legacy_receipts WHERE source_id = ? AND dob <> '' LIMIT 1", (source_id,)).fetchone():
-            say("\nBirth dates: RegSale has none; looking in the other tables")
-            fill_dob(db, export, source_id, say)
+            say("\nBirth dates: none in RegSale's own rows; vt-ilsa-history EXPORT --fill-dob --dry-run looks in the other tables")
         named, (codes, lines) = name_backfill(db)
         if named or codes:
             say(f"\nItems no longer in their copy's list: {named:,} line(s) named from another copy's list;"
                 f" {lines:,} line(s) on {codes:,} UPC(s) still named after their department (ILSA Differences lists them).")
-        path = report(db, days, out_dir, stamp, say)
+        path = report(db, days, out_dir, stamp, say, store)
         totals = db.execute("SELECT COUNT(*), MIN(day), MAX(day) FROM legacy_days").fetchone()
         close_db(db)
         say(f"\nDone in {time.time() - t0:,.0f} s: {len(days):,} day(s), {receipts:,} receipts imported this run."
@@ -1332,11 +1344,11 @@ def plan_command(copies, prefix, out_dir, run_it, db_path, dry, replace, force):
 
 # --- --recheck: the self-check again, from the history file -------------------------------------------
 
-def explain(db, what_like, cands, say):
+def explain(db, what_like, cands, say, store="BHDAN"):
     """For the Z's that differ on `what_like`: does the difference (ILSA - imported) equal one of
     `cands` (name -> SQL giving z_id, cents for the Z's of a day range), or minus it?"""
     bad = db.execute("SELECT v.z_id, v.ilsa_cents - v.ours_cents, substr(v.day, 1, 4) FROM legacy_variances v "
-                     "WHERE v.what LIKE ? AND v.what NOT LIKE '%known:%'", (what_like,)).fetchall()
+                     "WHERE v.what LIKE ? AND v.what NOT LIKE '%known:%' AND v.z_id IN (SELECT id FROM legacy_z WHERE source_id IN (SELECT id FROM legacy_sources WHERE store = ?))", (what_like, store)).fetchall()
     if not bad:
         return
     say(f"  {len(bad):,} Z's; by year: " + ", ".join(f"{y} {n}" for y, n in sorted(Counter(y for _, _, y in bad).items())))
@@ -1426,10 +1438,9 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
         say(f"Backup: {backup}")
     db = open_db(db_path)
     stores = [x.strip().upper() for x in (store or "").split(",") if x.strip()]   # --store BHDAN,BHNM (none: every store's)
-    days = [d for (d,) in db.execute("SELECT DISTINCT day FROM legacy_days WHERE day BETWEEN ? AND ?"
-                                     + (f" AND store IN ({','.join('?' * len(stores))})" if stores else "") + " ORDER BY day",
-                                     (day_from or "0000", day_to or "9999", *stores))]
-    say(("DRY RUN (nothing kept): " if dry else "") + f"rechecking {len(days):,} day(s) in {db_path}")
+    if not stores:
+        stores = [s for (s,) in db.execute("SELECT DISTINCT store FROM legacy_days ORDER BY store")]
+    say(("DRY RUN (nothing kept): " if dry else "") + f"rechecking store(s) {', '.join(stores)} in {db_path}")
     db.execute("BEGIN")
     try:
         # Z's with no receipts are not days of history (ILSA's Z 1, a Z run twice).
@@ -1442,33 +1453,38 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
             gone = db.execute("DELETE FROM legacy_days WHERE receipts = 0 OR NOT EXISTS (SELECT 1 FROM legacy_z z WHERE z.day = legacy_days.day)").rowcount
             say(f"  Z's with no receipts left out: {len(empty):,} (" + ", ".join(sorted({d for _, d in empty})[:6]) + ("..." if len(empty) > 6 else "")
                 + f"); days left out: {gone:,}")
-            days = [d for d in days if db.execute("SELECT 1 FROM legacy_days WHERE day = ?", (d,)).fetchone()]
-        for i, d in enumerate(days):
-            check_day(db, d)
+        for st in stores:
+          RECEIPT_STATS.clear(); RECEIPT_DIFFS.clear(); NO_SAVED_TENDERS.clear(); EXPLAINED.clear()
+          days = [d for (d,) in db.execute("SELECT day FROM legacy_days WHERE store = ? AND day BETWEEN ? AND ? ORDER BY day",
+                                           (st, day_from or "0000", day_to or "9999"))]
+          say(f"\n######## Store {st}: {len(days):,} day(s)" + (f", {days[0]} .. {days[-1]}" if days else ""))
+          for i, d in enumerate(days):
+            check_day(db, d, st)
             if not quiet and (i % 500 == 499 or i == len(days) - 1):
                 print(f"  {i + 1:,}/{len(days):,} days ({d}), {time.time() - t0:,.0f} s", flush=True)
-        mapping = learn_z_totals(db, tx=False)
-        say("\n== Receipts: total against lines + tax")
-        for k, n in RECEIPT_STATS.most_common():
-            say(f"  {k}: {n:,}")
-        if RECEIPT_DIFFS:
-            say("  unexplained, most common differences (total - lines - tax): "
-                + ", ".join(f"{money(d)} x{n:,}" for d, n in RECEIPT_DIFFS.most_common(8)))
-        if EXPLAINED:
-            say("\n== Differences explained (counted as matching)")
-            for k, n in EXPLAINED.most_common():
-                say(f"  {k}: {n:,} Z's")
-        if NO_SAVED_TENDERS:
-            say("  Z's whose ILSA Z kept no tenders (not compared), by year: "
-                + ", ".join(f"{y} {n}" for y, n in sorted(NO_SAVED_TENDERS.items())))
-        say("\n== ILSA Z_Totals amounts (meaning learned from the days)")
-        for col, (b, hits, n) in sorted(mapping.items()):
-            say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
-        for what, cands in RECHECK_CANDIDATES.items():
+          mapping = learn_z_totals(db, tx=False, store=st)
+          say("\n== Receipts: total against lines + tax")
+          for k, n in RECEIPT_STATS.most_common():
+              say(f"  {k}: {n:,}")
+          if RECEIPT_DIFFS:
+              say("  unexplained, most common differences (total - lines - tax): "
+                  + ", ".join(f"{money(d)} x{n:,}" for d, n in RECEIPT_DIFFS.most_common(8)))
+          if EXPLAINED:
+              say("\n== Differences explained (counted as matching)")
+              for k, n in EXPLAINED.most_common():
+                  say(f"  {k}: {n:,} Z's")
+          if NO_SAVED_TENDERS:
+              say("  Z's whose ILSA Z kept no tenders (not compared), by year: "
+                  + ", ".join(f"{y} {n}" for y, n in sorted(NO_SAVED_TENDERS.items())))
+          say("\n== ILSA Z_Totals amounts (meaning learned from the days)")
+          for col, (b, hits, n) in sorted(mapping.items()):
+              say(f"  {col[12:]}: = {bucket_text(b)} on {hits:,} of {n:,} Z's" + ("  (checked)" if hits >= 0.9 * n else ""))
+          for what, cands in RECHECK_CANDIDATES.items():
             say(f"\n== {what}: ILSA's Z - imported, on the Z's that differ")
-            explain(db, what + "%", cands, say)
+            explain(db, what + "%", cands, say, st)
+          report(db, days, out_dir, stamp, say, st)
+          last_stats = dict(RECEIPT_STATS)
         dates_report(db, say)
-        report(db, days, out_dir, stamp, say)
         db.execute("ROLLBACK" if dry else "COMMIT")
     except BaseException:
         db.execute("ROLLBACK")
@@ -1567,18 +1583,18 @@ def older_export(d):
 
 
 def other_store_export(d):
-    """A made-up copy of another store (BHNM): one receipt on 2026-10-15 (in the C++ tests' history) or
+    """A made-up copy of another store (BHNM; its Z 502 has the number of a BHDAN Z): one receipt on 2026-10-15 (in the C++ tests' history) or
     on `day`."""
-    write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"], [[1, 77, "10/15/26 21:00:00"]])
+    write_csv(d, "RegZCnt", ["REG_NUM", "REG_Z_COUNTER", "REG_Z_DATETIME"], [[1, 502, "10/15/26 21:00:00"]])
     write_csv(d, "RegSale", ["REG_NUM", "RECEIPT_NUM", "REG_Z_COUNTER", "START_TIME", "Z_MODE", "CSHR_NUM", "SALE_TOTAL", "TAX1_AMT"],
-              [[1, 9003, 77, "10/15/26 12:00:00", 0, 9, "10.63", "0.63"]])   # the same receipt number as a BHDAN one
+              [[1, 9003, 502, "10/15/26 12:00:00", 0, 9, "10.63", "0.63"]])   # the same receipt number as a BHDAN one
     write_csv(d, "PDetail", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "DETAIL_CLASS", "DETAIL_TYPE", "MODE_FLAGS", "DEPT", "PLU",
                              "DETAIL_ITEM_PRC", "DETAIL_FOR_QTY", "DETAIL_LINE_AMT", "ITEM_COST", "TIME_STAMP"],
-              [[1, 77, 9003, 1, 1, 0, 10, "012345678905", "10.00", 1, "10.00", "7.00", "10/15/26 12:00:00"]])
+              [[1, 502, 9003, 1, 1, 0, 10, "012345678905", "10.00", 1, "10.00", "7.00", "10/15/26 12:00:00"]])
     write_csv(d, "TendSale", ["REG_NUM", "REG_Z_COUNTER", "RECEIPT_NUM", "TENDER_TYPE", "SALE_AMT", "AMT_TEND", "CHANGE_DUE"],
-              [[1, 77, 9003, 1, "10.63", "10.63", "0"]])
-    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 77, 0, 1, "10.63"]])
-    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 77, 0, "0.63"]])
+              [[1, 502, 9003, 1, "10.63", "10.63", "0"]])
+    write_csv(d, "Z_Tender", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TENDER_TYPE", "TENDER_AMT"], [[1, 502, 0, 1, "10.63"]])
+    write_csv(d, "Z_Taxes", ["REG_NUM", "REG_Z_COUNTER", "CSHR_NUM", "TAX1_AMT"], [[1, 502, 0, "0.63"]])
     write_csv(d, "PLU", ["PLU_NUM", "PLU_DESC", "DEPT_NUM", "MANUF"], [["12345678905", "MADE UP CIGAR ROBUSTO", 10, "Acme Cigars"]])
     write_csv(d, "Dept", ["DEPT_NUM", "DEPT_NAME"], [[10, "CIGARS"]])
     write_csv(d, "Sys_Pram", ["STORE_NAME", "STORE_CITY"], [["MADE UP TOBACCO", "GAYLORDSVILLE"]])
@@ -1774,10 +1790,9 @@ def self_test(write_fixture=False):
               == [(1, 3, "Test Cashier Three"), (1, 4, "Test Cashier Four"), (2, 2, "Test Cashier Two")]
               and [c[1] for c in db.execute("PRAGMA table_info(legacy_cashiers)")] == ["source_id", "cashier_num", "name"])
         check("the older day matches its Z", q("SELECT COUNT(*) FROM legacy_variances WHERE day = '2026-10-20'") == (0,))
-        check("birth dates found in another table by their values (ID_VALUE), tied by receipt",
-              q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8001") == ("1976-07-04",)
-              and q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8002") == ("",))
-        db.execute("UPDATE legacy_receipts SET dob = '' WHERE receipt_num = 8001"); db.commit(); db.close()
+        check("birth dates in another table aren't filled by an import (only by --fill-dob)",
+              q("SELECT dob FROM legacy_receipts WHERE receipt_num = 8001") == ("",))
+        db.close()
         filled = fill_dob_command(old, dbp, None, False, out)
         db = sqlite3.connect(dbp)
         q = lambda s, *a: db.execute(s, a).fetchone()
@@ -1811,9 +1826,18 @@ def self_test(write_fixture=False):
         db = sqlite3.connect(dbp)
         db.execute("DELETE FROM legacy_sources WHERE name = 'made up other store'"); db.commit(); db.close()
         check("another store's export is refused under the wrong store", refused)
-        bhnm = run(nm, dbp, None, None, False, False, out, quiet=True, now=now, manage=False, prefix="BHNM")
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            bhnm = run(nm, dbp, None, None, False, False, out, quiet=False, now=now, manage=False, prefix="BHNM")
+        check("a store's import checks only that store's Z's (BHDAN's differences not in BHNM's self-check)",
+              "Self-check, store BHNM: 1 day(s), 1 ILSA Z(s); 1 day(s) match" in buf.getvalue() and "differs on" not in buf.getvalue())
         db = sqlite3.connect(dbp)
         q = lambda s, *a: db.execute(s, a).fetchone()
+        check("the same Z number in two stores is two Z's (never merged or compared)",
+              sorted(db.execute("SELECT s.store, v.cents FROM legacy_z z JOIN legacy_sources s ON s.id = z.source_id "
+                                "JOIN legacy_z_values v ON v.z_id = z.id WHERE z.z_counter = 502 AND v.name = 'ilsa:tax'").fetchall())
+              == [("BHDAN", 95), ("BHNM", 63)])
         check("another store's copy imported under its own store",
               bhnm["days"] == ["2026-10-15"] and q("SELECT store FROM legacy_days WHERE day = '2026-10-15'") == ("BHNM",))
         # The same day in two stores: on a copy of the file, a BHNM copy of 2026-10-28 neither skips nor replaces BHDAN's.
