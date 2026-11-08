@@ -1203,14 +1203,19 @@ ApplicationWindow {
                 readonly property var pos: root.controller.pos
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: status === Image.Ready
-                // The logo from Store Settings (on a tablet: the copy in its app folder); if that can't be
-                // loaded, the one built into the app (assets/images/store-logo.png), when there is one.
+                // The logo from Store Settings, the same picture the login page shows (it follows a change
+                // there, on tablets too); if that can't be loaded: on a tablet the copy in its app folder,
+                // then the one built into the app (assets/images/store-logo.png), when there is one.
                 readonly property url builtIn: "qrc:/images/store-logo.png"
-                readonly property url wanted: Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png"
-                                            : (root.controller.pos ? root.controller.pos.imageUrl("logo:") : "")
-                source: wanted.toString() !== "" ? wanted : builtIn
-                onWantedChanged: source = wanted.toString() !== "" ? wanted : builtIn
-                onStatusChanged: if (status === Image.Error && source !== builtIn) source = builtIn
+                readonly property url tabletCopy: Qt.platform.os === "android" ? "file:///sdcard/Android/data/org.viewtouch.pos/files/logo.png" : ""
+                readonly property url wanted: pos ? (pos.imageRevision < 0 ? "" : pos.imageUrl("logo:")) : ""
+                function fallback(from) {
+                    if (from.toString() === wanted.toString() && tabletCopy.toString() !== "") return tabletCopy
+                    return builtIn
+                }
+                source: wanted.toString() !== "" ? wanted : fallback(wanted)
+                onWantedChanged: source = wanted.toString() !== "" ? wanted : fallback(wanted)
+                onStatusChanged: if (status === Image.Error && source !== builtIn) source = fallback(source)
                 sourceSize.height: Math.round(Math.min(root.width, root.height) * 0.3)
                 width: Math.round(root.height * 0.28)
                 height: Math.round(root.height * 0.28)

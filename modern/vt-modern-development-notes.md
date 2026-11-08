@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 11:01 ET — Bob (Claude) — Touch to Wake: the Store Settings logo on tablets too
+- **What:** Main.qml screen saver logo now uses the store logo from Store Settings (pos.imageUrl("logo:"), the same picture as the login page's logo zone, following changes) on every screen; on a tablet it falls back to the copy in its app folder, then the built-in assets/images/store-logo.png. Before, tablets always used the app-folder copy or the built-in picture (the old Hat City logo), so a new Store Settings logo never reached Touch to Wake.
+- **Why:** Owner 2026-11-08: tablet login showed the new Coyote logo, Touch to Wake still the old Hat City one.
+- **Files:** (none)
+
 ### 2026-11-08 10:43 ET — Bob (Claude) — vt-label-utility launcher: any Pi user, not only pi
 - **What:** The 5-line launcher uses $HOME/viewtouch-main and the running user's id for XDG_RUNTIME_DIR instead of /home/pi and uid 1000 (still 5 lines; reinstall copies it to /usr/local/bin as before).
 - **Why:** The new HCA Pi may use a username other than pi; this was the only hard-coded /home/pi in scripts.
