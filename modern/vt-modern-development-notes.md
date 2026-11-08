@@ -123,22 +123,6 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
-### 2026-11-08 16:54 ET — Bob (Claude) — Entry Cam moved out of GitHub
-- **What:** Removed entrycam/, .github/workflows/entrycam-android.yml and scripts/bin/vt-entrycam (revert of 861a6a0 and cc6875e) The release entrycam-latest (with the APK) must be deleted by the owner on GitHub (Releases); Bob's session can't delete releases. Entry Cam now lives in Dropbox > POS project > Entry Cam (app, source, install script).
-- **Why:** Owner's decision: the camera / video integration stays out of GitHub and in the POS project Dropbox.
-- **Files:** `.github/workflows/entrycam-android.yml`, `entrycam/.gitignore`, `entrycam/app/build.gradle`, `entrycam/app/src/main/AndroidManifest.xml`, `entrycam/app/src/main/java/com/buttheads/entrycam/BootReceiver.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/MainActivity.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/WatchService.java`, `entrycam/app/src/main/res/drawable-xhdpi/banner.png`, `entrycam/app/src/main/res/drawable-xhdpi/icon.png`, `entrycam/app/src/main/res/layout/main.xml`, `entrycam/app/src/main/res/values/strings.xml`, `entrycam/app/src/main/res/values/styles.xml`, `entrycam/build.gradle`, `entrycam/gradle.properties`, `entrycam/settings.gradle`, `scripts/bin/vt-entrycam`
-
-### 2026-11-08 16:47 ET — Bob (Claude) — Entry Cam: fix first build
-- **What:** Removed an androidx.annotation import that isn't on the classpath; release lint check off (media3 RTSP is marked unstable API).
-- **Why:** First GitHub build of Entry Cam failed to compile.
-- **Files:** `entrycam/app/build.gradle`, `entrycam/app/src/main/java/com/buttheads/entrycam/MainActivity.java`
-
-### 2026-11-08 16:46 ET — Bob (Claude) — Entry Cam: UniFi camera app for Fire-6
-- **What:** New standalone Android / Fire TV app entrycam/ (com.buttheads.entrycam): one RTSP camera full screen, muted, keeps the screen on, starts on boot and when the TV wakes, reconnects every 5 s on errors or a frozen picture, returns to the camera 10 min after someone leaves it, Back ignored, Menu button changes the link. Built by .github/workflows/entrycam-android.yml and published to the release entrycam-latest. Pi script scripts/bin/vt-entrycam installs it over adb and sends the camera link.
-- **Why:** Owner wants Fire-6 (Insignia 24in Fire TV, 192.168.1.148) to show the front-entry UniFi camera automatically without VLC or a Pi in the middle.
-- **Files:** `.github/workflows/entrycam-android.yml`, `entrycam/.gitignore`, `entrycam/app/build.gradle`, `entrycam/app/src/main/AndroidManifest.xml`, `entrycam/app/src/main/java/com/buttheads/entrycam/BootReceiver.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/MainActivity.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/WatchService.java`, `entrycam/app/src/main/res/drawable-xhdpi/banner.png`, `entrycam/app/src/main/res/drawable-xhdpi/icon.png`, `entrycam/app/src/main/res/layout/main.xml`, `entrycam/app/src/main/res/values/strings.xml`, `entrycam/app/src/main/res/values/styles.xml`, `entrycam/build.gradle`, `entrycam/gradle.properties`, `entrycam/settings.gradle`, `scripts/bin/vt-entrycam`
-- **Next person must know:** The camera token is never in the repo (public fork): it lives in ~/.config/entrycam/<ip>.url on the Pi and on the TV. Use the plain rtsp://192.168.1.1:7447/<token> link; ExoPlayer can't play rtsps/SRTP.
-
 ### 2026-11-08 15:07 ET — Bob (Claude) — vt-copy-store: the other Pi's devices are not copied
 - **What:** After copying, vt-copy-store also removes from the copy's settings the other Pi's billboards (screen billboard or a TV address), paired tablets/terminals with their keys, and serverTerm (with serverId/replicaKey as before, so its standby can't connect), and deletes printer/standby entries from the problems table; it prints each device removed. Printers and screens set up by name only (no pairing) are kept. Checked: billboard power (sleep/wake) is sent by ADB to the TV's address (pos_billboards.cpp adbArgs -> vt-add-billboard), so the ViewTouch app on the TV can't refuse it; any Pi whose adb key the TV accepts and that lists the TV can sleep it. Settings and slides come only over the billboard's own paired connection (its device key, its store's serverId), so another server can't send those.
 - **Why:** Owner 2026-11-08: the copy at .225 started telling Danbury's Fire TV 'fire5' to sleep.
