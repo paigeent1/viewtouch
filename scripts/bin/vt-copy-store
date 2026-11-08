@@ -26,7 +26,7 @@ for p in glob.glob(os.path.join(d, '*.db')):
 PY" || { echo "Couldn't reach $FROM or copy its databases."; exit 1; }
 echo "2/4 Bringing them and the store's pictures here..."
 rm -rf "$STAGE"; mkdir -p "$STAGE"
-rsync -a --info=stats1 --exclude '*.db' --exclude '*.db-wal' --exclude '*.db-shm' --exclude '*.db-journal' \
+rsync -a --info=stats1 --exclude '*.db' --exclude '*.db-wal' --exclude '*.db-shm' --exclude '*.db-journal' --exclude '*.lock' \
     "pi@$FROM:$REMOTE_DATA/" "$STAGE/" || { echo "Copy failed."; exit 1; }
 rsync -a "pi@$FROM:vt-copy-outgoing/" "$STAGE/" || { echo "Copy failed."; exit 1; }
 ssh "pi@$FROM" 'rm -rf ~/vt-copy-outgoing'

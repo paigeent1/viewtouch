@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 13:19 ET — Bob (Claude) — vt-copy-store: don't copy the other Pi's database lock
+- **What:** rsync now skips *.lock: the copy brought .219's viewtouch.db.lock (its process number, its host name) to .225, and ViewTouch's one-per-database lock (QLockFile, stale time 0) can't tell another machine's lock is stale, so .225 refused to start ("already in use by another ViewTouch (process 26405)").
+- **Why:** Owner 2026-11-08: HCA Pi didn't start ViewTouch after copying Danbury.
+- **Files:** (none)
+
 ### 2026-11-08 12:49 ET — Bob (Claude) — vt-install: ViewTouch starts at boot on new Pis
 - **What:** vt-install step 6 links vt-start and writes ~/.config/autostart/ViewTouch.desktop and ~/Desktop/ViewTouch.desktop with Exec=/usr/local/bin/vt-start (the 2026-11-05 note's open item).
 - **Why:** Owner 2026-11-08: the new HCA Pi (.225) didn't start ViewTouch after a reboot.
