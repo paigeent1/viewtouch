@@ -4438,5 +4438,10 @@
  "👁 Preview": "👁 Vista previa",
  "🔍 Find an item": "🔍 Buscar un artículo",
  "🔍 Find an item (name or number)": "🔍 Buscar (nombre o número)",
- "🖨 Printed Menu…": "🖨 Menú impreso…"
+ "🖨 Printed Menu…": "🖨 Menú impreso…",
+ "Customer on receipts": "Cliente en los recibos",
+ "The customer's own receipt and reprints. Kitchen and order tickets always show the name.": "El recibo del cliente y sus reimpresiones. Los tiques de cocina y de pedido siempre muestran el nombre.",
+ "None (a delivery still shows its address)": "Ninguno (una entrega sigue mostrando su dirección)",
+ "First name only": "Solo el nombre de pila",
+ "Name, phone and address": "Nombre, teléfono y dirección"
 }

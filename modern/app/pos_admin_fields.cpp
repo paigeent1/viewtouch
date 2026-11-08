@@ -340,6 +340,10 @@ QVariantList PosService::adminFields(const QString &panel)
                   tr("Off: the guest's receipt shows only choices that change the price (Extra bacon), not No onion or Medium rare. Kitchen tickets show them all.")),
             field(u"receiptShowVoids"_s, tr("Voids and error corrects on receipts"), u"bool"_s,
                   tr("On: voided and error-corrected items print on the guest's receipt, marked VOID or ERR CORR with the price in brackets (not counted). Off: clean receipts without them. The cashier's screen and the Exceptions report always show them.")),
+            with(field(u"receiptCustomer"_s, tr("Customer on receipts"), u"enum"_s,
+                       tr("The customer's own receipt and reprints. Kitchen and order tickets always show the name.")),
+                 u"options"_s, options({{"", "None (a delivery still shows its address)"}, {"first", "First name only"},
+                                        {"full", "Name, phone and address"}})),
             field(u"receiptBarcode"_s, tr("Print a barcode on receipts"), u"bool"_s,
                   tr("On: every receipt, reprint and gift receipt ends with a barcode of its check (R-1234, with the check prefix: RHCA-1234). "
                      "Scanned at the register, Find a check opens that check, for a return or a reprint.")),

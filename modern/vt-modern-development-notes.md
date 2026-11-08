@@ -131,6 +131,9 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 ### 2026-11-08 14:28 ET — Bob (Claude) — Backlog: receipt design to revisit
 - **What:** Backlog entry listing receipt design work done and what to look at again later.
 - **Why:** Owner 2026-11-08 14:27: put receipt design changes on a list to go back to.
+### 2026-11-08 14:23 ET — Bob (Claude) — Receipts: customer details off by default; privacy notice in small print
+- **What:** Store Settings > Receipts > Customer on receipts (receiptCustomer): None (default: no name/phone/address on the customer's receipt and reprints; a delivery still shows its address), First name only, or Name, phone and address. Kitchen and order tickets unchanged (pickup names). The short privacy notice on receipts prints in the printer's small font (Document::small -> ESC/POS Font B). Tests in test_print.cpp; Spanish strings.
+- **Why:** Owner 2026-11-08: no need to print the customer's name and phone on receipts normally (default off); privacy notice in the smallest font.
 - **Files:** (none)
 
 ### 2026-11-08 13:21 ET — Bob (Claude) — vt-copy-store: the copy is its own store, not a standby

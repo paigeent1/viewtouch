@@ -106,6 +106,34 @@ TEST_CASE("ESC/POS: init, emphasis, cut, drawer kick, letters", "[print]")
     CHECK(std::ranges::none_of(plain, [](char c) { return static_cast<unsigned char>(c) >= 0x80 && c != '\xfa'; }));
 }
 
+TEST_CASE("Customer on receipts: none by default, first name or everything when the store asks", "[print][customer]")
+{
+    auto seed = test::seedPosData();
+    core::Check c = burgerCheck(seed.settings, seed.menu);
+    c.customer.name = "Pat Example";
+    c.customer.phone = "555-010-9999";
+    c.customer.address = "1 Test Lane";
+    std::string r = renderText(receipt(c, ctx(seed.settings)), 42);
+    CHECK_FALSE(contains(r, "Pat"));
+    CHECK_FALSE(contains(r, "555-010-9999"));
+    CHECK_FALSE(contains(r, "1 Test Lane"));
+    seed.settings.receiptCustomer = "first";
+    r = renderText(receipt(c, ctx(seed.settings)), 42);
+    CHECK(contains(r, "Pat"));
+    CHECK_FALSE(contains(r, "Example"));
+    CHECK_FALSE(contains(r, "555-010-9999"));
+    seed.settings.receiptCustomer = "full";
+    r = renderText(receipt(c, ctx(seed.settings)), 42);
+    CHECK(contains(r, "Pat Example"));
+    CHECK(contains(r, "555-010-9999"));
+    CHECK(contains(r, "1 Test Lane"));
+    seed.settings.receiptCustomer.clear();
+    c.type = core::CheckType::Delivery;   // a delivery keeps its address
+    r = renderText(receipt(c, ctx(seed.settings)), 42);
+    CHECK(contains(r, "1 Test Lane"));
+    CHECK_FALSE(contains(r, "555-010-9999"));
+}
+
 TEST_CASE("Privacy notice: on receipts with a customer's details, the full one on its own", "[print][privacy]")
 {
     auto seed = test::seedPosData();
@@ -114,6 +142,13 @@ TEST_CASE("Privacy notice: on receipts with a customer's details, the full one o
     c.customer.phone = "555-010-1234";
     std::string r = renderText(receipt(c, ctx(seed.settings)), 42);
     CHECK(contains(r, "PRIVACY: ViewTouch Caf"));                  // {store} filled in
+    {   // in the printer's small font (ESC M 1 just before it)
+        const std::string esc = renderEscPos(receipt(c, ctx(seed.settings)), 42, false);
+        const auto at = esc.find("PRIVACY");
+        REQUIRE(at != std::string::npos);
+        CHECK(esc.rfind(std::string("\x1bM\x01"), at) != std::string::npos);
+        CHECK(esc.rfind(std::string("\x1bM\x01"), at) > esc.rfind(std::string("\x1bM") + std::string(1, '\0'), at));
+    }
     CHECK_FALSE(contains(r, "{store}"));
     seed.settings.privacyOnReceipts = false;
     CHECK_FALSE(contains(renderText(receipt(c, ctx(seed.settings)), 42), "PRIVACY"));
@@ -683,6 +718,7 @@ TEST_CASE("Every printout fits the paper and stays readable", "[print][fit]")
     seed.settings.storeName = "La Taquería del Barrio — Since 1987";
     seed.settings.receiptHeader = "123 Main St\nSpringfield ☎ 555-0100";
     seed.settings.receiptFooter = "¡Gracias! Vuelva pronto 😊";
+    seed.settings.receiptCustomer = "full";   // the customer's name, phone and address on the receipt too
     const core::Check c = awkwardCheck();
     core::Report report;
     report.title = "Server Sales (comparison)";

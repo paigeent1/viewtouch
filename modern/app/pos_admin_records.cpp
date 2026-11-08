@@ -108,7 +108,7 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"dobReprintNeedsManager"_s, s_->settings.dobReprintNeedsManager},
              {u"receiptFreeChoices"_s, s_->settings.receiptFreeChoices},
              {u"receiptShowVoids"_s, s_->settings.receiptShowVoids},
-             {u"receiptBarcode"_s, s_->settings.receiptBarcode}, {u"checkPrefix"_s, qs(s_->settings.checkPrefix)},
+             {u"receiptBarcode"_s, s_->settings.receiptBarcode}, {u"checkPrefix"_s, qs(s_->settings.checkPrefix)}, {u"receiptCustomer"_s, qs(s_->settings.receiptCustomer)},
              {u"ageAlcohol"_s, s_->settings.ageAlcohol}, {u"ageTobacco"_s, s_->settings.ageTobacco},
              {u"privacyOnReceipts"_s, s_->settings.privacyOnReceipts},
              {u"privacyShort"_s, qs(s_->settings.privacyShort.empty() ? std::string(privacyShortDefault()) : s_->settings.privacyShort)},

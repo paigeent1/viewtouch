@@ -140,7 +140,7 @@ inline QVariantList storeSections(const QVariantList &fields)
     };
     const Section sections[] = {
         {"store", PosService::tr("The store"), {"storeName", "giftCardLocation", "storeZip", "topRibbonShowWeather", "language", "currencySymbol", "ilsaHistoryStore", "displayLogo"}},
-        {"receipts", PosService::tr("Receipts"), {"receiptHeader", "receiptFooter", "receiptLogo", "receiptFreeChoices", "receiptShowVoids", "receiptBarcode", "checkPrefix", "dobReprintNeedsManager"}},
+        {"receipts", PosService::tr("Receipts"), {"receiptHeader", "receiptFooter", "receiptLogo", "receiptFreeChoices", "receiptShowVoids", "receiptCustomer", "receiptBarcode", "checkPrefix", "dobReprintNeedsManager"}},
         {"privacy", PosService::tr("Privacy notice"), {"privacyOnReceipts", "privacyShort", "privacyFull"}},
         {"ages", PosService::tr("Age-restricted sales"), {"ageAlcohol", "ageTobacco"}},
         {"startPages", PosService::tr("Start pages"),

@@ -1147,7 +1147,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"receiptHeader"_s, qs(s.receiptHeader)}, {u"receiptLogo"_s, s.receiptLogo},
         {u"receiptFreeChoices"_s, s.receiptFreeChoices},
         {u"receiptShowVoids"_s, s.receiptShowVoids},
-        {u"receiptBarcode"_s, s.receiptBarcode}, {u"checkPrefix"_s, qs(s.checkPrefix)},
+        {u"receiptBarcode"_s, s.receiptBarcode}, {u"checkPrefix"_s, qs(s.checkPrefix)}, {u"receiptCustomer"_s, qs(s.receiptCustomer)},
         {u"soldOutBackNextDay"_s, s.soldOutBackNextDay},
         {u"ilsaSyncOn"_s, s.ilsaSyncOn},
         {u"receiptFooter"_s, qs(s.receiptFooter)},
@@ -1564,6 +1564,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.receiptFreeChoices = o.value(u"receiptFreeChoices").toBool(false);
     s.receiptShowVoids = o.value(u"receiptShowVoids").toBool(false);
     s.receiptBarcode = o.value(u"receiptBarcode").toBool(false);
+    s.receiptCustomer = ss(o.value(u"receiptCustomer").toString());
     s.checkPrefix = core::normalCheckPrefix(ss(o.value(u"checkPrefix").toString()));
     {
         const QJsonObject age = o.value(u"minimumAge").toObject();

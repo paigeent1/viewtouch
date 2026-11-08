@@ -208,6 +208,9 @@ struct PosSettings {
     // A Code 128 barcode at the bottom of every receipt, reprint and gift receipt: "R" + checkPrefix + "-" +
     // the check number (core/receipt_ref.hh); scanned at the register it opens that check (returns).
     bool receiptBarcode = false;
+    // The customer on the customer's receipt (and reprints): "" (none: default; a delivery still shows its
+    // address), "first" (first name only), "full" (name, phone, address). Kitchen and order tickets unchanged.
+    std::string receiptCustomer;
     // This store's check prefix (HCA, BHDAN...): letters and digits, in capitals; empty for none. On the
     // receipt barcode, so a receipt from another store is told apart.
     std::string checkPrefix;

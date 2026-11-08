@@ -267,6 +267,10 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             s_->settings.receiptShowVoids = record.value(u"receiptShowVoids"_s).toBool();
         if (record.contains(u"receiptBarcode"_s))
             s_->settings.receiptBarcode = record.value(u"receiptBarcode"_s).toBool();
+        if (record.contains(u"receiptCustomer"_s)) {
+            const QString v = record.value(u"receiptCustomer"_s).toString();
+            s_->settings.receiptCustomer = (v == u"first"_s || v == u"full"_s) ? ss(v) : std::string();
+        }
         if (record.contains(u"checkPrefix"_s))
             s_->settings.checkPrefix = normalCheckPrefix(ss(record.value(u"checkPrefix"_s).toString()));
         if (record.contains(u"ageAlcohol"_s))

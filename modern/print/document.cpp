@@ -21,6 +21,13 @@ Document &Document::columns(std::string left, std::string right, bool bold, bool
     return *this;
 }
 
+Document &Document::small(std::string s, Align a)
+{
+    text(std::move(s), a);
+    lines.back().small = true;
+    return *this;
+}
+
 Document &Document::rule()
 {
     lines.push_back({Kind::Rule});
@@ -421,7 +428,7 @@ std::string renderEscPos(const Document &doc, int width, bool accents)
             out += "\n" + ESC + "a" + std::string(1, '\0');
             continue;
         }
-        const bool isSubLine = !l.big && !l.bold && (l.text.starts_with("  ") || l.text.starts_with("Opened "));
+        const bool isSubLine = l.small || (!l.big && !l.bold && (l.text.starts_with("  ") || l.text.starts_with("Opened ")));
         // Font B (9x17) fits 4/3 as many characters across the same paper width as Font A (12x24)
         const std::size_t w = std::size_t(std::max(8, l.big ? width / 2 : (isSubLine ? (width * 4) / 3 : width)));
         out += ESC + "M" + (isSubLine ? std::string("\x01") : std::string(1, '\0')); // Font B for choices, Font A otherwise
