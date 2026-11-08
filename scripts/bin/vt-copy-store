@@ -7,7 +7,8 @@
 # aside first to ~/vt-data-before-copy-<time> (nothing is deleted), then ViewTouch starts again.
 # It becomes its own store (new server identity), never the other Pi's standby.
 # Not copied: this Pi's site file (~/.config/viewtouch: printers' devices, scanner, screens, paired
-# tablets and billboards stay this Pi's own).
+# tablets and billboards stay this Pi's own). Cleared from the copy: the other Pi's billboards, paired
+# tablets/terminals (and their keys), standby link and printer/standby alerts; printers are kept.
 FROM="$1"
 [ -n "$FROM" ] || { echo "usage: vt-copy-store OTHER-PI-ADDRESS (e.g. 192.168.1.219)"; exit 2; }
 DATA="$HOME/.local/share/ViewTouch/ViewTouch"
@@ -39,16 +40,46 @@ mkdir -p "$(dirname "$DATA")" && mv "$STAGE" "$DATA"
 # A store of its own, not the other Pi's standby: new server identity (ViewTouch makes a fresh id and
 # key when they're empty), no standby link, no other machine's lock.
 rm -f "$DATA/standby.json" "$DATA"/*.lock
+# The other Pi's devices stay the other Pi's: its billboards (2026-11-08 the copy at .225 told
+# Danbury's Fire TV 'fire5' to sleep), paired tablets and terminals with their keys, its standby
+# (the store key above), and its printer and standby alerts. Printers are kept (repoint them in
+# Manager > Printers); screens set up by name only (no pairing) are kept too.
 python3 - "$DATA/viewtouch.db" <<'PY'
 import json, sqlite3, sys
 db = sqlite3.connect(sys.argv[1]); n = 0
 for key, js in db.execute("SELECT key, json FROM settings").fetchall():
     try: o = json.loads(js)
     except ValueError: continue
-    if isinstance(o, dict) and ("serverId" in o or "replicaKey" in o):
-        o.pop("serverId", None); o.pop("replicaKey", None); n += 1
+    if not isinstance(o, dict): continue
+    changed = False
+    if "serverId" in o or "replicaKey" in o:
+        o.pop("serverId", None); o.pop("replicaKey", None); o.pop("serverTerm", None); n += 1; changed = True
+    if isinstance(o.get("terminals"), list):
+        keep, gone = [], []
+        for t in o["terminals"]:
+            if not isinstance(t, dict): continue
+            billboard = t.get("screen") == "billboard" or t.get("billboardIp")
+            if billboard or t.get("key") or t.get("id"):
+                gone.append("%s (%s)" % (t.get("name") or "?", "billboard" + (" at " + t["billboardIp"] if t.get("billboardIp") else "") if billboard else "paired device"))
+            else:
+                keep.append(t)
+        if gone:
+            o["terminals"] = keep; changed = True
+            print("   removed the other Pi's devices:"); [print("     -", g) for g in gone]
+    if changed:
         db.execute("UPDATE settings SET json=? WHERE key=?", (json.dumps(o), key))
-db.commit(); print("   new store identity" if n else "   (no store identity found to reset)")
+print("   new store identity (its standby can't connect to this copy)" if n else "   (no store identity found to reset)")
+try:
+    alerts = 0
+    for pid, js in db.execute("SELECT id, json FROM problems").fetchall():
+        try: kind = json.loads(js).get("kind")
+        except (ValueError, AttributeError): continue
+        if kind in ("printer", "standby"):
+            db.execute("DELETE FROM problems WHERE id=?", (pid,)); alerts += 1
+    if alerts: print("   cleared %d printer/standby alert(s) of the other Pi" % alerts)
+except sqlite3.OperationalError:
+    pass   # an older database without the problems table
+db.commit()
 PY
 echo "4/4 Starting ViewTouch..."
 vt-server
