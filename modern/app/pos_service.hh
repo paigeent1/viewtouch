@@ -487,6 +487,9 @@ public:
     // "paperOut", "coverOpen", "paperLow", "error", "offline"; none: fine.
     std::map<std::string, std::string> printerProblems;
     void setPrinterProblem(const std::string &printerId, const std::string &problem);
+    // A printer's tickets kept after it failed ("notPrinting"): send them
+    // again (set by the app: print::PrintSpooler::retryHeld).
+    std::function<void(const std::string &printerId)> reprintHeld;
     QVariantMap backup;
     void setBackupStatus(QVariantMap status)
     {
@@ -1049,6 +1052,8 @@ public:
     bool cardForwarded(const QVariantMap &r);
     QVariantList cardAlerts() const override;
     bool seeCardAlert(const QString &ref);
+    // The printer alert's Reprint: tickets a USB printer didn't take go again.
+    bool reprintHeld(const QString &printerId);
     void setStripeOffline(bool on);
     std::vector<core::Check *> checksToday();
     void saveAnyCheck(core::Check &c);

@@ -44,25 +44,73 @@ fi
 if grep -q "Qt6Multimedia_DIR:PATH=.*NOTFOUND" modern/build/CMakeCache.txt 2>/dev/null \
         && [ -f /usr/lib/aarch64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake -o -f /usr/lib/x86_64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake ]; then
     echo "Looking for Qt Multimedia again (video on the customer display)..."
-    cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null
+    cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null \
+        || echo "Couldn't look for Qt Multimedia again; building with the settings already there."
 fi
-cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}
+if ! cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}; then
+    echo "ViewTouch didn't start: the build failed (see above). The ViewTouch already running was left as it was."
+    exit 1
+fi
+# From here on no step ends the script half-way. set -e did, 2026-11-08 on the new HCA Pi: with no
+# ~/.vt-customer-display, GUEST="${VT_CUSTOMER_DISPLAY:-$(cat ...)}" failed and ended the script
+# right after the build, without a word and before ViewTouch was started (vt-start, without set -e,
+# worked). Each step now says what went wrong and carries on.
+set +e
 # A vt-* command added since this Pi linked them (e.g. vt-screens): linked now, so it runs by name.
-for f in "$VT_REPO"/scripts/bin/vt-*; do [ -e "/usr/local/bin/$(basename "$f")" ] || sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || true; done
-sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null || true
+for f in "$VT_REPO"/scripts/bin/vt-*; do
+    [ -e "/usr/local/bin/$(basename "$f")" ] && continue
+    sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || echo "Note: couldn't link $(basename "$f") into /usr/local/bin (run it as $f)."
+done
+sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null \
+    || echo "Note: couldn't copy the new vtmodern to /usr/local/bin (this script runs the one in modern/build)."
 # Stop ViewTouch the polite way first (it saves and closes the database on
 # SIGTERM); force it only if it is still running after 10 seconds.
-pkill -TERM -x vtmodern 2>/dev/null || true
-for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
-pkill -KILL -x vtmodern 2>/dev/null || true
-# The customer display on the second monitor (vt-guest-display on|off writes ~/.vt-customer-display).
-GUEST="${VT_CUSTOMER_DISPLAY:-$(cat "$HOME/.vt-customer-display" 2>/dev/null)}"
+if pgrep -x vtmodern >/dev/null; then
+    pkill -TERM -x vtmodern 2>/dev/null
+    for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
+    if pgrep -x vtmodern >/dev/null; then
+        echo "ViewTouch didn't stop in 10 seconds; stopping it now."
+        pkill -KILL -x vtmodern 2>/dev/null
+        sleep 1
+    fi
+fi
+# The customer display on the second monitor (vt-guest-display on|off writes ~/.vt-customer-display;
+# no file: none).
+GUEST="${VT_CUSTOMER_DISPLAY:-}"
+if [ -z "$GUEST" ] && [ -f "$HOME/.vt-customer-display" ]; then GUEST=$(cat "$HOME/.vt-customer-display" 2>/dev/null); fi
 EXTRA=()
-[ -n "$GUEST" ] && [ "$GUEST" != off ] && EXTRA=(--customer-display "$GUEST")
+if [ -n "$GUEST" ] && [ "$GUEST" != off ]; then EXTRA=(--customer-display "$GUEST"); fi
 # This site's scanner port and speed (vt-site), when set.
-[ -n "$SERIAL_SCANNER" ] && export VT_SERIAL_SCANNER="$SERIAL_SCANNER"
-export VT_SERIAL_SCANNER_BAUD="$SERIAL_SCANNER_BAUD"
+if [ -n "${SERIAL_SCANNER:-}" ]; then export VT_SERIAL_SCANNER="$SERIAL_SCANNER"; fi
+export VT_SERIAL_SCANNER_BAUD="${SERIAL_SCANNER_BAUD:-9600}"
+# May this computer become another one's standby (vt-site STANDBY_ALLOWED)? Not set: yes, as before.
+export VT_STANDBY_ALLOWED="${STANDBY_ALLOWED:-yes}"
 # Its messages go to ~/.vt-run.log (the run before in ~/.vt-run.log.1): what it said if it stops.
-[ -f "$HOME/.vt-run.log" ] && mv -f "$HOME/.vt-run.log" "$HOME/.vt-run.log.1"
-WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$VT_REPO/modern/build/vtmodern" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 &
+if [ -f "$HOME/.vt-run.log" ]; then mv -f "$HOME/.vt-run.log" "$HOME/.vt-run.log.1" || echo "Note: couldn't keep the last run's log."; fi
+BIN="$VT_REPO/modern/build/vtmodern"
+if [ ! -x "$BIN" ]; then
+    echo "ViewTouch didn't start: $BIN is missing after the build."
+    exit 1
+fi
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$BIN" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 &
+pid=$!
+# Still running a few seconds later (it looks for another server of this store first)?
+sleep 4
+if grep -q "set not to become its standby" "$HOME/.vt-run.log" 2>/dev/null; then
+    echo "ViewTouch didn't start: $(grep -m1 "set not to become its standby" "$HOME/.vt-run.log")"
+    echo "(To let this computer be that one's standby: vt-site set STANDBY_ALLOWED yes, then vt-server.)"
+    exit 1
+fi
+if ! kill -0 "$pid" 2>/dev/null; then
+    wait "$pid" 2>/dev/null
+    code=$?
+    case "$code" in
+        68) reason="another computer is already running this store, and this one is set not to become its standby (to allow it: vt-site set STANDBY_ALLOWED yes)" ;;
+        *) reason="it stopped right away (exit status $code)" ;;
+    esac
+    echo "ViewTouch didn't start: $reason."
+    why=$(grep -v '^[[:space:]]*$' "$HOME/.vt-run.log" 2>/dev/null | tail -n 4)
+    if [ -n "$why" ]; then echo "Its last messages (~/.vt-run.log):"; echo "$why" | sed 's/^/  /'; fi
+    exit 1
+fi
 echo "Server rebuilt and restarted.${GUEST:+ Customer display: $GUEST.}"

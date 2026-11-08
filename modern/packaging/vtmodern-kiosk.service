@@ -44,7 +44,9 @@ RestartSec=2
 # the next boot, and the screen goes to the second console (the desktop, or
 # a text login on a dedicated register).
 SuccessExitStatus=64
-RestartPreventExitStatus=64
+# 68: another computer runs this store and this one may not become its standby (STANDBY_ALLOWED=no):
+# trying again every few seconds would not change that.
+RestartPreventExitStatus=64 68
 ExecStopPost=-+/bin/sh -c 'if [ "$$EXIT_STATUS" = 64 ]; then /usr/bin/chvt 2; fi'
 TimeoutStopSec=30
 

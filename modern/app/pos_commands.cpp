@@ -329,6 +329,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"setAllergies"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setAllergies(a.value(0).toStringList())); }},
         {u"cardForwarded"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.cardForwarded(a.value(0).toMap())); }},
         {u"seeCardAlert"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.seeCardAlert(a.value(0).toString())); }},
+        {u"reprintHeld"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.reprintHeld(a.value(0).toString())); }},
         {u"undoMenuChange"_s, [](PosService &p, const QVariantList &) { return QVariant(p.undoMenuChange()); }},
         {u"menuExport"_s, [](PosService &p, const QVariantList &) { return QVariant(p.menuExport()); }},
         {u"importMenuFile"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.importMenuFile(a.value(0).toMap())); }},
