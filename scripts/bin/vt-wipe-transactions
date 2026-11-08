@@ -23,6 +23,9 @@ Then sets the next check number (meta next_check_id, read by ViewTouch at every 
   vt-wipe-transactions --keep-gift-balances no
                                              gift cards go back to before the beta (default yes: every card keeps
                                              the balance it has now; its beta activity becomes one "carried" line)
+  vt-wipe-transactions --remove-gift-cards   remove every gift card (a copied store whose cards are redeemed only at
+                                             the store they came from; the cards are in the backup's
+                                             gift-cards-before-wipe.csv)
   vt-wipe-transactions --wipe-inventory-log  also remove deliveries, stock counts and the waste log (kept by default)
   vt-wipe-transactions --force               go on even with open checks (they are wiped too)
   vt-wipe-transactions --no-start            leave ViewTouch stopped afterwards
@@ -208,14 +211,18 @@ def change_about_transactions(c):
 
 
 # --- the wipe (on the real database, or on a copy for --dry-run) ------------------------------------------
-def wipe(con, next_check, keep_balances, wipe_inventory, now):
+def wipe(con, next_check, keep_balances, wipe_inventory, now, remove_cards=False):
     have = set(tables(con))
     report = {"cleared": {}, "notes": []}
     for t in list(WIPED) + (list(INVENTORY_LOG) if wipe_inventory else []):
         if t in have:
             con.execute(f'DELETE FROM "{t}"')
 
-    if "gift_cards" in have:
+    if "gift_cards" in have and remove_cards:
+        n = con.execute("SELECT COUNT(*) FROM gift_cards").fetchone()[0]
+        con.execute("DELETE FROM gift_cards")
+        report["cleared"]["gift_cards"] = f"all {n:,} cards removed (--remove-gift-cards)"
+    elif "gift_cards" in have:
         cards = touched = entries = 0
         for number, raw in con.execute("SELECT number, json FROM gift_cards").fetchall():
             g, n, _ = clean_gift_card(loads(raw), keep_balances, now)
@@ -443,6 +450,7 @@ def main(argv):
     ap.add_argument("--next-check", type=int, default=NEXT_CHECK)
     ap.add_argument("--keep-gift-balances", choices=["yes", "no"], default="yes")
     ap.add_argument("--wipe-inventory-log", action="store_true")
+    ap.add_argument("--remove-gift-cards", action="store_true")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--no-start", action="store_true")
     ap.add_argument("--no-stop", action="store_true")
@@ -469,12 +477,15 @@ def main(argv):
         print(f"Open checks: {len(opened)}" + ("" if a.force else " - close or cancel them in ViewTouch first, or use --force"))
         print_open(opened)
     print_balances(ro, keep_balances)
+    if a.remove_gift_cards:
+        print("--remove-gift-cards: every gift card above is REMOVED from this store (listed in the backup)")
 
     if a.dry_run:
         mem = sqlite3.connect(":memory:")
         ro.backup(mem)
         ro.close()
-        rep = wipe(mem, a.next_check, keep_balances, a.wipe_inventory_log, now)
+        rep = wipe(mem, a.next_check, keep_balances, a.wipe_inventory_log, now,
+                   remove_cards=a.remove_gift_cards)
         print("\nDRY RUN: nothing was changed. After the wipe it would be:")
         print_table(before, counts(mem), a.wipe_inventory_log, rep["cleared"])
         mem.close()
@@ -538,7 +549,8 @@ def main(argv):
     con = sqlite3.connect(db, timeout=10, isolation_level=None)
     try:
         con.execute("BEGIN EXCLUSIVE")
-        rep = wipe(con, a.next_check, keep_balances, a.wipe_inventory_log, now)
+        rep = wipe(con, a.next_check, keep_balances, a.wipe_inventory_log, now,
+                   remove_cards=a.remove_gift_cards)
         after = counts(con)
         left = [t for t in WIPED if after.get(t)]
         if left:

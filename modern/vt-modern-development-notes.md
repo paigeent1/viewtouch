@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 15:21 ET — Bob (Claude) — vt-wipe-transactions --remove-gift-cards; gift cards stay at Danbury only
+- **What:** New --remove-gift-cards option empties the gift_cards table during the wipe (the cards are still listed in the backup's gift-cards-before-wipe.csv). For Hat City (.225), copied from Danbury.
+- **Why:** Owner decision: Hat City starts with no gift cards. Gift cards live only at BHDAN (the first store to go live) until the corporate Pi syncs gift cards across BHDAN, BHNM and HCA.
+- **Files:** (none)
+- **Next person must know:** Run on .225 as: vt-wipe-transactions --force --remove-gift-cards. Never use --remove-gift-cards on .219 (Danbury).
+
 ### 2026-11-08 14:58 ET — Bob (Claude) — vt-copy-store: skip the other Pi's running marker, socket and pairing files
 - **What:** rsync also skips *.running, control.sock, terminal.json and standby.json (they belong to the other machine).
 - **Why:** Owner 2026-11-08: .225's data folder held .219's viewtouch.db.running, control.sock and terminal.json after the copy.
