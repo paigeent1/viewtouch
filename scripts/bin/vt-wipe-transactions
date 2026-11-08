@@ -1,0 +1,574 @@
+#!/usr/bin/env python3
+"""Wipe the beta's sales and transactions from this store Pi's ViewTouch (the cutover step).
+
+Keeps what the store is set up with: items and prices, departments, modifiers, pages, staff (roles, PINs),
+customers (names, phones, emails), settings, taxes, pictures, the schedule, inventory, and the ILSA history
+file (ilsa-history.db, never opened for writing). Label templates (~/.local/share/ViewTouch/*.json) are not
+touched either.
+
+Removes every transaction: checks (their lines, payments, tips, voids, comps, discounts), refunds, business
+days (End of Day / Z reports), drawers and their counts, paid outs and paid ins, No Sales, time clock punches
+and breaks (and declared cash tips), the waitlist and reservations, gift card activity, customers' visits,
+spending, points, last order and house account charges, Changes rows about wiped time punches and checks
+(price, menu, staff and settings changes are kept), promotions' use counts, managers' punch edits, checklist
+ticks and table states. Printer files waiting in the data folder's printouts/ are removed too (kitchen and
+printer queues otherwise live only while ViewTouch runs).
+
+Then sets the next check number (meta next_check_id, read by ViewTouch at every start), so new checks start at
+100001 even with no checks saved, and starts ViewTouch again with vt-server (which builds it first).
+
+  vt-wipe-transactions --dry-run             what would go and what stays; changes nothing, ViewTouch keeps running
+  vt-wipe-transactions                       wipe (asks you to type WIPE), next check 100001, ViewTouch starts again
+  vt-wipe-transactions --next-check N        new checks start at N instead of 100001
+  vt-wipe-transactions --keep-gift-balances no
+                                             gift cards go back to before the beta (default yes: every card keeps
+                                             the balance it has now; its beta activity becomes one "carried" line)
+  vt-wipe-transactions --wipe-inventory-log  also remove deliveries, stock counts and the waste log (kept by default)
+  vt-wipe-transactions --force               go on even with open checks (they are wiped too)
+  vt-wipe-transactions --no-start            leave ViewTouch stopped afterwards
+  vt-wipe-transactions --yes                 don't ask to type WIPE
+  vt-wipe-transactions --data-dir DIR        another data folder (default ~/.local/share/ViewTouch/ViewTouch)
+  vt-wipe-transactions --backup-root DIR     where the backup folder goes (default ~/vt-backups)
+  vt-wipe-transactions --no-stop             don't stop ViewTouch (a copy of the data, tests); refuses if it's running
+
+Before anything is wiped, the whole data folder is backed up to ~/vt-backups/before-wipe-<time>/ (each .db with
+SQLite's online backup, then checked). The data folder's own backups/ folder is not copied (it is backups already).
+"""
+import argparse, csv, datetime, json, os, shutil, sqlite3, subprocess, sys, time
+
+DATA_DIR = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch")
+BACKUP_ROOT = os.path.expanduser("~/vt-backups")
+NEXT_CHECK = 100001
+IMPORTED_AT = 1767225600000   # gift cards imported from the old system (core/report.cpp "Imported")
+TZ = "America/New_York"       # the store's clock
+
+# Emptied: the transactions themselves.
+WIPED = {
+    "checks": "checks: lines, payments, tips, voids, comps, discounts (open, closed, cancelled, merged)",
+    "refunds": "refunds on closed checks",
+    "business_days": "business days: End of Day (Z) reports",
+    "drawer_sessions": "drawers: starting banks, counts, paid outs/ins, tip payouts, No Sales",
+    "time_punches": "time clock punches, breaks, declared cash tips",
+    "parties": "waitlist and reservations",
+}
+INVENTORY_LOG = {
+    "deliveries": "deliveries received",
+    "stock_counts": "stock counts",
+    "waste": "the waste log",
+}
+# Rows kept, the beta's part taken out of them.
+CLEANED = {
+    "customers": "kept; their visits, spending, points, last order and house account charges cleared",
+    "gift_cards": "kept; their beta activity cleared (see --keep-gift-balances)",
+    "changes": "kept (prices, menu, staff, settings, pages); rows about wiped time punches and checks removed",
+    "settings": "kept; promotions' use counts, punch edits, checklist ticks and table states cleared",
+    "menu_items": "kept (items, prices, departments, modifiers); event tickets sold cleared",
+    "meta": "kept; next_check_id set",
+}
+KEPT = {
+    "employees": "staff, roles, PINs",
+    "ingredients": "inventory items (on hand as now)",
+    "shifts": "the staff schedule",
+    "images": "the store's pictures",
+    "layout_pages": "pages",
+    "layout_theme": "the look",
+    "problems": "Store Check's problem log",
+}
+# Changes report areas about transactions (app/pos_admin_shared.hh panelName).
+PUNCH_AREAS = {"Time punches"}
+
+
+def money(cents):
+    cents = int(cents or 0)
+    return f"{'-' if cents < 0 else ''}${abs(cents) / 100:,.2f}"
+
+
+def when(ms):
+    if not ms:
+        return "-"
+    try:
+        from zoneinfo import ZoneInfo
+        zone = ZoneInfo(TZ)
+    except Exception:
+        zone = None
+    return datetime.datetime.fromtimestamp(int(ms) / 1000, zone).strftime("%Y-%m-%d %H:%M")
+
+
+def masked(number):
+    n = str(number or "")
+    return ("…" + n[-4:]) if len(n) > 4 else n
+
+
+def loads(raw):
+    try:
+        v = json.loads(raw or "{}")
+        return v if isinstance(v, dict) else {}
+    except ValueError:
+        return {}
+
+
+def dumps(obj):
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+
+def tables(con):
+    return [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table' "
+                                      "AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+
+
+def counts(con):
+    return {t: con.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in tables(con)}
+
+
+def open_checks(con):
+    if "checks" not in tables(con):
+        return []
+    out = []
+    for cid, label, opened, raw in con.execute(
+            "SELECT id, label, opened_at, json FROM checks WHERE status = 'open' ORDER BY id"):
+        c = loads(raw)
+        lines = [l for l in c.get("lines", []) if isinstance(l, dict)]
+        out.append({"id": cid, "label": label or "", "server": c.get("serverName", ""), "opened": opened,
+                    "lines": len(lines), "training": bool(c.get("training"))})
+    return out
+
+
+def print_open(checks):
+    for c in checks:
+        print(f"    check #{c['id']}  {c['label'] or '-':<12} {c['server'] or '-':<16} opened {when(c['opened'])}"
+              f"  {c['lines']} line(s){'  (training)' if c['training'] else ''}")
+
+
+# --- what is cleaned in the rows kept ------------------------------------------------------------------------
+def beta_entry(e):
+    """Gift card activity of the beta: anything on a check (all of them go), cash outs and balance moves."""
+    return int(e.get("checkId") or 0) > 0 or e.get("kind") in ("cashout", "transfer")
+
+
+def clean_gift_card(g, keep_balances, now):
+    """-> (card, entries removed, their net). keep_balances: the balance stays; the removed activity becomes one
+    'carried' line so the history still adds up. Else the balance goes back by what the beta did."""
+    history = [e for e in g.get("history", []) if isinstance(e, dict)]
+    removed = [e for e in history if beta_entry(e)]
+    if not removed:
+        return g, 0, 0
+    kept = [e for e in history if not beta_entry(e)]
+    net = sum(int(e.get("amount") or 0) for e in removed)
+    g = dict(g)
+    if keep_balances:
+        if net:
+            kept.append({"at": now, "amount": net, "what": "Balance carried over at the ViewTouch start (beta activity cleared)",
+                         "checkId": 0, "kind": "carried"})
+    else:
+        g["balance"] = int(g.get("balance") or 0) - net
+        if any(e.get("kind") == "transfer" for e in removed):
+            g["closed"], g["replacedBy"] = False, ""
+        if not kept and int(g.get("issuedAt") or 0) != IMPORTED_AT:
+            # Only ever used in the beta: back to an unsold card (number, PIN, type and store kept).
+            g.update({"issuedAt": 0, "purchasedBy": "", "issuedTo": "", "customerId": "", "closed": False,
+                      "replacedBy": ""})
+    g["history"] = kept
+    return g, len(removed), net
+
+
+CUSTOMER_CLEARED = {"visits": 0, "spent": 0, "lastVisit": 0, "points": 0, "lifetimePoints": 0, "lastOrder": [],
+                    "lastOrderAt": 0, "accountBalance": 0, "account": []}
+
+
+def clean_customer(c):
+    changed = any(c.get(k, v) != v for k, v in CUSTOMER_CLEARED.items())
+    if not changed:
+        return c, False
+    c = dict(c)
+    c.update({k: (list(v) if isinstance(v, list) else v) for k, v in CUSTOMER_CLEARED.items()})
+    return c, True
+
+
+def clean_settings(s):
+    """-> (settings, what was cleared)."""
+    s, said = dict(s), []
+    promos = s.get("promotions")
+    if isinstance(promos, list) and any(isinstance(p, dict) and p.get("uses") for p in promos):
+        s["promotions"] = [dict(p, uses=0) if isinstance(p, dict) else p for p in promos]
+        said.append("promotions' use counts")
+    for key, label, empty in (("punchChanges", "managers' punch edits", []),
+                              ("checklistTicks", "checklist ticks", []),
+                              ("tableStates", "table states", []),
+                              ("checklistDayId", "checklist day", 0)):
+        if s.get(key) not in (None, empty):
+            s[key] = list(empty) if isinstance(empty, list) else empty
+            said.append(label)
+    return s, said
+
+
+def change_about_transactions(c):
+    if c.get("area") in PUNCH_AREAS:
+        return True
+    return c.get("area") == "Customers" and str(c.get("after", "")).startswith("Forgotten (removed from")
+
+
+# --- the wipe (on the real database, or on a copy for --dry-run) ------------------------------------------
+def wipe(con, next_check, keep_balances, wipe_inventory, now):
+    have = set(tables(con))
+    report = {"cleared": {}, "notes": []}
+    for t in list(WIPED) + (list(INVENTORY_LOG) if wipe_inventory else []):
+        if t in have:
+            con.execute(f'DELETE FROM "{t}"')
+
+    if "gift_cards" in have:
+        cards = touched = entries = 0
+        for number, raw in con.execute("SELECT number, json FROM gift_cards").fetchall():
+            g, n, _ = clean_gift_card(loads(raw), keep_balances, now)
+            cards += 1
+            if n:
+                touched += 1
+                entries += n
+                con.execute("UPDATE gift_cards SET json = ? WHERE number = ?", (dumps(g), number))
+        report["cleared"]["gift_cards"] = f"{touched:,} of {cards:,} cards had beta activity ({entries:,} entries cleared)"
+
+    if "customers" in have:
+        n = 0
+        for cid, raw in con.execute("SELECT id, json FROM customers").fetchall():
+            c, changed = clean_customer(loads(raw))
+            if changed:
+                n += 1
+                con.execute("UPDATE customers SET json = ? WHERE id = ?", (dumps(c), cid))
+        report["cleared"]["customers"] = f"{n:,} customers' visits/spending/points/account cleared"
+
+    if "changes" in have:
+        gone = [cid for cid, raw in con.execute("SELECT id, json FROM changes").fetchall()
+                if change_about_transactions(loads(raw))]
+        con.executemany("DELETE FROM changes WHERE id = ?", [(i,) for i in gone])
+        report["cleared"]["changes"] = f"{len(gone):,} rows about time punches / checks removed"
+
+    if "settings" in have:
+        said = []
+        for key, raw in con.execute("SELECT key, json FROM settings").fetchall():
+            s, what = clean_settings(loads(raw))
+            if what:
+                said += what
+                con.execute("UPDATE settings SET json = ? WHERE key = ?", (dumps(s), key))
+        report["cleared"]["settings"] = ", ".join(said) or "nothing to clear"
+
+    if "menu_items" in have:
+        n = 0
+        for iid, raw in con.execute("SELECT id, json FROM menu_items").fetchall():
+            m = loads(raw)
+            if m.get("ticketsSoldBefore"):
+                m.pop("ticketsSoldBefore")
+                n += 1
+                con.execute("UPDATE menu_items SET json = ? WHERE id = ?", (dumps(m), iid))
+        report["cleared"]["menu_items"] = f"{n:,} event items' tickets sold cleared"
+
+    con.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('next_check_id', ?)", (str(next_check),))
+    con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('transactions_wiped_at', ?)", (str(now),))
+    report["cleared"]["meta"] = f"next_check_id = {next_check}"
+    return report
+
+
+def what_is(table, wipe_inventory):
+    if table in WIPED:
+        return "WIPED", WIPED[table]
+    if table in INVENTORY_LOG:
+        return ("WIPED", INVENTORY_LOG[table]) if wipe_inventory else ("kept", INVENTORY_LOG[table] + " (--wipe-inventory-log)")
+    if table in CLEANED:
+        return "cleaned", CLEANED[table]
+    if table in KEPT:
+        return "kept", KEPT[table]
+    return "kept", "(not known to this tool: left as it is)"
+
+
+def print_table(before, after, wipe_inventory, cleared):
+    print(f"  {'table':<16} {'before':>9} {'after':>9}  ")
+    for t in sorted(before, key=lambda t: (what_is(t, wipe_inventory)[0] != "WIPED", what_is(t, wipe_inventory)[0] != "cleaned", t)):
+        kind, why = what_is(t, wipe_inventory)
+        print(f"  {t:<16} {before[t]:>9,} {after.get(t, 0):>9,}  {kind:<7} {why}")
+        if t in cleared:
+            print(f"  {'':<16} {'':>9} {'':>9}          -> {cleared[t]}")
+
+
+def print_balances(con, keep_balances, limit=200):
+    """Gift cards with a balance and customers with something to clear, before the wipe."""
+    have = set(tables(con))
+    cards = []
+    if "gift_cards" in have:
+        for number, raw in con.execute("SELECT number, json FROM gift_cards"):
+            g = loads(raw)
+            beta = [e for e in g.get("history", []) if isinstance(e, dict) and beta_entry(e)]
+            if int(g.get("balance") or 0) != 0 or beta:
+                cards.append((number, g, sum(int(e.get("amount") or 0) for e in beta)))
+    with_balance = [c for c in cards if int(c[1].get("balance") or 0) != 0]
+    total = sum(int(c[1].get("balance") or 0) for c in with_balance)
+    print(f"Gift cards with a balance now: {len(with_balance):,}, {money(total)} in all"
+          + (" (balances are KEPT: --keep-gift-balances yes)" if keep_balances
+             else " (balances go back to before the beta: --keep-gift-balances no)"))
+    for number, g, net in sorted(cards, key=lambda c: str(c[0]))[:limit]:
+        bal = int(g.get("balance") or 0)
+        after = bal if keep_balances else bal - net
+        print(f"    card {masked(number):<7} {g.get('issuedTo') or g.get('purchasedBy') or '-':<22} balance {money(bal):>10}"
+              f"  beta activity {money(net):>10}  after {money(after):>10}"
+              + ("  (closed)" if g.get("closed") else ""))
+    if len(cards) > limit:
+        print(f"    ... and {len(cards) - limit:,} more (all of them in gift-cards-before-wipe.csv in the backup)")
+    if "customers" in have:
+        busy = []
+        for _, raw in con.execute("SELECT id, json FROM customers"):
+            c = loads(raw)
+            if clean_customer(c)[1]:
+                busy.append(c)
+        owed = [c for c in busy if int(c.get("accountBalance") or 0) != 0]
+        print(f"Customers kept with beta history to clear: {len(busy):,} (visits {sum(int(c.get('visits') or 0) for c in busy):,}, "
+              f"points {sum(int(c.get('points') or 0) for c in busy):,}, house account balances {money(sum(int(c.get('accountBalance') or 0) for c in owed))})")
+        for c in owed[:limit]:
+            print(f"    house account {c.get('name') or '-':<24} owes {money(c.get('accountBalance'))} (cleared to $0.00)")
+    return cards
+
+
+# --- stop, back up, start -----------------------------------------------------------------------------------
+def running():
+    try:
+        return subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+def lock_holder(db):
+    """The process holding ViewTouch's lock on this database (QLockFile: its pid on the first line), or 0."""
+    try:
+        with open(db + ".lock") as f:
+            pid = int((f.readline() or "0").strip() or 0)
+    except (OSError, ValueError):
+        return 0
+    return pid if pid > 0 and pid != os.getpid() and os.path.exists(f"/proc/{pid}") else 0
+
+
+def stop_viewtouch():
+    print("Stopping ViewTouch (it saves first)...")
+    subprocess.run(["pkill", "-TERM", "-x", "vtmodern"])
+    for _ in range(40):
+        if not running():
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def vt_server():
+    here = os.path.join(os.path.dirname(os.path.realpath(__file__)), "vt-server")
+    return here if os.path.exists(here) else "vt-server"
+
+
+def start_viewtouch():
+    print("Starting ViewTouch again (vt-server builds it first)...")
+    return subprocess.call([vt_server()])
+
+
+def folder_size(path, skip):
+    total = 0
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if os.path.join(root, d) not in skip]
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+def backup(data_dir, target, cards_con):
+    """The whole data folder (not its backups/), each .db with SQLite's online backup, checked."""
+    skip = {os.path.join(data_dir, "backups")}
+    need = folder_size(data_dir, skip)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    free = shutil.disk_usage(os.path.dirname(target)).free
+    if free < need * 1.1 + 50 * 1024 * 1024:
+        raise RuntimeError(f"not enough room for the backup: {need // 1048576:,} MB needed, {free // 1048576:,} MB free")
+    os.makedirs(target)
+    dbs = []
+    for root, dirs, files in os.walk(data_dir):
+        dirs[:] = [d for d in dirs if os.path.join(root, d) not in skip]
+        rel = os.path.relpath(root, data_dir)
+        out = os.path.join(target, rel) if rel != "." else target
+        os.makedirs(out, exist_ok=True)
+        for f in files:
+            src = os.path.join(root, f)
+            if f.endswith(("-wal", "-shm", "-journal", ".lock")):
+                continue
+            if f.endswith(".db"):
+                s = sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=10)
+                d = sqlite3.connect(os.path.join(out, f))
+                s.backup(d)
+                d.close()
+                s.close()
+                dbs.append(os.path.join(out, f))
+            else:
+                shutil.copy2(src, os.path.join(out, f))
+    # Label templates live one folder up; small, so they come along.
+    parent = os.path.dirname(data_dir.rstrip("/"))
+    for f in ("label_templates.json", "claude_label_templates.json"):
+        if os.path.isfile(os.path.join(parent, f)):
+            shutil.copy2(os.path.join(parent, f), os.path.join(target, f))
+    for p in dbs:
+        c = sqlite3.connect(p)
+        ok = c.execute("PRAGMA quick_check").fetchone()[0]
+        c.close()
+        if ok != "ok":
+            raise RuntimeError(f"the backup of {os.path.basename(p)} doesn't check out: {ok}")
+    # The gift cards as they were, in full, for the owner's records.
+    with open(os.path.join(target, "gift-cards-before-wipe.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["number", "issued_to", "purchased_by", "balance", "issued_at", "closed", "entries"])
+        if "gift_cards" in tables(cards_con):
+            for number, raw in cards_con.execute("SELECT number, json FROM gift_cards ORDER BY number"):
+                g = loads(raw)
+                w.writerow([number, g.get("issuedTo", ""), g.get("purchasedBy", ""), money(g.get("balance")),
+                            when(g.get("issuedAt")), bool(g.get("closed")), len(g.get("history", []))])
+    return dbs
+
+
+def clear_printouts(data_dir):
+    p = os.path.join(data_dir, "printouts")
+    n = 0
+    if os.path.isdir(p):
+        for root, _, files in os.walk(p):
+            n += len(files)
+        shutil.rmtree(p)
+    return n
+
+
+# --- main ---------------------------------------------------------------------------------------------------
+def main(argv):
+    ap = argparse.ArgumentParser(description="Wipe the beta's transactions from ViewTouch (see the top of this file).")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--next-check", type=int, default=NEXT_CHECK)
+    ap.add_argument("--keep-gift-balances", choices=["yes", "no"], default="yes")
+    ap.add_argument("--wipe-inventory-log", action="store_true")
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--no-start", action="store_true")
+    ap.add_argument("--no-stop", action="store_true")
+    ap.add_argument("--yes", action="store_true")
+    ap.add_argument("--data-dir", default=DATA_DIR)
+    ap.add_argument("--backup-root", default=BACKUP_ROOT)
+    a = ap.parse_args(argv)
+    data_dir = os.path.abspath(os.path.expanduser(a.data_dir))
+    db = os.path.join(data_dir, "viewtouch.db")
+    keep_balances = a.keep_gift_balances == "yes"
+    if a.next_check < 1:
+        sys.exit("--next-check must be 1 or more.")
+    if not os.path.exists(db):
+        sys.exit(f"Can't find ViewTouch's database: {db}")
+    now = int(time.time() * 1000)
+
+    # 1. Look first (read-only; ViewTouch can keep running).
+    ro = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=10)
+    before = counts(ro)
+    opened = open_checks(ro)
+    print(f"ViewTouch data: {db}")
+    print(f"Next check number after the wipe: {a.next_check}")
+    if opened:
+        print(f"Open checks: {len(opened)}" + ("" if a.force else " - close or cancel them in ViewTouch first, or use --force"))
+        print_open(opened)
+    print_balances(ro, keep_balances)
+
+    if a.dry_run:
+        mem = sqlite3.connect(":memory:")
+        ro.backup(mem)
+        ro.close()
+        rep = wipe(mem, a.next_check, keep_balances, a.wipe_inventory_log, now)
+        print("\nDRY RUN: nothing was changed. After the wipe it would be:")
+        print_table(before, counts(mem), a.wipe_inventory_log, rep["cleared"])
+        mem.close()
+        print("\nThe ILSA history (ilsa-history.db) and every other file are left alone.")
+        return 1 if opened and not a.force else 0
+    if opened and not a.force:
+        ro.close()
+        print("Nothing was changed.")
+        return 1
+
+    if not a.yes:
+        if not sys.stdin.isatty():
+            ro.close()
+            sys.exit("Run it in a terminal (it asks you to type WIPE), or add --yes. Nothing was changed.")
+        print(f"\nThis removes every sale and transaction above from ViewTouch (a backup is made first).")
+        if input("Type WIPE to go on: ").strip() != "WIPE":
+            ro.close()
+            print("Nothing was changed.")
+            return 1
+    ro.close()
+
+    # 2. Stop ViewTouch (it saves what's in memory), then look again.
+    stopped = False
+    if a.no_stop:
+        if lock_holder(db):
+            sys.exit(f"ViewTouch (process {lock_holder(db)}) has this database open; nothing was changed.")
+    else:
+        if not stop_viewtouch():
+            sys.exit("ViewTouch didn't stop; nothing was changed.")
+        stopped = True
+
+    def give_up(msg):
+        if stopped and not a.no_start:
+            start_viewtouch()
+        sys.exit(msg + " Nothing was changed.")
+
+    ro = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=10)
+    opened = open_checks(ro)
+    before = counts(ro)
+    if opened and not a.force:
+        print(f"Open checks (saved as ViewTouch stopped): {len(opened)}")
+        print_open(opened)
+        ro.close()
+        give_up("Close or cancel them first, or use --force.")
+
+    # 3. Back up the whole data folder.
+    stamp = time.strftime("%Y-%m-%d_%H%M%S")
+    target = os.path.join(os.path.abspath(os.path.expanduser(a.backup_root)), f"before-wipe-{stamp}")
+    print(f"Backing up {data_dir} to {target} ...")
+    try:
+        dbs = backup(data_dir, target, ro)
+    except Exception as e:
+        ro.close()
+        give_up(f"The backup failed ({e}).")
+    ro.close()
+    print(f"  backed up and checked: {', '.join(os.path.basename(p) for p in dbs)}")
+
+    # 4. Wipe, in one transaction.
+    if not a.no_stop and running():
+        give_up("ViewTouch started again by itself.")
+    con = sqlite3.connect(db, timeout=10, isolation_level=None)
+    try:
+        con.execute("BEGIN EXCLUSIVE")
+        rep = wipe(con, a.next_check, keep_balances, a.wipe_inventory_log, now)
+        after = counts(con)
+        left = [t for t in WIPED if after.get(t)]
+        if left:
+            raise RuntimeError(f"rows still in {', '.join(left)}")
+        con.execute("COMMIT")
+    except Exception as e:
+        try:
+            con.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        con.close()
+        give_up(f"The wipe failed ({e}).")
+    con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    con.execute("VACUUM")
+    con.close()
+    printouts = clear_printouts(data_dir)
+
+    print("\nWiped. Before and after:")
+    print_table(before, after, a.wipe_inventory_log, rep["cleared"])
+    if printouts:
+        print(f"  printouts/: {printouts:,} printer file(s) removed")
+    print(f"\nNew checks start at {a.next_check}. The ILSA history (ilsa-history.db) was not touched.")
+    print(f"Backup: {target}")
+    print(f"To undo: stop ViewTouch, copy {os.path.join(target, 'viewtouch.db')} over {db} "
+          f"(delete viewtouch.db-wal and -shm next to it), run vt-server.")
+    if a.no_start or a.no_stop:
+        print("ViewTouch was not started (--no-start / --no-stop).")
+        return 0
+    return start_viewtouch()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
