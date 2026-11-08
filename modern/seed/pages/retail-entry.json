@@ -423,7 +423,13 @@
           "text": "#ffffff"
         }
       },
-      "actions": []
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "find-check"
+        }
+      ]
     },
     {
       "id": "rtl-void",
@@ -599,7 +605,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "find-item"
+          "page": "item-lookup"
         }
       ]
     },

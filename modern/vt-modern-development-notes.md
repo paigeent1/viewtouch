@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 18:26 ET — Bob (Claude) — Retail: ALPHA LOOK UP opens Item Look Up; ITEM RETURN opens Find a Check; barcode hints
+- **What:** Starter Retail page (seed retail-entry.json): ALPHA LOOK UP now jumps to the Item Look Up page (item-lookup; it opens in ring mode) instead of Find; ITEM RETURN (had no action) now opens Find a Check, where Refund… is. Manager > Menu UPC / Alt UPC hints no longer claim a GS1 check-digit check (since 2026-11-04 only digits and duplicates are checked).
+- **Why:** Found while rebuilding the user manual: the earlier ALPHA LOOK UP change went only into the unused WidgetRetailEntry.qml, ITEM RETURN did nothing, and the hint text was wrong. Owner: fix all three.
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/seed/pages/retail-entry.json`
+- **Next person must know:** A store whose Retail page was edited in the page editor keeps its own buttons (starter updates only reach unedited pages): in that case set ALPHA LOOK UP > Jump to page 'Item Look Up' and ITEM RETURN > Jump to page 'Find a Check' in the editor.
+
 ### 2026-11-08 18:23 ET — Bob (Claude) — vt-manual-shots: manual pictures from this store's own setup
 - **What:** New Pi command scripts/bin/vt-manual-shots: copies the store database (SQLite backup, live ViewTouch untouched), removes customers, gift cards, sales, punches, reports and audit rows from the copy, renames staff Staff 1..n, adds a 'Manual Shots' manager, then runs the existing build offscreen once per page (--data-dir copy --login --page --screenshot) and saves every page to ~/vt-manual-shots/<date>/ and Google Drive 'POS project tmp/manual-shots/<date>/' via rclone.
 - **Why:** Owner wants the user manual's pictures to show the BH retail setup (219 Pi), not the demo restaurant, and a process he can rerun as the program changes.
