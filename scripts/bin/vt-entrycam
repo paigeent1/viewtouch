@@ -1,0 +1,101 @@
+#!/bin/bash
+# Entry Cam: puts one UniFi camera full screen on a Fire TV (or Android TV / tablet), muted,
+# starting by itself on boot and reconnecting by itself. Separate from ViewTouch (app: entrycam/).
+#   vt-entrycam 192.168.1.148                  install or update the app, then show the camera
+#   vt-entrycam 192.168.1.148 --url "rtsp://..."   set (or change) the camera link for that TV
+#   vt-entrycam 192.168.1.148 --restart        just bring the camera back on screen
+# The camera link is the password to the feed: it is kept on this computer in
+# ~/.config/entrycam/<TV address>.url (only you can read it) and on the TV, never in the repo.
+# Use the plain local link: rtsp://192.168.1.1:7447/<token>   (not rtsps://...:7441...?enableSrtp)
+# First, on the Fire TV: Settings > My Fire TV (Device & Software) > Developer options: ADB
+# debugging ON (no Developer options: About, select the device's name 7 times).
+IP="$1"
+if [ -z "$IP" ]; then
+    echo "Usage: vt-entrycam <the TV's IP address> [--url \"rtsp://...\"] [--restart]"
+    exit 1
+fi
+shift
+PORT=5555
+MODE=deploy
+NEWURL=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --url) NEWURL="$2"; shift ;;
+        --port) PORT="$2"; shift ;;
+        --restart) MODE=restart ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+done
+DEV="$IP:$PORT"
+PKG=com.buttheads.entrycam
+APK_URL=https://github.com/paigeent1/viewtouch/releases/download/entrycam-latest/EntryCam.apk
+CONF="$HOME/.config/entrycam"
+URLFILE="$CONF/$IP.url"
+command -v adb >/dev/null 2>&1 || { echo "adb isn't installed on this computer (sudo apt install adb)."; exit 1; }
+
+# The camera link, kept on this computer only.
+mkdir -p "$CONF" && chmod 700 "$CONF"
+if [ -n "$NEWURL" ]; then
+    case "$NEWURL" in
+        rtsps://*) echo "Note: that's the encrypted rtsps link. Use rtsp://192.168.1.1:7447/<token> instead (same token, no ?enableSrtp)." ;;
+    esac
+    printf '%s\n' "$NEWURL" > "$URLFILE" && chmod 600 "$URLFILE"
+fi
+URL=$(cat "$URLFILE" 2>/dev/null)
+if [ -z "$URL" ]; then
+    echo "No camera link saved for $IP yet. Run: vt-entrycam $IP --url \"rtsp://192.168.1.1:7447/<token>\""
+    exit 1
+fi
+
+echo "[1/4] Reaching the TV at $IP..."
+adb disconnect "$DEV" >/dev/null 2>&1
+timeout 15 adb connect "$DEV" >/dev/null 2>&1
+STATE=
+for i in $(seq 1 30); do
+    STATE=$(timeout 10 adb -s "$DEV" get-state 2>&1 | tr -d '\r')
+    [ "$STATE" = device ] && break
+    if echo "$STATE" | grep -qi unauthorized; then
+        [ "$i" = 1 ] && echo "      The TV is asking to let this computer in: choose 'Always allow from this computer', then OK."
+    else
+        timeout 10 adb connect "$DEV" >/dev/null 2>&1
+    fi
+    sleep 2
+done
+if [ "$STATE" != device ]; then
+    echo "Couldn't reach the TV ($STATE). Check it's on, on the network, and ADB debugging is ON."
+    exit 1
+fi
+
+if [ "$MODE" = deploy ]; then
+    echo "[2/4] Downloading the latest Entry Cam..."
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    if ! wget -q -O "$TMP/EntryCam.apk" "$APK_URL" || [ ! -s "$TMP/EntryCam.apk" ]; then
+        echo "Couldn't download $APK_URL (has the GitHub build finished?)."
+        exit 1
+    fi
+    echo "[3/4] Installing it on the TV..."
+    OUT=$(adb -s "$DEV" install -r "$TMP/EntryCam.apk" 2>&1)
+    if echo "$OUT" | grep -q "INSTALL_FAILED_UPDATE_INCOMPATIBLE\|signatures do not match"; then
+        echo "      New signing key: removing the old copy first (the camera link is sent again below)."
+        adb -s "$DEV" uninstall "$PKG" >/dev/null 2>&1
+        OUT=$(adb -s "$DEV" install "$TMP/EntryCam.apk" 2>&1)
+    fi
+    if ! echo "$OUT" | grep -q Success; then
+        echo "Install failed: $OUT"
+        exit 1
+    fi
+    # Keep the Fire TV from covering the camera with its screensaver or going to sleep.
+    adb -s "$DEV" shell settings put system screen_off_timeout 2147483647 >/dev/null 2>&1
+    adb -s "$DEV" shell settings put secure screensaver_enabled 0 >/dev/null 2>&1
+    adb -s "$DEV" shell settings put secure sleep_timeout 0 >/dev/null 2>&1
+else
+    echo "[2/4] (restart only)"
+    echo "[3/4] (restart only)"
+fi
+
+echo "[4/4] Showing the camera..."
+adb -s "$DEV" shell am start -n "$PKG/.MainActivity" --es url "'$URL'" >/dev/null 2>&1 \
+    || { echo "Couldn't start Entry Cam on the TV."; exit 1; }
+echo "Done: Entry Cam is on $IP."
