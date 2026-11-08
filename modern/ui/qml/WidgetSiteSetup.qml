@@ -24,6 +24,7 @@ Item {
         // Typing replaces a field's binding: put the saved values back by hand.
         serverAddrField.text = draft.serverAddr
         serverPortBox.value = draft.serverPort
+        standbyBox.checked = site.standbyAllowed ?? true
         dirty = false
     }
     function set(key, value) { const d = Object.assign({}, draft); d[key] = value; draft = d; dirty = true }
@@ -118,6 +119,20 @@ Item {
                             textFromValue: (v, locale) => String(v)
                             onValueModified: w.set("serverPort", value)
                         }
+                        // Off on a Pi that is its own store: if another computer already runs this store,
+                        // ViewTouch here says so and stops instead of quietly becoming that one's standby.
+                        Switch {
+                            id: standbyBox
+                            objectName: "standbyAllowed"
+                            Layout.fillWidth: true
+                            implicitHeight: 56
+                            font.pixelSize: 16; font.bold: false
+                            enabled: w.admin
+                            text: checked ? qsTr("May become a standby: Yes (a backup for this store's server)")
+                                          : qsTr("May become a standby: No (this computer runs its own store)")
+                            onToggled: w.set("standbyAllowed", checked)
+                        }
+                        Caption { text: qsTr("Takes effect the next time ViewTouch starts here.") }
                     }
                 }
 

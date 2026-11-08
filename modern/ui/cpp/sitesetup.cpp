@@ -1,6 +1,7 @@
 // Site Setup: this Pi's hardware settings (the Hardware Setup page, WidgetSiteSetup.qml), kept in the
 // same files the vt-site / vt-directv scripts read, so the screen and the terminal always agree:
-//   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD
+//   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
+//                                   STANDBY_ALLOWED
 //   ~/.config/viewtouch/tablets     Name|IP per line
 //   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
 // Per Pi, never in Git and not in the database: the store-wide settings (printers, receipts, taxes)
@@ -42,7 +43,15 @@ namespace {
 QString siteDir() { return QDir::home().filePath(u".config/viewtouch"_s); }
 
 const QStringList kSiteKeys{u"SITE_NAME"_s, u"SERVER_ADDR"_s, u"SERVER_PORT"_s, u"SERIAL_SCANNER"_s,
-                            u"SERIAL_SCANNER_BAUD"_s};
+                            u"SERIAL_SCANNER_BAUD"_s, u"STANDBY_ALLOWED"_s};
+
+// STANDBY_ALLOWED (vt-site, VT_STANDBY_ALLOWED for vtmodern): no / off / false / 0 = no; anything
+// else, or not set, = yes.
+bool standbyAllowedValue(const QString &v)
+{
+    const QString s = v.trimmed().toLower();
+    return !(s == u"no"_s || s == u"off"_s || s == u"false"_s || s == u"0"_s);
+}
 
 // KEY="value" lines (comments and anything else skipped).
 QMap<QString, QString> readSiteConf()
@@ -142,6 +151,8 @@ QVariantMap LayoutController::siteSettings() const
                     {u"scanner"_s, conf.value(u"SERIAL_SCANNER"_s)},
                     {u"scannerBaud"_s, conf.value(u"SERIAL_SCANNER_BAUD"_s, u"9600"_s).toInt()},
                     {u"configured"_s, QFile::exists(QDir(siteDir()).filePath(u"site.conf"_s))},
+                    // STANDBY_ALLOWED: not set = yes (servers paired before the setting keep working).
+                    {u"standbyAllowed"_s, standbyAllowedValue(conf.value(u"STANDBY_ALLOWED"_s))},
                     {u"lastScan"_s, lastScan_}, {u"lastScanAt"_s, lastScanAt_}};
     // The serial ports this Pi has now: by their stable names first, then any ttyUSB/ttyACM
     // without one.
@@ -198,6 +209,8 @@ bool LayoutController::saveSiteSettings(const QVariantMap &values)
     take(u"siteName"_s, u"SITE_NAME"_s);
     take(u"serverAddr"_s, u"SERVER_ADDR"_s);
     take(u"scanner"_s, u"SERIAL_SCANNER"_s);
+    if (values.contains(u"standbyAllowed"_s))
+        set.insert(u"STANDBY_ALLOWED"_s, values.value(u"standbyAllowed"_s).toBool() ? u"yes"_s : u"no"_s);
     if (values.contains(u"serverPort"_s)) {
         const int port = values.value(u"serverPort"_s).toInt();
         if (port < 1 || port > 65535) {

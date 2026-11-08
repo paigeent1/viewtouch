@@ -25,6 +25,13 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <algorithm>
+#ifdef Q_OS_UNIX
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 using namespace Qt::StringLiterals;
 using namespace vt;
 using namespace vt::print;
@@ -486,6 +493,90 @@ TEST_CASE("A dead printer never blocks the caller and is reported", "[print]")
     CHECK(failed.first()[0].toString() == u"Dead"_s);
     CHECK(readFile(dir.filePath(u"out.txt"_s)) == u"receipt\n"_s);
 }
+
+#ifdef Q_OS_UNIX
+TEST_CASE("A USB printer in error: never blocks, two tries, then kept for Reprint", "[print][device]")
+{
+    // A pipe stands in for /dev/usb/lp0: nobody reading = the printer won't take data.
+    QTemporaryDir dir;
+    const QString fifo = dir.filePath(u"lp0"_s);
+    REQUIRE(::mkfifo(QFile::encodeName(fifo).constData(), 0600) == 0);
+    CHECK(PrintSpooler::isDevice(fifo));
+    CHECK(PrintSpooler::isDevice(u"/dev/usb/lp9"_s));   // unplugged: still a device
+    CHECK_FALSE(PrintSpooler::isDevice(dir.filePath(u"out.txt"_s)));
+
+    core::PrinterConfig p;
+    p.id = "receipt";
+    p.name = "Epson";
+    p.type = "file";
+    p.path = fifo.toStdString();
+    PrintSpooler spooler;
+    spooler.setTimings(300, 50, 300, 200);   // write time 0.3 s, wait 0.2 s after a failure
+    QSignalSpy printed(&spooler, &PrintSpooler::jobPrinted);
+    QSignalSpy failed(&spooler, &PrintSpooler::jobFailed);
+    QSignalSpy errors(&spooler, &PrintSpooler::printerError);
+
+    // Not taking data: tried twice (with a wait between), then kept and the printer is in error.
+    QElapsedTimer t;
+    t.start();
+    spooler.submit(p, "ticket 1\n", u"Receipt 1"_s);
+    CHECK(t.elapsed() < 100);   // queuing is instant
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK(t.elapsed() >= 190);
+    REQUIRE(failed.size() == 1);
+    CHECK(failed[0][1].toString() == u"Receipt 1"_s);
+    REQUIRE(errors.size() == 1);
+    CHECK(errors[0][0].toString() == u"receipt"_s);
+    CHECK(errors[0][1].toString() == u"Epson"_s);
+    CHECK(errors[0][2].toBool());
+    CHECK(spooler.held(u"receipt"_s) == 1);
+
+    // A new ticket while it's in error: one try (after the wait), then kept too; nothing is re-sent on its own.
+    spooler.submit(p, "ticket 2\n", u"Receipt 2"_s);
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK(failed.size() == 2);
+    CHECK(errors.size() == 1);
+    CHECK(spooler.held(u"receipt"_s) == 2);
+    CHECK(printed.isEmpty());
+
+    // Fixed (someone reads the pipe), then Reprint: both go, in order, and the error clears.
+    const int rd = ::open(QFile::encodeName(fifo).constData(), O_RDONLY | O_NONBLOCK);
+    REQUIRE(rd >= 0);
+    spooler.retryHeld(u"receipt"_s);
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK(printed.size() == 2);
+    CHECK(spooler.held(u"receipt"_s) == 0);
+    REQUIRE(errors.size() == 2);
+    CHECK_FALSE(errors[1][2].toBool());
+    char buf[256];
+    const ssize_t n = ::read(rd, buf, sizeof buf);
+    CHECK(QByteArray(buf, int(std::max<ssize_t>(n, 0))) == "ticket 1\nticket 2\n");
+
+    // Stuck mid-ticket (the printer stops taking data: the pipe fills up): given up after the write time,
+    // the device closed, never a frozen print thread.
+    const QByteArray big(1 << 20, 'x');
+    t.restart();
+    spooler.submit(p, big, u"Big"_s);
+    CHECK(t.elapsed() < 100);
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK(t.elapsed() >= 500);   // two tries of 0.3 s
+    CHECK(failed.size() == 3);
+    CHECK(spooler.held(u"receipt"_s) == 1);
+    REQUIRE(errors.size() == 3);
+    CHECK(errors[2][2].toBool());
+    ::close(rd);
+
+    // A plain file printer beside it is never held up by it.
+    core::PrinterConfig f;
+    f.id = "kitchen";
+    f.name = "File";
+    f.type = "file";
+    f.path = dir.filePath(u"out.txt"_s).toStdString();
+    spooler.submit(f, "kitchen\n", u"kitchen"_s);
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK(readFile(dir.filePath(u"out.txt"_s)) == u"kitchen\n"_s);
+}
+#endif
 
 TEST_CASE("Logo: a picture becomes black-and-white dots, fitted to the paper", "[print][logo]")
 {

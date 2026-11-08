@@ -418,7 +418,73 @@ constexpr int kKioskClosed = 64;
 // server that finds the store already served elsewhere becomes the standby.
 constexpr int kTookOver = 66;
 constexpr int kBecomeStandby = 67;
+// ... unless this computer may not become a standby (vt-site STANDBY_ALLOWED=no, Hardware
+// Configuration > Site Setup; VT_STANDBY_ALLOWED for vtmodern): it says so and stops with this status.
+constexpr int kStandbyRefused = 68;
 bool gServeHeadless = false;
+// VT_STANDBY_ALLOWED: no / off / false / 0 = no; not set (servers paired before the setting) = yes.
+bool standbyAllowed()
+{
+    const QString v = qEnvironmentVariable("VT_STANDBY_ALLOWED").trimmed().toLower();
+    return !(v == u"no"_s || v == u"off"_s || v == u"false"_s || v == u"0"_s);
+}
+// On screen in the store's language; in the log always in English (vt-server looks for it there).
+QString standbyRefusedText(const QString &host, bool translated = true)
+{
+    if (!translated)
+        return u"Another computer is already running this store at %1. This computer is set not to become its "
+               "standby (Hardware Configuration / vt-site)."_s.arg(host);
+    return QCoreApplication::translate("main", "Another computer is already running this store at %1. "
+                                               "This computer is set not to become its standby "
+                                               "(Hardware Configuration / vt-site).").arg(host);
+}
+// The refusal on this computer's screen (when it has one) until someone taps Close, or a minute.
+void showStandbyRefused(const QString &text)
+{
+    if (QGuiApplication::platformName() == u"offscreen"_s || QGuiApplication::platformName() == u"minimal"_s)
+        return;
+    QQmlApplicationEngine engine;
+    engine.setInitialProperties({{u"message"_s, text}});
+    engine.loadData(QByteArrayLiteral(R"(
+import QtQuick
+import QtQuick.Window
+Window {
+    id: win
+    required property string message
+    visible: true
+    visibility: Window.FullScreen
+    color: "#1b1f27"
+    title: "ViewTouch"
+    Column {
+        anchors.centerIn: parent
+        width: Math.min(win.width - 80, 1100)
+        spacing: 36
+        Text {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+            color: "white"
+            font.pixelSize: 30
+            font.bold: true
+            text: win.message
+        }
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 220; height: 72; radius: 12
+            color: "#343c49"
+            Text { anchors.centerIn: parent; text: qsTr("Close"); color: "white"; font.pixelSize: 26 }
+            MouseArea { anchors.fill: parent; onClicked: Qt.quit() }
+        }
+    }
+}
+)"));
+    if (engine.rootObjects().isEmpty())
+        return;
+    QEventLoop loop;
+    QObject::connect(&engine, &QQmlEngine::quit, &loop, &QEventLoop::quit);
+    QTimer::singleShot(60'000, &loop, &QEventLoop::quit);
+    loop.exec();
+}
 // The store's main server answering for `storeId` on the network, if any.
 std::optional<vt::net::FoundServer> findMainServer(const QString &storeId, int waitMs, quint16 port);
 // Seconds without word from the main server before the standby takes over.
@@ -1310,6 +1376,15 @@ int runStore(const Args &cli, const Options &o)
                 shared->saveSettings();
             }
     });
+    // A USB printer that stopped taking tickets: on every screen ("Fix it, then Reprint"); its tickets wait
+    // for the Reprint on that alert instead of being sent again each time it comes back on.
+    QObject::connect(&spooler, &vt::print::PrintSpooler::printerError, shared,
+                     [shared](const QString &id, const QString &name, bool error) {
+        shared->setPrinterProblem(id.toStdString(), error ? "notPrinting" : "");
+        if (error)
+            qWarning().noquote() << "printer:" << name << "is not printing (error at the printer); its tickets wait for Reprint";
+    });
+    shared->reprintHeld = [&spooler](const std::string &id) { spooler.retryHeld(QString::fromStdString(id)); };
     // A ticket that didn't go: ask that printer what's wrong now.
     QObject::connect(&spooler, &vt::print::PrintSpooler::jobFailed, &printerMonitor, [&printerMonitor] { printerMonitor.checkNow(); });
     if (writer) {
@@ -1537,6 +1612,12 @@ int runStore(const Args &cli, const Options &o)
         // while this computer was away)? Then this one becomes the standby.
         if (const auto other = findMainServer(QString::fromStdString(shared->settings.serverId), 1500,
                                                cli.isSet(o.port) ? quint16(cli.value(o.port).toUInt()) : vt::net::DefaultPort)) {
+            if (!standbyAllowed()) {
+                // A Pi that is its own store: never quietly someone else's standby.
+                qCritical().noquote() << standbyRefusedText(other->host, false);
+                showStandbyRefused(standbyRefusedText(other->host));
+                return kStandbyRefused;
+            }
             qWarning().noquote() << "The store is already served by" << other->host
                                  << "- this computer becomes its standby.";
             stepDown(*other);
@@ -1585,10 +1666,21 @@ int runStore(const Args &cli, const Options &o)
         auto *watch = new QTimer(server.get());
         auto *newer = new vt::net::ServerFinder(server.get());
         QObject::connect(newer, &vt::net::ServerFinder::found, server.get(),
-                         [stepDown, shared](const vt::net::FoundServer &f) {
+                         [stepDown, shared, &pos](const vt::net::FoundServer &f) {
             if (f.id != QString::fromStdString(shared->settings.serverId) || f.role != u"main"
                 || f.term <= shared->settings.serverTerm)
                 return;
+            if (!standbyAllowed()) {
+                // Not this computer's job to be a standby: it stops serving (two servers of one store
+                // would split the sales) and says why, instead of quietly becoming the standby.
+                static bool once = false;
+                if (std::exchange(once, true))
+                    return;
+                qCritical().noquote() << standbyRefusedText(f.host, false);
+                say(pos, standbyRefusedText(f.host));
+                QTimer::singleShot(5000, qApp, [] { QCoreApplication::exit(kStandbyRefused); });
+                return;
+            }
             qWarning().noquote() << "The standby at" << f.host << "took over this store;"
                                  << "this computer steps down and becomes its standby.";
             stepDown(f);

@@ -536,7 +536,7 @@ void PosShared::setPrinterProblem(const std::string &printerId, const std::strin
         printerProblems[printerId] = problem;
     // Kept for the managers (paper running low is only a heads-up).
     if (!problem.empty() && problem != "paperLow")
-        if (const PrinterConfig *p = settings.printer(printerId); p && p->watch)
+        if (const PrinterConfig *p = settings.printer(printerId); p && (p->watch || problem == "notPrinting"))
             noteProblem("printer", p->name, problem);
     emit networkChanged();   // every screen's printerAlerts, and Manager -> Network
 }
@@ -546,15 +546,29 @@ QVariantList PosService::printerAlerts() const
     QVariantList out;
     for (const PrinterConfig &p : s_->settings.printers) {
         const auto it = s_->printerProblems.find(p.id);
-        if (it == s_->printerProblems.end() || !p.watch)
+        // Tickets that didn't go (a USB printer in error): shown even when its status isn't watched.
+        if (it == s_->printerProblems.end() || (!p.watch && it->second != "notPrinting"))
             continue;
         const QString name = qs(p.name);
         const std::string &what = it->second;
         const QString text = printerProblemText(name, what);
         out.append(QVariantMap{{u"id"_s, qs(p.id)}, {u"name"_s, name}, {u"problem"_s, qs(what)}, {u"text"_s, text},
-                               {u"urgent"_s, what != "paperLow"}});
+                               {u"urgent"_s, what != "paperLow"}, {u"reprint"_s, what == "notPrinting"}});
     }
     return out;
+}
+
+bool PosService::reprintHeld(const QString &printerId)
+{
+    const PrinterConfig *p = s_->settings.printer(printerId.toStdString());
+    if (!p)
+        return fail(tr("That printer is gone."));
+    if (!s_->reprintHeld)
+        return fail(tr("Reprint isn't available on this computer."));
+    // Sent again now (two tries); if it fails again the alert comes back.
+    s_->reprintHeld(p->id);
+    s_->setPrinterProblem(p->id, {});
+    return true;
 }
 
 QVariantMap PosService::networkInfo() const

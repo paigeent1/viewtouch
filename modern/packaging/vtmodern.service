@@ -17,6 +17,8 @@ Environment=QT_QPA_PLATFORM=offscreen
 ExecStart=/usr/bin/vtmodern --headless --data-dir ${STATE_DIRECTORY} --config /etc/viewtouch/server.conf
 Restart=on-failure
 RestartSec=3
+# 68: another computer runs this store and this one may not become its standby (STANDBY_ALLOWED=no).
+RestartPreventExitStatus=68
 # Give the last writes time to reach the database.
 TimeoutStopSec=30
 

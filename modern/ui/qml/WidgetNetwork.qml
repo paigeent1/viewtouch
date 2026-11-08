@@ -196,6 +196,7 @@ Item {
                                     : modelData.problem === "offlinePaper" ? qsTr("Not answering: probably out of paper")
                                     : modelData.problem === "silent" ? qsTr("Not responding: cover open or out of paper?")
                                     : modelData.problem === "error" ? qsTr("Printer error (paper jam or cutter?)")
+                                    : modelData.problem === "notPrinting" ? qsTr("Not printing (error at the printer): tickets wait for Reprint")
                                     : modelData.status === "ok" ? qsTr("Printed at %1").arg(w.time(modelData.at))
                                     : modelData.status === "failed" ? qsTr("Failed at %1: %2").arg(w.time(modelData.at)).arg(modelData.error)
                                     : qsTr("Nothing printed yet since start-up")

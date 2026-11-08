@@ -476,6 +476,27 @@ TEST_CASE("Printer alerts reach every screen, and go when fixed", "[status][aler
     CHECK(a.printerAlerts().isEmpty());
 }
 
+TEST_CASE("A USB printer in error: the alert says fix it, then Reprint, and Reprint sends its tickets", "[status][alerts]")
+{
+    app::PosShared shared(test::seedPosData(), nullptr);
+    for (core::PrinterConfig &p : shared.settings.printers)
+        if (p.id == "kitchen")
+            p.watch = false;   // its status isn't asked: tickets that didn't go still show
+    app::PosService a(&shared, u"Register"_s);
+    std::vector<std::string> reprinted;
+    shared.reprintHeld = [&](const std::string &id) { reprinted.push_back(id); };
+    shared.setPrinterProblem("kitchen", "notPrinting");
+    REQUIRE(a.printerAlerts().size() == 1);
+    const QVariantMap alert = a.printerAlerts()[0].toMap();
+    CHECK(alert[u"text"_s] == u"Printer Kitchen: not printing (error at the printer). Fix it, then Reprint."_s);
+    CHECK(alert[u"urgent"_s].toBool());
+    CHECK(alert[u"reprint"_s].toBool());
+    REQUIRE(a.reprintHeld(u"kitchen"_s));
+    CHECK(reprinted == std::vector<std::string>{"kitchen"});
+    CHECK(a.printerAlerts().isEmpty());   // back if it fails again
+    CHECK_FALSE(a.reprintHeld(u"nope"_s));
+}
+
 TEST_CASE("Self-order: no onion, light mayo, extra bacon, dressing on the side", "[kiosk][how]")
 {
     app::PosShared shared(test::seedPosData(true), nullptr);

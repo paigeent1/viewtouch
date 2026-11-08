@@ -2,13 +2,14 @@
 # This site's hardware settings (kept on this Pi in ~/.config/viewtouch, never in Git):
 #   vt-site                               show them
 #   vt-site init "Store name"             start them for a new site (keeps what's there)
-#   vt-site set KEY value                 SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD
+#   vt-site set KEY value                 SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
+#                                         STANDBY_ALLOWED (yes / no: may this computer become a standby)
 #   vt-site tablet add "Bar 1" 192.168.1.220
 #   vt-site tablet remove "Bar 1"
 #   vt-site edit                          open the settings in nano
 # Printers, taxes, receipts and the rest are set in ViewTouch itself (Manager); TVs with vt-directv scan --save.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD"
+KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD STANDBY_ALLOWED"
 
 write_template() {
     mkdir -p "$VT_CONF_DIR"
@@ -23,6 +24,15 @@ SERVER_PORT=7719
 SERIAL_SCANNER=""
 SERIAL_SCANNER_BAUD=9600
 EOF
+    # A new store Pi (vt-site init) runs its own store: no. Not written otherwise, and not set = yes,
+    # so servers paired before this setting keep their standby.
+    if [ -n "${2:-}" ]; then
+        cat >> "$VT_SITE_CONF" <<EOF
+# May this computer become the standby of another computer running the same store? no: if one is
+# already running this store, ViewTouch here says so and stops. yes: only on a backup machine.
+STANDBY_ALLOWED="$2"
+EOF
+    fi
 }
 
 case "$1" in
@@ -30,6 +40,7 @@ case "$1" in
         echo "Site: ${SITE_NAME:-(not set: vt-site init \"Store name\")}   settings: $VT_SITE_CONF"
         echo "Server: $(vt_server_addr):$SERVER_PORT"
         echo "Scanner: ${SERIAL_SCANNER:-auto: the serial adapter, first port} at $SERIAL_SCANNER_BAUD baud"
+        echo "May become a standby: ${STANDBY_ALLOWED:-yes (not set)}"
         echo "Tablets:"; t=$(vt_tablets); [ -n "$t" ] && echo "$t" | sed 's/|/  /; s/^/  /' || echo "  (none: vt-site tablet add \"Bar 1\" 192.168.1.x)"
         n=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$VT_CONF_DIR/tvs.json" 2>/dev/null)
         echo "TVs: ${n:-none} (vt-directv list / vt-directv scan --save)" ;;
@@ -38,7 +49,7 @@ case "$1" in
             echo "Already set up ($VT_SITE_CONF); kept as it is."
             [ -n "$2" ] && "$0" set SITE_NAME "$2"
         else
-            write_template "$2"; echo "Started $VT_SITE_CONF"
+            write_template "$2" no; echo "Started $VT_SITE_CONF (this computer runs its own store: STANDBY_ALLOWED=no)"
         fi
         vt_tablets_start
         "$0" show ;;
@@ -46,10 +57,16 @@ case "$1" in
         [[ " $KEYS " == *" $2 "* ]] || { echo "Settings: $KEYS"; exit 2; }
         [ -f "$VT_SITE_CONF" ] || write_template
         val=$(printf '%s' "$3" | tr -d '\042\134\044\140|')   # no quotes, \\, $, backquote or |
+        if [ "$2" = STANDBY_ALLOWED ]; then
+            case "$val" in yes|no) ;; *) echo "STANDBY_ALLOWED is yes or no"; exit 2 ;; esac
+        fi
         if grep -q "^$2=" "$VT_SITE_CONF"; then sed -i "s|^$2=.*|$2=\"$val\"|" "$VT_SITE_CONF"
         else echo "$2=\"$val\"" >> "$VT_SITE_CONF"; fi
         echo "$2=\"$val\""
-        case "$2" in SERIAL_SCANNER*) echo "Restart ViewTouch for the scanner to use it: vt-server" ;; esac ;;
+        case "$2" in
+            SERIAL_SCANNER*) echo "Restart ViewTouch for the scanner to use it: vt-server" ;;
+            STANDBY_ALLOWED) echo "Takes effect the next time ViewTouch starts (vt-start or vt-server)." ;;
+        esac ;;
     tablet)
         case "$2" in
             add) [ -n "$3" ] && [[ "$4" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'vt-site tablet add "Bar 1" 192.168.1.220'; exit 2; }

@@ -888,15 +888,32 @@ ApplicationWindow {
             delegate: Rectangle {
                 required property var modelData
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.min(alertText.implicitWidth + 64, root.width - 32)
-                height: alertText.implicitHeight + 18
+                // A USB printer that stopped taking tickets: Reprint sends them again once it's fixed.
+                readonly property int keyRoom: modelData.reprint ? reprintKey.width + 16 : 0
+                width: Math.min(alertText.implicitWidth + 64 + keyRoom, root.width - 32)
+                height: Math.max(alertText.implicitHeight + 18, modelData.reprint ? 56 : 0)
                 radius: Math.min(height / 2, 24)
                 color: modelData.urgent ? "#e8b83232" : "#e8a86a12"
+                WidgetKey {
+                    id: reprintKey
+                    objectName: "printerReprint-" + parent.modelData.id
+                    visible: parent.modelData.reprint === true
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 110
+                    height: 42
+                    text: qsTr("Reprint")
+                    fontScale: 0.3
+                    baseColor: "#343c49"
+                    onClicked: root.controller.pos.reprintHeld(parent.modelData.id)
+                }
                 Text {
                     id: alertText
                     objectName: "printerAlert-" + parent.modelData.id
                     anchors.centerIn: parent
-                    width: Math.min(implicitWidth, root.width - 80)
+                    anchors.horizontalCenterOffset: -parent.keyRoom / 2
+                    width: Math.min(implicitWidth, root.width - 80 - parent.keyRoom)
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                     text: "🖨  " + parent.modelData.text

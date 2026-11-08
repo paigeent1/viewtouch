@@ -27,6 +27,7 @@ QString PosService::printerProblemText(const QString &name, const std::string &w
            : what == "offline"      ? tr("%1: not answering: check its paper, cover and power (or the network)").arg(name)
            : what == "offlinePaper" ? tr("%1: not answering, probably out of paper (it was running low): put in a new roll and close the cover").arg(name)
            : what == "silent"       ? tr("%1: not responding: check that the cover is closed and it has paper, else turn it off and on").arg(name)
+           : what == "notPrinting"  ? tr("Printer %1: not printing (error at the printer). Fix it, then Reprint.").arg(name)
                                     : tr("%1 has a problem (a paper jam or the cutter?)").arg(name);
 }
 

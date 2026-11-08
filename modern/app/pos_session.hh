@@ -578,6 +578,7 @@ public:
     Q_INVOKABLE void applyMenuTemplate(const QString &id) { invoke(QStringLiteral("applyMenuTemplate"), {id}); }
     Q_INVOKABLE void cardForwarded(const QVariantMap &r) { invoke(QStringLiteral("cardForwarded"), {r}); }
     Q_INVOKABLE void seeCardAlert(const QString &ref) { invoke(QStringLiteral("seeCardAlert"), {ref}); }
+    Q_INVOKABLE void reprintHeld(const QString &printerId) { invoke(QStringLiteral("reprintHeld"), {printerId}); }
     Q_INVOKABLE void undoMenuChange() { invoke(QStringLiteral("undoMenuChange")); }
     // The allergens, [{id, name}] in the screen's language; names of some ids.
     Q_INVOKABLE static QVariantList allergenList();
