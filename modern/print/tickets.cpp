@@ -139,10 +139,15 @@ Document receipt(const Check &check, const TicketContext &ctx)
         const std::string cl = check.closedAt ? " - " + ctx.tr("closed %1", {ctx.dateTime(check.closedAt)}) : "";
         d.text(ctx.tr("Opened %1", {op}) + cl);
     }
+    // The customer: none by default (Store Settings > Receipts > Customer on receipts); a delivery
+    // always shows its address.
     if (!check.customer.empty()) {
-        if (!check.customer.name.empty())
+        const std::string &show = ctx.settings.receiptCustomer;
+        if (show == "full" && !check.customer.name.empty())
             d.columns(check.customer.name, check.customer.phone);
-        if (!check.customer.address.empty())
+        else if (show == "first" && !check.customer.name.empty())
+            d.text(check.customer.name.substr(0, check.customer.name.find(' ')));
+        if (!check.customer.address.empty() && (show == "full" || check.type == CheckType::Delivery))
             d.text(check.customer.address);
     }
     d.rule();
@@ -256,7 +261,7 @@ Document receipt(const Check &check, const TicketContext &ctx)
     if (receiptNeedsPrivacy(check, ctx.settings)) {
         d.blank();
         for (const std::string &l : splitLines(privacyText(ctx.settings, false)))
-            d.text(l);
+            d.small(l);   // the printer's smallest font
     }
     receiptBarcode(d, check, ctx);
     return d;

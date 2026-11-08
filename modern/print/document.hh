@@ -30,6 +30,7 @@ struct Document {
         Align align = Align::Left;
         bool bold = false;
         bool big = false;      // double width and height
+        bool small = false;    // the printer's small font (ESC/POS Font B), e.g. the privacy notice
         std::shared_ptr<const Raster> raster;   // Image: printed centered (plain text skips it)
     };
 
@@ -40,6 +41,8 @@ struct Document {
     Document &text(std::string s, Align a = Align::Left, bool bold = false, bool big = false);
     Document &center(std::string s, bool bold = false, bool big = false) { return text(std::move(s), Align::Center, bold, big); }
     Document &columns(std::string left, std::string right, bool bold = false, bool big = false);
+    // Small print: the printer's smallest font on ESC/POS printers (plain text: as usual).
+    Document &small(std::string s, Align a = Align::Left);
     Document &rule();
     Document &blank();
     Document &image(std::shared_ptr<const Raster> raster);
