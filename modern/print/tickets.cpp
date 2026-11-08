@@ -261,7 +261,7 @@ Document receipt(const Check &check, const TicketContext &ctx)
     if (receiptNeedsPrivacy(check, ctx.settings)) {
         d.blank();
         for (const std::string &l : splitLines(privacyText(ctx.settings, false)))
-            d.small(l);   // the printer's smallest font
+            d.small(l, Document::Align::Center);   // centered, in the printer's smallest font, word-wrapped
     }
     receiptBarcode(d, check, ctx);
     return d;
