@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 14:58 ET — Bob (Claude) — vt-copy-store: skip the other Pi's running marker, socket and pairing files
+- **What:** rsync also skips *.running, control.sock, terminal.json and standby.json (they belong to the other machine).
+- **Why:** Owner 2026-11-08: .225's data folder held .219's viewtouch.db.running, control.sock and terminal.json after the copy.
+- **Files:** (none)
+
 ### 2026-11-08 14:44 ET — Bob (Claude) — Backlog: standby/failover as an option; vt-server start issue
 - **What:** Backlog: site setting to allow or refuse becoming a standby, clear message instead of silent step-down, standby list on Manager > Network; vt-server ending after build without starting (seen on .225).
 - **Why:** Owner 2026-11-08 14:44: failover should be an option, two POS instances can share a network.
