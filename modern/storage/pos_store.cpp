@@ -408,7 +408,7 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
     // --next-check, at the cutover): numbering goes on from it even with no
     // checks saved yet, and after every restart.
     if (q.exec(u"SELECT value FROM meta WHERE key = 'next_check_id'"_s) && q.next())
-        data.lastCheckId = std::max(data.lastCheckId, q.value(0).toLongLong() - 1);
+        data.lastCheckId = std::max<std::int64_t>(data.lastCheckId, q.value(0).toLongLong() - 1);
 
     // Business day: the open one, its closed checks, and recent closed days.
     if (q.exec(u"SELECT COALESCE(MAX(id), 0) FROM business_days"_s) && q.next())
@@ -416,7 +416,7 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
     // A day's number is never used twice: changes kept from days that were
     // wiped (vt-wipe-transactions) still name theirs.
     if (q.exec(u"SELECT COALESCE(MAX(day), 0) FROM changes"_s) && q.next())
-        data.lastDayId = std::max(data.lastDayId, q.value(0).toLongLong());
+        data.lastDayId = std::max<std::int64_t>(data.lastDayId, q.value(0).toLongLong());
     if (q.exec(u"SELECT id, opened_at FROM business_days WHERE closed_at = 0 ORDER BY id DESC LIMIT 1"_s) && q.next())
         data.currentDay = BusinessDay{q.value(0).toLongLong(), q.value(1).toLongLong(), 0};
     const std::int64_t dayStart = data.currentDay ? data.currentDay->openedAt : std::numeric_limits<std::int64_t>::max();
