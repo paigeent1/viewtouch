@@ -707,20 +707,47 @@
 <h2>Gift cards</h2>
 <p class="shot"><img src="shots/m17-gift-card.png" width="560" height="315"></p>
 <p class="caption">Gift cards: type or swipe the number to see the balance and history.</p>
+<!-- SHOT: the Gift Card screen with Transfer / Replace Card… and Cash Out under the balance, Pay the Check from This Card at the bottom (page gift-card) -->
 <ul>
 <li><b>Sell</b> or <b>Reload</b>: choose an amount; the card goes on the check and works once that check is paid. No number? One is made up and printed on the receipt.</li>
-<li><b>Pay the Check from This Card</b> takes as much as the card holds.</li>
+<li><b>Pay the Check from This Card</b> takes as much as the card holds. It sits alone at the bottom, in the middle (or <b>Add Customer…</b> / <b>Bypass &amp; Pay Now</b> there). <b>Transfer / Replace Card…</b> and <b>Cash Out</b> are under the balance.</li>
 <li><b>Cash Out</b>: some states make a small balance redeemable in cash when the guest asks (California: under $10). With the store's state chosen (Store Settings → Staff hours), the button shows for such a card; the cash comes out of the drawer (or your bank) as a recorded pay out, and the card is empty. Gift cards never expire.</li>
 </ul>
 
-<h3>Split First &amp; Last Name Customer Profiles &amp; Closed-Check Assignment</h3>
-<p>Customer records in <b>Manager → Customers</b> and <b>Check Options → Customer</b> use split <b>First Name</b> and <b>Last Name</b> fields with cumulative visit and spend tracking.</p>
+<h3>Who bought it, who it's for, and where</h3>
+<ul>
+<li><b>Purchased By</b> is the customer on the check. With no customer on it, <b>Sell</b> asks: <b>Add Customer…</b> or <b>Sell Without Customer</b>.</li>
+<li><b>Purchased For</b> (<i>Optional: who it's for</i>) is typed on the Gift Card screen.</li>
+<li>Every sale and reload records where it happened: Store Settings → The store → <i>Gift card location</i> (for example "Hat City Ale House"; empty means the store's name). The card's history says <i>Sold on check #12 at</i> that place, and the Gift Card screen shows <i>Issued at:</i>.</li>
+<li>The search box finds a card by its number, Purchased By or Purchased For.</li>
+<li>Cards imported from PatronPal keep their old <b>Purchased By</b> and <b>Issued To</b> names.</li>
+</ul>
 
-<h3>Gift Cards: Reload, Cash-Out Threshold &amp; 8-Column Report Views</h3>
-<p>On the <b>Gift Card</b> screen (<code>m17-gift-card.png</code>), staff can sell a new card, <b>Reload</b> an existing card, check its balance and transaction history, or <b>Cash Out</b> a low remaining balance when it falls below the store's cash-out threshold (<code>giftCardCashBelowCents</code> in Store Settings). Legacy cards imported from PatronPal also retain their historical <b>Purchased By</b> and <b>Issued To</b> names.</p>
+<h3>Card numbers and subscription cards</h3>
+<ul>
+<li>Card numbers starting with <b>6</b> are gift cards; numbers starting with <b>9</b> are subscription cards.</li>
+<li>A new 12-digit card number must pass its check digit, so a mistyped number is caught. A number made up for a card sold without one is 6, ten random digits and a check digit.</li>
+<li>A new subscription card can't be sold without its customer on the check: <i>Subscription card: put its customer on the check first (Customers…)</i>. The card is then linked to that customer, and showing it on a later check puts that customer on the check (for subscription promotions, chapter 11).</li>
+</ul>
+
+<h3>Moving a balance to a new card (managers)</h3>
+<ol>
+<li>On the Gift Card screen, look up the old card and touch <b>Transfer / Replace Card…</b> beside the balance.</li>
+<li>Choose or swipe the new card.</li>
+<li>Touch <b>Move Balance (Manager)</b>.</li>
+</ol>
+<p>The whole balance moves (up to $2,000), with the PIN, the kind of card and the names. The old card is closed for good: it can't be paid with or reloaded. Both cards' history shows the move.</p>
+
+<h3>Gift card PINs</h3>
+<p>Only managers see a card's PIN. Everyone else sees ••••, the search doesn't match PINs for them, and the gift card reports print •••• in the PIN column.</p>
+
+<h3>First and last names</h3>
+<p>Customer records in <b>Manager → Customers</b> and <b>Check Options → Customer</b> use separate <b>First Name</b> and <b>Last Name</b> fields, with their visits and spending added up.</p>
+
+<h3>The Gift Cards report</h3>
 <p class="shot"><img src="shots/m48-report-gift-cards.png" width="560" height="315"></p>
 <p class="caption">Reports → Gift Cards: 8-column report with Summary, Activated, Active Balances, Inactive, and Transactions views.</p>
-<p>In <b>Manager → Reports → Gift Cards</b>, the report provides five dedicated views—<b>Summary</b>, <b>Activated</b>, <b>Active Balances</b>, <b>Inactive</b>, and <b>Transactions</b>—and its card lists have eight columns: Card #, PIN, First Name, Last Name, Purchased By (Customer), Sold By, Status / Date and Balance.</p>
+<p>In <b>Manager → Reports → Gift Cards</b>, the report provides five dedicated views—<b>Summary</b>, <b>Activated</b>, <b>Active Balances</b>, <b>Inactive</b>, and <b>Transactions</b>—and its card lists have eight columns: Card #, PIN (for managers only), First Name, Last Name, Purchased By (Customer), Sold By, Status / Date and Balance.</p>
 
 <h2>House accounts</h2>
 <p>A manager turns on a house account for a customer (with an optional limit). Put the customer on the check, then touch <b>House Account</b> on the payment screen. Payments on the account (cash or card) are taken on the Customers screen.</p>
@@ -787,6 +814,15 @@
 </ul>
 <p>Kitchen, bar and expo screens need no login. Open them from the Manager screen, or set a screen to start on them.</p>
 <p>The kitchen screen also has <b>Waste…</b> (log what was thrown away) and <b>Labels…</b> (print prep labels), both chapter 11. Nobody needs to log in: they're signed by the screen.</p>
+<p>A kitchen screen can only be set to one of the store's stations (Store Settings → <i>Kitchen stations</i>). A line sent to a station that has no printer prints no ticket; it doesn't go to the kitchen printer instead.</p>
+
+<h2>The humidor runner</h2>
+<p>A retail item (a cigar, a single from a box, or anything taxed as Merchandise) rung on a bar or table check goes to:</p>
+<ul>
+<li>a printer named "humidor" (or with the id humidor), or</li>
+<li>a kitchen station named <b>Humidor</b> (Store Settings → <i>Kitchen stations</i>), on its screen.</li>
+</ul>
+<p>With neither, it prints nowhere and shows on no screen: it never goes to the kitchen. Where it goes is decided when it's rung in. Items rung on the Retail screen are handed over at the counter and go nowhere.</p>
 
 <!-- ======================================================================= -->
 <h1>10. Cash: banks, drawers and tips</h1>
@@ -810,7 +846,23 @@
 <li><b>Bills and coins</b> (Store Settings → Cash): the store's list, largest first. $100 to 1¢ to start; for pesos, for example, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.50.</li>
 </ul>
 <h2>Pay outs, paid ins and No Sale</h2>
-<p>On the Drawer page a manager types the amount, touches <b>Reason…</b> (optional), then <b>Pay Out</b> or <b>Paid In</b>. A pay out is an expense: first touch what it was for (Food &amp; supplies, Produce, Ice, Cleaning, Repairs, Other; Store Settings → <i>Expense categories</i> sets the list). Reports → <b>Expenses</b> adds them up. <b>No Sale</b> opens the drawer.</p>
+<p>On the Drawer page a manager types the amount, touches <b>Reason…</b> (optional), then <b>Pay Out</b> or <b>Paid In</b>. A pay out is an expense: first touch what it was for (Food &amp; supplies, Produce, Ice, Cleaning, Repairs, Other; Store Settings → <i>Expense categories</i> sets the list). Reports → <b>Expenses</b> adds them up.</p>
+<h3>No Sale</h3>
+<ol>
+<li>Touch <b>NO SALE</b> (on the Retail screen, on Cashier Duty, or on the Drawer page).</li>
+<li>It asks <b>Why open the drawer?</b> Touch a reason (to start: Make Change, Forgot to put cash in, Retrieved Item, Other). <b>Cancel</b> keeps the drawer shut.</li>
+<li>The drawer opens, and a slip prints on the drawer's printer: <b>****No Sale****</b>, the day's No Sale number, the drawer, who, why, the date and the time.</li>
+</ol>
+<p>Managers: the reasons are in Store Settings → <b>Voids, comps, No Sale and Cancel Sale</b> → <i>Reasons for No Sale</i>. An empty list turns the question off. The Exceptions report has a <i>No sale: why</i> section.</p>
+<!-- SHOT: the Why open the drawer? reasons -->
+
+<h2>X Report: the day so far</h2>
+<p>An X report prints <b>X REPORT</b> on the receipt printer: today's Sales report and the Drawer report so far. Nothing resets; End of Day is still the Z. Anyone allowed to open the drawer can print it:</p>
+<ul>
+<li>Retail → <b>CASHIER DUTY</b> → <b>X REPORT (print, nothing reset)</b>, or</li>
+<li>Reports (today) → <b>X Report</b>.</li>
+</ul>
+<p>The Retail screen's <b>CASHIER DUTY</b> page also has the drawer, No Sale, past receipts, open checks and the time clock (chapter 19).</p>
 <h2>Tips</h2>
 <ul>
 <li>Card tips are owed to the server; <b>Cash Out My Tips</b> pays them from the bank or drawer.</li>
@@ -824,6 +876,8 @@
 <p class="shot"><img src="shots/m30-manager.png" width="560" height="315"></p>
 <p class="caption">The Manager screen (PIN 1234).</p>
 <p><b>Network…</b> shows the store's computers and printers (chapter 18), and <b>Self-Order Kiosk</b> turns this screen into a kiosk for guests (chapter 16).</p>
+<!-- SHOT: the store's Manager screen with System Config, Label Utility, Store Setup and Displays (page manager) -->
+<p>This edition's Manager screen also has <b>System Config</b> (opens Hardware Configuration), <b>Label Utility</b> (chapter 20), <b>Store Setup</b> and <b>Displays</b> (the kitchen, bar and expo screens). Hardware Configuration has <b>Terminals</b>, <b>Printers</b>, the tablet buttons, <b>Learn guest touchscreen (2x Tap)</b>, <b>Site Setup</b>, <b>Bluetooth scanner</b>, <b>Screen check</b> and <b>Billboards</b> (chapter 30, Site Setup, Hardware Configuration and Screen check). A store whose Hardware Configuration or Reports page was edited gets these new buttons once, by itself.</p>
 <p>Every Manager screen works the same way: the list on the left, the details on the right. Touch a record, change it, touch <b>Save</b> (or <b>Undo changes</b>). <b>+ Add</b> makes a new one; <b>Remove</b> deletes it.</p>
 
 <h2>Building the menu (Menu Builder)</h2>
@@ -833,13 +887,19 @@
 <li><b>Items</b> (middle): the category's items as tiles. <b>+ Add Item</b>, or touch an item to change it. Hold an item and drag it to another place: the order screens follow.</li>
 <li><b>The item's card</b> (right): name, price, category, photo, sold out, on the kiosk or not. <b>What's on it</b>: type the ingredients it comes with, separated by commas (<i>lettuce, tomato, onion, mayo</i>); guests and staff can then have each No, Light, Extra or On the side. <b>Choices it asks for</b>: touch the choice groups it should ask for (Temperature, Side, Dressing…). <b>Add to the Menu</b> / <b>Save</b> are always at the bottom. <b>More…</b> opens every setting (kitchen name, prices by meal, takeout price, recipe…) in Manager → Menu.</li>
 <li><b>Add Several…</b> (beside the category's name): type or paste a list, one per line or separated by commas, each with its price: <i>Carne Asada 3.50</i>, <i>Al Pastor $3.25</i>, <i>Lengua 4,25</i>. A line starting with a category's name and a colon puts what follows there, and makes the category if it's new: <i>Drinks: Horchata 2.75, Agua Fresca 2.50</i>. It shows what it will add before you touch <b>Add</b>.</li>
-<li><b>Import…</b> (under the categories): a menu from a spreadsheet. In Excel, Google Sheets or LibreOffice, save it as CSV (File → Save As / Download → CSV) onto a USB stick or this computer, then choose it. A first row with column names is read by name: <i>Name</i> or <i>Item</i>, <i>Price</i>, <i>Category</i> or <i>Section</i>, <i>Description</i>, <i>Ingredients</i> (Spanish names work too); without one, the columns are name, price, category. Prices like <i>$3.50</i> or <i>3,50</i> are fine. A <i>Photo</i> (or <i>Foto</i>) column names a picture file for each item, like <i>fish-tacos.jpg</i>: put the pictures in the same folder as the spreadsheet (on the USB stick too). Rows whose picture isn't there come in without one, and the preview says which. It shows what it will add, and which rows it leaves out and why, before <b>Import</b>; new categories are made, items already on the menu are skipped, or get the file's price if you turn that on.</li>
+<li><b>🏷 Retail screen only</b> (a category's switch): its items are sold on the Retail screen only (scanned or looked up) and left off the bar and restaurant menus and order screens. The ILSA price book's departments come in with it on (chapter 27).</li>
+<li><b>🚫 No discounts</b> (on an item, or on a category for all its items): discounts never come off those items, fixed-amount ones included (cigarettes, say). The receipt and the Pay screen show what each discount really took.</li>
+<li><b>Cigar size</b> (retail items): <i>Length</i> (type 6 1/8, 6-1/8, 6.125, 6⅛ or ILSA's "6+"; it shows as 6 1/8), <i>Ring gauge</i>, and a second ring gauge for shapes like a 52/60 diadema. Labels can print them (chapter 20).</li>
+<li><b>Maker, Product group and Sub group</b> (items) and a department group (categories): the Labels screen and the label utility use them to sort the tree.</li>
+<li><b>Import…</b> (under the categories): a menu from a spreadsheet. In Excel, Google Sheets or LibreOffice, save it as CSV (File → Save As / Download → CSV) onto a USB stick or this computer, then choose it. A first row with column names is read by name: <i>Name</i> or <i>Item</i>, <i>Price</i>, <i>Category</i> or <i>Section</i>, <i>Description</i>, <i>Ingredients</i> (Spanish names work too); without one, the columns are name, price, category. Prices like <i>$3.50</i> or <i>3,50</i> are fine. A <i>Photo</i> (or <i>Foto</i>) column names a picture file for each item, like <i>fish-tacos.jpg</i>: put the pictures in the same folder as the spreadsheet (on the USB stick too). Rows whose picture isn't there come in without one, and the preview says which. It shows what it will add, and which rows it leaves out and why, before <b>Import</b>; new categories are made, items already on the menu are skipped, or get the file's price if you turn that on.
+<br>Retail columns read too: <i>Cost</i> (the store's cost, never the price; the preview shows it beside the price), <i>Barcode</i> or <i>UPC</i>, <i>More UPCs</i>, <i>Item #</i>, <i>Tax</i>, <i>Maker</i>, <i>Product group</i>, <i>Sub group</i>, <i>Prints to</i> (blank: no printer), and the cigar sizes (<i>Length</i>, <i>Ring gauge</i> or <i>RG</i>, <i>Ring gauge 2</i> or <i>RG2</i>). An 11-digit UPC also gets its 12-digit form. Importing again finds an item by its first UPC before its name. (The ILSA price book keeps itself up to date and needs no import: chapter 27.)</li>
 <li><b>Export</b>: the whole menu as one file (in <i>ViewTouch Exports</i>, or the folder set for exports): its categories, choice groups and items with every setting. At another store, <b>Import…</b> that file: what that store doesn't have by name is added, with its choices; nothing it has changes. Photos go along in the file; sales counts and stock recipes stay with each store.</li>
 <li><b>Print…</b> (beside Import… and Export): the menu with today's prices as a PDF, to print or hand out (in <i>ViewTouch Exports</i>). Type a title and a line under it (address, hours), choose 1 or 2 columns, Letter or A4, with or without pictures and descriptions, and which categories. The first page shows as it will print. Sizes print with their prices; sections from the Menu Builder print as small headings. Make a new one after prices change.</li>
 <li><b>Starter…</b>: a Taqueria, Café, Burgers &amp; Bar or Pizza menu: its categories, choice groups (salsas, sizes, milks, how it's cooked…) and items with typical prices and what's on them, added to your menu; nothing already on it changes. Then change the prices and names to yours.</li>
 <li><b>Duplicate</b> (on an item's card) makes a copy right after it, with its choices and what's on it, named <i>Fish Tacos 2</i>: change its name and price and save.</li>
 <li><b>Choice Groups</b> (the switch at the top left): every group of choices, how many items ask for it, and <b>+ Choice Group</b>. A group has a name; how many guests pick (<b>One</b>, <b>Up to…</b>, <b>Any number</b>) and whether it's <b>Required</b>; whether guests can ask for a choice <b>Light, Extra or On the side</b> (dressings, toppings; not temperatures or sizes); and its options, a row each: name, what it adds to the price, and <b>Comes on it</b> for what's already on the item. ▲ ▼ reorder them, ✕ removes one, <b>+ Option</b> adds one. It lists which items ask for it. <b>+ New Choice Group…</b> on an item's card opens it too.</li>
-<li><b>✓ Ready to go</b> / <b>⚠ 3 to fix</b> (top left) checks the menu for what would trip up service: an item with no price or category, a choice group it asks for that's gone, a kitchen printer that isn't set up, two items with the same name, a required choice group with too few options, a category on a meal period that isn't set up, and (as notes) empty categories. Touch one to go straight to it.</li>
+<li><b>✓ Ready to go</b> / <b>⚠ 3 to fix</b> (top left) checks the menu for what would trip up service: an item with no price or category, a choice group it asks for that's gone, a kitchen printer that isn't set up, two items with the same name, a required choice group with too few options, a category on a meal period that isn't set up, and (as notes) empty categories. Touch one to go straight to it. Retail-only categories give two summary lines instead (how many $0.00 items, how many same-name items to look over), not a line per item.</li>
+<li><b>A big price book:</b> only the open category's items (and what a search finds) are loaded, so the Menu Builder stays quick with 30,000 items. A second touch on <b>Import…</b>, <b>Starter…</b> or <b>+ Category</b> closes what the first opened. A new item's card turns into the saved item when you save it.</li>
 <li><b>↶ Undo</b> (top left, under the check) takes back the last change: a removed item, a moved category, an import or a starter menu as a whole; again for the one before (up to 20). If the menu was changed elsewhere since (another screen, Manager → Menu), it says so and doesn't undo over that change.</li>
 <li>Touching another item, category or choice group with changes not saved asks <b>Save</b>, <b>Don't Save</b> or <b>Keep Editing</b>. <b>+ New Choice Group…</b> on an item's card comes back to the item once the group is added, with it chosen (<b>‹ item</b> goes back without one). Prices can be typed 3.50, $3.50 or 3,50.</li>
 <li><b>Contains</b> (an item's card): its allergens (gluten, dairy, egg, peanut, tree nuts, soy, fish, shellfish, sesame).</li>
