@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 12:49 ET — Bob (Claude) — vt-install: ViewTouch starts at boot on new Pis
+- **What:** vt-install step 6 links vt-start and writes ~/.config/autostart/ViewTouch.desktop and ~/Desktop/ViewTouch.desktop with Exec=/usr/local/bin/vt-start (the 2026-11-05 note's open item).
+- **Why:** Owner 2026-11-08: the new HCA Pi (.225) didn't start ViewTouch after a reboot.
+- **Files:** (none)
+
 ### 2026-11-08 11:59 ET — Bob (Claude) — vt-copy-store: a new site Pi starts as a copy of another
 - **What:** New scripts/bin/vt-copy-store OTHER-PI (run on the new Pi): SQLite online backups of the other Pi's databases (it keeps running), rsync of its data folder (pictures etc.), this Pi's old data moved aside to ~/vt-data-before-copy-<time>, copy put in place, vt-server. Site file ~/.config/viewtouch (devices, paired tablets, billboards) is not copied.
 - **Why:** Owner 2026-11-08: the new HCA Pi starts identical to Danbury (vt-bhdan-pi, .219).

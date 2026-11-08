@@ -46,7 +46,15 @@ if [ ! -f modern/build/build.ninja ]; then
     cmake -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 fi
 
-step "6. This site's settings (vt-site)"
+step "6. Start ViewTouch at every boot, and a desktop shortcut (vt-start)"
+sudo ln -sf "$HOME/viewtouch-main/scripts/bin/vt-start" /usr/local/bin/vt-start
+mkdir -p "$HOME/.config/autostart" "$HOME/Desktop"
+for f in "$HOME/.config/autostart/ViewTouch.desktop" "$HOME/Desktop/ViewTouch.desktop"; do
+    printf '[Desktop Entry]\nType=Application\nName=ViewTouch\nExec=/usr/local/bin/vt-start\nTerminal=false\n' > "$f"
+done
+chmod +x "$HOME/Desktop/ViewTouch.desktop"
+
+step "7. This site's settings (vt-site)"
 if [ -n "$SITE" ]; then vt-site init "$SITE" >/dev/null; else vt-site init >/dev/null; fi
 vt-site
 
