@@ -16,7 +16,6 @@ import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
@@ -193,7 +192,7 @@ public class MainActivity extends Activity {
         }
 
         @Override
-        public void onPlayerError(@NonNull PlaybackException error) {
+        public void onPlayerError(PlaybackException error) {
             restart("No signal");
         }
     };

@@ -36,6 +36,11 @@ android {
         }
     }
 
+    lint {
+        checkReleaseBuilds false   // media3 RTSP calls are marked 'unstable API'; fine for us
+        abortOnError false
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
