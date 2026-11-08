@@ -125,6 +125,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **What:** The 5-line launcher uses $HOME/viewtouch-main and the running user's id for XDG_RUNTIME_DIR instead of /home/pi and uid 1000 (still 5 lines; reinstall copies it to /usr/local/bin as before).
 - **Why:** The new HCA Pi may use a username other than pi; this was the only hard-coded /home/pi in scripts.
 - **Files:** (none)
+### 2026-11-08 10:35 ET — Bob (Claude) — ILSA self-check: tax rate by date; ILSA journal gaps labelled; explain-receipts by department and journal tables
+- **What:** --recheck adds, per store: (1) Tax rate by date: each sales receipt's tax against the CT rate of its day (6% to 2011-06-30, 6.35% from 2011-07-01) on its taxable lines (items and promotions, lottery out), a cent a line of rounding; less tax counts as tax-exempt lines; more, or the other period's rate, is listed (tax-rate-<store>-<time>.csv). (2) ILSA journal gaps: sales receipts ILSA wrote only in part (tenders but no lines, lines but no tenders, a total with no lines) counted per store; a Z's difference that such receipts may explain is labelled 'ILSA journal gap?' (never forced to match; amounts kept as imported). --explain-receipts also lists the export's journal / log / error / void / suspend / hold tables (names, rows, columns; no values) and tests PDetail line codes by department.
+- **Why:** Owner 2026-11-08: CT tax rates by date; the stores never charged bag fees or deposits, so the receipts' extra amounts are something else; ILSA had journal writing errors over the years.
+- **Files:** `scripts/bin/vt-ilsa-history`
+- **Next person must know:** Read-only findings until the owner's --explain-receipts and --recheck --dry-run output is in.
 
 ### 2026-11-07 22:52 ET — Bob (Claude) — Notes: ViewTouch check numbering (HCA/BHD/BHG, from 100001)
 - **What:** Transition checklist: ViewTouch prefixes HCA, BHD, BHG with 6-digit check numbers from 100001; ILSA history keeps BHDAN/BHNM; cutover step sets next check number.
