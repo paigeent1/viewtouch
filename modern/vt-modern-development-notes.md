@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 10:43 ET — Bob (Claude) — vt-label-utility launcher: any Pi user, not only pi
+- **What:** The 5-line launcher uses $HOME/viewtouch-main and the running user's id for XDG_RUNTIME_DIR instead of /home/pi and uid 1000 (still 5 lines; reinstall copies it to /usr/local/bin as before).
+- **Why:** The new HCA Pi may use a username other than pi; this was the only hard-coded /home/pi in scripts.
+- **Files:** (none)
+
 ### 2026-11-07 22:52 ET — Bob (Claude) — Notes: ViewTouch check numbering (HCA/BHD/BHG, from 100001)
 - **What:** Transition checklist: ViewTouch prefixes HCA, BHD, BHG with 6-digit check numbers from 100001; ILSA history keeps BHDAN/BHNM; cutover step sets next check number.
 - **Why:** Owner 2026-11-07 22:51.
