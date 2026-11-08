@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 16:54 ET — Bob (Claude) — Entry Cam moved out of GitHub
+- **What:** Removed entrycam/, .github/workflows/entrycam-android.yml and scripts/bin/vt-entrycam (revert of 861a6a0 and cc6875e) and deleted the release entrycam-latest. Entry Cam now lives in Dropbox > POS project > Entry Cam (app, source, install script).
+- **Why:** Owner's decision: the camera / video integration stays out of GitHub and in the POS project Dropbox.
+- **Files:** `.github/workflows/entrycam-android.yml`, `entrycam/.gitignore`, `entrycam/app/build.gradle`, `entrycam/app/src/main/AndroidManifest.xml`, `entrycam/app/src/main/java/com/buttheads/entrycam/BootReceiver.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/MainActivity.java`, `entrycam/app/src/main/java/com/buttheads/entrycam/WatchService.java`, `entrycam/app/src/main/res/drawable-xhdpi/banner.png`, `entrycam/app/src/main/res/drawable-xhdpi/icon.png`, `entrycam/app/src/main/res/layout/main.xml`, `entrycam/app/src/main/res/values/strings.xml`, `entrycam/app/src/main/res/values/styles.xml`, `entrycam/build.gradle`, `entrycam/gradle.properties`, `entrycam/settings.gradle`, `scripts/bin/vt-entrycam`
+
 ### 2026-11-08 16:47 ET — Bob (Claude) — Entry Cam: fix first build
 - **What:** Removed an androidx.annotation import that isn't on the classpath; release lint check off (media3 RTSP is marked unstable API).
 - **Why:** First GitHub build of Entry Cam failed to compile.
