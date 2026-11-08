@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 11:59 ET — Bob (Claude) — vt-copy-store: a new site Pi starts as a copy of another
+- **What:** New scripts/bin/vt-copy-store OTHER-PI (run on the new Pi): SQLite online backups of the other Pi's databases (it keeps running), rsync of its data folder (pictures etc.), this Pi's old data moved aside to ~/vt-data-before-copy-<time>, copy put in place, vt-server. Site file ~/.config/viewtouch (devices, paired tablets, billboards) is not copied.
+- **Why:** Owner 2026-11-08: the new HCA Pi starts identical to Danbury (vt-bhdan-pi, .219).
+- **Files:** (none)
+
 ### 2026-11-08 11:01 ET — Bob (Claude) — Touch to Wake: the Store Settings logo on tablets too
 - **What:** Main.qml screen saver logo now uses the store logo from Store Settings (pos.imageUrl("logo:"), the same picture as the login page's logo zone, following changes) on every screen; on a tablet it falls back to the copy in its app folder, then the built-in assets/images/store-logo.png. Before, tablets always used the app-folder copy or the built-in picture (the old Hat City logo), so a new Store Settings logo never reached Touch to Wake.
 - **Why:** Owner 2026-11-08: tablet login showed the new Coyote logo, Touch to Wake still the old Hat City one.

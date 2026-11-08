@@ -1,0 +1,40 @@
+#!/bin/bash
+# Make this Pi's ViewTouch an exact copy of another store Pi's (items, prices, staff, pages, settings,
+# pictures, the ILSA history file), e.g. a new site starting from Danbury. Run on the NEW Pi:
+#   vt-copy-store 192.168.1.219
+# It asks for the other Pi's password (ssh). The other Pi keeps running: its databases are copied
+# with SQLite's online backup, so the copy is consistent. This Pi's own ViewTouch data is moved
+# aside first to ~/vt-data-before-copy-<time> (nothing is deleted), then ViewTouch starts again.
+# Not copied: this Pi's site file (~/.config/viewtouch: printers' devices, scanner, screens, paired
+# tablets and billboards stay this Pi's own).
+FROM="$1"
+[ -n "$FROM" ] || { echo "usage: vt-copy-store OTHER-PI-ADDRESS (e.g. 192.168.1.219)"; exit 2; }
+DATA="$HOME/.local/share/ViewTouch/ViewTouch"
+REMOTE_DATA='.local/share/ViewTouch/ViewTouch'   # relative to the other Pi's home
+STAGE="$HOME/vt-copy-incoming"; WHEN=$(date +%Y-%m-%d_%H%M%S)
+command -v rsync >/dev/null || sudo apt-get install -y rsync >/dev/null
+echo "1/4 Copying the databases on $FROM (it keeps running)..."
+ssh "pi@$FROM" "python3 - <<'PY'
+import os, sqlite3, glob
+d = os.path.expanduser('~/.local/share/ViewTouch/ViewTouch'); out = os.path.expanduser('~/vt-copy-outgoing')
+os.makedirs(out, exist_ok=True)
+for p in glob.glob(os.path.join(d, '*.db')):
+    dst = os.path.join(out, os.path.basename(p))
+    if os.path.exists(dst): os.remove(dst)
+    src = sqlite3.connect(p); tgt = sqlite3.connect(dst); src.backup(tgt); tgt.close(); src.close()
+    print('   ', os.path.basename(p), os.path.getsize(dst) // 1048576, 'MB')
+PY" || { echo "Couldn't reach $FROM or copy its databases."; exit 1; }
+echo "2/4 Bringing them and the store's pictures here..."
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+rsync -a --info=stats1 --exclude '*.db' --exclude '*.db-wal' --exclude '*.db-shm' --exclude '*.db-journal' \
+    "pi@$FROM:$REMOTE_DATA/" "$STAGE/" || { echo "Copy failed."; exit 1; }
+rsync -a "pi@$FROM:vt-copy-outgoing/" "$STAGE/" || { echo "Copy failed."; exit 1; }
+ssh "pi@$FROM" 'rm -rf ~/vt-copy-outgoing'
+echo "3/4 Stopping ViewTouch here and putting the copy in place..."
+pkill -TERM -x vtmodern 2>/dev/null; for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
+pkill -KILL -x vtmodern 2>/dev/null
+[ -d "$DATA" ] && mv "$DATA" "$HOME/vt-data-before-copy-$WHEN" && echo "   this Pi's old data: ~/vt-data-before-copy-$WHEN"
+mkdir -p "$(dirname "$DATA")" && mv "$STAGE" "$DATA"
+echo "4/4 Starting ViewTouch..."
+vt-server
+echo "This Pi is now a copy of $FROM. Change what differs here (Store Settings: name, check prefix, taxes, printers)."
