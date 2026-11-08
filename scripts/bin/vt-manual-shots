@@ -1,0 +1,108 @@
+#!/bin/bash
+# Pictures of every ViewTouch page for the user manual, taken from THIS store's own setup (its pages,
+# menu, departments, settings), not the built-in demo restaurant. Run on the store's Pi (the 219):
+#   vt-manual-shots                 every page
+#   vt-manual-shots --size 1366x768 another screen size (default 1280x800)
+#   vt-manual-shots --pages "login,manager"    only these page ids
+# How: a COPY of the store's database is made (the running ViewTouch is never touched, nothing
+# prints, no terminal or billboard is contacted). In the copy, customers, gift cards, sales, time
+# punches and reports are removed and staff are renamed "Staff 1, 2..." so the pictures, which end up
+# in the public manual, show no real people or numbers. A "Manual Shots" manager logs in to the copy.
+# The pictures go to ~/vt-manual-shots/<date>/ and to Google Drive "POS project tmp/manual-shots/<date>/"
+# (rclone remote "gdrive"), where Bob (Claude) picks them up. Rerun any time the screens change.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+SIZE=1280x800
+ONLY=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --size) SIZE="$2"; shift ;;
+        --pages) ONLY="$2"; shift ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+done
+BIN="$VT_REPO/modern/build/vtmodern"
+[ -x "$BIN" ] || BIN=/usr/local/bin/vtmodern
+[ -x "$BIN" ] || { echo "No ViewTouch build found (modern/build/vtmodern)."; exit 1; }
+LIVE_DIR="${VT_DATA_DIR:-$HOME/.local/share/ViewTouch/ViewTouch}"
+LIVE_DB="$LIVE_DIR/viewtouch.db"
+[ -f "$LIVE_DB" ] || { echo "No store database at $LIVE_DB"; exit 1; }
+STAMP=$(date +%Y-%m-%d_%H%M)
+WORK=$(mktemp -d /tmp/vt-manual-shots.XXXXXX)
+trap 'rm -rf "$WORK"' EXIT
+OUT="$HOME/vt-manual-shots/$STAMP"
+mkdir -p "$OUT" "$WORK/data"
+PIN=97531
+
+echo "[1/4] Copying the store (the running ViewTouch keeps going)..."
+python3 - "$LIVE_DB" "$WORK/data/viewtouch.db" "$PIN" <<'EOF'
+import hashlib, json, os, sqlite3, sys
+live, copy, pin = sys.argv[1:]
+src = sqlite3.connect("file:%s?mode=ro" % live, uri=True, timeout=30)
+dst = sqlite3.connect(copy)
+src.backup(dst)          # a consistent copy, safe while ViewTouch writes
+src.close()
+tables = {r[0] for r in dst.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+# Nothing private in the pictures: no customers, cards, sales, punches, reports or audit trail.
+for t in ("customers", "gift_cards", "checks", "parties", "refunds", "deliveries", "time_punches",
+          "drawer_sessions", "business_days", "changes", "problems", "stock_counts", "waste"):
+    if t in tables:
+        dst.execute("DELETE FROM %s" % t)
+# Staff renamed; their PINs no longer matter (the copy is thrown away).
+n = 0
+for eid, js in dst.execute("SELECT id, json FROM employees").fetchall():
+    try:
+        e = json.loads(js)
+    except ValueError:
+        continue
+    n += 1
+    e.update(name="Staff %d" % n, firstName="Staff", lastName=str(n))
+    for k in ("phone", "email", "address", "ssn", "dob", "birthday"):
+        e.pop(k, None)
+    dst.execute("UPDATE employees SET json = ? WHERE id = ?", (json.dumps(e), eid))
+salt = os.urandom(16).hex()
+me = {"id": "manual-shots", "name": "Manual Shots", "firstName": "Manual", "lastName": "Shots",
+      "role": "manager", "pinSalt": salt,
+      "pinHash": hashlib.sha256((salt + pin).encode()).hexdigest(), "active": True}
+dst.execute("INSERT OR REPLACE INTO employees (id, json) VALUES (?, ?)", ("manual-shots", json.dumps(me)))
+dst.commit()
+dst.close()
+EOF
+[ -d "$LIVE_DIR/cache" ] && cp -r "$LIVE_DIR/cache" "$WORK/data/" 2>/dev/null
+
+PAGES=$(python3 - "$WORK/data/viewtouch.db" <<'EOF'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+try:
+    print("\n".join(r[0] for r in db.execute("SELECT id FROM layout_pages ORDER BY position")))
+except sqlite3.Error:
+    pass
+EOF
+)
+[ -n "$ONLY" ] && PAGES=$(echo "$ONLY" | tr ',' '\n')
+COUNT=$(echo "$PAGES" | grep -c .)
+echo "[2/4] Taking pictures of $COUNT pages at $SIZE (nothing shows on the screens)..."
+export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software VT_STANDBY_ALLOWED=no VT_SERIAL_SCANNER=
+shoot() {   # name, extra arguments...
+    local name="$1"; shift
+    timeout 90 "$BIN" --data-dir "$WORK/data" --size "$SIZE" --screenshot "$OUT/$name.png" "$@" \
+        >>"$OUT/run.log" 2>&1
+    if [ -s "$OUT/$name.png" ]; then printf '.'; else printf 'x'; echo "  (no picture: $name)" >>"$OUT/run.log"; fi
+}
+shoot "00-login"
+i=0
+while read -r page; do
+    [ -n "$page" ] || continue
+    i=$((i + 1))
+    shoot "$(printf '%03d' $i)-${page//[^A-Za-z0-9._-]/_}" --login "$PIN" --page "$page"
+done <<< "$PAGES"
+echo
+MADE=$(ls "$OUT"/*.png 2>/dev/null | wc -l)
+
+echo "[3/4] $MADE pictures in $OUT"
+echo "[4/4] Sending them to Google Drive for Bob..."
+if command -v rclone >/dev/null && rclone copy "$OUT" "gdrive:POS project tmp/manual-shots/$STAMP/" 2>/dev/null; then
+    echo "Done: Google Drive > POS project tmp > manual-shots > $STAMP"
+else
+    echo "Couldn't copy them to Google Drive; they're in $OUT"
+fi

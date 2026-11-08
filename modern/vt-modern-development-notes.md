@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 18:23 ET — Bob (Claude) — vt-manual-shots: manual pictures from this store's own setup
+- **What:** New Pi command scripts/bin/vt-manual-shots: copies the store database (SQLite backup, live ViewTouch untouched), removes customers, gift cards, sales, punches, reports and audit rows from the copy, renames staff Staff 1..n, adds a 'Manual Shots' manager, then runs the existing build offscreen once per page (--data-dir copy --login --page --screenshot) and saves every page to ~/vt-manual-shots/<date>/ and Google Drive 'POS project tmp/manual-shots/<date>/' via rclone.
+- **Why:** Owner wants the user manual's pictures to show the BH retail setup (219 Pi), not the demo restaurant, and a process he can rerun as the program changes.
+- **Files:** `scripts/bin/vt-manual-shots`
+- **Next person must know:** Rerun after screen changes: vt-manual-shots (options --size WxH, --pages a,b). Pictures go to Google Drive, never to the public repo.
+
 ### 2026-11-08 15:07 ET — Bob (Claude) — vt-copy-store: the other Pi's devices are not copied
 - **What:** After copying, vt-copy-store also removes from the copy's settings the other Pi's billboards (screen billboard or a TV address), paired tablets/terminals with their keys, and serverTerm (with serverId/replicaKey as before, so its standby can't connect), and deletes printer/standby entries from the problems table; it prints each device removed. Printers and screens set up by name only (no pairing) are kept. Checked: billboard power (sleep/wake) is sent by ADB to the TV's address (pos_billboards.cpp adbArgs -> vt-add-billboard), so the ViewTouch app on the TV can't refuse it; any Pi whose adb key the TV accepts and that lists the TV can sleep it. Settings and slides come only over the billboard's own paired connection (its device key, its store's serverId), so another server can't send those.
 - **Why:** Owner 2026-11-08: the copy at .225 started telling Danbury's Fire TV 'fire5' to sleep.
