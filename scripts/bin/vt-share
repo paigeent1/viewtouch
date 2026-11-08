@@ -12,7 +12,8 @@ OUT="$HOME/vt-output"
 mkdir -p "$OUT"
 name=$(basename "$1")
 [ "$name" = sh ] || [ "$name" = bash ] && name=commands
-file="$OUT/$(date +%Y-%m-%d_%H%M%S)-${name//[^A-Za-z0-9._-]/_}.txt"
+host=$(hostname -s | tr "[:upper:]" "[:lower:]")
+file="$OUT/$(date +%Y-%m-%d_%H%M%S)-${host}-${name//[^A-Za-z0-9._-]/_}.txt"
 {
     echo "\$ $*"
     echo "# $(hostname) $(date '+%Y-%m-%d %H:%M:%S %Z') in $(pwd)"

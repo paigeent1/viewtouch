@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 15:35 ET — Bob (Claude) — vt-share: Pi name in shared file names; .225 linked to Google Drive
+- **What:** vt-share output files are now named <time>-<pi name>-<command>.txt (e.g. vt-hca-pi). .225 got rclone and .219's rclone.conf, so both Pis share output to the same Drive folder.
+- **Why:** Two store Pis now write to POS project tmp/pi-output; the name tells them apart at a glance.
+- **Files:** (none)
+
 ### 2026-11-08 15:21 ET — Bob (Claude) — vt-wipe-transactions --remove-gift-cards; gift cards stay at Danbury only
 - **What:** New --remove-gift-cards option empties the gift_cards table during the wipe (the cards are still listed in the backup's gift-cards-before-wipe.csv). For Hat City (.225), copied from Danbury.
 - **Why:** Owner decision: Hat City starts with no gift cards. Gift cards live only at BHDAN (the first store to go live) until the corporate Pi syncs gift cards across BHDAN, BHNM and HCA.
