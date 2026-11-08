@@ -121,6 +121,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 13:21 ET — Bob (Claude) — vt-copy-store: the copy is its own store, not a standby
+- **What:** After copying, vt-copy-store removes standby.json and lock files and clears serverId/replicaKey in the settings table, so ViewTouch makes a new store identity. Before, the copy had Danbury's serverId, found Danbury on the network and turned itself into Danbury's standby (main.cpp findMainServer -> stepDown).
+- **Why:** Owner 2026-11-08: .225 (HCA) said 'The store is already served by 192.168.1.219 - this computer becomes its standby'.
+- **Files:** (none)
+
 ### 2026-11-08 13:19 ET — Bob (Claude) — vt-copy-store: don't copy the other Pi's database lock
 - **What:** rsync now skips *.lock: the copy brought .219's viewtouch.db.lock (its process number, its host name) to .225, and ViewTouch's one-per-database lock (QLockFile, stale time 0) can't tell another machine's lock is stale, so .225 refused to start ("already in use by another ViewTouch (process 26405)").
 - **Why:** Owner 2026-11-08: HCA Pi didn't start ViewTouch after copying Danbury.

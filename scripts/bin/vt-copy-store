@@ -5,6 +5,7 @@
 # It asks for the other Pi's password (ssh). The other Pi keeps running: its databases are copied
 # with SQLite's online backup, so the copy is consistent. This Pi's own ViewTouch data is moved
 # aside first to ~/vt-data-before-copy-<time> (nothing is deleted), then ViewTouch starts again.
+# It becomes its own store (new server identity), never the other Pi's standby.
 # Not copied: this Pi's site file (~/.config/viewtouch: printers' devices, scanner, screens, paired
 # tablets and billboards stay this Pi's own).
 FROM="$1"
@@ -35,6 +36,20 @@ pkill -TERM -x vtmodern 2>/dev/null; for _ in $(seq 1 20); do pgrep -x vtmodern 
 pkill -KILL -x vtmodern 2>/dev/null
 [ -d "$DATA" ] && mv "$DATA" "$HOME/vt-data-before-copy-$WHEN" && echo "   this Pi's old data: ~/vt-data-before-copy-$WHEN"
 mkdir -p "$(dirname "$DATA")" && mv "$STAGE" "$DATA"
+# A store of its own, not the other Pi's standby: new server identity (ViewTouch makes a fresh id and
+# key when they're empty), no standby link, no other machine's lock.
+rm -f "$DATA/standby.json" "$DATA"/*.lock
+python3 - "$DATA/viewtouch.db" <<'PY'
+import json, sqlite3, sys
+db = sqlite3.connect(sys.argv[1]); n = 0
+for key, js in db.execute("SELECT key, json FROM settings").fetchall():
+    try: o = json.loads(js)
+    except ValueError: continue
+    if isinstance(o, dict) and ("serverId" in o or "replicaKey" in o):
+        o.pop("serverId", None); o.pop("replicaKey", None); n += 1
+        db.execute("UPDATE settings SET json=? WHERE key=?", (json.dumps(o), key))
+db.commit(); print("   new store identity" if n else "   (no store identity found to reset)")
+PY
 echo "4/4 Starting ViewTouch..."
 vt-server
 echo "This Pi is now a copy of $FROM. Change what differs here (Store Settings: name, check prefix, taxes, printers)."
