@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 13:07 ET — Bob (Claude) — BHDAN USB receipt printer: findings 2026-11-09 (not software)
+- **What:** TM-T88IV (M129H) with UB-U09 USB card (2003): prints line by line and goes into error when FEED or the cutter runs, but only while its USB is connected to a Raspberry Pi (BHDAN Pi 5, HCA Pi 5, and an older Pi not updated since about Jan 2024). On a Windows PC: no error. Ruled out: ViewTouch (cat with ViewTouch stopped), receipt content (plain text too), the usblp driver (FEED errors with it unbound), kernel 6.18.60 and its device tree/overlays (full 6.18.50 set booted: same), EEPROM (not updated), USB autosuspend, cable (known-good cable), power brick (swapped), DIP switches (match the fast .77 unit), unread status (printer sends nothing). Receipts run on the network TM-T88IV (Receipt, .77) meanwhile.
+- **Why:** Owner needs USB receipt printing for retail launch at BHDAN.
+- **Files:** (none)
+- **Next person must know:** Likely electrical (Pi's floating ground vs the printer's motor current through the USB card). Try a powered USB hub, or a full-speed USB isolator (ADuM3160, 12 Mbps), or a newer Epson USB card. BHDAN was booted on /boot/firmware/old (os_prefix=old/); restore with config.txt.before-old-kernel.
+
 ### 2026-11-09 12:18 ET — Bob (Claude) — vt-usb-readback: does the USB printer talk back while we print?
 - **What:** Test tool: opens /dev/usb/lp0 read+write, keeps reading (shows any status bytes the printer sends) for 20 s while FEED is pressed, then sends ~/receipt-dump.bin and times it, still reading.
 - **Why:** Owner 2026-11-09: BHDAN's TM-T88IV (UB-U09 USB card) errors when FEED is pressed only while USB is connected to the Pi (fine alone, not the cable, not power, nothing on the Pi holding it), and prints line by line. If the printer sends status back and nobody reads it, it may stall; Windows' Epson driver reads it, ViewTouch and cat don't.
