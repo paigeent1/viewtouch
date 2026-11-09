@@ -344,7 +344,7 @@ TEST_CASE("Retail register keys: the right column on the keypad rows, MISC MDSE 
     const QVariantList lines = pos.lines();
     REQUIRE(lines.size() == 2);
     CHECK(lines[0].toMap()[u"name"_s].toString() == u"Misc Merchandise"_s);
-    CHECK(lines[0].toMap()[u"price"_s].toString() == pos.format(core::Money::fromCents(1200)));
+    CHECK(lines[0].toMap()[u"price"_s].toString() == pos.format(Money::fromCents(1200)));
     CHECK(lines[1].toMap()[u"name"_s].toString() == u"Misc Food/Bev"_s);
     REQUIRE(pos.shared()->open.size() == 1);
     const core::Check &check = pos.shared()->open.begin()->second;

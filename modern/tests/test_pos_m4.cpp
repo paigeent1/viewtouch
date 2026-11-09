@@ -681,7 +681,7 @@ TEST_CASE("Retail open departments: MISC MDSE and MISC FOOD/BEV ring the amount 
     const std::size_t menuBefore = p.pos.shared()->menu.size();
     p.entry("2000");
     REQUIRE(p.pos.ringOpenDepartment(u"Misc Merchandise"_s, u"merchandise"_s));
-    CHECK(p.pos.entryAmount() == p.pos.format(core::Money()));   // the amount is used up
+    CHECK(p.pos.entryAmount() == p.pos.format(Money()));   // the amount is used up
     p.entry("2000");
     REQUIRE(p.pos.ringOpenDepartment(u"Misc Food/Bev"_s, u"food"_s));
     REQUIRE(p.pos.shared()->open.size() == 1);
@@ -746,7 +746,7 @@ TEST_CASE("Retail VOID ITEM takes off only the touched line; RESTORE ITEM brings
     p.pos.finishChoosing();
     core::Check &c = p.pos.shared()->open.begin()->second;
     REQUIRE(c.lines.size() == 2);
-    const core::Money full = c.totals(p.pos.shared()->settings.tax).total;
+    const Money full = c.totals(p.pos.shared()->settings.tax).total;
 
     // Nothing touched: a message, and nothing taken off (not even the newest).
     said.clear();
