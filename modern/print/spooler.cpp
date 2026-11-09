@@ -15,6 +15,11 @@
 #include <QTimer>
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <cerrno>
 #include <cstring>
 #include <deque>
@@ -252,9 +257,13 @@ private:
         return true;
     }
 
-    // A USB printer (/dev/usb/lp0) or a pipe: never blocks, never stays open.
-    // A printer in an error state stops taking data; after `timeoutMs` the
-    // ticket is given up and the device closed, so it's free again.
+    // A USB printer (/dev/usb/lp0) or a pipe. Written the plain way, as `cat file > /dev/usb/lp0`
+    // does: each write waits until the printer has taken it. (Non-blocking writes don't work
+    // with the kernel's USB printer driver: it takes a write as soon as it's queued and drops
+    // what's unsent when the device is closed, so tickets came out cut off or not at all.)
+    // The writing happens on a thread of its own: a printer in an error state stops taking
+    // data, and after `timeoutMs` the ticket is given up here while that thread waits on (it
+    // closes the device when the printer takes the rest or goes away, e.g. its USB unplugged).
     static bool toDevice(const QString &path, const QByteArray &data, int timeoutMs, QString *error)
     {
 #ifndef Q_OS_UNIX
@@ -263,7 +272,7 @@ private:
 #else
         const QByteArray name = QFile::encodeName(path);
         int fd;
-        do
+        do   // O_NONBLOCK for the open only: a pipe with no reader fails at once (ENXIO) instead of waiting
             fd = ::open(name.constData(), O_WRONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
         while (fd < 0 && errno == EINTR);
         if (fd < 0) {
@@ -275,72 +284,49 @@ private:
                                                  : u"%1: %2"_s.arg(path, why);
             return false;
         }
-        QElapsedTimer t;
-        t.start();
-        qint64 off = 0;
-        bool ok = true;
-        while (off < data.size()) {
-            const ssize_t n = ::write(fd, data.constData() + off, size_t(data.size() - off));
-            if (n > 0) {
-                off += n;
-                continue;
-            }
-            if (n < 0 && errno == EINTR)
-                continue;
-            if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-                *error = u"the printer stopped taking the ticket (%1)"_s.arg(QString::fromLocal8Bit(std::strerror(errno)));
+        if (const int fl = ::fcntl(fd, F_GETFL); fl >= 0)
+            ::fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);   // writes wait, like cat
+        struct State {
+            std::mutex m;
+            std::condition_variable cv;
+            bool done = false;
+            bool ok = false;
+            int err = 0;
+        };
+        auto st = std::make_shared<State>();
+        std::thread([st, fd, data] {
+            qint64 off = 0;
+            bool ok = true;
+            int err = 0;
+            while (off < data.size()) {
+                const ssize_t n = ::write(fd, data.constData() + off, size_t(data.size() - off));
+                if (n > 0) {
+                    off += n;
+                    continue;
+                }
+                if (n < 0 && errno == EINTR)
+                    continue;
                 ok = false;
+                err = n < 0 ? errno : EIO;
                 break;
             }
-            const qint64 left = timeoutMs - t.elapsed();
-            if (left <= 0) {
-                *error = u"the printer did not take the ticket in %1 s (error at the printer?)"_s.arg((timeoutMs + 999) / 1000);
-                ok = false;
-                break;
-            }
-            pollfd pfd{fd, POLLOUT, 0};
-            const int r = ::poll(&pfd, 1, int(std::min<qint64>(left, 500)));
-            if (r < 0 && errno != EINTR) {
-                *error = QString::fromLocal8Bit(std::strerror(errno));
-                ok = false;
-                break;
-            }
-            if (r > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) && !(pfd.revents & POLLOUT)) {
-                *error = u"the printer went away while printing"_s;
-                ok = false;
-                break;
-            }
+            ::close(fd);
+            std::lock_guard lock(st->m);
+            st->done = true;
+            st->ok = ok;
+            st->err = err;
+            st->cv.notify_all();
+        }).detach();
+        std::unique_lock lock(st->m);
+        if (!st->cv.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return st->done; })) {
+            *error = u"the printer did not take the ticket in %1 s (error at the printer?)"_s.arg((timeoutMs + 999) / 1000);
+            return false;
         }
-        // A USB printer takes a write as soon as it is queued, not when it has gone out: the
-        // last piece may still be on its way. Closing now would cancel it (the kernel's
-        // printer driver drops what's unsent on close), so the printer would get a cut-off
-        // ticket, or nothing. Wait until it has gone (the driver says "writable" again then).
-        while (ok) {
-            const qint64 left = timeoutMs - t.elapsed();
-            if (left <= 0) {
-                *error = u"the printer did not take the ticket in %1 s (error at the printer?)"_s.arg((timeoutMs + 999) / 1000);
-                ok = false;
-                break;
-            }
-            pollfd pfd{fd, POLLOUT, 0};
-            const int r = ::poll(&pfd, 1, int(std::min<qint64>(left, 500)));
-            if (r < 0 && errno == EINTR)
-                continue;
-            if (r < 0) {
-                *error = QString::fromLocal8Bit(std::strerror(errno));
-                ok = false;
-                break;
-            }
-            if (r > 0 && (pfd.revents & POLLOUT))
-                break;
-            if (r > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
-                *error = u"the printer went away while printing"_s;
-                ok = false;
-                break;
-            }
+        if (!st->ok) {
+            *error = u"the printer stopped taking the ticket (%1)"_s.arg(QString::fromLocal8Bit(std::strerror(st->err)));
+            return false;
         }
-        ::close(fd);
-        return ok;
+        return true;
 #endif
     }
 

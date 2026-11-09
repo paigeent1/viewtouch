@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 10:16 ET — Bob (Claude) — USB printer: write like cat (waiting writes on their own thread)
+- **What:** PrintSpooler toDevice: the device is still opened with O_NONBLOCK (a pipe with no reader fails at once) but O_NONBLOCK is then cleared, and the ticket is written with ordinary waiting writes on a short-lived thread of its own; the spooler waits up to the device time limit (10 s) for it, else gives the ticket up (kept for Reprint) while that thread waits on and closes the device when the printer takes the rest or goes away. Replaces 055736a's poll-before-close.
+- **Why:** Owner 2026-11-09 on BHDAN: ViewTouch's receipt, saved to a file and sent with cat > /dev/usb/lp0, printed perfectly, but sent by ViewTouch (non-blocking writes, even with 055736a's wait) it left the TM-T88IV stuck or in error. So the receipt is fine and only the non-blocking USB writes were wrong.
+- **Files:** (none)
+- **Next person must know:** Not yet tried on the TM-T88IV: BHDAN is the test. If a timed-out write is still waiting, the next ticket finds the printer busy (EBUSY) until it's reset.
+
 ### 2026-11-09 10:10 ET — Bob (Claude) — vt-touch-map --watch: notice a touchscreen that came back untied
 - **What:** The watcher now also compares each touchscreen's Coordinate Transformation Matrix, not just the device ids and monitors, and re-ties when it changes (re-reading after its own tie so it doesn't loop).
 - **Why:** Owner 2026-11-09: on BHDAN, unplugging the receipt printer's USB made the register's touch land wrong again although the watcher was running: the touchscreen reconnected under the same xinput ids, so the old check saw no change.
