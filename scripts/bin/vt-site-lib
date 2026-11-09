@@ -2,6 +2,9 @@
 # store is set up with `vt-site`, not by changing code.
 #   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
 #                                   STANDBY_ALLOWED (yes/no; not set = yes)
+#     SERIAL_SCANNER: empty or all = every USB-serial port (any number of scanners); off = none; or a
+#     list of ports by commas or spaces, each @speed if wanted ("/dev/ttyUSB0, /dev/ttyUSB1@19200").
+#     vt-server / vt-start pass it to ViewTouch as VT_SERIAL_SCANNER (see modern/ui/cpp/serialscanner.hh).
 #   ~/.config/viewtouch/tablets     one tablet per line: Name|IP   (vt-site tablet add/remove)
 #   ~/.config/viewtouch/tvs.json    TVs and DIRECTV receivers (vt-directv scan --save)
 VT_CONF_DIR="$HOME/.config/viewtouch"
