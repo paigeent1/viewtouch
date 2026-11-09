@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 09:29 ET — Bob (Claude) — USB printer: wait for the ticket to go out before closing the device
+- **What:** PrintSpooler toDevice (USB /dev/usb/lp0, pipes): after the last write, poll for POLLOUT until the driver says the write has completed, then close (same 10 s limit). With O_NONBLOCK the Linux usblp driver accepts a write as soon as it is queued; closing right away cancels the unsent data (usblp_release unlinks the URBs), so receipts came out cut off or not at all.
+- **Why:** Owner 2026-11-09: on BHDAN nothing printed from ViewTouch after the printer fix (554fb09), while the same printer printed and cut fine from the shell (printf > /dev/usb/lp0, a blocking write).
+- **Files:** (none)
+- **Next person must know:** Not tried on the TM-T88IV yet; BHDAN is the test.
+
 ### 2026-11-09 08:00 ET — Bob (Claude) — Find a Tablet: a tablet left lying around beeps until it's found
 - **What:** End of shift (Log Out page, any staff) has a new 'Find a Tablet…' button (also on phones, and given once to stores that edited that page) opening the new find-tablet page: the store's tablets (paired screens that are Android or haven't said yet; never billboards, computers' screens or this one) with connected / last seen. Find sends {t:event, e:findMe} over that tablet's own connection (PosShared::sendToScreen, set by PosServer); the tablet shows a full-screen flashing 'Here I am — tap to stop' with the asking screen's name (FindMeOverlay.qml) and beeps: Android FindMe.kt plays ToneGenerator on STREAM_ALARM with the alarm volume turned to max (put back after), wakes the screen and keeps it on; Linux screens play a generated WAV (QSoundEffect, else aplay/paplay). Stops when tapped there (foundTablet), Stop on the asking screen (stopFindingTablet), or after 120 s. Not connected: 'Bar 2 is not connected — it may be off, asleep with Wi-Fi off, or out of battery.' New: TerminalConfig.platform (kept from hello), PosShared::screenLinks (in memory), state piece 'tablets' (on request only), Spanish strings, test in test_kiosk.cpp.
 - **Why:** Owner 2026-11-09 07:45: staff need a way, from any station, to make a tablet that was left lying around beep so it can be found.

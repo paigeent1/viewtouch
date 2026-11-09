@@ -311,6 +311,34 @@ private:
                 break;
             }
         }
+        // A USB printer takes a write as soon as it is queued, not when it has gone out: the
+        // last piece may still be on its way. Closing now would cancel it (the kernel's
+        // printer driver drops what's unsent on close), so the printer would get a cut-off
+        // ticket, or nothing. Wait until it has gone (the driver says "writable" again then).
+        while (ok) {
+            const qint64 left = timeoutMs - t.elapsed();
+            if (left <= 0) {
+                *error = u"the printer did not take the ticket in %1 s (error at the printer?)"_s.arg((timeoutMs + 999) / 1000);
+                ok = false;
+                break;
+            }
+            pollfd pfd{fd, POLLOUT, 0};
+            const int r = ::poll(&pfd, 1, int(std::min<qint64>(left, 500)));
+            if (r < 0 && errno == EINTR)
+                continue;
+            if (r < 0) {
+                *error = QString::fromLocal8Bit(std::strerror(errno));
+                ok = false;
+                break;
+            }
+            if (r > 0 && (pfd.revents & POLLOUT))
+                break;
+            if (r > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
+                *error = u"the printer went away while printing"_s;
+                ok = false;
+                break;
+            }
+        }
         ::close(fd);
         return ok;
 #endif
