@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 14:16 ET — Bob (Claude) — Retail Reprint Receipt opens Look Up Checks
+- **What:** Retail Mode's Reprint Receipt button (retail-entry rtl-reprint) now does exactly what Cashier Duty's LOOK UP CHECKS does: jump (push) to receipt-lookup. Seed page changed; a one-time zone patch in main.cpp (mark retail-entry#rtl-reprint@receipt-lookup) moves stores' saved button from check-list or reprint-receipt to receipt-lookup, only while it still has one of those given jumps. The unused WidgetRetailEntry.qml default key points there too. Test: Reprint Receipt -> Look Up Checks -> Cancel returns to Retail; from Cashier Duty it returns to Cashier Duty.
+- **Why:** Owner 2026-11-09: Reprint Receipt should be the same function as Look Up Checks on Cashier Duties, and leaving it must return to Retail Mode. Look Up Checks' Cancel is history Back (controller.goBack), so a push from Retail returns to Retail with no other change.
+- **Files:** `modern/main.cpp`, `modern/seed/pages/retail-entry.json`, `modern/tests/test_receipt_barcode.cpp`, `modern/ui/qml/WidgetRetailEntry.qml`
+- **Next person must know:** Look Up Checks stays open after a reprint (as from Cashier Duty); Cancel then returns to the page it came from. No overlay was built (owner dropped it).
+
 ### 2026-11-09 14:08 ET — Bob (Claude) — Backlog: cash drawer setting clarity (not built; owner: upstream idea)
 - **What:** Backlog only, no code. Today Printers > Cash drawer (a drawer is wired to this printer) and Terminals > Receipts and cash drawer on (which printer this station uses) can disagree; TicketPrinter::openDrawer / printNoSale then quietly use the first other printer with a drawer (BHDAN 2026-11-09: No Sale went to Receipt .77 while the terminal was set to VT-BHDAN-RECEIPT, which had Cash drawer off). Idea: Terminals shows has-drawer/no-drawer per printer and warns, with a button to turn it on; never send a kick or No Sale to another printer without saying so on screen. Check whether original ViewTouch behaves the same; if so, suggest it upstream.
 - **Why:** Owner 2026-11-09: confusing to have the drawer choice in two places; not changing it now, wants it in the notes as an upstream suggestion.

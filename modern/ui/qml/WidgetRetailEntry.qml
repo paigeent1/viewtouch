@@ -19,7 +19,7 @@ Rectangle {
     property var row1Model: [
         { lbl: "LOG\nON/Off", col: "#d4af37", rad: 32, w: 86, cmd: "logout", pg: "", code: "" },
         { lbl: "CASHIER\nDUTY", col: "#a855f7", rad: 32, w: 86, cmd: "", pg: "drawer-count", code: "" },
-        { lbl: "Reprint\nReceipt", col: "#a855f7", rad: 32, w: 86, cmd: "printReceipt", pg: "", code: "" },
+        { lbl: "Reprint\nReceipt", col: "#a855f7", rad: 32, w: 86, cmd: "", pg: "receipt-lookup", code: "" },
         { lbl: "CANCEL SALE", col: "#ef4444", rad: 32, w: 175, cmd: "cancelCheck", pg: "", code: "" },
         { lbl: "ITEM\nRETURN", col: "#ef4444", rad: 32, w: 155, cmd: "toggleReturn", pg: "", code: "" },
         { lbl: "VOID\nPREV ITEM", col: "#ef4444", rad: 32, w: 165, cmd: "removeLine", pg: "", code: "" },

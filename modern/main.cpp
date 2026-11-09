@@ -1137,6 +1137,12 @@ int runStore(const Args &cli, const Options &o)
                          if (!jumpsTo(z, u"reprint-receipt"_s)) return false;
                          setJump(z, u"check-list"_s);
                          return true; }},
+                    // Reprint Receipt: the same as Cashier Duty's LOOK UP CHECKS (past receipts, reprint or
+                    // gift receipt), owner 2026-11-09. After the patch above, from either earlier jump.
+                    {u"retail-entry"_s, u"rtl-reprint"_s, u"receipt-lookup"_s, [&](Zone &z) {
+                         if (!jumpsTo(z, u"check-list"_s) && !jumpsTo(z, u"reprint-receipt"_s)) return false;
+                         setJump(z, u"receipt-lookup"_s);
+                         return true; }},
                     {u"retail-entry"_s, u"rtl-key-."_s, u"blank"_s, [](Zone &z) {
                          if (z.label != u".") return false;
                          z.label.clear();

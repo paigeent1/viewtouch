@@ -267,3 +267,28 @@ TEST_CASE("Receipt barcode: a scan at the register opens Find a check on that ch
     CHECK(said.join(u" "_s).contains(u"That receipt is from HCA; look it up there."_s));
     CHECK(notOnFile.isEmpty());
 }
+
+TEST_CASE("Retail Reprint Receipt opens Look Up Checks; Cancel goes back to where it was opened", "[receipts][controller]")
+{
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    PosService pos(test::seedPosData(), nullptr);
+    LayoutController c(*l);
+    c.setMealPeriod(u"lunch"_s);
+    c.setPos(&pos);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+
+    // Retail Mode's Reprint Receipt: the same screen as Cashier Duty's LOOK UP CHECKS.
+    REQUIRE(c.jumpTo(u"retail-entry"_s));
+    c.activate(u"rtl-reprint"_s);
+    CHECK(c.pageId() == u"receipt-lookup"_s);
+    c.goBack();   // its Cancel
+    CHECK(c.pageId() == u"retail-entry"_s);
+
+    // From Cashier Duty it still goes back to Cashier Duty.
+    REQUIRE(c.jumpTo(u"cashier-duty"_s));
+    c.activate(u"cd-lookup"_s);
+    CHECK(c.pageId() == u"receipt-lookup"_s);
+    c.goBack();
+    CHECK(c.pageId() == u"cashier-duty"_s);
+}

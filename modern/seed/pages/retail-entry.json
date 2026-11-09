@@ -376,7 +376,7 @@
         {
           "type": "jump",
           "mode": "push",
-          "page": "check-list"
+          "page": "receipt-lookup"
         }
       ]
     },
