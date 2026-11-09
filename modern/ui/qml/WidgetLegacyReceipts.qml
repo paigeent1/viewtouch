@@ -120,6 +120,16 @@ Rectangle {
                     placeholderText: qsTr("Day (2026-10-28), BHDAN-836100, UPC, 12.34 or a name")
                     onAccepted: { w.query = text; w.offsets = [0]; w.index = -1; w.load(0) }
                 }
+                // A day off the calendar: its receipts, found at once (no typing 2026-10-28).
+                DateField {
+                    objectName: "ilsaDay"
+                    Layout.preferredWidth: w.unit * 11
+                    implicitHeight: w.keyH
+                    value: /^\d{4}-\d{2}-\d{2}$/.test(w.query) ? w.query : ""
+                    placeholder: qsTr("Day…")
+                    title: qsTr("ILSA receipts from the day")
+                    onPicked: v => { search.text = v; w.query = v; w.offsets = [0]; w.index = -1; w.load(0) }
+                }
                 Button {
                     objectName: "ilsaFind"
                     text: qsTr("Find")

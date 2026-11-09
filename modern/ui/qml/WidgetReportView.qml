@@ -86,6 +86,22 @@ Item {
         { id: "custom", label: qsTr("Dates…") },
     ]
     readonly property var range: pos ? pos.rangeReport : ({})
+    // Dates…: From and To start on the days shown just before (Last Month's, say), else this month
+    // so far; never blank boxes under an older report's heading (owner's photo 2026-11-09).
+    function startCustom() {
+        if (fromDate !== "" && toDate !== "")
+            return
+        const now = new Date()
+        const iso = d => Qt.formatDate(d, "yyyy-MM-dd")
+        fromDate = range.from ?? iso(new Date(now.getFullYear(), now.getMonth(), 1))
+        toDate = range.to ?? iso(now)
+    }
+    // The report on the screen is for the dates in From and To (it was asked for them), or it
+    // isn't shown: heading and boxes never disagree.
+    readonly property bool customInStep: {
+        const a = fromDate < toDate ? fromDate : toDate, b = fromDate < toDate ? toDate : fromDate
+        return range.period === "custom" && range.from === a && range.to === b
+    }
     // The forecast: a coming day (0 today ... 6), from past weeks.
     readonly property bool forecasting: reportId === "forecast"
     property int forecastDay: 1
@@ -123,6 +139,8 @@ Item {
         if (forecasting)
             return range.id === "forecast" && range.report ? range.report
                  : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
+        if (period === "custom" && !customInStep)
+            return ({ title: "", rows: [] })
         if (period !== "day")
             return range.report ?? ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
         // Live: again when checks close, the drawer changes, or (remote
@@ -233,7 +251,11 @@ Item {
                     text: modelData.label
                     fontScale: 0.34
                     baseColor: w.period === modelData.id ? "#2f6fd6" : "#343c49"
-                    onClicked: w.period = modelData.id
+                    onClicked: {
+                        if (modelData.id === "custom")
+                            w.startCustom()
+                        w.period = modelData.id
+                    }
                 }
             }
             WidgetKey {
@@ -286,30 +308,37 @@ Item {
             }
         }
 
-        // Dates… : from and to.
+        // Dates… : from and to, chosen on the calendar (DateField); shown as soon as both are.
         RowLayout {
             visible: w.period === "custom"
             Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
             Layout.fillHeight: false
             spacing: w.unit * 0.4
-            Text { text: qsTr("From"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            TextField {
-                implicitWidth: w.unit * 8
-                placeholderText: "2026-09-01"
-                inputMethodHints: Qt.ImhPreferNumbers
-                onTextEdited: w.fromDate = text
+            Text { text: qsTr("From"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.9 }
+            DateField {
+                objectName: "reportFrom"
+                Layout.fillWidth: true
+                Layout.maximumWidth: w.unit * 14
+                Layout.fillHeight: true
+                value: w.fromDate
+                title: qsTr("Report from")
+                onPicked: v => { w.fromDate = v; w.refresh() }
             }
-            Text { text: qsTr("to"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            TextField {
-                implicitWidth: w.unit * 8
-                placeholderText: "2026-09-30"
-                inputMethodHints: Qt.ImhPreferNumbers
-                onTextEdited: w.toDate = text
-                onAccepted: w.refresh()
+            Text { text: qsTr("to"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.9 }
+            DateField {
+                objectName: "reportTo"
+                Layout.fillWidth: true
+                Layout.maximumWidth: w.unit * 14
+                Layout.fillHeight: true
+                value: w.toDate
+                title: qsTr("Report to")
+                onPicked: v => { w.toDate = v; w.refresh() }
             }
             WidgetKey {
+                objectName: "reportShow"
                 Layout.preferredWidth: w.unit * 5
-                Layout.preferredHeight: Math.max(w.unit * 2, w.zone ? w.zone.touch(46) : 0)
+                Layout.fillHeight: true
                 text: qsTr("Show")
                 fontScale: 0.34
                 onClicked: w.refresh()
@@ -326,7 +355,9 @@ Item {
                 visible: w.period !== "day" || w.forecasting
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: (w.range.label ?? "") + (w.range.loading ? "  ·  " + qsTr("reading…")
+                text: w.period === "custom" && !w.forecasting && !w.ilsaEmployees && !w.customInStep
+                      ? qsTr("Choose the days, then Show")
+                      : (w.range.label ?? "") + (w.range.loading ? "  ·  " + qsTr("reading…")
                                                : w.range.checks !== undefined ? "  ·  " + qsTr("%1 checks").arg(w.range.checks) : "")
                 color: w.ink
                 font.family: w.face

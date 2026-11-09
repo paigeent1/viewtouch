@@ -52,8 +52,6 @@ Item {
     function setDates(a, b) {
         fromDate = a
         toDate = b
-        fromField.text = a
-        toField.text = b
         Qt.callLater(refresh)
     }
     function setPeriod(id) {
@@ -236,32 +234,25 @@ Item {
                 }
             }
             Text { text: qsTr("From"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            TextField {
-                id: fromField
+            // On the calendar (DateField). A new From is one day (To follows it) until To is chosen.
+            DateField {
                 objectName: "ilsaFrom"
-                implicitWidth: w.unit * 7
+                Layout.preferredWidth: w.unit * 10
                 Layout.fillHeight: true
                 Layout.minimumHeight: w.zone ? w.zone.touch(48) : 48
-                font.pixelSize: w.unit * 0.8
-                text: w.fromDate
-                placeholderText: "2026-10-28"
-                inputMethodHints: Qt.ImhPreferNumbers
-                onTextEdited: { w.fromDate = text; w.toDate = text; toField.text = text }
-                onAccepted: w.refresh()
+                value: w.fromDate
+                title: qsTr("ILSA history from")
+                onPicked: v => { w.fromDate = v; w.toDate = v; w.refresh() }
             }
             Text { text: qsTr("to"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
-            TextField {
-                id: toField
+            DateField {
                 objectName: "ilsaTo"
-                implicitWidth: w.unit * 7
+                Layout.preferredWidth: w.unit * 10
                 Layout.fillHeight: true
                 Layout.minimumHeight: w.zone ? w.zone.touch(48) : 48
-                font.pixelSize: w.unit * 0.8
-                text: w.toDate
-                placeholderText: "2026-10-28"
-                inputMethodHints: Qt.ImhPreferNumbers
-                onTextEdited: w.toDate = text
-                onAccepted: w.refresh()
+                value: w.toDate
+                title: qsTr("ILSA history to")
+                onPicked: v => { w.toDate = v; w.refresh() }
             }
             WidgetKey {
                 objectName: "ilsaShow"

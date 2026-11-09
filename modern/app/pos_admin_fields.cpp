@@ -85,8 +85,8 @@ QVariantList PosService::adminFields(const QString &panel)
             with(with(field(u"ticketCapacity"_s, tr("Event tickets: seats"), u"int"_s,
                             tr("Tickets to an event: it sells out when this many are sold. 0 = not an event.")),
                       u"min"_s, 0), u"max"_s, 100000),
-            field(u"eventAt"_s, tr("Event date and time"), u"string"_s,
-                  tr("Like 2026-10-09 7:00 PM. On the ticket and the receipt; it can't be sold after.")),
+            field(u"eventAt"_s, tr("Event date and time"), u"datetime"_s,
+                  tr("On the ticket and the receipt; it can't be sold after. Clear: not an event.")),
             field(u"substitute"_s, tr("Can be a substitute"), u"bool"_s,
                   tr("With Sub, it goes in place of part of the item before it (a house salad instead of fries).")),
             field(u"substitutePrice"_s, tr("Substitute price"), u"money"_s, tr("What it adds as a substitute, e.g. 3.00.")),
@@ -123,15 +123,15 @@ QVariantList PosService::adminFields(const QString &panel)
                             tr("0 = every matching item is off. Otherwise buy this many...")), u"min"_s, 0), u"max"_s, 20),
             with(with(field(u"get"_s, tr("…and get this many (the cheapest) at the percent off"), u"int"_s), u"min"_s, 0),
                  u"max"_s, 20),
-            field(u"start"_s, tr("From"), u"string"_s, tr("Like 3:00 PM. From = Until: all day.")),
-            field(u"end"_s, tr("Until"), u"string"_s),
+            field(u"start"_s, tr("From"), u"time"_s, tr("From = Until: all day.")),
+            field(u"end"_s, tr("Until"), u"time"_s),
             field(u"days"_s, tr("Days"), u"string"_s, tr("e.g. Mon-Fri, or Tue, or Sat, Sun. Empty: every day.")),
             field(u"code"_s, tr("Coupon code"), u"string"_s,
                   tr("e.g. SAVE5: then it only comes off checks the code is typed or scanned on (Pay -> Coupon…). Empty: by itself.")),
             field(u"amount"_s, tr("Amount off"), u"money"_s, tr("A fixed amount instead of a percent, e.g. 5.00.")),
             field(u"minimum"_s, tr("Orders of at least"), u"money"_s, tr("0 = any order.")),
-            field(u"fromDay"_s, tr("First day"), u"string"_s, tr("e.g. 2026-11-01. Empty: from now.")),
-            field(u"untilDay"_s, tr("Last day"), u"string"_s, tr("e.g. 2026-12-31. Empty: no end.")),
+            field(u"fromDay"_s, tr("First day"), u"date"_s, tr("Clear: from now.")),
+            field(u"untilDay"_s, tr("Last day"), u"date"_s, tr("Clear: no end.")),
             with(field(u"maxUses"_s, tr("Times it may be used"), u"int"_s, tr("Checks in all. 0 = no limit.")), u"min"_s, 0),
             with(field(u"uses"_s, tr("Used so far"), u"int"_s, tr("Closed checks it came off. 0 starts over.")), u"min"_s, 0),
         };
@@ -679,8 +679,8 @@ QVariantList PosService::adminFields(const QString &panel)
     if (panel == u"mealPeriods") {
         return {
             field(u"name"_s, tr("Name"), u"string"_s), readonlyId,
-            field(u"start"_s, tr("Starts at"), u"string"_s,
-                  tr("Like 11:00 AM. Runs until the next period starts.")),
+            with(field(u"start"_s, tr("Starts at"), u"time"_s, tr("Runs until the next period starts.")),
+                 u"required"_s, true),
         };
     }
     if (panel == u"billboards")   // Store Settings > Billboards (pos_billboards.cpp)

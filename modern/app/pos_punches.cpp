@@ -99,8 +99,13 @@ QVariantList PosService::punchFields()
     return {
         who,
         job,
-        field(u"clockIn"_s, tr("Clocked in"), u"string"_s, tr("Like 2026-10-06 9:00 AM")),
-        field(u"clockOut"_s, tr("Clocked out"), u"string"_s, tr("Like 2026-10-06 5:30 PM. Empty: still clocked in.")),
+        // On the calendar with the hour and minute (DatePickerPopup): "2026-10-06 9:00 AM".
+        [] {
+            QVariantMap in = field(u"clockIn"_s, tr("Clocked in"), u"datetime"_s);
+            in.insert(u"required"_s, true);
+            return in;
+        }(),
+        field(u"clockOut"_s, tr("Clocked out"), u"datetime"_s, tr("Clear: still clocked in.")),
         field(u"breaks"_s, tr("Breaks"), u"text"_s, tr("One per line, like 12:30 PM-1:00 PM.")),
         field(u"reason"_s, tr("Reason for the change"), u"string"_s,
               tr("Required: \"forgot to clock out\", \"came in early\"… It goes on the Labor report.")),

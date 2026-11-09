@@ -142,15 +142,17 @@ Dialog {
                     onClicked: pricesDialog.dayOffset = index
                 }
             }
-            TextField {
+            // The hour on the hour/minute picker (kept as 06:00).
+            DateField {
                 objectName: "builderPricesTime"
-                width: 110
-                implicitHeight: 48
-                font.pixelSize: 18
-                text: pricesDialog.time
-                placeholderText: "06:00"
-                inputMethodHints: Qt.ImhPreferNumbers
-                onTextEdited: pricesDialog.time = text
+                mode: "time"
+                twentyFour: true
+                width: 130
+                height: 48
+                fontSize: 18
+                value: pricesDialog.time
+                title: qsTr("The prices change at")
+                onPicked: v => pricesDialog.time = v
             }
         }
         // Set for later already: each can be canceled.

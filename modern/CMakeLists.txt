@@ -176,6 +176,9 @@ if(Qt6_FOUND)
             ui/qml/CashTipsPrompt.qml
             ui/qml/DrawerCount.qml
             ui/qml/ReasonSheet.qml
+            ui/qml/DatePickerPopup.qml
+            ui/qml/DateField.qml
+            ui/qml/DateMath.js
             ui/qml/PriceCheckOverlay.qml
             ui/qml/WidgetGuestOrder.qml
             ui/qml/WidgetGuestMessages.qml

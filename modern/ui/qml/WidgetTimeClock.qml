@@ -257,6 +257,16 @@ Item {
                             }
                         }
                     }
+                    // Further off than four weeks: on the calendar.
+                    DateField {
+                        objectName: "offDayLater"
+                        Layout.preferredWidth: w.unit * 14
+                        Layout.preferredHeight: w.unit * 2.2
+                        value: w.offDay
+                        placeholder: qsTr("Another day…")
+                        title: qsTr("Which day off?")
+                        onPicked: v => { w.touched(); w.offDay = v }
+                    }
                     Text {
                         text: qsTr("Why? (optional)")
                         color: "#8a94a6"
