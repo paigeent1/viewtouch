@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 17:26 ET — Bob (Claude) — Stable: 7b2fd8f (tag stable-2026-11-09) for BHDAN and HCA
+- **What:** Owner declared main 7b2fd8f stable: Rongta USB receipts, cash drawer clarity, Retail page (MISC MDSE/FOOD-BEV, VOID/RESTORE ITEM, Cancel Sale, login back to Retail), Find/search speed and readability, scanners on every serial port, Reprint opens Look Up Checks. Tagged stable-2026-11-09 on 7b2fd8f. APKs: Modern Android run 42707979857 (arm64-v8a tablets, armeabi-v7a fire5). Both store Pis (BHDAN, HCA) run the same build: one codebase, no per-store fork.
+- **Why:** Owner 2026-11-09 17:26: 'all these changes are not another fork. HCA will be the same. ... lets go with this as stable!'
+- **Files:** (none)
+
 ### 2026-11-09 16:43 ET — Bob (Claude) — Retail Cancel Sale test: run it as the key does
 - **What:** The new Cancel Sale test calls cancelSale through invoke (as the key does), so it asks for a reason; called directly it doesn't ask (haveReason only asks for a screen's operation).
 - **Why:** CI: the test expected the reason prompt from a direct call.
