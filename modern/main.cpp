@@ -1121,6 +1121,18 @@ int runStore(const Args &cli, const Options &o)
                 }
                 state.seen << mark;
             }
+            // Retail Mode stays off the phones' order screens and Open checks (as their starter pages).
+            for (const QString &phone : {u"order-template-phone"_s, u"check-list-phone"_s}) {
+                const QString mark = phone + u"#retail-mode-btn@hidden"_s;
+                if (state.seen.contains(mark))
+                    continue;
+                if (vt::layout::Page *p = layout->page(phone); p && !p->hiddenZones.contains(u"retail-mode-btn"_s)
+                    && std::ranges::none_of(p->zones, [](const vt::layout::Zone &z) { return z.id == u"retail-mode-btn"; })) {
+                    p->hiddenZones << u"retail-mode-btn"_s;
+                    zonesAdded = true;
+                }
+                state.seen << mark;
+            }
             // A given button renamed later: once, and only if the store kept the old name.
             static const struct { const char16_t *pageId, *zoneId, *was, *renamed; } renamedZones[] = {
                 {u"hardware-config", u"vt-touch-map", u"Guest touch monitor sync (2x Tap)", u"Learn guest touchscreen (2x Tap)"},

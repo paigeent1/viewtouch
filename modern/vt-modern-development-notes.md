@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 16:22 ET — Bob (Claude) — Retail Mode kept off the phone order screen; Find rows test
+- **What:** order-template-phone.json hides retail-mode-btn (as check-list-phone already did); main.cpp hides it once on a store's saved order-template-phone / check-list-phone pages too. The Find test (UI: find an item by typing part of its name) takes rows of at least 56 (was 64): about six rows now show on the zone.
+- **Why:** CI 42699066570: the page check said the phone order template didn't place or hide the new Retail Mode button (test_seed, test_editor, test_phone, test_edit_mode); Find's rows are 60.7 tall on the test screen.
+- **Files:** `modern/main.cpp`, `modern/seed/pages/order-template-phone.json`, `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-09 16:04 ET — Bob (Claude) — Retail Mode button on the order screens, Tables and Open checks
 - **What:** Starter order template (order-template.json): a '🏷️ Retail Mode' button above the check (16,16 560x72; the check's list now starts at y 104), jumping to the Retail screen like the Tables page's button. Saved pages: main.cpp gives the button once to order-template, tables and check-list (givenZones) when it isn't there, and moves the check's list down 88 once if it is still where it was given; a given button is now never put over something the store placed there (it says so in the log instead). Left-handed: a button just above the check in its column moves with it (layoutcontroller.cpp), so the tabs still move left as before.
 - **Why:** Owner 2026-11-09 15:50: from the order page, or the Tables / Open checks pages he passed through, there is no way back to the retail screen.
