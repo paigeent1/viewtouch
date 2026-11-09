@@ -14,12 +14,39 @@
       "kind": "orderList",
       "rect": {
         "x": 16,
-        "y": 16,
+        "y": 104,
         "w": 560,
-        "h": 948
+        "h": 860
       },
       "shape": "rect",
       "behavior": "none"
+    },
+    {
+      "id": "retail-mode-btn",
+      "kind": "button",
+      "label": "🏷️ Retail Mode",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 560,
+        "h": 72
+      },
+      "style": {
+        "normal": {
+          "fill": "#0284c7",
+          "fontSize": 30
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "retail-entry",
+          "target": "retail-entry"
+        }
+      ]
     },
     {
       "id": "flow-tables",

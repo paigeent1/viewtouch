@@ -1266,11 +1266,13 @@ struct PosService::ItemFind {
     QVariantMap answer;
 };
 
-bool PosService::findItems(const QString &text)
+bool PosService::findItems(const QString &text, int limit)
 {
-    if (itemQuery_ == text.trimmed())
+    limit = std::clamp(limit <= 0 ? 50 : limit, 1, 1000);
+    if (itemQuery_ == text.trimmed() && itemLimit_ == limit)
         return true;
     itemQuery_ = text.trimmed();
+    itemLimit_ = limit;
     emit sessionChanged();
     return true;
 }
@@ -1370,11 +1372,12 @@ QVariantMap PosService::itemSearch() const
         kept.byName = !digits;
     }
 
-    // The best 300 as they are now (sold out, prices of the hour): the very same answer while nothing changed.
+    // The best 50 (or as many as asked: More…) as they are now (sold out, prices of the hour): the very same
+    // answer while nothing changed.
     QVariantList items;
     if (user()) {
         const std::string period = currentMealPeriod();
-        for (std::size_t k = 0; k < kept.found.size() && k < 300; ++k) {
+        for (std::size_t k = 0; k < kept.found.size() && k < std::size_t(itemLimit_); ++k) {
             const MenuItem &m = s_->menu[kept.found[k]];
             QStringList allergens;
             for (const std::string &a : m.allergens)
@@ -1382,15 +1385,18 @@ QVariantMap PosService::itemSearch() const
             items.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"family"_s, qs(m.family)},
                                      {u"price"_s, format(m.priceDuring(period))},
                                      {u"available"_s, m.available && ticketsLeft(m) != 0}, {u"byWeight"_s, m.byWeight},
-                                     {u"unit"_s, qs(m.weightUnit)}, {u"number"_s, qs(m.number)}, {u"allergens"_s, allergens}});
+                                     {u"unit"_s, qs(m.weightUnit)}, {u"number"_s, qs(m.number)},
+                                     {u"upc"_s, m.barcodes.empty() ? QString() : qs(m.barcodes.front())},
+                                     {u"allergens"_s, allergens}});
         }
     }
     const int count = user() ? int(kept.found.size()) : 0;
     if (!kept.answer.isEmpty() && kept.answer.value(u"query"_s).toString() == itemQuery_
-        && kept.answer.value(u"count"_s).toInt() == count && kept.answer.value(u"items"_s).toList() == items)
+        && kept.answer.value(u"count"_s).toInt() == count && kept.answer.value(u"limit"_s).toInt() == itemLimit_
+        && kept.answer.value(u"items"_s).toList() == items)
         return kept.answer;
     static qint64 next = QDateTime::currentMSecsSinceEpoch();
-    kept.answer = {{u"query"_s, itemQuery_}, {u"count"_s, count}, {u"items"_s, items}, {u"rev"_s, ++next}};
+    kept.answer = {{u"query"_s, itemQuery_}, {u"count"_s, count}, {u"limit"_s, itemLimit_}, {u"items"_s, items}, {u"rev"_s, ++next}};
     return kept.answer;
 }
 

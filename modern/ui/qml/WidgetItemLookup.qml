@@ -83,7 +83,7 @@ Item {
         leave()
     }
     function page(by) {
-        const step = Math.max(1, Math.floor(list.height / rowHeight) - 1)
+        const step = Math.max(1, Math.floor((list.height + list.spacing) / (rowHeight + list.spacing)))
         const top = list.indexAt(10, list.contentY + 10)
         list.positionViewAtIndex(Math.max(0, Math.min(rows.length - 1, (top < 0 ? 0 : top) + by * step)), ListView.Beginning)
     }
@@ -114,7 +114,7 @@ Item {
     // Typing: found as it's typed (a moment after the last key).
     Timer {
         id: typing
-        interval: 300
+        interval: 200
         onTriggered: w.find(searchField.text)
     }
 
@@ -286,26 +286,12 @@ Item {
                     }
                 }
 
-                ColumnLayout {
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 150
-                    spacing: 10
-                    Button {
-                        objectName: "lookupPageUp"
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        font.pixelSize: 64
-                        text: "▲"
-                        onClicked: w.page(-1)
-                    }
-                    Button {
-                        objectName: "lookupPageDown"
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        font.pixelSize: 64
-                        text: "▼"
-                        onClicked: w.page(1)
-                    }
+                PageArrows {
+                    upName: "lookupPageUp"
+                    downName: "lookupPageDown"
+                    keyWidth: 150
+                    onUp: w.page(-1)
+                    onDown: w.page(1)
                 }
             }
 

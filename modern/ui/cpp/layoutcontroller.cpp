@@ -2429,6 +2429,18 @@ void LayoutController::refresh()
                 colBottom = pz.zone->rect.y() + pz.zone->rect.height();
                 break;
             }
+        // A button just above the check in its column (Retail Mode on the order screens) goes with it.
+        for (bool grew = colRight >= 0; grew;) {
+            grew = false;
+            for (const Layout::PlacedZone &pz : s.zones) {
+                const QRect &r = pz.zone->rect;
+                if (!s.moved.contains(pz.zone) && r.x() >= colLeft && r.x() + r.width() <= colRight && r.y() < colTop
+                    && r.y() + r.height() <= colTop && colTop - (r.y() + r.height()) <= 32) {
+                    colTop = r.y();
+                    grew = true;
+                }
+            }
+        }
         for (const Layout::PlacedZone &pz : s.zones)
             if (colRight >= 0 && pz.zone->rect.x() >= colRight && pz.zone->rect.y() >= colTop
                 && pz.zone->rect.y() + pz.zone->rect.height() <= colBottom && (nextLeft < 0 || pz.zone->rect.x() < nextLeft))
