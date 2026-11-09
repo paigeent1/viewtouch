@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""USB receipt printer test: keeps reading what the printer sends back (status bytes) while you
+press FEED and while a receipt is sent, and shows it. If the printer talks back and nobody reads
+it, some printers stop taking data or go into error; this reads it, so we can see.
+  vt-usb-readback            open /dev/usb/lp0, read for 20 s (press FEED a few times), then send
+                             ~/receipt-dump.bin and time it, still reading
+"""
+import os, sys, threading, time
+dev = sys.argv[1] if len(sys.argv) > 1 else "/dev/usb/lp0"
+fd = os.open(dev, os.O_RDWR)
+got = []
+stop = False
+def reader():
+    while not stop:
+        try:
+            b = os.read(fd, 64)
+        except OSError as e:
+            print(f"   (read: {e})", flush=True); time.sleep(0.5); continue
+        if b:
+            got.append(b)
+            print(f"   printer sent back: {b.hex(' ')}", flush=True)
+        else:
+            time.sleep(0.05)
+threading.Thread(target=reader, daemon=True).start()
+print("Reading from the printer for 20 s: press FEED a few times now.", flush=True)
+time.sleep(20)
+data = open(os.path.expanduser("~/receipt-dump.bin"), "rb").read() + b"\n\n\n\n\x1dVB\x00"
+print(f"Sending the receipt ({len(data)} bytes), still reading...", flush=True)
+t = time.time()
+os.write(fd, data)
+print(f"   written in {time.time() - t:.1f} s; reading 10 s more", flush=True)
+time.sleep(10)
+stop = True
+print(f"Done. The printer sent back {sum(map(len, got))} byte(s) in all.")

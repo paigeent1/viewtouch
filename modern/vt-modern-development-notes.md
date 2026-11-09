@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 12:18 ET — Bob (Claude) — vt-usb-readback: does the USB printer talk back while we print?
+- **What:** Test tool: opens /dev/usb/lp0 read+write, keeps reading (shows any status bytes the printer sends) for 20 s while FEED is pressed, then sends ~/receipt-dump.bin and times it, still reading.
+- **Why:** Owner 2026-11-09: BHDAN's TM-T88IV (UB-U09 USB card) errors when FEED is pressed only while USB is connected to the Pi (fine alone, not the cable, not power, nothing on the Pi holding it), and prints line by line. If the printer sends status back and nobody reads it, it may stall; Windows' Epson driver reads it, ViewTouch and cat don't.
+- **Files:** (none)
+
 ### 2026-11-09 11:04 ET — Bob (Claude) — vt-usb-variants: find which receipt command slows a USB printer
 - **What:** New test tool: sends ~/receipt-dump.bin (a ViewTouch receipt saved to a file) to /dev/usb/lp0 seven ways, one printer command type removed each time (character set, small font, size, bold, centering), plus plain text and as-is, each slip labelled, waiting for Enter between.
 - **Why:** Owner 2026-11-09: BHDAN's TM-T88IV prints ViewTouch's receipt line by line over USB, even sent with cat with ViewTouch stopped, while hand-written test lines printed fast; the owner believes the code is the cause.
