@@ -414,7 +414,7 @@ QVariantList LayoutController::pageChoices(const QString &only) const
         // "start": what a device may start on: floor plans, Open Checks, menus, tabs, deliveries.
         if (p.kind != u"template" && p.kind != u"library" && (only != u"floor" || floor(p))
             && (only != u"start" || (p.variantOf.isEmpty() && (floor(p) || p.kind == u"items" || p.role == u"checkList"
-                                                               || p.id == u"tabs" || p.id == u"deliveries"))))
+                                                               || p.id == u"tabs" || p.id == u"deliveries" || p.id == u"retail-entry"))))
             out.append(QVariantMap{{u"value"_s, p.id}, {u"text"_s, p.name}});
     return out;
 }
@@ -438,17 +438,25 @@ void LayoutController::onLoggedInChanged(bool loggedIn)
     // floor (tables); logged out, it is the login page.
     const QString login = loginPage();
     QString tables = rolePage(u"tables"_s);
-    if (const QString start = pos_ ? pos_->userPrefs().value(u"startPage"_s).toString() : QString();
+    const QVariantMap prefs = pos_ ? pos_->userPrefs() : QVariantMap();
+    if (const QString start = prefs.value(u"startPage"_s).toString();
         loggedIn && !start.isEmpty() && activeLayout().page(start))
         tables = start;
+    // No Start screen for this terminal (Manager -> Terminals): back to the mode this screen was in
+    // (Retail Mode after a timeout stays Retail Mode).
+    if (loggedIn && retailMode_ && !prefs.value(u"deviceStart"_s).toBool() && !retailPage().isEmpty())
+        tables = retailPage();
     const QString home = loggedIn && !tables.isEmpty() ? tables : login;
     nav_.reset(home);
     if (editing_ && editor_)
         editor_->setPageId(nav_.current());
+    noteMode();
     refresh();
     emit pageChanged();
-    // Back to the check they had open (Switch User): its order screen.
-    if (loggedIn && pos_ && pos_->hasCheck() && !editing())
+    // Back to the check they had open (Switch User): its order screen; a retail sale stays on the
+    // Retail register, which shows it.
+    const bool retailSale = home == retailPage() && pos_ && pos_->checkInfo().value(u"type"_s).toString() == u"quick";
+    if (loggedIn && pos_ && pos_->hasCheck() && !editing() && !retailSale)
         navigate(Navigator::Mode::Index, {});
     // Opened for one thing (--after-login): there, once.
     if (loggedIn && !afterLogin_.isEmpty() && !editing()) {
@@ -2367,6 +2375,10 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
             const qint64 bp = pct.toString() == u"typed" ? 0 : qint64(pct.toDouble() * 100);
             return call(u"discountPercent"_s, {bp, name == u"itemDiscount"}, [done](const QVariant &ok) { done(ok.toBool()); });
         }
+        // Retail open-department key (MISC MDSE...): {department, tax}: the amount typed, in that department.
+        if (name == u"openDepartment")
+            return call(u"ringOpenDepartment"_s, {args.value(u"department"_s).toString(), args.value(u"tax"_s).toString()},
+                        [done](const QVariant &ok) { done(ok.toBool()); });
         if (const auto it = operations.constFind(name); it != operations.cend())
             return call(it->first, it->second, [done](const QVariant &ok) { done(ok.toBool()); });
     }
@@ -2400,11 +2412,30 @@ bool LayoutController::navigate(Navigator::Mode mode, const QString &target)
     if (nav_.jump(mode, target)) {
         if (editing_ && editor_)
             editor_->setPageId(nav_.current());
+        noteMode();
         refresh();
         emit pageChanged();
         return true;
     }
     return false;
+}
+
+QString LayoutController::retailPage() const
+{
+    return activeLayout().page(u"retail-entry"_s) ? u"retail-entry"_s : QString();
+}
+
+void LayoutController::noteMode()
+{
+    if (!pos_ || !pos_->loggedIn() || editing())
+        return;
+    const vt::layout::Page *p = currentPage();
+    if (!p)
+        return;
+    if (p->id == retailPage())
+        retailMode_ = true;
+    else if (p->kind == u"tables" || p->kind == u"index" || p->role == u"menu" || p->role == u"tables")
+        retailMode_ = false;   // the floor or the menu: hospitality (Open Checks, Pay, Manager... don't change it)
 }
 
 void LayoutController::refresh()
@@ -2583,6 +2614,9 @@ QString LayoutController::describeAction(const Action &a) const
             {u"cardOnFile"_s, QT_TR_NOOP("The tab's held card: hold one, charge it with a tip, or let it go.")},
         };
         const QString name = a.str(u"name");
+        if (name == u"openDepartment")
+            return tr("Rings the amount typed on the keypad in %1.")
+                .arg(a.data.value(u"args").toObject().value(u"department").toString());
         if (const auto it = plain.constFind(name); it != plain.constEnd())
             return tr(it.value());
         // Else the editor's name for it.

@@ -611,7 +611,8 @@ QVariantMap PosService::userPrefs() const
     if (!deviceStart.empty())
         start = deviceStart;
     return {{u"textSize"_s, e->textSize != 100 || !screenText ? e->textSize : screenText},
-            {u"leftHanded"_s, e->leftHanded}, {u"startPage"_s, qs(start)}};
+            {u"leftHanded"_s, e->leftHanded}, {u"startPage"_s, qs(start)},
+            {u"deviceStart"_s, !deviceStart.empty()}};   // this terminal's Start screen is set
 }
 
 void PosShared::noteProblem(const std::string &kind, const std::string &subject, const std::string &detail)
@@ -1329,8 +1330,9 @@ bool PosService::cancelSale()
         return fail(tr("No sale to cancel."));
     if (std::ranges::any_of(c->payments, [](const Payment &p) { return p.kind != TenderKind::Discount; }))
         return fail(tr("Take the payment back first (Undo Payment), then Cancel Sale."));
-    const bool anything = std::ranges::any_of(c->lines, [](const OrderLine &l) { return !l.voided && !l.isComment(); });
-    if (!anything) {   // nothing rung in: just put away, no number used
+    // Nothing rung in: just put away, no number used. A sale whose items were all taken off (error
+    // corrects, voids) is still cancelled and closed: put away, it would stay open (owner 2026-11-09).
+    if (c->lines.empty()) {
         releaseCheck();
         emit notice(tr("Nothing to cancel"));
         return true;
@@ -1456,6 +1458,8 @@ bool PosService::addItem(const QString &idOrName)
     const MenuItem *item = findItem(idOrName);
     if (!item)
         return fail(tr("'%1' is not on the menu.").arg(idOrName));
+    if (item->id.starts_with("open-dept-"))   // an open department's item (looked up): the amount typed
+        return ringOpenDepartment(qs(item->name), qs(toString(item->taxClass)));
     if (!item->available)
         return fail(tr("%1 is sold out.").arg(qs(item->name)));
     // Tobacco and alcohol: the buyer's ID first (once per check; pos_age.cpp).
@@ -1590,8 +1594,8 @@ void PosService::setQualifier(const QString &qualifier)
 
 void PosService::selectLine(qint64 lineId)
 {
-    lineTouched_ = lineId != 0;   // seat / course now apply to it
-    if (lineId == selectedLine_)
+    const bool wasTouched = std::exchange(lineTouched_, lineId != 0);   // seat / course now apply to it
+    if (lineId == selectedLine_ && wasTouched == lineTouched_)   // (the newest, touched: now it's "touched")
         return;
     selectedLine_ = lineId;
     emit checkChanged();
@@ -1649,15 +1653,13 @@ bool PosService::errorCorrect()
     Check *c = current();
     if (!c)
         return fail(tr("No check is open."));
-    OrderLine *l = c->line(selectedLine_);
-    if (!l || l->voided || l->isComment()) {
-        l = nullptr;
-        for (auto it = c->lines.rbegin(); it != c->lines.rend() && !l; ++it)
-            if (!it->voided && !it->isComment())
-                l = &*it;
-    }
-    if (!l)
-        return fail(tr("Nothing to take off."));
+    // Only the line the cashier touched: never the newest by itself (owner 2026-11-09: a second press
+    // took off the item before it too).
+    OrderLine *l = lineTouched_ ? c->line(selectedLine_) : nullptr;
+    if (!l || l->isComment())
+        return fail(tr("Touch the item on the check first, then VOID ITEM."));
+    if (l->voided)               // RESTORE ITEM: the key on a struck-through line
+        return restoreLine();
     if (l->sent) {               // already sent: an ordinary void (reason, permission, kitchen told)
         selectedLine_ = l->id;
         return voidItem();
@@ -1673,7 +1675,132 @@ bool PosService::errorCorrect()
     noteEvent(*c, tr("Error correct %1 (%2)").arg(name, format(was)), "errorCorrect", was);
     emit notice(tr("Error correct: %1").arg(name));
     selectedLine_ = 0;
+    lineTouched_ = false;
     changed(*c);
+    return true;
+}
+
+bool PosService::restoreLine()
+{
+    Check *c = current();
+    if (!c)
+        return fail(tr("No check is open."));
+    OrderLine *l = lineTouched_ ? c->line(selectedLine_) : nullptr;
+    if (!l || !l->voided)
+        return fail(tr("Touch the struck-through item first, then RESTORE ITEM."));
+    if (c->status != CheckStatus::Open)
+        return fail(tr("This check is closed: its items can't be restored."));
+    if (std::ranges::any_of(c->payments, [](const Payment &p) { return p.kind != TenderKind::Discount; }))
+        return fail(tr("Take the payment back first (Undo Payment), then RESTORE ITEM."));
+    if (!l->corrected)   // voided after it was sent: the kitchen was told and the stock put back
+        return fail(tr("%1 was voided after it was sent: ring it in again.").arg(qs(l->displayName())));
+    if (!require(perm::Order, tr("Ordering")))
+        return false;
+    // Back as it was rung (price, modifiers, how many): only the error correct is undone. It waits
+    // to be sent again, to wherever it went before.
+    l->voided = false;
+    l->corrected = false;
+    l->sent = false;
+    const MenuItem *item = findItem(qs(l->itemId));
+    l->kitchenHide = !item || item->kitchenHide || l->itemId.starts_with("open-dept-")
+                     || (isRetailItem(*item) && l->printer.empty() && l->station.empty());
+    const QString name = qs(l->displayName());
+    const Money worth = l->total();
+    // A void undone is no exception (owner 2026-11-09): its error correct stays in the check's history
+    // but no longer counts (Exceptions, Audit summary, exception tickets); voided again, it counts again.
+    const std::string corrected = ss(tr("Error correct %1 (%2)").arg(name, format(worth)));
+    auto undone = std::ranges::find_if(c->events.rbegin(), c->events.rend(), [&](const CheckEvent &e) {
+        return e.kind == "errorCorrect" && e.what == corrected; });
+    if (undone == c->events.rend())
+        undone = std::ranges::find_if(c->events.rbegin(), c->events.rend(), [&](const CheckEvent &e) {
+            return e.kind == "errorCorrect" && e.amount == worth; });
+    if (undone != c->events.rend())
+        undone->kind = "errorCorrectUndone";
+    noteEvent(*c, tr("Restored %1 (%2)").arg(name, format(worth)), "restore", worth);
+    emit notice(tr("Restored: %1").arg(name));
+    selectedLine_ = 0;
+    lineTouched_ = false;
+    changed(*c);
+    return true;
+}
+
+bool PosService::ringOpenDepartment(const QString &department, const QString &taxClass)
+{
+    if (!require(perm::Order, tr("Ordering")))
+        return false;
+    const QString dept = department.trimmed();
+    if (dept.isEmpty())
+        return fail(tr("This key has no department (args.department)."));
+    const qint64 cents = entry_.toLongLong();
+    if (entry_.isEmpty() || cents <= 0)
+        return fail(tr("Type the amount, then %1.").arg(dept));
+    // The key's tax class (the store's rate in Store Settings > Taxes); a class with no rate set there
+    // rings at the sales tax (Merchandise) instead of going untaxed.
+    TaxClass cls = taxClass.isEmpty() ? TaxClass::Merchandise : taxClassFromString(ss(taxClass));
+    if (cls != TaxClass::None && s_->settings.tax.ratePpm(cls) == 0)
+        cls = TaxClass::Merchandise;
+
+    // Its department: the store's category of that name, else a new one (Retail screen only).
+    QString slug = dept.toLower();
+    for (QChar &ch : slug)
+        if (!ch.isLetterOrNumber())
+            ch = u'-';
+    while (slug.contains(u"--"_s))
+        slug.replace(u"--"_s, u"-"_s);
+    slug = u"open-dept-"_s + slug;
+    std::string family;
+    for (const MenuCategory &cat : s_->settings.menuCategories)
+        if (QString::compare(qs(cat.name), dept, Qt::CaseInsensitive) == 0)
+            family = cat.id;
+    if (family.empty()) {
+        MenuCategory cat;
+        cat.id = ss(slug);
+        cat.name = ss(dept);
+        cat.taxClass = toString(cls);
+        cat.retailOnly = true;
+        s_->settings.menuCategories.push_back(cat);
+        family = cat.id;
+        settingsChanged();
+    }
+    // Its item (one per department, the price typed each time), made the first time: reports count
+    // the sale in the department like any item.
+    const MenuItem *item = nullptr;
+    for (const MenuItem &m : s_->menu)
+        if (!m.isModifier && m.family == family && QString::compare(qs(m.name), dept, Qt::CaseInsensitive) == 0)
+            item = &m;
+    if (!item) {
+        MenuItem m;
+        m.id = ss(slug);
+        m.name = ss(dept);
+        m.family = family;
+        m.taxClass = cls;
+        m.kitchenHide = true;
+        s_->menu.push_back(m);
+        if (s_->sink)
+            s_->sink->saveMenuItem(s_->menu.back(), int(s_->menu.size()) - 1);
+        menuChanged();
+        item = &s_->menu.back();
+    }
+    MenuItem priced = *item;
+    priced.price = Money::fromCents(cents);
+    priced.taxClass = cls;
+
+    if (!current() && !startCheck(CheckType::Quick))
+        return false;
+    Check &c = *current();
+    OrderLine &line = c.addItem(priced);
+    stampNewLine(line);
+    line.handed = true;          // rung at the counter: the customer has it
+    line.kitchenHide = true;
+    line.printer.clear();
+    line.station.clear();
+    line.seat = seat_;
+    line.course = course_;
+    selectedLine_ = line.id;
+    lineTouched_ = false;
+    entry_.clear();
+    emit entryChanged();
+    changed(c);
     return true;
 }
 
@@ -2452,6 +2579,7 @@ QVariantList PosService::lines() const
             {u"fee"_s, l.isFee()},
             {u"shared"_s, l.isShare()},
             {u"selected"_s, qint64(l.id) == selectedLine_},
+            {u"touched"_s, lineTouched_ && qint64(l.id) == selectedLine_},   // the cashier touched it (VOID ITEM)
             {u"seat"_s, l.seat}, {u"course"_s, l.course}, {u"held"_s, c->held(l)},
             // Its modifier groups can still be changed / a required one is missing.
             {u"choices"_s, !l.sent && !l.isComment() && [&] {

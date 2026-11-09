@@ -661,6 +661,190 @@ TEST_CASE("Cancel Sale asks why, numbers the cancel for the day, isn't a sale, a
     CHECK(p.pos.buildReport(u"sales"_s).find("Checks").at(1) == "0");
 }
 
+TEST_CASE("Retail open departments: MISC MDSE and MISC FOOD/BEV ring the amount typed, in their department and tax",
+          "[m4][retail][opendept]")
+{
+    Pos p;
+    p.login("1234");
+    core::TaxRates &tax = p.pos.shared()->settings.tax;
+    tax.merchandisePpm = 63500;   // a merchandise rate and a meals rate (made up for the test)
+    tax.foodPpm = 73500;
+    QStringList said;
+    QObject::connect(&p.pos, &PosService::notice, [&](const QString &m) { said << m; });
+
+    // No amount typed: nothing rung in.
+    CHECK_FALSE(p.pos.ringOpenDepartment(u"Misc Merchandise"_s, u"merchandise"_s));
+    REQUIRE_FALSE(said.isEmpty());
+    CHECK(said.last().startsWith(u"Type the amount"_s));
+    CHECK(p.pos.shared()->open.empty());
+
+    const std::size_t menuBefore = p.pos.shared()->menu.size();
+    p.entry("2000");
+    REQUIRE(p.pos.ringOpenDepartment(u"Misc Merchandise"_s, u"merchandise"_s));
+    CHECK(p.pos.entryAmount() == p.pos.format(core::Money()));   // the amount is used up
+    p.entry("2000");
+    REQUIRE(p.pos.ringOpenDepartment(u"Misc Food/Bev"_s, u"food"_s));
+    REQUIRE(p.pos.shared()->open.size() == 1);
+    core::Check &c = p.pos.shared()->open.begin()->second;
+    REQUIRE(c.lines.size() == 2);
+    CHECK(c.lines[0].name == "Misc Merchandise");
+    CHECK(c.lines[0].unitPrice.cents() == 2000);
+    CHECK(c.lines[0].taxClass == core::TaxClass::Merchandise);
+    CHECK(c.lines[1].name == "Misc Food/Bev");
+    CHECK(c.lines[1].taxClass == core::TaxClass::Food);
+    CHECK_FALSE(c.lines[0].forKitchen());   // the customer has it: no ticket
+    const core::Totals t = c.totals(tax);
+    CHECK(t.taxByClass.at(core::TaxClass::Merchandise).cents() == 127);   // 6.35% of $20.00
+    CHECK(t.taxByClass.at(core::TaxClass::Food).cents() == 147);          // 7.35% of $20.00
+
+    // Each is a department (a Retail-only category) with one item, made once and saved.
+    CHECK(p.pos.shared()->menu.size() == menuBefore + 2);
+    const auto &cats = p.pos.shared()->settings.menuCategories;
+    const auto dept = std::ranges::find_if(cats, [](const core::MenuCategory &m) { return m.name == "Misc Food/Bev"; });
+    REQUIRE(dept != cats.end());
+    CHECK(dept->retailOnly);
+    CHECK(p.sink.menu.contains("open-dept-misc-food-bev"));
+    p.entry("500");
+    REQUIRE(p.pos.ringOpenDepartment(u"misc merchandise"_s, u"merchandise"_s));
+    CHECK(p.pos.shared()->menu.size() == menuBefore + 2);   // the same department and item again
+    REQUIRE(c.lines.size() == 3);
+    CHECK(c.lines[2].unitPrice.cents() == 500);
+
+    // Looked up by name (ALPHA LOOK UP): the same thing, at the amount typed.
+    p.entry("300");
+    REQUIRE(p.pos.addItem(u"Misc Food/Bev"_s));
+    REQUIRE(c.lines.size() == 4);
+    CHECK(c.lines[3].unitPrice.cents() == 300);
+    CHECK(c.lines[3].taxClass == core::TaxClass::Food);
+
+    // No meals rate set (Store Settings > Taxes > Food tax % at 0): the sales tax rate, never untaxed.
+    tax.foodPpm = 0;
+    p.entry("1000");
+    REQUIRE(p.pos.ringOpenDepartment(u"Misc Food/Bev"_s, u"food"_s));
+    REQUIRE(c.lines.size() == 5);
+    CHECK(c.lines[4].taxClass == core::TaxClass::Merchandise);
+}
+
+TEST_CASE("Retail VOID ITEM takes off only the touched line; RESTORE ITEM brings it back, no exception",
+          "[m4][retail][void][exceptions]")
+{
+    Pos p;
+    p.login("1234");   // Morgan, a manager
+    p.openDrawer("10000");
+    QStringList said;
+    QObject::connect(&p.pos, &PosService::notice, [&](const QString &m) { said << m; });
+    const std::string morgan = "Morgan (Manager)";
+    const std::string corrects = "Error corrects (retail, before paying)";
+    const auto exceptionTicketsFor = [&](std::int64_t id) {
+        const auto tickets = p.pos.exceptionTickets();
+        return std::ranges::count_if(tickets, [&](const auto &t) { return t.file == "check-" + std::to_string(id); });
+    };
+
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.addItem(u"cobb"_s));
+    REQUIRE(p.pos.addItem(u"caesar"_s));
+    p.pos.finishChoosing();
+    core::Check &c = p.pos.shared()->open.begin()->second;
+    REQUIRE(c.lines.size() == 2);
+    const core::Money full = c.totals(p.pos.shared()->settings.tax).total;
+
+    // Nothing touched: a message, and nothing taken off (not even the newest).
+    said.clear();
+    CHECK_FALSE(p.pos.errorCorrect());
+    REQUIRE_FALSE(said.isEmpty());
+    CHECK(said.last() == u"Touch the item on the check first, then VOID ITEM."_s);
+    CHECK(std::ranges::none_of(c.lines, [](const core::OrderLine &l) { return l.voided; }));
+    CHECK_FALSE(p.pos.lines()[1].toMap()[u"touched"_s].toBool());   // the newest is not lit as touched
+
+    // The touched line, not the newest; then nothing is touched any more.
+    p.pos.selectLine(c.lines[0].id);
+    CHECK(p.pos.lines()[0].toMap()[u"touched"_s].toBool());
+    REQUIRE(p.pos.errorCorrect());
+    CHECK(c.lines[0].voided);
+    CHECK(c.lines[0].corrected);
+    CHECK_FALSE(c.lines[1].voided);
+    CHECK(p.pos.selectedLine() == 0);
+    CHECK_FALSE(p.pos.errorCorrect());
+    CHECK_FALSE(c.lines[1].voided);
+    CHECK(rowIn(p.pos.buildReport(u"exceptions"_s), corrects, morgan) == std::vector<std::string>{morgan, "1", "$12.50"});
+
+    // The struck-through line touched: the same key restores it, as it was rung.
+    p.pos.selectLine(c.lines[0].id);
+    REQUIRE(p.pos.restoreLine());
+    CHECK_FALSE(c.lines[0].voided);
+    CHECK_FALSE(c.lines[0].corrected);
+    CHECK(c.totals(p.pos.shared()->settings.tax).total == full);
+    CHECK(std::ranges::any_of(c.events, [](const core::CheckEvent &e) { return e.what.starts_with("Restored "); }));
+    CHECK(std::ranges::any_of(c.events, [](const core::CheckEvent &e) { return e.what.starts_with("Error correct "); }));
+    // Void then restore cancels out: no exception, no exception ticket.
+    CHECK(rowIn(p.pos.buildReport(u"exceptions"_s), corrects, morgan).empty());
+    CHECK(exceptionTicketsFor(c.id) == 0);
+
+    // Through the void key itself (errorCorrect on a struck-through line), then voided again: one exception.
+    p.pos.selectLine(c.lines[0].id);
+    REQUIRE(p.pos.errorCorrect());
+    p.pos.selectLine(c.lines[0].id);
+    REQUIRE(p.pos.errorCorrect());   // RESTORE ITEM
+    CHECK_FALSE(c.lines[0].voided);
+    CHECK(rowIn(p.pos.buildReport(u"exceptions"_s), corrects, morgan).empty());
+    p.pos.selectLine(c.lines[0].id);
+    REQUIRE(p.pos.errorCorrect());   // voided again, and left so
+    CHECK(c.lines[0].voided);
+    CHECK(rowIn(p.pos.buildReport(u"exceptions"_s), corrects, morgan) == std::vector<std::string>{morgan, "1", "$12.50"});
+    CHECK(exceptionTicketsFor(c.id) == 1);
+
+    // Paid: no restoring until the payment is taken back.
+    const std::int64_t id = c.id;
+    const std::int64_t voidedLine = c.lines[0].id;
+    p.entry("100");
+    REQUIRE(p.pos.tender(u"cash"_s));
+    p.pos.selectLine(voidedLine);
+    CHECK_FALSE(p.pos.restoreLine());
+    CHECK(c.lines[0].voided);
+    // Closed: no restoring at all.
+    REQUIRE(p.pos.removePayment());
+    p.entry("5000");
+    REQUIRE(p.pos.tender(u"cash"_s));
+    REQUIRE(p.pos.closeCheck());
+    p.pos.selectLine(voidedLine);
+    CHECK_FALSE(p.pos.restoreLine());
+    const auto closed = std::ranges::find(p.pos.shared()->closedToday, id, &core::Check::id);
+    REQUIRE(closed != p.pos.shared()->closedToday.end());
+    CHECK(closed->lines[0].voided);
+}
+
+TEST_CASE("Cancel Sale closes a sale whose items were all error-corrected: not left open", "[m4][retail][cancel]")
+{
+    Pos p;
+    p.login("1234");
+    p.openDrawer("10000");
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.addItem(u"cobb"_s));
+    REQUIRE(p.pos.addItem(u"caesar"_s));
+    p.pos.finishChoosing();
+    core::Check &c = p.pos.shared()->open.begin()->second;
+    const std::int64_t id = c.id;
+    for (const std::int64_t line : {c.lines[0].id, c.lines[1].id}) {
+        p.pos.selectLine(line);
+        REQUIRE(p.pos.errorCorrect());
+    }
+    CHECK_FALSE(p.pos.cancelSale());   // asks why
+    REQUIRE(p.pos.reasonAsk()[u"kind"_s] == u"cancel"_s);
+    REQUIRE(p.pos.giveReason(u"Price"_s));
+    CHECK(p.pos.shared()->open.empty());             // not put away (suspended) for later
+    CHECK_FALSE(p.pos.hasCheck());                   // the register is at an empty sale
+    REQUIRE(p.pos.shared()->cancelledToday.size() == 1);
+    CHECK(p.pos.shared()->cancelledToday.front().id == id);
+    CHECK(p.pos.shared()->cancelledToday.front().status == core::CheckStatus::Discarded);
+    CHECK(p.pos.shared()->closedToday.empty());      // not a sale
+
+    // A sale with nothing rung in at all: just gone, no Cancel number used.
+    REQUIRE(p.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(p.pos.cancelSale());
+    CHECK(p.pos.shared()->open.empty());
+    CHECK(p.pos.shared()->cancelledToday.size() == 1);
+}
+
 TEST_CASE("Price check: on and off, a scan shows the item and its box or singles", "[m4][pricecheck]")
 {
     Pos p;

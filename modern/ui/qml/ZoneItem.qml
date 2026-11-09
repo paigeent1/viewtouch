@@ -157,6 +157,11 @@ Item {
             "date": Qt.locale().toString(zone.now, "ddd MMM d"),
             "mealPeriod": controller ? controller.mealPeriod : "",
         }
+        // The Retail screen's void key: RESTORE ITEM on a touched struck-through line.
+        if (text.indexOf("{voidKey}") >= 0) {
+            const lines = p && p.hasCheck ? p.lines : []
+            values["voidKey"] = lines.some(l => l.touched && l.voided) ? qsTr("RESTORE ITEM") : qsTr("VOID ITEM")
+        }
         // New problems for the managers (Store Check): "⚠ 2", or nothing.
         if (text.indexOf("{problems}") >= 0) {
             const n = p && p.storeCheck ? (p.storeCheck.unseen ?? 0) : 0

@@ -1201,6 +1201,58 @@ int runStore(const Args &cli, const Options &o)
                     state.seen << mark;
                 }
             }
+            // Retail register keys (owner, 2026-11-09): SUSPEND / RESUME / CLEAR / SUB TOTAL down the right,
+            // MISC FOOD/BEV where SUSPEND was, MISC TXBL -> MISC MDSE (open departments), VOID ITEM / RESTORE
+            // ITEM on the touched line, no TIME CLOCK. Once; each part only while the store's keys are still
+            // where and as the seed had them.
+            if (const QString mark = u"retail-entry#retail-keys@2026-11-09"_s; !state.seen.contains(mark)) {
+                vt::layout::Page *mine = layout->page(u"retail-entry"_s);
+                const vt::layout::Page *given = starter->page(u"retail-entry"_s);
+                const auto zoneIn = [](auto *page, const QString &id) -> decltype(&page->zones.front()) {
+                    for (auto &z : page->zones)
+                        if (z.id == id)
+                            return &z;
+                    return nullptr;
+                };
+                const auto at = [](const vt::layout::Zone *z, int x, int y, int w, int h) {
+                    return z && z->rect == QRect(x, y, w, h);
+                };
+                if (mine && given) {
+                    auto *suspend = zoneIn(mine, u"rtl-suspend"_s), *resume = zoneIn(mine, u"rtl-resume"_s);
+                    auto *clear = zoneIn(mine, u"rtl-clear"_s), *pay = zoneIn(mine, u"rtl-subtotal"_s);
+                    if (at(suspend, 1732, 364, 172, 84) && at(resume, 1640, 468, 264, 112) && at(clear, 1640, 596, 264, 112)
+                        && at(pay, 1640, 724, 264, 340) && !zoneIn(mine, u"rtl-miscfood"_s)) {
+                        for (auto *z : {suspend, resume, clear, pay})
+                            if (const auto *g = zoneIn(given, z->id))
+                                z->rect = g->rect;
+                        if (const auto *g = zoneIn(given, u"rtl-miscfood"_s))
+                            mine->zones.append(*g);
+                        zonesAdded = true;
+                    }
+                    if (auto *misc = zoneIn(mine, u"rtl-misc"_s); misc && misc->label == u"MISC TXBL"
+                        && misc->actions.size() == 1 && misc->actions.front().type() == u"addItem"
+                        && misc->actions.front().str(u"item") == u"Misc Txbl") {
+                        if (const auto *g = zoneIn(given, u"rtl-misc"_s)) {
+                            misc->label = g->label;
+                            misc->actions = g->actions;
+                            zonesAdded = true;
+                        }
+                    }
+                    if (auto *v = zoneIn(mine, u"rtl-void"_s); v && v->label == u"VOID PREV ITEM") {
+                        v->label = u"{voidKey}"_s;
+                        zonesAdded = true;
+                    }
+                    if (auto *list = zoneIn(mine, u"retail-check"_s); list && !list->props.contains(u"touchToSelect")) {
+                        list->props.insert(u"touchToSelect"_s, true);
+                        zonesAdded = true;
+                    }
+                    if (const auto *clock = zoneIn(mine, u"rtl-clock"_s); at(clock, 1732, 260, 172, 88)) {
+                        mine->zones.removeIf([](const vt::layout::Zone &z) { return z.id == u"rtl-clock"; });
+                        zonesAdded = true;
+                    }
+                }
+                state.seen << mark;
+            }
             if (zonesAdded && !store.save(*layout, &error))
                 qWarning().noquote() << "Could not save the added buttons:" << error;
             for (const vt::layout::Page &p : starter->pages) {

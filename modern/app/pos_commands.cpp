@@ -132,6 +132,8 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"setCheckFilter"_s, [](PosService &p, const QVariantList &a) { p.setCheckFilter(a.value(0).toString()); return QVariant(true); }},
         {u"voidItem"_s, [](PosService &p, const QVariantList &) { return QVariant(p.voidItem()); }},
         {u"errorCorrect"_s, [](PosService &p, const QVariantList &) { return QVariant(p.errorCorrect()); }},
+        {u"restoreLine"_s, [](PosService &p, const QVariantList &) { return QVariant(p.restoreLine()); }},
+        {u"ringOpenDepartment"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.ringOpenDepartment(a.value(0).toString(), a.value(1).toString())); }},
         {u"noteScan"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.noteScan(a.value(0).toString(), a.value(1).toString(), a.value(2).toBool())); }},
         {u"setLineQuantity"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setLineQuantity(a.value(0).toLongLong(), a.value(1).toInt())); }},
         {u"lineMore"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.changeLineQuantity(a.value(0).toLongLong(), 1)); }},
