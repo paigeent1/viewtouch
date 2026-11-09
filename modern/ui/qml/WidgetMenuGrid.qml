@@ -29,19 +29,26 @@ Item {
         Component.onCompleted: ask()
         Component.onDestruction: if (asked) asked.want("itemSearch", false)
     }
-    // Typing: found a moment after the last key.
+    // Typing: found a moment after the last key; the best 50 (More… for the next 50).
+    property int findLimit: 50
+    readonly property bool foundMore: search && typed !== "" && (found.count ?? 0) > shown.length
+    function findMore() {
+        findLimit = shown.length + 50
+        if (pos) pos.findItems(typed, findLimit)
+    }
     Timer {
         id: findTyping
-        interval: 200
-        onTriggered: if (w.pos && w.search) w.pos.findItems(w.typed)
+        interval: 150
+        onTriggered: if (w.pos && w.search) w.pos.findItems(w.typed, w.findLimit)
     }
     onTypedChanged: {
         if (!search) return
+        findLimit = 50
         findTyping.restart()
         if (typed === "") refreshFound()      // cleared: no bars right away
     }
     Component.onCompleted: {
-        if (search && pos) pos.findItems(typed)
+        if (search && pos) pos.findItems(typed, findLimit)
         refreshFound()
     }
     readonly property var found: pos && search ? pos.itemSearch : ({})
@@ -108,8 +115,16 @@ Item {
     }
 
     readonly property real gap: 12
-    // Find's bars: big enough to touch (64 at the least, in the page's units).
-    readonly property real barH: Math.max(64, zone ? zone.touch(64) : 64)
+    // Find's rows: about six show at once, never shorter than a finger (48 screen pixels) nor taller
+    // than 96; the words sized from the row, so a name stays readable.
+    readonly property real rowH: {
+        const fit = (height - gap * 3) / 6
+        const finger = zone ? zone.touch(48) : 48
+        return Math.max(finger, Math.min(96, fit))
+    }
+    readonly property real nameSize: Math.max(14, Math.min(28, rowH * 0.4))
+    readonly property real detailSize: Math.max(11, Math.min(19, rowH * 0.26))
+    readonly property real priceSize: Math.max(14, Math.min(30, rowH * 0.44))
     // Arranging (managers): touch an item, then move it or color it.
     // Kept by the controller: a menu change rebuilds the page.
     property bool arranging: zone && zone.controller ? zone.controller.widgetState(zone.zoneId + ".arranging") === true : false
@@ -159,7 +174,8 @@ Item {
             }
         }
 
-        // Find: one bar per item (name, price), best first, with big ▲ ▼ to page through them.
+        // Find: one row per item (name; its UPC and number under it; the price on the right), best first,
+        // about six to a screen, with ▲ PG UP / ▼ PG DN on the right to page through them.
         RowLayout {
             objectName: "findBars"
             visible: w.search && w.shown.length > 0
@@ -177,17 +193,32 @@ Item {
                 model: w.search ? w.shown : []
                 readonly property var allergenNames: w.pos ? w.pos.allergenList() : []
                 function allergenName(id) { return (allergenNames.find(a => a.id === id) ?? { name: id }).name }
+                // One page: as many rows as show.
                 function page(by) {
-                    const step = Math.max(1, Math.floor(height / (w.barH + spacing)) - 1)
+                    const step = Math.max(1, Math.floor((height + spacing) / (w.rowH + spacing)))
                     const top = indexAt(10, contentY + 10)
                     positionViewAtIndex(Math.max(0, Math.min(count - 1, (top < 0 ? 0 : top) + by * step)), ListView.Beginning)
+                }
+                // More than shown: the next 50.
+                footer: Item {
+                    width: bars.width
+                    height: w.foundMore ? w.rowH + w.gap * 0.5 : 0
+                    WidgetKey {
+                        objectName: "findMore"
+                        visible: w.foundMore
+                        anchors.fill: parent
+                        anchors.topMargin: w.gap * 0.5
+                        text: qsTr("More… (%1 of %2 shown)").arg(w.shown.length).arg(w.found.count ?? 0)
+                        fontScale: 0.3
+                        onClicked: w.findMore()
+                    }
                 }
                 delegate: Rectangle {
                     id: bar
                     required property var modelData
                     objectName: "menuItem-" + modelData.id
                     width: ListView.view.width
-                    height: w.barH
+                    height: w.rowH
                     radius: 8
                     readonly property var hits: (modelData.allergens ?? []).filter(a => w.allergies.includes(a))
                     color: !modelData.available ? "#3a3f48" : "#1f2937"
@@ -199,21 +230,15 @@ Item {
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
                         spacing: 14
-                        Text {
-                            visible: !!bar.modelData.number
-                            text: bar.modelData.number ?? ""
-                            font.family: w.face
-                            font.pixelSize: 18
-                            color: "#93c5fd"
-                        }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 0
                             Text {
+                                objectName: "findName-" + bar.modelData.id
                                 Layout.fillWidth: true
                                 text: qsTranslate("Page", bar.modelData.name)
                                 font.family: w.face
-                                font.pixelSize: 24; font.bold: true
+                                font.pixelSize: w.nameSize; font.bold: true
                                 color: "white"
                                 elide: Text.ElideRight
                             }
@@ -222,8 +247,20 @@ Item {
                                 visible: bar.hits.length > 0
                                 Layout.fillWidth: true
                                 text: "⚠ " + bar.hits.map(a => bars.allergenName(a)).join(", ")
-                                font.pixelSize: 16; font.bold: true
+                                font.pixelSize: w.detailSize; font.bold: true
                                 color: "#fbbf24"
+                                elide: Text.ElideRight
+                            }
+                            // Its UPC and number (no allergy line there instead).
+                            Text {
+                                objectName: "findDetail-" + bar.modelData.id
+                                Layout.fillWidth: true
+                                visible: bar.hits.length === 0 && text !== ""
+                                text: [bar.modelData.upc ? "UPC " + bar.modelData.upc : "",
+                                       bar.modelData.number ? "#" + bar.modelData.number : ""].filter(x => x).join("    ")
+                                font.family: w.face
+                                font.pixelSize: w.detailSize
+                                color: "#cbd5e1"
                                 elide: Text.ElideRight
                             }
                         }
@@ -232,7 +269,7 @@ Item {
                             text: !bar.modelData.available ? qsTr("SOLD OUT")
                                 : bar.modelData.price + (bar.modelData.byWeight ? " / " + bar.modelData.unit : "")
                             font.family: w.face
-                            font.pixelSize: 26; font.bold: true
+                            font.pixelSize: w.priceSize; font.bold: true
                             color: !bar.modelData.available ? "#ff6b6b" : "#fde047"
                         }
                     }
@@ -242,26 +279,12 @@ Item {
                     }
                 }
             }
-            ColumnLayout {
-                Layout.fillHeight: true
-                Layout.preferredWidth: 130
-                spacing: w.gap
-                WidgetKey {
-                    objectName: "findPageUp"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: "▲"
-                    fontScale: 0.5
-                    onClicked: bars.page(-1)
-                }
-                WidgetKey {
-                    objectName: "findPageDown"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: "▼"
-                    fontScale: 0.5
-                    onClicked: bars.page(1)
-                }
+            PageArrows {
+                upName: "findPageUp"
+                downName: "findPageDown"
+                keyWidth: Math.max(110, Math.min(w.zone ? w.zone.touch(90) : 130, w.width * 0.14))
+                onUp: bars.page(-1)
+                onDown: bars.page(1)
             }
         }
 

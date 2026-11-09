@@ -173,8 +173,9 @@ class PosSession : public QObject {
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
     Q_PROPERTY(QVariantMap checkSearch READ checkSearch NOTIFY sessionChanged)
-    // Find on the order screens (findItems): {query, count, rev, items: [{id, name, price, available, byWeight,
-    //  unit, number, family, allergens}]} (the best 300, best first; every word typed in the name, or a number / UPC).
+    // Find on the order screens (findItems): {query, count, limit, rev, items: [{id, name, price, available, byWeight,
+    //  unit, number, upc, family, allergens}]} (the best 50 or as many as asked, best first; every word typed in the
+    //  name, or a number / UPC).
     Q_PROPERTY(QVariantMap itemSearch READ itemSearch NOTIFY sessionChanged)
     // Manager -> Network: {role: main|single, term, terminals: [{name,
     // address, user, since}], standby: {address, since} | null, printers:
@@ -616,7 +617,7 @@ public:
     // {ingredient | name, hours, count, note}.
     Q_INVOKABLE void printPrepLabels(const QVariantMap &labels) { invoke(QStringLiteral("printPrepLabels"), {labels}); }
     Q_INVOKABLE void findRetailLabels(const QString &query) { invoke(QStringLiteral("findRetailLabels"), {query}); }
-    Q_INVOKABLE void findItems(const QString &text) { invoke(QStringLiteral("findItems"), {text}); }
+    Q_INVOKABLE void findItems(const QString &text, int limit = 50) { invoke(QStringLiteral("findItems"), {text, limit}); }
     // What Menu Builder shows (builderItems): its open category, its search, the item on its card and
     // that item's parent UPC (its box or carton).
     Q_INVOKABLE void setBuilderView(const QString &categoryId, const QString &search, const QString &itemId,

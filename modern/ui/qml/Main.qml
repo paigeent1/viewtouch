@@ -234,6 +234,21 @@ ApplicationWindow {
                     } else {
                         root.scanBuffer = ""
                     }
+                    // Find: letters, a space and Backspace typed on a keyboard go into its search line, as
+                    // its on-screen keys do (no touch on the line first). Digits stay item numbers / scans.
+                    if (!burst && root.controller.pageId === "find-item" && root.controller.pos) {
+                        const t = event.text
+                        if (t.length === 1 && (t === " " || t.toLowerCase() !== t.toUpperCase())) {
+                            root.controller.pos.textKey(t === " " ? "space" : t)
+                            event.accepted = true
+                            return
+                        }
+                        if (event.key === Qt.Key_Backspace && root.controller.pos.textEntry !== "") {
+                            root.controller.pos.textKey("back")
+                            event.accepted = true
+                            return
+                        }
+                    }
                     if (event.key === Qt.Key_Escape && root.controller.numberKey("escape")) {
                         event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {

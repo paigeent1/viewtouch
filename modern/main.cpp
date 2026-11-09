@@ -1081,8 +1081,24 @@ int runStore(const Args &cli, const Options &o)
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
+                // Retail Mode back to the Retail screen, from the order screens (above the check), the
+                // floor plan and Open checks (owner 2026-11-09: no way back from there).
+                {u"order-template", u"retail-mode-btn"},
+                {u"tables", u"retail-mode-btn"},
+                {u"check-list", u"retail-mode-btn"},
             };
             bool zonesAdded = false;
+            // Room for Retail Mode above the check: the check's list starts 88 lower, once, while it's
+            // where it was given.
+            if (const QString mark = u"order-template#order-list@retail-room"_s; !state.seen.contains(mark)) {
+                if (vt::layout::Page *mine = layout->page(u"order-template"_s))
+                    for (vt::layout::Zone &z : mine->zones)
+                        if (z.id == u"order-list" && z.rect == QRect(16, 16, 560, 948)) {
+                            z.rect = QRect(16, 104, 560, 860);
+                            zonesAdded = true;
+                        }
+                state.seen << mark;
+            }
             for (const auto &[pageId, zoneId] : givenZones) {
                 const QString mark = QString::fromUtf16(pageId) + u'#' + QString::fromUtf16(zoneId);
                 if (state.seen.contains(mark))
@@ -1092,6 +1108,12 @@ int runStore(const Args &cli, const Options &o)
                 if (mine && given && std::ranges::none_of(mine->zones, [&](const vt::layout::Zone &z) { return z.id == QString::fromUtf16(zoneId); })) {
                     for (const vt::layout::Zone &z : given->zones)
                         if (z.id == QString::fromUtf16(zoneId)) {
+                            // Not over something the store put there itself (decorations aside).
+                            const auto covers = [&](const vt::layout::Zone &o) { return o.kind != u"decor" && o.rect.intersects(z.rect); };
+                            if (std::ranges::any_of(mine->zones, covers)) {
+                                qInfo().noquote() << "Button not added to" << QString::fromUtf16(pageId) << "(something is in its place):" << z.label;
+                                continue;
+                            }
                             mine->zones.append(z);
                             zonesAdded = true;
                             qInfo().noquote() << "Button added to" << QString::fromUtf16(pageId) << ":" << z.label;

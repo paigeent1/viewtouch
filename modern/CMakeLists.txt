@@ -169,6 +169,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetModifierPicker.qml
             ui/qml/WidgetSoldOutList.qml
             ui/qml/TouchScrollBar.qml
+            ui/qml/PageArrows.qml
             ui/qml/TouchScrollColumn.qml
             ui/qml/SelfOrder.qml
             ui/qml/JobChooser.qml

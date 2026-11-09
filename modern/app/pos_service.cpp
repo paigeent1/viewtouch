@@ -7,6 +7,10 @@
 
 #include <QDateTime>
 #include <QLocale>
+#include <QHash>
+
+#include <algorithm>
+#include <unordered_map>
 
 using namespace Qt::StringLiterals;
 using namespace vt::core;
@@ -240,9 +244,108 @@ Check *PosService::current()
     return it == s_->open.end() ? nullptr : &it->second;
 }
 
+// Every item's id, number, barcodes and name (case folded) to its place in the menu, the first item
+// in menu order for each (as the walks through the menu found them). A 31,700-item price book took
+// a walk through every item, making a QString of every name, on each scan and price check.
+struct PosService::CodeIndex {
+    std::uint64_t shared = 0;
+    int revision = -1;
+    std::size_t size = 0;
+    std::unordered_map<std::string, std::uint32_t> id, number, barcode;
+    QHash<QString, std::uint32_t> name;
+    // The first item with this exact barcode, or nullptr.
+    const std::uint32_t *code(const std::string &c) const
+    {
+        const auto it = barcode.find(c);
+        return it == barcode.end() ? nullptr : &it->second;
+    }
+};
+
+const PosService::CodeIndex &PosService::codeIndex() const
+{
+    if (!codeIndex_)
+        codeIndex_ = std::make_shared<CodeIndex>();
+    CodeIndex &x = *codeIndex_;
+    if (x.shared == s_->serial && x.revision == s_->adminRevision && x.size == s_->menu.size())
+        return x;
+    x.shared = s_->serial;
+    x.revision = s_->adminRevision;
+    x.size = s_->menu.size();
+    x.id.clear();
+    x.number.clear();
+    x.barcode.clear();
+    x.name.clear();
+    x.id.reserve(x.size);
+    x.barcode.reserve(x.size * 2);
+    x.name.reserve(qsizetype(x.size));
+    for (std::size_t i = 0; i < s_->menu.size(); ++i) {
+        const MenuItem &m = s_->menu[i];
+        const auto at = std::uint32_t(i);
+        x.id.emplace(m.id, at);   // emplace: the first one stays
+        if (!m.number.empty())
+            x.number.emplace(m.number, at);
+        for (const std::string &b : m.barcodes)
+            if (!b.empty())
+                x.barcode.emplace(b, at);
+        if (QString folded = qs(m.name).toCaseFolded(); !x.name.contains(folded))   // the first one stays
+            x.name.insert(std::move(folded), at);
+    }
+    return x;
+}
+
+namespace {
+// The barcode a scanner's other reading of `scanned` is stored as (PosService::sameBarcode): a
+// UPC-A read as an EAN-13 (0 in front), either way round, or a UPC-A without its check digit.
+std::vector<std::string> otherReadings(const std::string &scanned)
+{
+    if (scanned.empty() || !std::ranges::all_of(scanned, [](char ch) { return ch >= '0' && ch <= '9'; }))
+        return {};
+    if (scanned.size() == 13 && scanned[0] == '0')
+        return {scanned.substr(1)};
+    if (scanned.size() == 12)
+        return {"0" + scanned};
+    if (scanned.size() == 11) {
+        int sum = 0;
+        for (int i = 0; i < 11; ++i)
+            sum += (scanned[10 - i] - '0') * (i % 2 == 0 ? 3 : 1);
+        return {scanned + char('0' + (10 - sum % 10) % 10)};
+    }
+    return {};
+}
+} // namespace
+
 const MenuItem *PosService::findItem(const QString &idOrName) const
 {
     const std::string key = ss(idOrName);
+    // By the index (checked against the item itself: a menu changed without a word is walked).
+    {
+        const CodeIndex &x = codeIndex();
+        const auto item = [&](std::uint32_t i) { return i < s_->menu.size() ? &s_->menu[i] : nullptr; };
+        if (const auto it = x.id.find(key); it != x.id.end()) {
+            if (const MenuItem *m = item(it->second); m && m->id == key)
+                return m;
+        } else if (const auto n = x.name.constFind(idOrName.toCaseFolded()); n != x.name.cend()) {
+            if (const MenuItem *m = item(*n); m && QString::compare(qs(m->name), idOrName, Qt::CaseInsensitive) == 0)
+                return m;
+        } else if (const auto nu = key.empty() ? x.number.end() : x.number.find(key); nu != x.number.end()) {
+            if (const MenuItem *m = item(nu->second); m && m->number == key)
+                return m;
+        } else if (const std::uint32_t *b = key.empty() ? nullptr : x.code(key)) {
+            if (const MenuItem *m = item(*b); m && std::ranges::find(m->barcodes, key) != m->barcodes.end())
+                return m;
+        } else {
+            const MenuItem *found = nullptr;
+            for (const std::string &other : otherReadings(key))
+                if (const std::uint32_t *o = x.code(other))
+                    if (const MenuItem *m = item(*o); m && (!found || m < found)
+                        && std::ranges::any_of(m->barcodes, [&](const std::string &s) { return sameBarcode(s, key); }))
+                        found = m;
+            if (found)
+                return found;
+            if (!key.empty() && !std::ranges::any_of(key, [](char ch) { return ch < '0' || ch > '9'; }))
+                return nullptr;   // a code on no item (a scan not on file): nothing more to look at
+        }
+    }
     for (const MenuItem &m : s_->menu) {
         if (m.id == key)
             return &m;
