@@ -4,6 +4,10 @@
 #   vt-site init "Store name"             start them for a new site (keeps what's there)
 #   vt-site set KEY value                 SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
 #                                         STANDBY_ALLOWED (yes / no: may this computer become a standby)
+#   vt-site set SERIAL_SCANNER ""         serial scanners: every USB-serial port (the default; any number
+#                                         of scanners, printers' ports left alone). Same: all. off: none.
+#                                         Or only some ports, by commas or spaces, each @speed if wanted:
+#                                         vt-site set SERIAL_SCANNER "/dev/ttyUSB0, /dev/ttyUSB1@19200"
 #   vt-site tablet add "Bar 1" 192.168.1.220
 #   vt-site tablet remove "Bar 1"
 #   vt-site edit                          open the settings in nano
@@ -19,8 +23,10 @@ SITE_NAME="${1:-}"
 # The ViewTouch server's address for pairing tablets. Empty: this Pi's own address.
 SERVER_ADDR=""
 SERVER_PORT=7719
-# The barcode scanner's serial port. Empty: the serial adapter's first port, found by name
-# (/dev/serial/by-id/...-port0). "off": no serial scanner (a USB scanner that types needs none).
+# Serial barcode scanners. Empty (or all): every USB-serial port, looked for again every few seconds,
+# so any number of scanners on any ports just work (a "file" printer's port is left alone).
+# "off": no serial scanner (a USB scanner that types needs none). Or only these ports, separated by
+# commas or spaces, each with its own speed if wanted: "/dev/ttyUSB0, /dev/ttyUSB1@19200".
 SERIAL_SCANNER=""
 SERIAL_SCANNER_BAUD=9600
 EOF
@@ -39,7 +45,7 @@ case "$1" in
     ""|show)
         echo "Site: ${SITE_NAME:-(not set: vt-site init \"Store name\")}   settings: $VT_SITE_CONF"
         echo "Server: $(vt_server_addr):$SERVER_PORT"
-        echo "Scanner: ${SERIAL_SCANNER:-auto: the serial adapter, first port} at $SERIAL_SCANNER_BAUD baud"
+        echo "Serial scanners: ${SERIAL_SCANNER:-all: every USB-serial port} (speed $SERIAL_SCANNER_BAUD baud unless @speed)"
         echo "May become a standby: ${STANDBY_ALLOWED:-yes (not set)}"
         echo "Tablets:"; t=$(vt_tablets); [ -n "$t" ] && echo "$t" | sed 's/|/  /; s/^/  /' || echo "  (none: vt-site tablet add \"Bar 1\" 192.168.1.x)"
         n=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$VT_CONF_DIR/tvs.json" 2>/dev/null)
@@ -78,5 +84,5 @@ case "$1" in
     edit)
         [ -f "$VT_SITE_CONF" ] || write_template
         ${EDITOR:-nano} "$VT_SITE_CONF" ;;
-    *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -82,7 +82,7 @@ EOF
 [ -n "$ONLY" ] && PAGES=$(echo "$ONLY" | tr ',' '\n')
 COUNT=$(echo "$PAGES" | grep -c .)
 echo "[2/4] Taking pictures of $COUNT pages at $SIZE (nothing shows on the screens)..."
-export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software VT_STANDBY_ALLOWED=no VT_SERIAL_SCANNER=
+export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software VT_STANDBY_ALLOWED=no VT_SERIAL_SCANNER=off   # never read the register's scanners
 shoot() {   # name, extra arguments...
     local name="$1"; shift
     timeout 90 "$BIN" --data-dir "$WORK/data" --size "$SIZE" --screenshot "$OUT/$name.png" "$@" \

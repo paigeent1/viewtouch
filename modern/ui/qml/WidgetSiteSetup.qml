@@ -141,7 +141,26 @@ Item {
                     title: qsTr("Scanner")
                     ColumnLayout {
                         anchors.fill: parent
-                        Caption { text: qsTr("USB scanners need no setup: they type into the POS screen (a second one just for IDs too). These settings are for a serial scanner on the adapter.") }
+                        Caption { text: qsTr("USB scanners need no setup: they type into the POS screen (a second one just for IDs too). Serial scanners on a USB-serial adapter need none either: ViewTouch listens on every port, so any number of them work.") }
+                        // The ports ViewTouch listens on now, and whether each is open.
+                        Repeater {
+                            model: w.site.scanners ?? []
+                            Label {
+                                required property var modelData
+                                objectName: "scannerStatus"
+                                Layout.fillWidth: true
+                                font.pixelSize: 14; font.bold: false
+                                elide: Text.ElideMiddle
+                                color: modelData.open ? "#8fd19e" : "#c9ced6"
+                                text: (modelData.open ? qsTr("Listening: %1 at %2 baud") : qsTr("Waiting for: %1 at %2 baud"))
+                                          .arg(String(modelData.device).replace("/dev/serial/by-id/usb-", "").replace(/_/g, " "))
+                                          .arg(modelData.baud)
+                            }
+                        }
+                        Caption {
+                            visible: (w.site.scanners ?? []).length === 0
+                            text: qsTr("No serial port to listen on now.")
+                        }
                         Caption { text: qsTr("Serial scanner port") }
                         ComboBox {
                             id: portBox
@@ -149,15 +168,17 @@ Item {
                             Layout.fillWidth: true; font.pixelSize: 15; font.bold: false
                             // Auto, Off, then the ports this Pi has now (the saved one kept if it's unplugged).
                             readonly property var choices: {
-                                const out = [{ path: "", label: qsTr("Auto: the serial adapter's first port") },
+                                // "" and "all": every USB-serial port (printers' ports left alone).
+                                const out = [{ path: "", label: qsTr("Auto: every serial port (any number of scanners)") },
                                              { path: "off", label: qsTr("Off (a USB scanner that types needs none)") }]
                                 for (const p of (w.site.scannerPorts ?? [])) out.push(p)
-                                const cur = w.draft.scanner ?? ""
+                                const cur = portBox.current
                                 if (cur !== "" && !out.some(p => p.path === cur)) out.push({ path: cur, label: cur + qsTr(" (not plugged in)") })
                                 return out
                             }
+                            readonly property string current: (w.draft.scanner ?? "").toLowerCase() === "all" ? "" : (w.draft.scanner ?? "")
                             model: choices.map(p => p.label)
-                            currentIndex: Math.max(0, choices.findIndex(p => p.path === (w.draft.scanner ?? "")))
+                            currentIndex: Math.max(0, choices.findIndex(p => p.path === current))
                             onActivated: i => w.set("scanner", choices[i].path)
                         }
                         Caption { text: qsTr("Speed (baud)") }

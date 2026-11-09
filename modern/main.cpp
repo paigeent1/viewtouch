@@ -892,9 +892,9 @@ int runTerminal(const Args &cli, const Options &o)
         LayoutController controller(*pages);
         controller.setPos(&remote);
 #ifndef Q_OS_ANDROID
-        SerialScanner serialScanner;   // a serial barcode scanner on this terminal (see serialscanner.hh)
-        QObject::connect(&serialScanner, &SerialScanner::scanned, &controller, &LayoutController::scanned);
-        serialScanner.start();
+        SerialScanners serialScanners;   // serial barcode scanners on this terminal (see serialscanner.hh)
+        QObject::connect(&serialScanners, &SerialScanners::scanned, &controller, &LayoutController::scanned);
+        serialScanners.start();
 #endif
         // Page edits are saved on the server, which passes them on to everyone.
         controller.setSaver([&remote](const vt::layout::Layout &layout, QString *) {
@@ -1811,10 +1811,19 @@ int runStore(const Args &cli, const Options &o)
     controller.setPos(&pos);
     controller.setIlsaSync(ilsaSync.get());
 #ifndef Q_OS_ANDROID
-    // A serial barcode scanner (USB-serial adapter) rings items in like a keyboard scanner.
-    SerialScanner serialScanner;
-    QObject::connect(&serialScanner, &SerialScanner::scanned, &controller, &LayoutController::scanned);
-    serialScanner.start();
+    // Serial barcode scanners (USB-serial adapters) ring items in like a keyboard scanner: every
+    // USB-serial port unless site.conf's SERIAL_SCANNER says otherwise, but never a port a "file"
+    // printer prints to (a serial printer or pole display).
+    SerialScanners serialScanners;
+    serialScanners.setSkip([&pos] {
+        QStringList out;
+        for (const auto &p : pos.settings().printers)
+            if (p.type == "file" && !p.path.empty())
+                out << QString::fromStdString(p.path);
+        return out;
+    });
+    QObject::connect(&serialScanners, &SerialScanners::scanned, &controller, &LayoutController::scanned);
+    serialScanners.start();
 #endif
     controller.setSaver([&hub, &controller](const vt::layout::Layout &l, QString *error) {
         return hub.save(l, error, &controller);

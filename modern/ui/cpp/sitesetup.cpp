@@ -9,6 +9,7 @@
 #include "app/ilsa_sync.hh"
 #include "guestslides.hh"
 #include "layoutcontroller.hh"
+#include "serialscanner.hh"
 
 #include <QBuffer>
 #include <QDateTime>
@@ -171,6 +172,8 @@ QVariantMap LayoutController::siteSettings() const
         if (!seen.contains(fi.absoluteFilePath()))
             ports.append(QVariantMap{{u"path"_s, fi.absoluteFilePath()}, {u"label"_s, fi.fileName()}});
     out.insert(u"scannerPorts"_s, ports);
+    // The serial scanner ports ViewTouch listens on now: [{device, baud, open}].
+    out.insert(u"scanners"_s, SerialScanner::status());
     out.insert(u"tablets"_s, readTablets());
     QVariantList tvs;
     QFile tf(QDir(siteDir()).filePath(u"tvs.json"_s));

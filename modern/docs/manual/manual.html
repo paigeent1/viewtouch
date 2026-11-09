@@ -427,7 +427,7 @@
 <li>An 11-digit code (a UPC-A without its last digit) finds the 12-digit item.</li>
 <li>A code with letters that is no coupon or gift card says <i>That code isn't a product barcode.</i> It is never offered as a new item and never shown on the screen (so a driver's license number isn't displayed).</li>
 </ul>
-<div class="tip">Owner: a scanner on a USB-serial adapter works too; plug it into the adapter's first port. Its settings are in <b>Site Setup → Scanner</b>: <i>Serial scanner port</i> (Auto, Off or a port), <i>Speed (baud)</i>, a live test (<i>Test: scan anything with this screen showing</i>) and <b>Restart ViewTouch (new port or speed)</b>. USB scanners that type like a keyboard need no setup, including a second one just for IDs (chapter 23).</div>
+<div class="tip">Owner: scanners on a USB-serial adapter work too, on any port and as many as there are ports (one for products and one for IDs, say): ViewTouch listens on every USB-serial port except a printer's. Their settings are in <b>Site Setup → Scanner</b>: <i>Serial scanner port</i> (Auto, Off or a port), <i>Speed (baud)</i>, a live test (<i>Test: scan anything with this screen showing</i>) and <b>Restart ViewTouch (new port or speed)</b>. USB scanners that type like a keyboard need no setup, including a second one just for IDs (chapter 23).</div>
 
 <h2>Find an item by typing</h2>
 <p>Don't know where something is on the menu? Touch <b>Find</b> at the top of the order screen and type part of its name: <i>cob</i> finds Cobb, <i>bur</i> every burger. Every word you type must be somewhere in the name, in any order: <i>oliva mel</i> finds OLIVA V MELANIO. An item's own number or UPC comes first, then names that start with the first word, then the rest.</p>
@@ -2236,9 +2236,9 @@
 <div class="warn">With <i>No</i>, if another computer is already running this store, ViewTouch here says <i>Another computer is already running this store at &lt;address&gt;. This computer is set not to become its standby</i> and doesn't start. That keeps a copied Pi (chapter 31) from taking over the store it was copied from.</div>
 
 <h3>Scanner</h3>
-<p>USB scanners need no setup: they type into the POS screen, and so does a second one just for IDs. These settings are only for a scanner on a USB-serial adapter.</p>
+<p>USB scanners need no setup: they type into the POS screen, and so does a second one just for IDs. Scanners on a USB-serial adapter need none either: ViewTouch listens on every USB-serial port (a port a printer prints to is left alone) and finds a scanner plugged in later by itself. Under the box's title, each port shows as <i>Listening: …</i> (open) or <i>Waiting for: …</i>. A driver's license is known by what it says, whichever scanner reads it.</p>
 <ul>
-<li><i>Serial scanner port</i>: <b>Auto: the serial adapter's first port</b>, <b>Off</b>, or a port from the list.</li>
+<li><i>Serial scanner port</i>: <b>Auto: every serial port (any number of scanners)</b>, <b>Off</b>, or one port from the list (only that one). Several chosen ports: <code>vt-site set SERIAL_SCANNER "/dev/ttyUSB0, /dev/ttyUSB1@19200"</code> (each with its own speed if wanted).</li>
 <li><i>Speed (baud)</i>.</li>
 <li><i>Test: scan anything with this screen showing.</i> The last scan shows with its time. A driver's license shows only that it read OK, never what's on it.</li>
 <li><b>Restart ViewTouch (new port or speed)</b> after changing the port or speed.</li>
@@ -2340,7 +2340,7 @@ bash ~/viewtouch-main/scripts/bin/vt-install "Store name"</pre>
 <tr><th>Command</th><th>Does</th></tr>
 <tr><td><code>vt-site</code></td><td>Shows them.</td></tr>
 <tr><td><code>vt-site init "<i>Store name</i>"</code></td><td>Starts them for a new site (keeps what's there).</td></tr>
-<tr><td><code>vt-site set <i>SETTING value</i></code></td><td>Changes one: <code>SITE_NAME</code>, <code>SERVER_ADDR</code>, <code>SERVER_PORT</code>, <code>SERIAL_SCANNER</code>, <code>SERIAL_SCANNER_BAUD</code>, <code>STANDBY_ALLOWED</code>.</td></tr>
+<tr><td><code>vt-site set <i>SETTING value</i></code></td><td>Changes one: <code>SITE_NAME</code>, <code>SERVER_ADDR</code>, <code>SERVER_PORT</code>, <code>SERIAL_SCANNER</code>, <code>SERIAL_SCANNER_BAUD</code>, <code>STANDBY_ALLOWED</code>. <code>SERIAL_SCANNER</code>: empty or <code>all</code> = every USB-serial port (the default), <code>off</code>, or a list of ports.</td></tr>
 <tr><td><code>vt-site tablet add "<i>Bar 1</i>" <i>address</i></code></td><td>Adds a tablet to this site's list.</td></tr>
 <tr><td><code>vt-site tablet remove "<i>Bar 1</i>"</code></td><td>Takes it off.</td></tr>
 <tr><td><code>vt-site edit</code></td><td>Opens the settings file to edit by hand.</td></tr>
