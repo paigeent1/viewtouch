@@ -273,7 +273,8 @@ QVariantList PosService::adminFields(const QString &panel)
             with(with(field(u"labelHeightMm"_s, tr("Label height (mm)"), u"int"_s), u"min"_s, 10), u"max"_s, 300),
             with(with(field(u"width"_s, tr("Characters per line"), u"int"_s), u"min"_s, 16), u"max"_s, 80),
             field(u"cutter"_s, tr("Cut paper after each ticket"), u"bool"_s),
-            field(u"drawerKick"_s, tr("Cash drawer is connected to this printer"), u"bool"_s),
+            field(u"drawerKick"_s, tr("Cash drawer is connected to this printer"), u"bool"_s,
+                  tr("Is a cash drawer cable plugged into this printer? Only then can its terminals' drawers open.")),
             with(field(u"charset"_s, tr("Letters"), u"enum"_s,
                        tr("Accented letters (ñ, é), ¿ ¡, £ and € on Epson and most receipt printers; plain letters for a printer that shows them wrong.")),
                  u"options"_s, options({{"", "Accented letters (PC858)"}, {"ascii", "Plain letters only"}})),
@@ -685,12 +686,32 @@ QVariantList PosService::adminFields(const QString &panel)
     if (panel == u"billboards")   // Store Settings > Billboards (pos_billboards.cpp)
         return billboardFields();
     if (panel == u"terminals") {
+        // Each printer says whether a cash drawer is wired to it: the drawer opens only
+        // on the terminal's own printer (Printers -> Cash drawer), never another's.
+        const auto drawerText = [this](const PrinterConfig *p) {
+            return !p ? tr("not set up") : p->drawerKick ? tr("has cash drawer") : tr("no cash drawer");
+        };
+        const PrinterConfig *receipt = s_->settings.printer("receipt");
         QVariantList printers = options({{"", "Receipt (default)"}, {"ask", "Ask each time (handhelds)"}});
+        for (QVariant &v : printers) {
+            QVariantMap o = v.toMap();
+            o.insert(u"printer"_s, u"receipt"_s);   // both print on the Receipt printer
+            o.insert(u"drawer"_s, receipt && receipt->drawerKick);
+            o.insert(u"exists"_s, receipt != nullptr);
+            o.insert(u"text"_s, u"%1 · %2"_s.arg(o.value(u"text"_s).toString(), drawerText(receipt)));
+            v = o;
+        }
         for (const PrinterConfig &p : s_->settings.printers)
-            printers.append(QVariantMap{{u"value"_s, qs(p.id)}, {u"text"_s, qs(p.name)}});
+            printers.append(QVariantMap{{u"value"_s, qs(p.id)}, {u"text"_s, u"%1 · %2"_s.arg(qs(p.name), drawerText(&p))},
+                                        {u"printer"_s, qs(p.id)}, {u"drawer"_s, p.drawerKick}});
+        const QString unlisted = unlistedScreensText();
         return {
             field(u"name"_s, tr("Terminal name"), u"string"_s, tr("As given with --terminal (this one: %1)").arg(terminal_)),
-            with(field(u"receiptPrinter"_s, tr("Receipts and cash drawer on"), u"enum"_s), u"options"_s, printers),
+            with(with(field(u"receiptPrinter"_s, tr("Receipts (and cash drawer) print on"), u"enum"_s,
+                            tr("Its cash drawer opens only when it's wired to this printer (Printers → Cash drawer).")
+                                + (unlisted.isEmpty() ? QString() : u"\n"_s + unlisted)),
+                      u"options"_s, printers),
+                 u"storeHasDrawer"_s, s_->settings.terminalsHaveDrawer),
             with(field(u"drawer"_s, tr("Cash drawer"), u"enum"_s,
                        tr("Store setting: %1.").arg(s_->settings.terminalsHaveDrawer ? tr("has a drawer") : tr("no drawer"))),
                  u"options"_s, options({{"", "Store setting"}, {"yes", "Has a cash drawer"}, {"no", "No cash drawer"}})),

@@ -557,7 +557,7 @@ bool PosService::cashOutGiftCard()
     if (s_->sink)
         s_->sink->saveDrawer(*d);
     if (s_->printer && !serverBank() && terminalHasDrawer())
-        s_->printer->openDrawer(s_->settings, receiptPrinter());
+        openCashDrawer();
     emit notice(tr("Give the guest %1 in cash: the card is empty now.").arg(format(amount)));
     emit s_->drawerChanged();
     emit s_->dayChanged();
@@ -818,7 +818,7 @@ bool PosService::payOnAccount(const QString &method, qint64 amountCents)
         if (s_->sink)
             s_->sink->saveDrawer(*d);
         if (s_->printer && !serverBank() && terminalHasDrawer())
-            s_->printer->openDrawer(s_->settings, receiptPrinter());
+            openCashDrawer();
         emit s_->drawerChanged();
     }
     r->post(now(), -amount, ss(cash ? tr("Payment (cash), %1").arg(qs(user()->name))

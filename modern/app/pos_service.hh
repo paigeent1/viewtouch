@@ -98,7 +98,9 @@ public:
                              const std::string &drawer, const std::string &printerId)
     {
         (void)noSale; (void)number; (void)drawer;
-        openDrawer(settings, printerId);
+        // Only the terminal's own printer's drawer, when it has one (as TicketPrinter does).
+        if (const core::PrinterConfig *p = settings.printer(printerId); p && p->drawerKick)
+            openDrawer(settings, printerId);
     }
     // A test page on printer `printerId` (its logo, text sizes, a cut), and
     // the drawer wired to it opened when `kickDrawer`. False: no such printer.
@@ -508,6 +510,10 @@ public:
     // A printer's tickets kept after it failed ("notPrinting"): send them
     // again (set by the app: print::PrintSpooler::retryHeld).
     std::function<void(const std::string &printerId)> reprintHeld;
+    // Screens whose cash drawer didn't open (their printer has no drawer, or
+    // isn't set up): terminal name -> why. Their own printer alert says so
+    // until it's fixed (Terminals or Printers) or their drawer opens.
+    std::map<std::string, std::string> drawerMisses;
     QVariantMap backup;
     void setBackupStatus(QVariantMap status)
     {
@@ -893,6 +899,8 @@ public:
     bool printTableChecks();
     // Manager -> Printers: a test page (and the drawer wired to it, opened).
     bool testPrinter(const QString &printerId, bool kickDrawer);
+    // A cash drawer is wired to this printer (Printers -> Cash drawer on), saved: from Terminals.
+    bool printerHasDrawer(const QString &printerId);
     bool combineTableChecks();
     QString checkFilter() const override { return checkFilter_; }
     void setCheckFilter(const QString &label) override;
@@ -1560,6 +1568,17 @@ private:
     struct ItemFind;
     mutable std::shared_ptr<ItemFind> itemFind_;
     std::string receiptPrinter() const { return s_->settings.receiptPrinterFor(terminal_.toStdString()); }
+    // Why this terminal's drawer can't open (its printer has no drawer, or isn't
+    // set up); empty: it opens. No other printer's drawer is ever opened instead.
+    QString drawerProblem() const { return drawerProblemFor(terminal_.toStdString()); }
+    QString drawerProblemFor(const std::string &terminal) const;
+    // The drawer opened on this terminal's printer, else that said on its screen
+    // (its printer alert, a notice, Store Check's problems). False: it didn't open.
+    bool openCashDrawer();
+    void noteDrawerMiss(const QString &why);
+    // Screens seen (this one, those connected) with no line in Manager -> Terminals,
+    // and the printer they fall back to ("Front, Patio use Receipt").
+    QString unlistedScreensText() const;
     // Cash handling for the logged-in person: their own choice, else the store's.
     bool serverBank() const;
     bool terminalHasDrawer() const { return s_->settings.hasDrawer(terminal_.toStdString()); }

@@ -149,8 +149,12 @@ bool PosService::noSale()
         number += static_cast<int>(std::ranges::count_if(
             ds.movements, [](const CashMovement &x) { return x.kind == CashMovement::Kind::NoSale; }));
     DrawerSession *d = myDrawer();
-    // The slip ("****No Sale****", no logo) and the drawer kick.
+    // The slip ("****No Sale****", no logo) and the drawer kick: only on this terminal's own
+    // printer, when its drawer is wired there. Otherwise still recorded, and the screen says so.
+    const QString why = drawerProblem();
     s_->printer->printNoSale(s_->settings, m, number, d ? d->name : std::string(), receiptPrinter());
+    if (!why.isEmpty())
+        noteDrawerMiss(why);
     // Kept with the drawer: who opened it with nothing sold, and why (exceptions report).
     if (d) {
         m.id = d->nextMovementId++;
@@ -159,7 +163,8 @@ bool PosService::noSale()
             s_->sink->saveDrawer(*d);
         emit s_->drawerChanged();
     }
-    emit notice(tr("Drawer opened (No Sale #%1)").arg(number));
+    emit notice(why.isEmpty() ? tr("Drawer opened (No Sale #%1)").arg(number)
+                              : tr("No Sale #%1 recorded, but the drawer did not open: %2").arg(number).arg(why));
     return true;
 }
 
@@ -493,6 +498,27 @@ bool PosService::testPrinter(const QString &printerId, bool kickDrawer)
     return true;
 }
 
+bool PosService::printerHasDrawer(const QString &printerId)
+{
+    if (!require(perm::Manager, tr("Changing settings")))
+        return false;
+    const auto it = std::ranges::find_if(s_->settings.printers, [&](const PrinterConfig &p) { return qs(p.id) == printerId; });
+    if (it == s_->settings.printers.end())
+        return fail(tr("That printer is gone."));
+    if (!it->drawerKick) {
+        it->drawerKick = true;
+        settingsChanged();
+        logChange(tr("Printers"), qs(it->name), tr("Cash drawer is connected to this printer"), tr("no"), tr("yes"));
+    }
+    // The screens whose drawer didn't open on it: fixed now.
+    std::erase_if(s_->drawerMisses, [&](const auto &m) { return drawerProblemFor(m.first).isEmpty(); });
+    ++s_->adminRevision;
+    emit s_->adminChanged();
+    emit s_->networkChanged();
+    emit notice(tr("%1: cash drawer on. Cash sales and No Sale open it.").arg(qs(it->name)));
+    return true;
+}
+
 bool PosService::printTableChecks()
 {
     const QVariantList checks = tableChecks();
@@ -571,6 +597,63 @@ QString PosService::noDrawerMessage() const
     return terminalHasDrawer()
                ? tr("Open this terminal's cash drawer first (Drawer…).")
                : tr("%1 has no cash drawer. Take cash on a terminal with one, or use your own bank.").arg(terminal_);
+}
+
+QString PosService::drawerProblemFor(const std::string &terminal) const
+{
+    // The terminal's own printer only: another printer's drawer is never opened instead.
+    const std::string id = s_->settings.receiptPrinterFor(terminal);
+    const PrinterConfig *p = s_->settings.printer(id);
+    if (!p)
+        return tr("No cash drawer for %1: its printer \"%2\" isn't set up (Manager → Terminals) — the drawer was not opened.")
+            .arg(qs(terminal), qs(id));
+    if (!p->drawerKick)
+        return tr("No cash drawer on %1 (Printers > Cash drawer is Off) — the drawer was not opened.").arg(qs(p->name));
+    return {};
+}
+
+void PosService::noteDrawerMiss(const QString &why)
+{
+    const std::string terminal = terminal_.toStdString();
+    s_->drawerMisses[terminal] = ss(why);
+    s_->noteProblem("drawer", terminal, ss(why));   // Store Check's problems (it emits networkChanged)
+    emit s_->networkChanged();                       // this screen's printer alert
+}
+
+bool PosService::openCashDrawer()
+{
+    if (!s_->printer)
+        return false;
+    const QString why = drawerProblem();
+    if (!why.isEmpty()) {
+        noteDrawerMiss(why);
+        emit notice(why);
+        return false;
+    }
+    s_->printer->openDrawer(s_->settings, receiptPrinter());
+    if (s_->drawerMisses.erase(terminal_.toStdString()))
+        emit s_->networkChanged();
+    return true;
+}
+
+QString PosService::unlistedScreensText() const
+{
+    QStringList names;
+    const auto see = [&](const QString &name) {
+        if (!name.isEmpty() && !names.contains(name) && !s_->settings.listsTerminal(ss(name)))
+            names << name;
+    };
+    see(terminal_);
+    if (s_->network)
+        for (const QVariant &v : s_->network().value(u"terminals"_s).toList())
+            see(v.toMap().value(u"name"_s).toString());
+    if (names.isEmpty())
+        return {};
+    if (const PrinterConfig *r = s_->settings.printer("receipt"))
+        return tr("Not listed in Terminals: %1. They print receipts on %2 (%3).")
+            .arg(names.join(u", "_s), qs(r->name), r->drawerKick ? tr("has cash drawer") : tr("no cash drawer"));
+    return tr("Not listed in Terminals: %1. There's no Receipt printer, so they print no receipts and open no drawer.")
+        .arg(names.join(u", "_s));
 }
 
 bool PosService::mustCloseChecksToCheckOut() const
@@ -680,7 +763,7 @@ bool PosService::openDrawerSession()
     if (s_->sink)
         s_->sink->saveDrawer(d);
     if (s_->printer)
-        s_->printer->openDrawer(s_->settings, receiptPrinter());
+        openCashDrawer();
     emit notice(tr("%1 opened with %2").arg(qs(d.name), format(d.startingCash)));
     emit s_->drawerChanged();
     emit s_->dayChanged();
@@ -815,7 +898,7 @@ bool PosService::payout(CashMovement::Kind kind)
     if (s_->sink)
         s_->sink->saveDrawer(*d);
     if (s_->printer && !serverBank() && terminalHasDrawer())
-        s_->printer->openDrawer(s_->settings, receiptPrinter());
+        openCashDrawer();
     emit notice(kind == CashMovement::Kind::PaidIn ? tr("Paid in %1").arg(format(amount))
                                                    : tr("Paid out %1").arg(format(amount)));
     emit s_->drawerChanged();
@@ -853,7 +936,7 @@ bool PosService::cashOutTips()
     if (s_->sink)
         s_->sink->saveDrawer(*d);
     if (s_->printer && !serverBank() && terminalHasDrawer())
-        s_->printer->openDrawer(s_->settings, receiptPrinter());
+        openCashDrawer();
     emit notice(tr("Paid %1 in tips to %2").arg(format(owed), qs(e->name)));
     emit s_->drawerChanged();
     emit s_->dayChanged();

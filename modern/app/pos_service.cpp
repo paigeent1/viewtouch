@@ -555,6 +555,12 @@ QVariantList PosService::printerAlerts() const
         out.append(QVariantMap{{u"id"_s, qs(p.id)}, {u"name"_s, name}, {u"problem"_s, qs(what)}, {u"text"_s, text},
                                {u"urgent"_s, what != "paperLow"}, {u"reprint"_s, what == "notPrinting"}});
     }
+    // This screen's cash drawer didn't open (no other printer's drawer is opened instead):
+    // said here until it's fixed in Terminals or Printers, or the drawer opens.
+    if (s_->drawerMisses.contains(terminal_.toStdString()))
+        if (const QString why = drawerProblem(); !why.isEmpty())
+            out.append(QVariantMap{{u"id"_s, u"drawer"_s}, {u"name"_s, terminal_}, {u"problem"_s, u"noDrawer"_s},
+                                   {u"text"_s, why}, {u"urgent"_s, true}, {u"reprint"_s, false}});
     return out;
 }
 
@@ -2161,7 +2167,7 @@ bool PosService::closeCheck()
     if (s_->sink)
         s_->sink->saveCheck(*c);
     if (cash && s_->printer && !serverBank() && terminalHasDrawer())
-        s_->printer->openDrawer(s_->settings, receiptPrinter());
+        openCashDrawer();
     s_->kitchenAgain(c->id);   // closed again after a reopen: looked at afresh
     s_->closedToday.push_back(*c);
     lastClosedId_ = c->id;

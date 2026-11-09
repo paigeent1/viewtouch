@@ -89,7 +89,7 @@ struct DrawerSession {
 struct Problem {
     std::int64_t id = 0;
     std::int64_t at = 0;
-    std::string kind;     // printer | database | backup | backupCopy | standby | crash
+    std::string kind;     // printer | drawer | database | backup | backupCopy | standby | crash
     std::string subject;
     std::string detail;
     bool operator==(const Problem &) const = default;

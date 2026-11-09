@@ -84,6 +84,15 @@ QVariantList PosService::adminRecords(const QString &panel)
             r.insert(u"port"_s, p.port);
             r.insert(u"labelWidthMm"_s, p.labelWidthMm);
             r.insert(u"labelHeightMm"_s, p.labelHeightMm);
+            // The terminals whose receipts (and cash drawer) are on it (shown by its Cash drawer setting).
+            QStringList users;
+            for (const TerminalConfig &t : s_->settings.terminals)
+                if (s_->settings.receiptPrinterFor(t.name) == p.id && t.screen != "billboard")
+                    users << qs(t.name);
+            if (p.id == "receipt")
+                users << tr("any screen not in Terminals");
+            r.insert(u"_usedBy"_s, users.isEmpty() ? tr("No terminal prints its receipts here.")
+                                                   : tr("Terminals using it for receipts and the cash drawer: %1").arg(users.join(u", "_s)));
             const QString how = p.type == "network" ? tr("Network") : p.type == "cups" ? tr("CUPS queue")
                               : p.type == "file" ? tr("Text file") : p.type == "none" ? tr("Off") : qs(p.type);
             add(r, qs(p.name), how + (p.host.empty() ? QString() : u" · "_s + qs(p.host)));
@@ -308,7 +317,9 @@ QVariantList PosService::adminRecords(const QString &panel)
                  {u"labelPrinter"_s, qs(t.labelPrinter)}, {u"textSize"_s, t.textSize ? QString::number(t.textSize) : QString()},
                  {u"customerDisplay"_s, qs(t.customerDisplay)}},
                 qs(t.name), (p ? qs(p->name) : tr("Receipt (default)"))
-                                + (s_->settings.hasDrawer(t.name) ? QString() : tr(" · no drawer"))
+                                + (!s_->settings.hasDrawer(t.name) ? tr(" · no drawer")
+                                   : drawerProblemFor(t.name).isEmpty() ? QString()
+                                   : tr(" · its printer has no cash drawer"))
                                 + (t.key.empty() ? QString() : tr(" · paired device"))
                                 + (t.screen == "billboard" ? tr(" · billboard") : QString())
                                 + (qs(t.name) == terminal_ ? tr(" · this screen") : QString()));

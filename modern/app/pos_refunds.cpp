@@ -160,7 +160,7 @@ bool PosService::refundPayment(qint64 checkId, qint64 paymentId, qint64 cents, c
         if (s_->sink)
             s_->sink->saveDrawer(*d);
         if (s_->printer && !serverBank() && terminalHasDrawer())
-            s_->printer->openDrawer(s_->settings, receiptPrinter());
+            openCashDrawer();
         emit s_->drawerChanged();
     }
     s_->recordRefund(r, found, what({}));

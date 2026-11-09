@@ -516,6 +516,8 @@ public:
     Q_INVOKABLE void splitBySeat() { invoke(QStringLiteral("splitBySeat"), {}); }
     Q_INVOKABLE void printTableChecks() { invoke(QStringLiteral("printTableChecks"), {}); }
     Q_INVOKABLE void testPrinter(const QString &printerId, bool kickDrawer = false) { invoke(QStringLiteral("testPrinter"), {printerId, kickDrawer}); }
+    // Manager -> Terminals: "This printer has the drawer" (Printers -> Cash drawer on, saved).
+    Q_INVOKABLE void printerHasDrawer(const QString &printerId) { invoke(QStringLiteral("printerHasDrawer"), {printerId}); }
     Q_INVOKABLE void combineTableChecks() { invoke(QStringLiteral("combineTableChecks"), {}); }
     Q_INVOKABLE void anotherRound() { invoke(QStringLiteral("anotherRound"), {}); }
     Q_INVOKABLE void customDiscount(bool percent) { invoke(QStringLiteral("customDiscount"), {percent}); }
