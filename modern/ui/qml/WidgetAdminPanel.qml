@@ -771,49 +771,98 @@ Item {
                         }
                         Repeater {
                             model: w.shownFields
-                            delegate: FieldEditor {
+                            delegate: ColumnLayout {
+                                id: fieldRow
                                 required property var modelData
-                                minHeight: w.narrow ? 36 : 0
-                                // A "look" field: an enum of this screen's looks.
-                                // The billboard defaults row: its values are the defaults themselves.
-                                field: w.boards && w.draft._defaults === true ? Object.assign({}, modelData, { inheritable: false })
-                                     : modelData.type !== "look" || !w.zone ? modelData
-                                     : Object.assign({}, modelData, {
-                                           type: "enum",
-                                           options: [{ value: "", text: qsTr("The store's look") }].concat(
-                                               w.zone.controller.looks().map(l => ({ value: l.id, text: qsTranslate("Looks", l.name) })))
-                                       })
-                                pos: w.pos
-                                controller: w.zone ? w.zone.controller : null
-                                touch: true
-                                pages: modelData.type === "page" && w.zone ? w.pageChoices(modelData) : []
-                                // This screen's own lines (About): from this screen, not the store.
-                                value: modelData.path === "screen.version" && w.zone ? w.zone.controller.screenBuild()
-                                     : modelData.path === "screen.display" ? w.screenText
-                                     : w.boards && modelData.path === "status" ? w.boardStatus(w.saved)
-                                     : w.draft[modelData.path]
-                                isSet: !(modelData.inheritable === true && w.draft._defaults !== true
-                                         && (w.draft[modelData.path] === null || w.draft[modelData.path] === undefined))
-                                resolved: modelData.inheritable === true ? (w.draft._inherit ?? {})[modelData.path] : undefined
-                                inheritedText: qsTr("default")
-                                changed: w.differs(modelData.path)
-                                section: w.sectioned && w.query !== "" ? modelData.group : ""
-                                readOnly: modelData.readonlyExisting === true && w.index >= 0
-                                onCommit: v => {
-                                    if (w.panel === "menu" && modelData.path === "upc") {
-                                        const hit = w.findMenuIndexByBarcode(v)
-                                        if (hit >= 0 && hit !== w.index) {
-                                            Qt.callLater(() => w.choose(hit))
-                                            return
+                                Layout.fillWidth: true
+                                spacing: 4
+                                FieldEditor {
+                                    Layout.fillWidth: true
+                                    minHeight: w.narrow ? 36 : 0
+                                    // A "look" field: an enum of this screen's looks.
+                                    // The billboard defaults row: its values are the defaults themselves.
+                                    field: w.boards && w.draft._defaults === true ? Object.assign({}, fieldRow.modelData, { inheritable: false })
+                                         : fieldRow.modelData.type !== "look" || !w.zone ? fieldRow.modelData
+                                         : Object.assign({}, fieldRow.modelData, {
+                                               type: "enum",
+                                               options: [{ value: "", text: qsTr("The store's look") }].concat(
+                                                   w.zone.controller.looks().map(l => ({ value: l.id, text: qsTranslate("Looks", l.name) })))
+                                           })
+                                    pos: w.pos
+                                    controller: w.zone ? w.zone.controller : null
+                                    touch: true
+                                    pages: fieldRow.modelData.type === "page" && w.zone ? w.pageChoices(fieldRow.modelData) : []
+                                    // This screen's own lines (About): from this screen, not the store.
+                                    value: fieldRow.modelData.path === "screen.version" && w.zone ? w.zone.controller.screenBuild()
+                                         : fieldRow.modelData.path === "screen.display" ? w.screenText
+                                         : w.boards && fieldRow.modelData.path === "status" ? w.boardStatus(w.saved)
+                                         : w.draft[fieldRow.modelData.path]
+                                    isSet: !(fieldRow.modelData.inheritable === true && w.draft._defaults !== true
+                                             && (w.draft[fieldRow.modelData.path] === null || w.draft[fieldRow.modelData.path] === undefined))
+                                    resolved: fieldRow.modelData.inheritable === true ? (w.draft._inherit ?? {})[fieldRow.modelData.path] : undefined
+                                    inheritedText: qsTr("default")
+                                    changed: w.differs(fieldRow.modelData.path)
+                                    section: w.sectioned && w.query !== "" ? fieldRow.modelData.group : ""
+                                    readOnly: fieldRow.modelData.readonlyExisting === true && w.index >= 0
+                                    onCommit: v => {
+                                        if (w.panel === "menu" && fieldRow.modelData.path === "upc") {
+                                            const hit = w.findMenuIndexByBarcode(v)
+                                            if (hit >= 0 && hit !== w.index) {
+                                                Qt.callLater(() => w.choose(hit))
+                                                return
+                                            }
+                                        }
+                                        const d = w.copy(w.draft)
+                                        d[fieldRow.modelData.path] = v
+                                        w.dirty = true   // first: the new draft may rebuild this form
+                                        w.draft = d
+                                    }
+                                    // Emptied (a color): back to the usual. A billboard's: back to the defaults.
+                                    onReset: commit(fieldRow.modelData.inheritable === true ? null : "")
+                                }
+                                // Terminals: the chosen printer has no cash drawer wired to it.
+                                Rectangle {
+                                    id: noDrawer
+                                    objectName: "terminalNoDrawer"
+                                    readonly property var chosen: fieldRow.modelData.path === "receiptPrinter"
+                                        ? (fieldRow.modelData.options ?? []).find(o => o.value === String(w.draft.receiptPrinter ?? "")) ?? null : null
+                                    readonly property bool hasDrawerHere: w.draft.drawer === "yes"
+                                        || ((w.draft.drawer ?? "") === "" && fieldRow.modelData.storeHasDrawer === true)
+                                    visible: w.panel === "terminals" && w.index !== -2 && chosen !== null && chosen.drawer === false
+                                             && hasDrawerHere && !["selfOrder", "timeClock", "billboard"].includes(w.draft.screen ?? "")
+                                    Layout.fillWidth: true
+                                    implicitHeight: noDrawerBody.implicitHeight + 16
+                                    radius: 6
+                                    color: "#4a3a16"
+                                    ColumnLayout {
+                                        id: noDrawerBody
+                                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
+                                        spacing: 6
+                                        Label {
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            color: "white"
+                                            text: qsTr("This printer has no cash drawer, so cash sales and No Sale won't open one.")
+                                        }
+                                        Button {
+                                            objectName: "terminalPrinterHasDrawer"
+                                            visible: noDrawer.chosen !== null && noDrawer.chosen.exists !== false
+                                            text: qsTr("This printer has the drawer")
+                                            onClicked: w.pos.printerHasDrawer(noDrawer.chosen.printer)
                                         }
                                     }
-                                    const d = w.copy(w.draft)
-                                    d[modelData.path] = v
-                                    w.dirty = true   // first: the new draft may rebuild this form
-                                    w.draft = d
                                 }
-                                // Emptied (a color): back to the usual. A billboard's: back to the defaults.
-                                onReset: commit(modelData.inheritable === true ? null : "")
+                                // Printers: the terminals whose receipts and cash drawer are on this one.
+                                Label {
+                                    objectName: "printerUsedBy"
+                                    visible: w.panel === "printers" && w.index >= 0 && fieldRow.modelData.path === "drawerKick"
+                                             && (w.draft._usedBy ?? "") !== ""
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: 13
+                                    opacity: 0.8
+                                    text: w.draft._usedBy ?? ""
+                                }
                             }
                         }
                     }

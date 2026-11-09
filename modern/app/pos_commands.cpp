@@ -109,6 +109,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"newTableCheck"_s, [](PosService &p, const QVariantList &) { return QVariant(p.newTableCheck()); }},
         {u"splitBySeat"_s, [](PosService &p, const QVariantList &) { return QVariant(p.splitBySeat()); }},
         {u"testPrinter"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.testPrinter(a.value(0).toString(), a.value(1).toBool())); }},
+        {u"printerHasDrawer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printerHasDrawer(a.value(0).toString())); }},
         {u"printTableChecks"_s, [](PosService &p, const QVariantList &) { return QVariant(p.printTableChecks()); }},
         {u"combineTableChecks"_s, [](PosService &p, const QVariantList &) { return QVariant(p.combineTableChecks()); }},
         {u"addItem"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.addItem(a.value(0).toString())); }},

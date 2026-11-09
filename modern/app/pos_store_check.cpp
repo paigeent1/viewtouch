@@ -128,6 +128,26 @@ QVariantMap PosService::storeCheck() const
                 : p.watch ? tr("No problem reported") : tr("Not watched (its status isn't asked)"));
     }
 
+    // Cash drawers: each terminal's opens only on its own printer (never another's instead).
+    {
+        QStringList shut;
+        for (const TerminalConfig &t : s_->settings.terminals) {
+            if (!s_->settings.hasDrawer(t.name) || t.screen == "selfOrder" || t.screen == "timeClock" || t.screen == "billboard")
+                continue;
+            const std::string id = s_->settings.receiptPrinterFor(t.name);
+            if (const PrinterConfig *p = s_->settings.printer(id); !p)
+                shut << tr("%1: its printer \"%2\" isn't set up").arg(qs(t.name), qs(id));
+            else if (!p->drawerKick)
+                shut << tr("%1 prints on %2, which has no cash drawer (Printers > Cash drawer is Off)").arg(qs(t.name), qs(p->name));
+        }
+        if (!shut.isEmpty())
+            add(u"drawerPrinters"_s, false, tr("Cash drawer printers"),
+                tr("These drawers won't open: %1.").arg(shut.join(u"; "_s)), true);
+    }
+    // Screens with no line in Terminals: their receipts go to the Receipt printer.
+    if (const QString unlisted = unlistedScreensText(); !unlisted.isEmpty())
+        add(u"unlistedScreens"_s, false, tr("Screens not in Terminals"), unlisted, true);
+
     // A backup in the last day.
     if (n.contains(u"backups"_s)) {
         const std::int64_t last = n.value(u"lastBackup"_s).toLongLong();

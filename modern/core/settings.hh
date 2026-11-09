@@ -11,6 +11,7 @@
 #include "core/receipt_ref.hh"
 #include "core/tax.hh"
 
+#include <algorithm>
 #include <ctime>
 #include <string>
 #include <vector>
@@ -49,7 +50,9 @@ struct PrinterConfig {
 };
 
 // Per-terminal setup: which printer takes its receipts (and opens its
-// drawer). Terminals not listed use the "receipt" printer.
+// drawer, when that printer has one: no other printer's drawer is ever
+// opened instead). Terminals not listed use the "receipt" printer
+// (Manager -> Terminals and Store Check name them).
 // A place in the kitchen with its own screen: Grill, Fryer, Cold Line.
 struct Station {
     std::string id;
@@ -619,6 +622,14 @@ struct PosSettings {
         return terminalsHaveDrawer;
     }
 
+    // A screen with its own line in Manager -> Terminals.
+    bool listsTerminal(const std::string &terminal) const
+    {
+        return std::ranges::any_of(terminals, [&](const TerminalConfig &t) { return t.name == terminal; });
+    }
+
+    // Its receipts' printer, and its cash drawer's (only when that printer has one).
+    // Not listed in Terminals (or the default chosen): the "receipt" printer.
     std::string receiptPrinterFor(const std::string &terminal) const
     {
         for (const TerminalConfig &t : terminals) {

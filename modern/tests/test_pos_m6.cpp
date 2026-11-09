@@ -101,6 +101,9 @@ TEST_CASE("Each terminal has its own drawer and receipt printer", "[m6][drawers]
 {
     app::PosData data = test::seedPosData();
     data.settings.terminals = {{"Bar", "bar"}};
+    for (core::PrinterConfig &p : data.settings.printers)
+        if (p.id == "bar")
+            p.drawerKick = true;   // the bar's drawer is wired to the bar's printer
     PosShared shared(data, nullptr);
     struct Kicks : app::PosPrinter {
         std::vector<std::string> printers;
@@ -270,4 +273,167 @@ TEST_CASE("Cash rounding at the register: Cash takes the rounded balance; the re
     for (const core::ReportRow &row : pos.buildReport(u"sales"_s).rows)
         line = line || (row.cells.size() == 2 && row.cells[0] == "Cash rounding" && row.cells[1] == "$0.02");
     CHECK(line);
+}
+
+namespace {
+
+// BHDAN, 2026-11-09: "Terminal" prints on a USB printer with no drawer wired to it,
+// while the old network "Receipt" printer still has one.
+app::PosData usbWithoutDrawer()
+{
+    app::PosData data = test::seedPosData();
+    core::PrinterConfig usb;
+    usb.id = "usb";
+    usb.name = "VT-BHDAN-RECEIPT";
+    usb.type = "file";
+    usb.path = "usb.txt";
+    usb.drawerKick = false;
+    data.settings.printers.push_back(usb);
+    data.settings.terminals = {{"Terminal", "usb"}};
+    data.settings.noSaleReasons.clear();   // No Sale opens without asking why
+    return data;
+}
+
+struct DrawerKicks : app::PosPrinter {
+    std::vector<std::string> kicks;
+    std::vector<std::string> noSales;
+    void printKitchen(const core::PosSettings &, const core::Check &, const std::vector<core::OrderLine> &, bool) override {}
+    void printReceipt(const core::PosSettings &, const core::Check &, const std::string &) override {}
+    void printReport(const core::PosSettings &, const core::Report &, const std::string &) override {}
+    void openDrawer(const core::PosSettings &, const std::string &p) override { kicks.push_back(p); }
+    void printNoSale(const core::PosSettings &s, const core::CashMovement &m, int n, const std::string &d,
+                     const std::string &p) override
+    {
+        noSales.push_back(p);
+        PosPrinter::printNoSale(s, m, n, d, p);   // the kick: only on that printer, when it has a drawer
+    }
+};
+
+QVariantMap drawerAlert(const PosService &pos)
+{
+    for (const QVariant &v : pos.printerAlerts())
+        if (v.toMap()[u"id"_s] == u"drawer"_s)
+            return v.toMap();
+    return {};
+}
+
+} // namespace
+
+TEST_CASE("No borrowing: the drawer opens only on the terminal's own printer, and the screen says when it didn't",
+          "[m6][drawers][nosale]")
+{
+    PosShared shared(usbWithoutDrawer(), nullptr);
+    DrawerKicks printer;
+    shared.printer = &printer;
+    PosService pos(&shared, u"Terminal"_s);
+    QStringList said;
+    QObject::connect(&pos, &PosService::notice, [&](const QString &n) { said << n; });
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+
+    // Starting the drawer: no kick on Receipt (it has a drawer, but it isn't this terminal's printer).
+    pos.entryKey(u"10000"_s);
+    REQUIRE(pos.openDrawerSession());
+    CHECK(printer.kicks.empty());
+    const QString why = u"No cash drawer on VT-BHDAN-RECEIPT (Printers > Cash drawer is Off) — the drawer was not opened."_s;
+    CHECK(drawerAlert(pos)[u"text"_s] == why);
+    CHECK(drawerAlert(pos)[u"urgent"_s].toBool());
+
+    // No Sale: still recorded, its slip on this terminal's printer, but no drawer opened anywhere.
+    REQUIRE(pos.noSale());
+    CHECK(printer.noSales == std::vector<std::string>{"usb"});
+    CHECK(printer.kicks.empty());
+    REQUIRE(!said.isEmpty());
+    CHECK(said.last().contains(u"did not open"_s));
+    const core::DrawerSession *d = shared.openDrawerFor("Terminal");
+    REQUIRE(d);
+    CHECK(std::ranges::count_if(d->movements, [](const CashMovement &m) { return m.kind == CashMovement::Kind::NoSale; }) == 1);
+
+    // A cash sale: the same.
+    pos.addItem(u"coffee"_s);
+    REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
+    CHECK(printer.kicks.empty());
+
+    // Only this screen is told; Store Check keeps it for the managers.
+    PosService bar(&shared, u"Bar"_s);
+    CHECK(drawerAlert(bar).isEmpty());
+    bool kept = false;
+    for (const QVariant &p : pos.storeCheck()[u"problems"_s].toList())
+        kept = kept || p.toMap()[u"text"_s].toString().contains(u"No cash drawer on VT-BHDAN-RECEIPT"_s);
+    CHECK(kept);
+
+    // Terminals: "This printer has the drawer". The alert goes, and the drawer opens there.
+    REQUIRE(pos.printerHasDrawer(u"usb"_s));
+    CHECK(shared.settings.printer("usb")->drawerKick);
+    CHECK(drawerAlert(pos).isEmpty());
+    REQUIRE(pos.noSale());
+    CHECK(printer.kicks == std::vector<std::string>{"usb"});
+    CHECK(said.last().startsWith(u"Drawer opened"_s));
+}
+
+TEST_CASE("A printer with the drawer still opens it; tablets without drawers are unchanged", "[m6][drawers][nosale]")
+{
+    PosShared shared(usbWithoutDrawer(), nullptr);
+    shared.settings.terminals.push_back({"Patio", "usb", "no"});   // a tablet: no drawer by design
+    DrawerKicks printer;
+    shared.printer = &printer;
+
+    // Not in Terminals: the Receipt printer is its own (it has the drawer), as before.
+    PosService front(&shared, u"Front"_s);
+    REQUIRE(front.loginWithPin(u"1234"_s));
+    front.entryKey(u"10000"_s);
+    REQUIRE(front.openDrawerSession());
+    CHECK(printer.kicks == std::vector<std::string>{"receipt"});
+    REQUIRE(front.noSale());
+    CHECK(printer.kicks == std::vector<std::string>{"receipt", "receipt"});
+    CHECK(drawerAlert(front).isEmpty());
+
+    // The tablet: No Sale is off there, and nothing is kicked or alerted, as before.
+    PosService patio(&shared, u"Patio"_s);
+    REQUIRE(patio.loginWithPin(u"2222"_s));
+    CHECK_FALSE(patio.noSale());
+    CHECK(printer.kicks.size() == 2);
+    CHECK(drawerAlert(patio).isEmpty());
+}
+
+TEST_CASE("Terminals: each printer says if it has a cash drawer; screens not listed are named", "[m6][drawers][admin]")
+{
+    PosShared shared(usbWithoutDrawer(), nullptr);
+    shared.network = [] { return QVariantMap{{u"terminals"_s, QVariantList{QVariantMap{{u"name"_s, u"Back Office"_s}}}}}; };
+    PosService pos(&shared, u"Terminal"_s);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    QVariantMap picker;
+    for (const QVariant &f : pos.adminFields(u"terminals"_s))
+        if (f.toMap()[u"path"_s] == u"receiptPrinter"_s)
+            picker = f.toMap();
+    REQUIRE(!picker.isEmpty());
+    CHECK(picker[u"label"_s] == u"Receipts (and cash drawer) print on"_s);
+    QHash<QString, QVariantMap> options;
+    for (const QVariant &o : picker[u"options"_s].toList())
+        options.insert(o.toMap()[u"value"_s].toString(), o.toMap());
+    CHECK(options[u"usb"_s][u"text"_s] == u"VT-BHDAN-RECEIPT · no cash drawer"_s);
+    CHECK_FALSE(options[u"usb"_s][u"drawer"_s].toBool());
+    CHECK(options[u"receipt"_s][u"text"_s] == u"Receipt · has cash drawer"_s);
+    CHECK(options[u""_s][u"text"_s] == u"Receipt (default) · has cash drawer"_s);
+    // Screens with no line here, and where they print.
+    CHECK(picker[u"hint"_s].toString().contains(
+        u"Not listed in Terminals: Back Office. They print receipts on Receipt (has cash drawer)."_s));
+    const QVariantList checks = pos.storeCheck()[u"checks"_s].toList();
+    const auto detail = [&](const QString &id) {
+        for (const QVariant &c : checks)
+            if (c.toMap()[u"id"_s] == id)
+                return c.toMap()[u"detail"_s].toString();
+        return QString();
+    };
+    CHECK(detail(u"unlistedScreens"_s).contains(u"Back Office"_s));
+    CHECK(detail(u"drawerPrinters"_s).contains(u"Terminal prints on VT-BHDAN-RECEIPT, which has no cash drawer"_s));
+
+    // Printers: who uses each one.
+    for (const QVariant &r : pos.adminRecords(u"printers"_s)) {
+        const QVariantMap m = r.toMap();
+        if (m[u"id"_s] == u"usb"_s)
+            CHECK(m[u"_usedBy"_s].toString() == u"Terminals using it for receipts and the cash drawer: Terminal"_s);
+        if (m[u"id"_s] == u"kitchen"_s)
+            CHECK(m[u"_usedBy"_s].toString() == u"No terminal prints its receipts here."_s);
+    }
 }

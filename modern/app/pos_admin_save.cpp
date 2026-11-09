@@ -21,6 +21,15 @@ using namespace admin;
 
 bool PosService::adminSave(const QString &panel, int index, const QVariantMap &record)
 {
+    // A printer or terminal changed: a screen's "drawer didn't open" alert may be fixed now.
+    struct DrawerRecheck {
+        std::function<void()> then;
+        ~DrawerRecheck() { if (then) then(); }
+    } recheck{panel == u"printers" || panel == u"terminals" ? std::function<void()>([this] {
+        if (std::erase_if(s_->drawerMisses, [&](const auto &m) { return drawerProblemFor(m.first).isEmpty(); }) > 0
+            || !s_->drawerMisses.empty())
+            emit s_->networkChanged();
+    }) : std::function<void()>()};
     // A new one: added, by its name.
     if (index < 0) {
         if (!saveAdminRecord(panel, index, record))

@@ -250,36 +250,25 @@ void TicketPrinter::printLabels(const PosSettings &settings,
 
 void TicketPrinter::openDrawer(const PosSettings &settings, const std::string &printerId)
 {
-    // The terminal's own printer when its drawer is wired there, else any
-    // printer with a drawer.
-    const PrinterConfig *mine = receiptPrinter(settings, printerId);
-    if (mine && mine->drawerKick) {
+    // Only the terminal's own printer, and only when its drawer is wired there:
+    // never another printer's drawer (the cash would go in the wrong one).
+    // PosService says on the screen when it doesn't open.
+    const PrinterConfig *mine = settings.printer(printerId.empty() ? std::string("receipt") : printerId);
+    if (mine && mine->drawerKick)
         send(settings, *mine, drawerKick(), u"Open drawer"_s);
-        return;
-    }
-    for (const PrinterConfig &p : settings.printers) {
-        if (p.drawerKick) {
-            send(settings, p, drawerKick(), u"Open drawer"_s);
-            return;
-        }
-    }
 }
 
 void TicketPrinter::printNoSale(const PosSettings &settings, const CashMovement &m, int number,
                                 const std::string &drawer, const std::string &printerId)
 {
     const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
-    // On the printer the drawer is wired to (as openDrawer picks it): the slip and the kick together.
+    // On the terminal's receipt printer: the slip, and the kick when the drawer is wired to it
+    // (never another printer's drawer: PosService says on the screen that it didn't open).
     const PrinterConfig *p = receiptPrinter(settings, printerId);
-    if (!p || !p->drawerKick) {
-        const auto it = std::ranges::find_if(settings.printers, [](const PrinterConfig &c) { return c.drawerKick; });
-        if (it != settings.printers.end())
-            p = &*it;
-    }
     if (!p)
         return;
     Document d = noSaleTicket(m, number, drawer, context(settings));
-    d.kickDrawer = p->drawerKick;
+    d.kickDrawer = p->drawerKick && (printerId.empty() || p->id == printerId);
     send(settings, *p, d, QString::fromStdString("No Sale #" + std::to_string(number)));
 }
 

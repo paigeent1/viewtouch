@@ -285,6 +285,51 @@ TEST_CASE("No Sale prints a slip like a kitchen ticket (no logo) and opens the d
     CHECK(out.contains(u"[drawer opened]"_s));
 }
 
+TEST_CASE("No borrowing: a drawer opens only on the printer asked for, never another one with a drawer",
+          "[print][nosale][drawers]")
+{
+    QTemporaryDir dir;
+    auto seed = test::seedPosData();   // Receipt has the drawer
+    core::PrinterConfig usb;
+    usb.id = "usb";
+    usb.name = "VT-BHDAN-RECEIPT";
+    usb.type = "file";
+    usb.path = "usb.txt";
+    usb.drawerKick = false;
+    seed.settings.printers.push_back(usb);
+    PrintSpooler spooler;
+    TicketPrinter printer(spooler, dir.path());
+    core::CashMovement m;
+    m.kind = core::CashMovement::Kind::NoSale;
+    m.by = "Morgan";
+    m.at = 1'700'000'000'000;
+
+    // The terminal's printer has no drawer: the slip there, no kick, and nothing on Receipt.
+    printer.openDrawer(seed.settings, "usb");
+    printer.printNoSale(seed.settings, m, 1, "Terminal drawer", "usb");
+    REQUIRE(spooler.waitIdle(5000));
+    const QString onUsb = readFile(dir.filePath(u"usb.txt"_s));
+    CHECK(onUsb.contains(u"****No Sale****"_s));
+    CHECK_FALSE(onUsb.contains(u"[drawer opened]"_s));
+    CHECK(readFile(dir.filePath(u"receipt.txt"_s)).isEmpty());
+
+    // A printer that isn't set up: no drawer opened anywhere.
+    printer.openDrawer(seed.settings, "gone");
+    REQUIRE(spooler.waitIdle(5000));
+    CHECK_FALSE(readFile(dir.filePath(u"receipt.txt"_s)).contains(u"[drawer opened]"_s));
+
+    // With the drawer wired to it, it opens there.
+    seed.settings.printers.back().drawerKick = true;
+    printer.printNoSale(seed.settings, m, 2, "Terminal drawer", "usb");
+    printer.openDrawer(seed.settings, "usb");
+    REQUIRE(spooler.waitIdle(5000));
+    const QString after = readFile(dir.filePath(u"usb.txt"_s));
+    const qsizetype first = after.indexOf(u"[drawer opened]"_s);
+    CHECK(first >= 0);
+    CHECK(after.indexOf(u"[drawer opened]"_s, first + 1) > first);   // the slip's and the kick's
+    CHECK_FALSE(readFile(dir.filePath(u"receipt.txt"_s)).contains(u"[drawer opened]"_s));
+}
+
 TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy showing voids",
           "[print][exceptions]")
 {
