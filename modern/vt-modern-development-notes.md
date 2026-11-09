@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 10:10 ET — Bob (Claude) — vt-touch-map --watch: notice a touchscreen that came back untied
+- **What:** The watcher now also compares each touchscreen's Coordinate Transformation Matrix, not just the device ids and monitors, and re-ties when it changes (re-reading after its own tie so it doesn't loop).
+- **Why:** Owner 2026-11-09: on BHDAN, unplugging the receipt printer's USB made the register's touch land wrong again although the watcher was running: the touchscreen reconnected under the same xinput ids, so the old check saw no change.
+- **Files:** (none)
+
 ### 2026-11-09 09:44 ET — Bob (Claude) — Backlog: test original ViewTouch with a jammed USB printer
 - **What:** Backlog item only, no code: after the stores are live, run original (upstream) ViewTouch with a USB receipt printer in an error state and see whether the register freezes; report it upstream if it does.
 - **Why:** Owner 2026-11-09: wants to help other ViewTouch users if the hang we saw is in the original code too (not shown yet; we only saw it in vtmodern).

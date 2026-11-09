@@ -11,11 +11,18 @@ if [ "$1" = --watch ]; then
     for p in $(pgrep -f "vt-touch-map --watc[h]"); do [ "$p" != "$$" ] && kill "$p" 2>/dev/null; done   # one watcher
     last=""
     while sleep 3; do
-        now="$(xinput list 2>/dev/null | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -o 'id=[0-9]*' | tr '\n' ' ')$(xrandr 2>/dev/null | grep ' connected')"
+        ids=$(xinput list 2>/dev/null | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -o 'id=[0-9]*' | cut -d= -f2)
+        # Each one's tie (its transformation matrix) too: a touchscreen that reconnects under the
+        # same id comes back untied (the whole screen), and the ids alone wouldn't show that.
+        ties=$(for i in $ids; do xinput list-props "$i" 2>/dev/null | grep -m1 'Coordinate Transformation Matrix'; done)
+        now="$ids $ties $(xrandr 2>/dev/null | grep ' connected')"
         if [ "$now" != "$last" ]; then
             sleep 1
             "$0"
-            last="$now"
+            # Read again after tying, so the tie it just made isn't taken for a change.
+            ids=$(xinput list 2>/dev/null | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -o 'id=[0-9]*' | cut -d= -f2)
+            ties=$(for i in $ids; do xinput list-props "$i" 2>/dev/null | grep -m1 'Coordinate Transformation Matrix'; done)
+            last="$ids $ties $(xrandr 2>/dev/null | grep ' connected')"
         fi
     done
 fi
