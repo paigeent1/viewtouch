@@ -166,8 +166,8 @@ TEST_CASE("Serial scanners on every port: found, a printer's port left alone, un
     b.close();
     CHECK(waitFor([&] {
         scanners.rescan();
-        return std::none_of(scanners.scanners().begin(), scanners.scanners().end(),
-                            [&](const SerialScanner *s) { return s->device() == b.path; });
+        const QList<SerialScanner *> now = scanners.scanners();   // a copy: begin and end of one list
+        return std::none_of(now.begin(), now.end(), [&](const SerialScanner *s) { return s->device() == b.path; });
     }));
     // Nothing listed twice when a port is seen again.
     scanners.rescan();
