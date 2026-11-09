@@ -151,10 +151,10 @@ bool PosService::noSale()
     DrawerSession *d = myDrawer();
     // The slip ("****No Sale****", no logo) and the drawer kick: only on this terminal's own
     // printer, when its drawer is wired there. Otherwise still recorded, and the screen says so.
-    const QString why = drawerProblem();
+    const QString shut = drawerProblem();
     s_->printer->printNoSale(s_->settings, m, number, d ? d->name : std::string(), receiptPrinter());
-    if (!why.isEmpty())
-        noteDrawerMiss(why);
+    if (!shut.isEmpty())
+        noteDrawerMiss(shut);
     // Kept with the drawer: who opened it with nothing sold, and why (exceptions report).
     if (d) {
         m.id = d->nextMovementId++;
@@ -163,8 +163,8 @@ bool PosService::noSale()
             s_->sink->saveDrawer(*d);
         emit s_->drawerChanged();
     }
-    emit notice(why.isEmpty() ? tr("Drawer opened (No Sale #%1)").arg(number)
-                              : tr("No Sale #%1 recorded, but the drawer did not open: %2").arg(number).arg(why));
+    emit notice(shut.isEmpty() ? tr("Drawer opened (No Sale #%1)").arg(number)
+                              : tr("No Sale #%1 recorded, but the drawer did not open: %2").arg(number).arg(shut));
     return true;
 }
 
