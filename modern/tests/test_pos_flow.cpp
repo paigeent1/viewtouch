@@ -2955,7 +2955,7 @@ TEST_CASE("UI: find an item by typing part of its name", "[flow][ui][find]")
     QQuickItem *cobb = find(u"menuItem-cobb"_s);
     REQUIRE(cobb);
     CHECK_FALSE(find(u"menuItem-caesar"_s));                  // only what matches
-    CHECK(cobb->height() >= 64);                              // a bar, big enough to touch
+    CHECK(cobb->height() >= 56);                              // a row, big enough to touch (about six show)
     CHECK(find(u"findPageUp"_s));                             // with ▲ ▼ beside the bars
     s.shot("51-find-item");
     s.tapItem(cobb);

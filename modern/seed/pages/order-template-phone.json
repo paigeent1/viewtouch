@@ -20,7 +20,8 @@
     "tab-breakfast",
     "tab-lunch",
     "tab-dinner",
-    "tab-scan"
+    "tab-scan",
+    "retail-mode-btn"
   ],
   "zones": [
     {
