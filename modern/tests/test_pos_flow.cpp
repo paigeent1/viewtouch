@@ -34,6 +34,11 @@
 #include <QTest>
 #include <QFile>
 #include <QUrl>
+#include <QElapsedTimer>
+#include <QFont>
+
+#include <algorithm>
+#include <cstdio>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -8514,4 +8519,225 @@ TEST_CASE("UI: a long order goes on in the next column (Continued), nothing cut 
     s.tapItem(second);
     QTest::qWait(100);
     CHECK(s.pos.kitchenTickets().size() == 2);
+}
+
+// --- A 31,700-item price book on the register's own screen (BHDAN) ---------------------------------
+
+namespace {
+
+// The ILSA price book's shape: retail items named BRAND LINE SIZE n, a UPC each (every third a second).
+QVariantMap priceBookFile(int count)
+{
+    static const char *brands[] = {"OLIVA", "PADRON", "PERDOMO", "ROCKY PATEL", "MACANUDO", "ARTURO FUENTE", "MY FATHER",
+                                   "ALEC BRADLEY", "DREW ESTATE", "MONTECRISTO", "ROMEO Y JULIETA", "CAO", "ACID", "PUNCH",
+                                   "HOYO", "JOYA DE NICARAGUA", "TATUAJE", "LA FLOR", "CROWNED HEADS", "AJ FERNANDEZ"};
+    static const char *lines[] = {"SERIE V", "MELANIO", "1964", "VINTAGE", "MADURO", "HABANO", "CONNECTICUT", "SUN GROWN",
+                                  "RESERVA", "CLASSIC", "BLUE", "GOLD", "NUB", "DOUBLE", "LIGA"};
+    static const char *sizes[] = {"ROBUSTO", "TORO", "CHURCHILL", "LANCERO", "BELICOSO", "CORONA", "GORDO", "PETITE"};
+    QVariantList cats, items;
+    for (int c = 0; c < 40; ++c)
+        cats << QVariantMap{{u"id"_s, u"ilsa-dept-%1"_s.arg(c)}, {u"name"_s, u"DEPT %1"_s.arg(c)}, {u"taxClass"_s, u"merchandise"_s}};
+    for (int i = 0; i < count; ++i) {
+        const QString name = u"%1 %2 %3 %4"_s.arg(QLatin1String(brands[i % 20]), QLatin1String(lines[(i / 20) % 15]),
+                                                 QLatin1String(sizes[(i / 300) % 8])).arg(i);
+        QStringList codes{u"7%1"_s.arg(i, 11, 10, QChar(u'0'))};
+        if (i % 3 == 0)
+            codes << u"8%1"_s.arg(i, 11, 10, QChar(u'0'));
+        items << QVariantMap{{u"id"_s, u"ilsa-%1"_s.arg(i)}, {u"name"_s, name}, {u"price"_s, 5.0 + (i % 400) / 10.0},
+                             {u"taxClass"_s, u"merchandise"_s}, {u"family"_s, u"ilsa-dept-%1"_s.arg(i % 40)},
+                             {u"manufacturer"_s, QLatin1String(brands[i % 20])}, {u"barcodes"_s, codes}};
+    }
+    return {{u"format"_s, u"viewtouch-menu"_s}, {u"version"_s, 1}, {u"store"_s, u"ILSA price book"_s},
+            {u"categories"_s, cats}, {u"choiceGroups"_s, QVariantList{}}, {u"items"_s, items}, {u"pictures"_s, QVariantMap{}}};
+}
+
+QQuickItem *byName(QQuickItem *root, const QString &name)
+{
+    return Screen::findBy(root, "objectName", name);
+}
+
+} // namespace
+
+// Find on the order screen and PRICE CHECK, drawn as on the register, with the price book: each key typed,
+// the answer shown, the rows readable (name, UPC, price; about six at once; ▲ PG UP / ▼ PG DN on the
+// right), the search line active with what it's doing, and Retail Mode back from there. Prints the times
+// ([find-ui]); the limits only catch something far too slow for a Pi (about 3x this machine).
+TEST_CASE("UI: Find and price check with a 31,700-item price book", "[flow][ui][find][catalog]")
+{
+    QTemporaryDir home;   // no price book of Neil's here
+    const QByteArray oldHome = qgetenv("HOME");
+    qputenv("HOME", home.path().toUtf8());
+    Screen s(false, 1920, 1080);
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.pos.importMenuFile(priceBookFile(31700)) == 31700);
+    QElapsedTimer t;
+    const auto ms = [&] { return double(t.nsecsElapsed()) / 1e6; };
+    REQUIRE(s.pos.startCheck(core::CheckType::Takeout));
+    REQUIRE(s.c.jumpTo(u"index-lunch"_s));
+    QTest::qWait(80);
+
+    // PRICE CHECK, a scan: the last item's second UPC (every item before it looked at, the old way); one not on file.
+    REQUIRE(s.pos.togglePriceCheck());
+    QTest::qWait(30);
+    t.start();
+    s.c.scanned(u"8%1"_s.arg(31698, 11, 10, QChar(u'0')));
+    QCoreApplication::processEvents();
+    const double scanMs = ms();
+    CHECK(s.pos.priceCheck()[u"item"_s].toMap()[u"name"_s].toString().endsWith(u" 31698"_s));
+    s.pos.closePriceCheck();
+    t.start();
+    s.c.scanned(u"799999999999"_s);
+    QCoreApplication::processEvents();
+    const double scanMissMs = ms();
+    CHECK_FALSE(s.pos.priceCheck().contains(u"item"_s));
+    t.start();
+    REQUIRE(s.pos.priceCheckCode(u"08%1"_s.arg(31698, 11, 10, QChar(u'0'))));   // read as an EAN-13 (a 0 in front)
+    const double scanShortMs = ms();
+    CHECK(s.pos.priceCheck()[u"item"_s].toMap()[u"name"_s].toString().endsWith(u" 31698"_s));
+    s.pos.closePriceCheck();
+    REQUIRE(s.pos.togglePriceCheck());   // off
+    QTest::qWait(30);
+
+    // Retail Mode, on the order screen: back to the Retail screen.
+    bool hasRetailMode = false;
+    for (int r = 0; r < s.c.zones()->rowCount(); ++r)
+        hasRetailMode = hasRetailMode || s.c.zones()->data(s.c.zones()->index(r), ZoneModel::ZoneIdRole).toString() == u"retail-mode-btn"_s;
+    CHECK(hasRetailMode);
+
+    // Find.
+    s.c.activate(u"tab-find"_s);
+    QTest::qWait(100);
+    REQUIRE(s.c.pageId() == u"find-item"_s);
+    QQuickItem *root = s.window->contentItem();
+    // The search line is active from the start: a bright border, a cursor (no touch on it needed).
+    QQuickItem *line = byName(root, u"keyboardLine"_s);
+    QQuickItem *cursor = byName(root, u"keyboardCursor"_s);
+    CHECK(line != nullptr);
+    CHECK(cursor != nullptr);
+    if (cursor)
+        CHECK(cursor->width() >= 4);
+    if (line)
+        CHECK(QQmlProperty::read(line, u"border.width"_s).toDouble() >= 3);
+
+    // "oliva v", a key at a time on the screen's keys, as the owner typed it: how long each key holds the
+    // screen, then how long until the rows show the answer.
+    double slowestKeyMs = 0, keysMs = 0;
+    const QString typed = u"oliva v"_s;
+    for (const QChar ch : typed) {
+        t.start();
+        s.pos.textKey(ch == u' ' ? u"space"_s : QString(ch));
+        QCoreApplication::processEvents();
+        const double k = ms();
+        slowestKeyMs = std::max(slowestKeyMs, k);
+        keysMs += k;
+        QTest::qWait(100);
+    }
+    t.start();
+    double shownMs = -1;
+    QQuickItem *list = nullptr;
+    while (ms() < 5000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        list = byName(root, u"findList"_s);
+        if (s.pos.itemSearch()[u"query"_s].toString() == typed && list && list->property("count").toInt() > 0) {
+            shownMs = ms();
+            break;
+        }
+    }
+    REQUIRE(shownMs >= 0);
+    QTest::qWait(60);
+    const QVariantMap found = s.pos.itemSearch();
+    const int count = found[u"count"_s].toInt();
+    const QVariantList items = found[u"items"_s].toList();
+    REQUIRE_FALSE(items.isEmpty());
+    for (const QVariant &v : items)
+        CHECK(v.toMap()[u"name"_s].toString().startsWith(u"OLIVA "_s));
+    CHECK(items.size() <= 50);   // the best 50; More… for the next
+    // What it's doing, on the search line.
+    QQuickItem *status = byName(root, u"findStatus"_s);
+    CHECK(status != nullptr);
+    if (status)
+        CHECK(status->property("text").toString() == u"%1 matches"_s.arg(count));
+
+    // The rows: the list takes the width, ▲ PG UP / ▼ PG DN on its right; about six rows show, each with
+    // its name, its UPC and its price, big enough to read and touch.
+    QQuickItem *up = byName(root, u"findPageUp"_s), *down = byName(root, u"findPageDown"_s);
+    REQUIRE(up);
+    REQUIRE(down);
+    const QRectF listBox = list->mapRectToScene(QRectF(0, 0, list->width(), list->height()));
+    const QRectF upBox = up->mapRectToScene(QRectF(0, 0, up->width(), up->height()));
+    QQuickItem *bars = byName(root, u"findBars"_s);
+    REQUIRE(bars);
+    const double barsW = bars->mapRectToScene(QRectF(0, 0, bars->width(), bars->height())).width();
+    const QString firstId = items.first().toMap()[u"id"_s].toString();
+    QQuickItem *firstRow = byName(root, u"menuItem-"_s + firstId);
+    REQUIRE(firstRow);
+    const double rowH = firstRow->height() + list->property("spacing").toDouble();
+    const int rowsShown = int((list->height() + list->property("spacing").toDouble()) / rowH);   // whole rows
+    CHECK(listBox.width() >= barsW * 0.75);
+    CHECK(upBox.left() >= listBox.right());
+    CHECK(up->property("text").toString().contains(u"PG UP"_s));
+    CHECK(down->property("text").toString().contains(u"PG DN"_s));
+    CHECK(rowsShown >= 5);
+    CHECK(rowsShown <= 10);
+    QQuickItem *name = byName(root, u"findName-"_s + firstId);
+    QQuickItem *detail = byName(root, u"findDetail-"_s + firstId);
+    CHECK(name != nullptr);
+    CHECK(detail != nullptr);
+    if (name) {
+        CHECK(name->property("text").toString() == items.first().toMap()[u"name"_s].toString());
+        CHECK(name->property("font").value<QFont>().pixelSize() >= 18);
+        CHECK(name->width() >= listBox.width() * 0.5);
+    }
+    if (detail)
+        CHECK(detail->property("text").toString().startsWith(u"UPC "_s));
+    s.shot("find-price-book");
+
+    // PG DN: one page on.
+    const double y0 = list->property("contentY").toDouble();
+    s.tapItem(down);
+    QTest::qWait(60);
+    const double paged = list->property("contentY").toDouble() - y0;
+    CHECK(paged >= (rowsShown - 1) * rowH);
+    // More…: the next 50.
+    if (count > 50) {
+        s.pos.invoke(u"findItems"_s, {typed, 100});   // what More… asks
+        QTest::qWait(60);
+        CHECK(s.pos.itemSearch()[u"items"_s].toList().size() == std::min(100, count));
+    }
+
+    // Nothing found: said so on the line.
+    s.pos.textKey(u"clear"_s);
+    for (const QChar ch : u"zzqx"_s)
+        s.pos.textKey(QString(ch));
+    QTest::qWait(400);
+    if (status)
+        CHECK(status->property("text").toString() == u"No match for 'zzqx'"_s);
+
+    // Any change at all while Find shows (a line rung on another screen, the clock...): what the screen does.
+    t.start();
+    for (int n = 0; n < 20; ++n) {
+        emit s.pos.sessionChanged();
+        QCoreApplication::processEvents();
+    }
+    const double changeMs = ms() / 20;
+
+    std::printf("\n[find-ui] 31700 items: price check scan %.1f ms (not on file %.1f ms, 11 digits %.1f ms); "
+                "Find typing: slowest key %.1f ms (%d keys %.1f ms), rows shown %.0f ms after the last key "
+                "(%d matches, %d rows on screen, PG DN moved %.0f); any change while Find shows %.1f ms\n",
+                scanMs, scanMissMs, scanShortMs, slowestKeyMs, int(typed.size()), keysMs, shownMs, count, rowsShown,
+                paged, changeMs);
+    std::fflush(stdout);
+    CHECK(scanMs < 100);
+    CHECK(scanMissMs < 100);
+    CHECK(slowestKeyMs < 150);
+    CHECK(shownMs < 1000);
+    CHECK(changeMs < 100);
+
+    // Retail Mode from the order screen: the Retail screen.
+    REQUIRE(s.c.jumpTo(u"index-lunch"_s));
+    QTest::qWait(40);
+    s.c.activate(u"retail-mode-btn"_s);
+    QTest::qWait(60);
+    CHECK(s.c.pageId() == u"retail-entry"_s);
+    qputenv("HOME", oldHome);
 }
