@@ -29,6 +29,25 @@ Item {
         note = ""
     }
 
+    // A day chosen on the calendar ("2026-12-24"): the week it is in, and that day.
+    function goTo(iso) {
+        if (iso === "" || !days.length)
+            return
+        const at = s => { const p = s.split("-"); return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])) }
+        const diff = Math.round((at(iso) - at(days[0].date)) / 86400000)
+        const weeks = Math.floor(diff / 7)
+        const target = (info.week ?? 0) + weeks
+        // The schedule shows two weeks back to eight ahead (pos_schedule.cpp).
+        goToFar = target < -2 || target > 8
+        if (goToFar)
+            return
+        pickedDay = diff - weeks * 7
+        chosen = null
+        if (weeks !== 0)
+            pos.setScheduleWeek(target)
+    }
+    property bool goToFar: false
+
     // Upright (a phone): the week as rows, and adding a shift over three lines.
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 380 : 680) : 1
@@ -54,6 +73,21 @@ Item {
                     Layout.preferredWidth: 220
                 }
                 Button { text: "›"; font.pixelSize: 22; implicitWidth: 56; onClicked: { w.pickedDay = 0; w.pos.setScheduleWeek((w.info.week ?? 0) + 1) } }
+                // Any day off the calendar: its week, that day picked for a new shift.
+                DateField {
+                    objectName: "scheduleGoTo"
+                    implicitWidth: 200
+                    implicitHeight: 44
+                    fontSize: 15
+                    value: w.days[w.dayIndex] ? w.days[w.dayIndex].date : ""
+                    title: qsTr("Go to the day")
+                    onPicked: v => w.goTo(v)
+                }
+                Label {
+                    visible: w.goToFar
+                    text: qsTr("The schedule goes two weeks back and eight ahead.")
+                    color: "#f6ad55"
+                }
                 Item { Layout.fillWidth: true }
                 Label {
                     visible: w.info.required ?? false
@@ -171,26 +205,29 @@ Item {
                     onModelChanged: if (w.who === "") w.who = currentValue ?? ""
                 }
                 Label { Layout.columnSpan: w.narrow ? 2 : 1; text: w.days[w.dayIndex] ? w.days[w.dayIndex].label : "" ; font.bold: true }
-                TextField {
-                    Layout.minimumHeight: w.narrow ? 40 : 0
-                    implicitWidth: 110
-                    Layout.preferredWidth: 110
+                // The shift's hours: on the hour/minute picker, not typed.
+                DateField {
+                    objectName: "shiftStart"
+                    mode: "time"
+                    implicitWidth: 150
+                    Layout.preferredWidth: 150
+                    Layout.preferredHeight: 48
                     Layout.fillWidth: false
-                    text: w.start
-                    placeholderText: "4:00 PM"
-                    inputMethodHints: Qt.ImhPreferNumbers
-                    onTextEdited: w.start = text
+                    value: w.start
+                    title: qsTr("The shift starts")
+                    onPicked: v => w.start = v
                 }
                 Label { text: "–" }
-                TextField {
-                    Layout.minimumHeight: w.narrow ? 40 : 0
-                    implicitWidth: 110
-                    Layout.preferredWidth: 110
+                DateField {
+                    objectName: "shiftEnd"
+                    mode: "time"
+                    implicitWidth: 150
+                    Layout.preferredWidth: 150
+                    Layout.preferredHeight: 48
                     Layout.fillWidth: false
-                    text: w.end
-                    placeholderText: "10:00 PM"
-                    inputMethodHints: Qt.ImhPreferNumbers
-                    onTextEdited: w.end = text
+                    value: w.end
+                    title: qsTr("The shift ends")
+                    onPicked: v => w.end = v
                 }
                 TextField {
                     Layout.minimumHeight: w.narrow ? 40 : 0

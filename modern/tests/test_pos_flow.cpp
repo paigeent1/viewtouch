@@ -7732,6 +7732,122 @@ TEST_CASE("UI: Reports -> Forecast: a coming day, chosen by its key", "[flow][ui
     s.shot("forecast");
 }
 
+// Owner 2026-11-09: the From / To boxes were small, brought up the keyboard, and could show
+// September under October's report. Now: big fields, a calendar, and always the report's days.
+TEST_CASE("UI: Reports -> Dates…: From and To on the calendar, in step with the report", "[flow][ui][datepicker]")
+{
+    Screen s(true);   // the on-screen keyboard is on: it must not come up for a date
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    s.pos.shared()->history = [](std::int64_t, std::int64_t) { return std::vector<core::Check>{}; };
+    const auto settle = [&] {
+        for (int i = 0; i < 100 && s.pos.rangeReport()[u"loading"_s].toBool(); ++i)
+            QTest::qWait(20);
+        QTest::qWait(60);
+    };
+    const auto find = [&](const QString &name) { return Screen::findBy(s.window->contentItem(), "objectName", name); };
+    QQuickItem *from = nullptr;
+    const auto openPicker = [&]() -> QObject * {
+        QObject *p = from ? qvariant_cast<QObject *>(from->property("picker")) : nullptr;
+        return p && p->property("visible").toBool() ? p : nullptr;
+    };
+    REQUIRE(s.c.jumpTo(u"reports"_s));
+    QTest::qWait(50);
+    s.tapKey(u"Last Month"_s);
+    settle();
+    const QString lastFrom = s.pos.rangeReport()[u"from"_s].toString();
+    const QString lastTo = s.pos.rangeReport()[u"to"_s].toString();
+    REQUIRE(QDate::fromString(lastFrom, Qt::ISODate).day() == 1);
+
+    // Dates…: the boxes start on the days just shown, and the report is asked for them.
+    s.tapKey(u"Dates…"_s);
+    settle();
+    from = find(u"reportFrom"_s);
+    QQuickItem *to = find(u"reportTo"_s);
+    REQUIRE(from);
+    REQUIRE(to);
+    CHECK(from->property("value").toString() == lastFrom);
+    CHECK(to->property("value").toString() == lastTo);
+    CHECK(s.pos.rangeReport()[u"period"_s] == u"custom"_s);
+    CHECK(s.pos.rangeReport()[u"from"_s] == lastFrom);
+    // As tall as the keys beside it.
+    QQuickItem *show = find(u"reportShow"_s);
+    REQUIRE(show);
+    CHECK(from->height() >= show->height() - 1);
+
+    // Touched: the calendar, not the keyboard, on that day.
+    REQUIRE_FALSE(openPicker());
+    s.tapItem(from);
+    QTest::qWait(80);
+    QObject *picker = openPicker();
+    REQUIRE(picker);
+    CHECK_FALSE(s.keyboardShown());
+    const QDate shown = QDate::fromString(lastFrom, Qt::ISODate);
+    CHECK(picker->property("year").toInt() == shown.year());
+    CHECK(picker->property("month").toInt() == shown.month());
+    CHECK(picker->property("day").toInt() == 1);
+
+    // The date math: a month with fewer days keeps the day valid; leap years.
+    const auto call = [&](const char *fn, int arg) {
+        REQUIRE(QMetaObject::invokeMethod(picker, fn, Q_ARG(QVariant, QVariant(arg))));
+    };
+    picker->setProperty("year", 2028);
+    picker->setProperty("month", 1);
+    picker->setProperty("day", 31);
+    call("setMonth", 2);
+    CHECK(picker->property("day").toInt() == 29);    // 2028 is a leap year
+    call("stepYear", 1);
+    CHECK(picker->property("year").toInt() == 2029);
+    CHECK(picker->property("day").toInt() == 28);    // Feb 29 -> Feb 28
+    call("stepYear", -129);
+    CHECK(picker->property("year").toInt() == 1900);
+    picker->setProperty("month", 1);
+    picker->setProperty("day", 31);
+    call("setMonth", 2);
+    CHECK(picker->property("day").toInt() == 28);    // 1900: not a leap year
+    call("stepYear", 100);
+    picker->setProperty("day", 29);
+    CHECK(picker->property("value").toString() == u"2000-02-29"_s);   // 2000 is
+    picker->setProperty("month", 12);
+    picker->setProperty("day", 31);
+    call("stepMonth", 1);                            // over the year's end
+    CHECK(picker->property("value").toString() == u"2001-01-31"_s);
+    call("stepMonth", -2);
+    CHECK(picker->property("value").toString() == u"2000-11-30"_s);
+    // The hour and minute (date-and-time fields): 12-hour keys and AM/PM.
+    picker->setProperty("hour", 13);
+    call("setHour12", 12);
+    CHECK(picker->property("hour").toInt() == 12);   // noon stays PM
+    REQUIRE(QMetaObject::invokeMethod(picker, "setPm", Q_ARG(QVariant, QVariant(false))));
+    CHECK(picker->property("hour").toInt() == 0);    // midnight
+    picker->setProperty("minute", 0);
+    call("stepMinute", -1);
+    CHECK(picker->property("minute").toInt() == 59);
+
+    // Touched: September, the 15th, OK. The box says so and the report is for it.
+    picker->setProperty("year", 2026);
+    s.tapItem(find(u"dateMonth-9"_s));
+    s.tapItem(find(u"dateDay-15"_s));
+    s.tapItem(find(u"dateOk"_s));
+    settle();
+    CHECK_FALSE(openPicker());
+    CHECK(from->property("value").toString() == u"2026-09-15"_s);
+    CHECK(s.pos.rangeReport()[u"from"_s] == u"2026-09-15"_s);
+    CHECK(s.pos.rangeReport()[u"to"_s] == lastTo);
+    // Shown in words, kept as 2026-09-15.
+    CHECK(Screen::findBy(from, "text", QLocale().toString(QDate(2026, 9, 15), u"ddd, MMM d, yyyy"_s)));
+
+    // Cancel changes nothing.
+    s.tapItem(from);
+    QTest::qWait(80);
+    picker = openPicker();
+    REQUIRE(picker);
+    s.tapItem(find(u"dateDay-3"_s));
+    s.tapItem(find(u"dateCancel"_s));
+    QTest::qWait(60);
+    CHECK(from->property("value").toString() == u"2026-09-15"_s);
+    s.shot("report-dates");
+}
+
 TEST_CASE("UI: the Changes report: who changed what", "[flow][ui][changes]")
 {
     Screen s;

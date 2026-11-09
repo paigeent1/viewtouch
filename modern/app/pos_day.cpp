@@ -1719,7 +1719,9 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
     const std::int64_t a0 = startOf(from.addYears(-1)), b0 = startOf(to.addDays(1).addYears(-1));
 
     const int request = ++rangeRequest_;
-    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"period"_s, period}, {u"label"_s, label}};
+    // The days read, too: the screen's From and To show the very days the report is for.
+    rangeReport_ = {{u"loading"_s, true}, {u"id"_s, id}, {u"period"_s, period}, {u"label"_s, label},
+                    {u"from"_s, from.toString(u"yyyy-MM-dd"_s)}, {u"to"_s, to.toString(u"yyyy-MM-dd"_s)}};
     emit sessionChanged();
 
     // Read the checks away from the screen, then build here.

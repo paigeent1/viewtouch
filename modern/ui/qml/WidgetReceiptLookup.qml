@@ -13,6 +13,7 @@ Item {
     readonly property var found: (info.results ?? []).filter(r => r.status !== "open")   // receipts: closed checks
     readonly property var check: info.selected ?? null
     property int days: zone && zone.props && zone.props.days !== undefined ? zone.props.days : 1
+    property string since: ""   // a day chosen on the calendar: `days` reaches back to it
     property var offsets: [0]
     property int index: -1
     function load(offset) { w.pos.searchChecks("", days, offset) }
@@ -85,10 +86,29 @@ Item {
                         required property var modelData
                         text: modelData[1]
                         checkable: true
-                        checked: w.days === modelData[0]
+                        checked: w.since === "" && w.days === modelData[0]
                         implicitHeight: w.unit * 2.4
                         font.pixelSize: w.unit * 0.8
-                        onClicked: { w.days = modelData[0]; w.offsets = [0]; w.index = -1; w.load(0) }
+                        onClicked: { w.since = ""; w.days = modelData[0]; w.offsets = [0]; w.index = -1; w.load(0) }
+                    }
+                }
+                // Or back to a day off the calendar: the receipts since then (that day too).
+                DateField {
+                    objectName: "lookupSince"
+                    Layout.preferredWidth: w.unit * 11
+                    implicitHeight: w.unit * 2.4
+                    fontSize: w.unit * 0.8
+                    value: w.since
+                    placeholder: qsTr("Since…")
+                    title: qsTr("Receipts since the day")
+                    onPicked: v => {
+                        w.since = v
+                        if (v === "")
+                            return
+                        const p = v.split("-")
+                        const start = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getTime()
+                        w.days = Math.max(1, Math.floor((Date.now() - start) / 86400000) + 1)
+                        w.offsets = [0]; w.index = -1; w.load(0)
                     }
                 }
                 Button {

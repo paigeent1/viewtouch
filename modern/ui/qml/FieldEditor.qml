@@ -51,6 +51,9 @@ ColumnLayout {
         case "image": return imagePicker
         case "rows": return rowsField
         case "info": return infoText
+        case "date": return dateField
+        case "datetime": return dateField
+        case "time": return dateField
         default: return textField
         }
     }
@@ -488,6 +491,25 @@ ColumnLayout {
                 const v = Number(text === "" ? 0 : text)
                 if (!isNaN(v) && v !== Number(fe.value)) fe.commit(v)
             }
+        }
+    }
+
+    // A date ("2026-11-01"), a date and time ("2026-10-09 7:00 PM") or a time: on the calendar,
+    // not typed. Empty allowed unless the field says required (field.required).
+    Component {
+        id: dateField
+        DateField {
+            Layout.fillWidth: true
+            Layout.maximumWidth: 420
+            Layout.minimumHeight: Math.max(fe.minHeight, 52)
+            implicitHeight: 52
+            mode: fe.type
+            value: fe.mixed || fe.value == null ? "" : String(fe.value)
+            placeholder: fe.mixed ? qsTr("(mixed)") : fe.type === "time" ? qsTr("Choose a time") : qsTr("Choose a date")
+            title: fe.field.label ?? ""
+            allowClear: fe.field.required !== true
+            readOnly: fe.readOnly
+            onPicked: v => { if (v !== String(fe.value ?? "")) fe.commit(v) }
         }
     }
 

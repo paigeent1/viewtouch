@@ -51,6 +51,7 @@ Item {
     property bool quoteTouched: false
     onInfoChanged: if (!quoteTouched) quote = info.nextQuote ?? 10
     property int dayOffset: 0
+    property string resDay: ""   // a day off the calendar ("2026-12-24"), in place of dayOffset
     property string time: "7:00 PM"
 
     function clearForm() {
@@ -62,7 +63,7 @@ Item {
         if (reservation) {
             const d = new Date()
             d.setDate(d.getDate() + dayOffset)
-            const day = Qt.formatDate(d, "yyyy-MM-dd")
+            const day = resDay !== "" ? resDay : Qt.formatDate(d, "yyyy-MM-dd")
             p.at = day + " " + time
             pos.addReservation(p)
         } else {
@@ -235,18 +236,31 @@ Item {
                                     required property int index
                                     text: modelData
                                     checkable: true
-                                    checked: w.dayOffset === index
-                                    onClicked: w.dayOffset = index
+                                    checked: w.resDay === "" && w.dayOffset === index
+                                    onClicked: { w.resDay = ""; w.dayOffset = index }
                                 }
                             }
                         }
-                        TextField {
-                            implicitHeight: 48
-                            implicitWidth: 120
-                            text: w.time
-                            placeholderText: "7:30 PM"
-                            inputMethodHints: Qt.ImhPreferNumbers
-                            onTextEdited: w.time = text
+                        RowLayout {
+                            // Further off: on the calendar. The time: on the hour/minute picker.
+                            DateField {
+                                objectName: "reservationDay"
+                                implicitWidth: 230
+                                implicitHeight: 48
+                                value: w.resDay
+                                placeholder: qsTr("Another day…")
+                                title: qsTr("The reservation's day")
+                                onPicked: v => w.resDay = v
+                            }
+                            DateField {
+                                objectName: "reservationTime"
+                                mode: "time"
+                                implicitWidth: 150
+                                implicitHeight: 48
+                                value: w.time
+                                title: qsTr("The reservation's time")
+                                onPicked: v => w.time = v
+                            }
                         }
                     }
                     Label { text: qsTr("Note") }

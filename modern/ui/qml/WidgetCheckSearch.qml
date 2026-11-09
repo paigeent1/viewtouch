@@ -19,6 +19,13 @@ Item {
     // props.showAll lists those checks as soon as the screen opens (Reprint Receipt: 7 days).
     property int days: zone && zone.props && zone.props.days !== undefined ? zone.props.days : 365
     Component.onCompleted: if (pos && zone && zone.props && zone.props.showAll === true) fresh("")
+    // A day chosen on the calendar ("2026-10-01"): `days` reaches back to its start.
+    property string since: ""
+    function daysSince(iso) {
+        const p = iso.split("-")
+        const start = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getTime()
+        return Math.max(1, Math.floor((Date.now() - start) / 86400000) + 1)
+    }
     property string asked: ""          // the search ("" with Show All: every check)
     property bool searched: false
     property var offsets: [0]         // where each page began (for ‹ Newer)
@@ -104,11 +111,29 @@ Item {
                         text: modelData[1]
                         implicitHeight: 38
                         font.pixelSize: 14
-                        highlighted: w.days === modelData[0]
+                        highlighted: w.since === "" && w.days === modelData[0]
                         onClicked: {
+                            w.since = ""
                             w.days = modelData[0]
                             if (w.searched)
                                 w.fresh(w.asked)
+                        }
+                    }
+                }
+                // Or back to a day off the calendar: the checks since then (that day too).
+                DateField {
+                    objectName: "searchSince"
+                    width: 230
+                    height: 38
+                    fontSize: 14
+                    value: w.since
+                    placeholder: qsTr("Since…")
+                    title: qsTr("Checks since the day")
+                    onPicked: v => {
+                        w.since = v
+                        if (v !== "") {
+                            w.days = w.daysSince(v)
+                            w.fresh(w.asked)
                         }
                     }
                 }
