@@ -794,6 +794,246 @@ Report laborReport(const std::vector<TimePunch> &punches, const std::vector<Empl
     return r;
 }
 
+// --- Time Clock (the ILSA printout) -------------------------------------------------
+
+namespace {
+
+std::tm localTm(std::int64_t ms)
+{
+    const std::time_t t = std::time_t(ms >= 0 ? ms / 1000 : (ms - 999) / 1000);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    return tm;
+}
+
+int hour12(const std::tm &tm) { return tm.tm_hour % 12 == 0 ? 12 : tm.tm_hour % 12; }
+
+// "11/03/2026 08:00:57 am": a punch's date and time (am / pm by hand: the C library's %p is the
+// locale's, and may be blank).
+std::string punchStamp(std::int64_t ms, bool withDate = true)
+{
+    const std::tm tm = localTm(ms);
+    char buf[48];
+    if (withDate)
+        std::snprintf(buf, sizeof buf, "%02d/%02d/%04d %02d:%02d:%02d %s", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900,
+                      hour12(tm), tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "am" : "pm");
+    else
+        std::snprintf(buf, sizeof buf, "%02d:%02d:%02d %s", hour12(tm), tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "am" : "pm");
+    return buf;
+}
+
+// "11/02/2026 12:00AM" (the heading's days).
+std::string rangeStamp(std::int64_t ms)
+{
+    const std::tm tm = localTm(ms);
+    char buf[40];
+    std::snprintf(buf, sizeof buf, "%02d/%02d/%04d %02d:%02d%s", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900,
+                  hour12(tm), tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
+    return buf;
+}
+
+// "11/09/2026 4:55:10 PM" (when it was printed).
+std::string printedStamp(std::int64_t ms)
+{
+    const std::tm tm = localTm(ms);
+    char buf[40];
+    std::snprintf(buf, sizeof buf, "%02d/%02d/%04d %d:%02d:%02d %s", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900,
+                  hour12(tm), tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "AM" : "PM");
+    return buf;
+}
+
+bool sameDay(std::int64_t a, std::int64_t b)
+{
+    const std::tm x = localTm(a), y = localTm(b);
+    return x.tm_year == y.tm_year && x.tm_yday == y.tm_yday;
+}
+
+// The non-blank lines of `text`, trimmed.
+std::vector<std::string> textLines(const std::string &text)
+{
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : text + "\n") {
+        if (c == '\n' || c == '\r') {
+            const auto b = cur.find_first_not_of(" \t"), e = cur.find_last_not_of(" \t");
+            if (b != std::string::npos)
+                out.push_back(cur.substr(b, e - b + 1));
+            cur.clear();
+        } else {
+            cur += c;
+        }
+    }
+    return out;
+}
+
+bool allDigits(const std::string &s)
+{
+    return !s.empty() && std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isdigit(c); });
+}
+
+} // namespace
+
+std::string clockHours(std::int64_t minutes)
+{
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%02lld:%02lld", static_cast<long long>(minutes / 60),
+                  static_cast<long long>(minutes % 60));
+    return buf;
+}
+
+std::string decimalHours(std::int64_t minutes)
+{
+    const std::int64_t hundredths = (minutes * 100 + 30) / 60;   // minutes / 60, rounded to 2 places
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%lld.%02lld", static_cast<long long>(hundredths / 100),
+                  static_cast<long long>(hundredths % 100));
+    return buf;
+}
+
+Report timeClockReport(const std::vector<TimePunch> &punches, const std::vector<Employee> &employees,
+                       const ReportContext &ctx, const TimeClockOptions &o)
+{
+    // A phrase in the screen's language, %1 %2 filled in.
+    const auto tr = [&](const std::string &english, std::initializer_list<std::string> args = {}) {
+        std::string text = o.words ? o.words(english) : english;
+        int n = 1;
+        for (const std::string &a : args) {
+            const std::string key = "%" + std::to_string(n++);
+            if (const auto at = text.find(key); at != std::string::npos)
+                text.replace(at, key.size(), a);
+        }
+        return text;
+    };
+    const PosSettings &s = ctx.settings;
+    Report r;
+    r.id = "timeclock";
+    r.title = tr("Time Clock Report");
+    r.subtitle = tr("%1 thru %2", {rangeStamp(o.from), rangeStamp(o.to)});
+    if (o.paper)
+        r.columns = {tr("Begin / End"), tr("Hrs:Min"), tr("Hours")};
+    else
+        r.columns = {tr("Begin Date and Time"), tr("End Date and Time"), tr("Hours & Minutes"), tr("Total Hours")};
+
+    // The heading: the store (on paper its name and the time are printed at the top already).
+    std::vector<std::string> address = textLines(s.storeAddress);
+    const std::string phone = s.storePhone;
+    if (address.empty() && phone.empty())
+        address = textLines(s.receiptHeader);
+    if (!o.paper)
+        r.line({tr("Store: %1", {s.storeName})});
+    for (size_t i = 0; i < address.size(); ++i)
+        r.line({i == 0 ? tr("Address: %1", {address[i]}) : "          " + address[i]});
+    if (!phone.empty())
+        r.line({tr("Phone: %1", {phone})});
+    if (!o.paper)
+        r.line({tr("Report printed: %1", {printedStamp(ctx.now)})});
+
+    std::map<std::string, std::string> names;
+    for (const Employee &e : employees)
+        names[e.id] = e.name;
+    const auto nameOf = [&](const std::string &id) {
+        const auto it = names.find(id);
+        return it == names.end() ? id : it->second;
+    };
+    std::set<std::int64_t> edited;
+    for (const PosSettings::PunchChange &c : s.punchChanges)
+        edited.insert(c.punchId);
+
+    // By employee number (78 before 102; ids that aren't numbers after them), each one's punches in order.
+    std::map<std::string, std::vector<const TimePunch *>> people;
+    for (const TimePunch &p : punches)
+        if (o.employeeId.empty() || p.employeeId == o.employeeId)
+            people[p.employeeId].push_back(&p);
+    std::vector<std::string> order;
+    for (const auto &[id, list] : people)
+        order.push_back(id);
+    std::ranges::sort(order, [](const std::string &a, const std::string &b) {
+        const bool na = allDigits(a), nb = allDigits(b);
+        if (na != nb)
+            return na;
+        if (na && a.size() != b.size())
+            return a.size() < b.size();
+        return a < b;
+    });
+    if (order.empty()) {
+        r.note(o.employeeId.empty() ? tr("Nobody clocked in on these days.")
+                                    : tr("%1 didn't clock in on these days.", {nameOf(o.employeeId)}));
+        return r;
+    }
+
+    // Minutes: each punch's paid time to the nearest minute (Labor's: breaks left out unless they're
+    // paid); the totals add those minutes, then show them as hours. Nearest, not floored, as ILSA did:
+    // the owner's printout has 08:06:37 am to 11:13:22 am (3:06:45) as 03:07 and 3.12.
+    const auto toMinutes = [](std::int64_t ms) { return (std::max<std::int64_t>(0, ms) + 30'000) / 60'000; };
+    std::int64_t grand = 0;
+    bool anyEdited = false, anyOpen = false, anyUnpaid = false;
+    for (const std::string &id : order) {
+        std::vector<const TimePunch *> &list = people[id];
+        std::ranges::sort(list, {}, &TimePunch::clockIn);
+        r.section(tr("Employee #: %1", {id}) + "    " + tr("Name: %1", {nameOf(id)}));
+        if (o.paper)
+            r.line({"", tr("Hrs:Min"), tr("Hours")});
+        std::int64_t minutes = 0;
+        for (const TimePunch *p : list) {
+            const std::string mark = edited.contains(p->id) ? " " + tr("*edited") : "";
+            anyEdited = anyEdited || !mark.empty();
+            const std::string begin = punchStamp(p->clockIn);
+            if (p->open()) {
+                anyOpen = true;
+                if (o.paper) {
+                    r.line({tr("In") + "  " + begin + mark});
+                    r.line({tr("Out") + " " + tr("(still clocked in)"), "--:--", "--"});
+                } else {
+                    r.line({begin + mark, tr("(still clocked in)"), "--:--", "--"});
+                }
+            } else {
+                const std::int64_t m = toMinutes(p->workedMs(ctx.now, s.paidBreaks));
+                minutes += m;
+                if (o.paper) {
+                    r.line({tr("In") + "  " + begin + mark});
+                    r.line({tr("Out") + " " + punchStamp(p->clockOut, !sameDay(p->clockIn, p->clockOut)),
+                            clockHours(m), decimalHours(m)});
+                } else {
+                    r.line({begin + mark, punchStamp(p->clockOut), clockHours(m), decimalHours(m)});
+                }
+            }
+            // Its breaks, under it: taken off (unpaid) or counted (paid).
+            for (const TimePunch::Break &b : p->breaks) {
+                const std::int64_t end = b.end ? b.end : (p->open() ? 0 : p->clockOut);
+                const std::string when = punchStamp(b.start, false) + " - " + (end ? punchStamp(end, false) : "...");
+                const std::int64_t len = toMinutes((end ? end : ctx.now) - b.start);
+                if (s.paidBreaks) {
+                    r.note("   " + tr("Paid break %1 (%2), counted", {when, clockHours(len)}));
+                } else {
+                    anyUnpaid = true;
+                    r.note("   " + tr("Unpaid break %1 (%2), not counted", {when, clockHours(len)}));
+                }
+            }
+        }
+        grand += minutes;
+        if (o.paper)
+            r.total({tr("Total"), clockHours(minutes), decimalHours(minutes)});
+        else
+            r.total({tr("Total"), "", clockHours(minutes), decimalHours(minutes)});
+    }
+    if (o.paper)
+        r.total({tr("Grand Total Hours:"), clockHours(grand), decimalHours(grand)});
+    else
+        r.total({tr("Grand Total Hours:"), "", clockHours(grand), decimalHours(grand)});
+
+    if (anyEdited)
+        r.note(tr("*edited: a manager changed this punch (Manager > Time Punches; who and why are on the Labor report)."));
+    if (anyOpen)
+        r.note(tr("(still clocked in): no clock-out yet, so not in the totals. Clock them out, or fix the punch in Manager > Time Punches."));
+    if (anyUnpaid)
+        r.note(tr("Unpaid breaks are taken off: the hours are paid time, as on the Labor report."));
+    return r;
+}
+
 Report expensesReport(const std::vector<DrawerSession> &drawers, const ReportContext &ctx)
 {
     Report r;

@@ -1507,6 +1507,11 @@ private:
     int rangeRequest_ = 0;
     core::Report forecast_;   // the forecast last shown (Print)
     core::Report legacyReport_;   // the ILSA History report last shown (Print)
+    core::Report timeClockPaper_;   // the Time Clock report last shown over a range, for receipt paper (Print)
+    // The Time Clock report (core::timeClockReport) over [from, to) from these punches; id "timeclock" or
+    // "timeclock|<employee id>" (only theirs); `paper`: for the receipt printer.
+    core::Report timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
+                                 const std::vector<core::TimePunch> &punches, bool paper) const;
     QVariantMap checkSearch_;
     std::vector<core::Check> searchHits_;
     qint64 selectedHit_ = 0;

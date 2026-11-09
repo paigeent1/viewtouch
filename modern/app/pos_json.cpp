@@ -1127,7 +1127,7 @@ QJsonObject toJson(const PosSettings &s)
         mealPeriods.append(QJsonObject{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"start"_s, clockText(m.start)}});
     return {
         {u"schemaVersion"_s, PosSchemaVersion},
-        {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"giftCardLocation"_s, qs(s.giftCardLocation)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
+        {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"storeAddress"_s, qs(s.storeAddress)}, {u"storePhone"_s, qs(s.storePhone)}, {u"giftCardLocation"_s, qs(s.giftCardLocation)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
         {u"currencySymbol"_s, qs(s.currencySymbol)},
         {u"ilsaHistoryStore"_s, qs(s.ilsaHistoryStore)},
         {u"customColors"_s, [&s] { QJsonArray a; for (const std::string &c : s.customColors) a.append(qs(c)); return a; }()},
@@ -1388,6 +1388,8 @@ PosSettings settingsFromJson(const QJsonObject &o)
 {
     PosSettings s;
     s.storeName = ss(o.value(u"storeName").toString(qs(s.storeName)));
+    s.storeAddress = ss(o.value(u"storeAddress").toString());
+    s.storePhone = ss(o.value(u"storePhone").toString());
     s.giftCardLocation = ss(o.value(u"giftCardLocation").toString());
     s.setupDone = o.value(u"setupDone").toBool(false);
     s.currencySymbol = ss(o.value(u"currencySymbol").toString(qs(s.currencySymbol)));

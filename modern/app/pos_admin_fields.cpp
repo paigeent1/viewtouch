@@ -300,6 +300,9 @@ QVariantList PosService::adminFields(const QString &panel)
     if (panel == u"store") {
         return storeSections({
             field(u"storeName"_s, tr("Store name"), u"string"_s),
+            field(u"storeAddress"_s, tr("Store address"), u"text"_s,
+                  tr("Street, then city, state and ZIP: one per line. On the Time Clock report.")),
+            field(u"storePhone"_s, tr("Store phone"), u"string"_s, tr("On the Time Clock report.")),
             field(u"storeZip"_s, tr("Store ZIP code (for weather)"), u"string"_s),
             field(u"giftCardLocation"_s, tr("Gift card location"), u"string"_s,
                   tr("Recorded on every gift card sold or reloaded here, e.g. Hat City Ale House, or Buttheads Tobacco Emporium - Danbury. Empty: the store name.")),

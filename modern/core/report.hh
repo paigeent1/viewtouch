@@ -128,6 +128,29 @@ HoursSplit splitHours(const std::vector<std::int64_t> &daysMs, const OvertimeRul
 
 Report laborReport(const std::vector<TimePunch> &punches, const std::vector<Employee> &employees,
                    const ReportContext &ctx, const std::vector<TimePunch> &earlier = {}, Money netSales = {});
+// The Time Clock report, as ILSA printed it (owner's printout 2026-11-09): the store's name, address and
+// phone, then each employee (number and name) with one line per punch - begin and end date and time,
+// hours and minutes (HH:MM, the time worked to the nearest minute, as ILSA's printout has it: 3:06:45 is
+// 03:07) and decimal hours (those minutes / 60, to 2 places) -
+// a subtotal each and a Grand Total Hours line. Totals are the lines' minutes added up, then made decimal
+// (never the rounded decimals added). Paid time as Labor counts it (TimePunch::workedMs): unpaid breaks
+// are listed under their punch and left out; paid ones (PosSettings::paidBreaks) listed and counted.
+// A punch still open shows "(still clocked in)" and is left out of the totals (it has no end yet).
+// Punches a manager changed (PosSettings::punchChanges) are marked "*edited", with a footnote.
+// `punches`: those to show (the caller picks the days); `employeeId`: only theirs (empty: everyone).
+// `paper`: for 80 mm receipt paper, each punch on two lines (In, then Out with the hours).
+struct TimeClockOptions {
+    std::int64_t from = 0, to = 0;     // the days shown in the heading (epoch ms, `to` the midnight after)
+    std::string employeeId;
+    bool paper = false;
+    // English phrase -> the screen's language (none: English).
+    std::function<std::string(const std::string &)> words;
+};
+// 2637 minutes -> "43:57" and "43.95".
+std::string clockHours(std::int64_t minutes);
+std::string decimalHours(std::int64_t minutes);
+Report timeClockReport(const std::vector<TimePunch> &punches, const std::vector<Employee> &employees,
+                       const ReportContext &ctx, const TimeClockOptions &options);
 Report drawerReport(const std::vector<DrawerSession> &drawers, const std::vector<Check> &closed,
                     const ReportContext &ctx);
 // Cash paid out of drawers and banks for expenses: by category, then each one.

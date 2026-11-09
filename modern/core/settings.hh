@@ -404,6 +404,10 @@ struct PosSettings {
     // bar and expo screens and the self-order kiosk stay on.
     int screenSaverMinutes = 3;
     std::string storeZip;
+    // The store's street address (street, then city, state and ZIP: one per line) and phone, for the
+    // Time Clock report's heading (empty: the receipt header's lines).
+    std::string storeAddress;
+    std::string storePhone;
     // Recorded on every gift card sold or reloaded here ("Hat City Ale House"); empty: the store name.
     std::string giftCardLocation;
     std::string scanAddPermission = "manager";

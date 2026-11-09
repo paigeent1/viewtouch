@@ -5,6 +5,7 @@
 #include "app/pos_service.hh"
 
 #include <algorithm>
+#include <set>
 #include <QDateTime>
 #include <QThreadPool>
 #include <QPointer>
@@ -52,11 +53,14 @@ QVariantMap toVariant(const Report &r)
 const QStringList kReportIds = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s, u"tips"_s,
                                 u"labor"_s, u"drawer"_s, u"expenses"_s, u"purchases"_s, u"audit"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s, u"kitchen"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s,
                                 u"exceptions"_s, u"deposit"_s, u"customers"_s,
-                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s};
+                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s};
 
 // "employee_items|cohiba": the Sales by Employee and Item report, only items matching "cohiba".
 bool isEmployeeItems(const QString &id) { return id == u"employee_items" || id.startsWith(u"employee_items|"); }
 std::string reportFilter(const QString &id) { return id.section(u'|', 1).trimmed().toStdString(); }
+// "timeclock|78": the Time Clock report, only employee 78's punches.
+bool isTimeClock(const QString &id) { return id == u"timeclock" || id.startsWith(u"timeclock|"); }
+std::int64_t startOfDay(QDate d) { return QDateTime(d, QTime(0, 0)).toMSecsSinceEpoch(); }
 
 } // namespace
 
@@ -1556,6 +1560,10 @@ Report PosService::buildReport(const QString &id) const
                 net += c.totals(s_->settings.tax).subtotal;
         return laborReport(s_->punches, s_->employees, ctx, s_->earlierPunches, net);
     }
+    if (isTimeClock(id)) {   // today: today's punches and any still open
+        const QDate today = QDateTime::fromMSecsSinceEpoch(now()).date();
+        return timeClockReport(id, startOfDay(today), startOfDay(today.addDays(1)), s_->punches, false);
+    }
     if (id == u"drawer")
         return drawerReport(s_->drawers, s_->closedToday, ctx);
     if (id == u"changes")
@@ -1614,6 +1622,18 @@ Report PosService::buildReport(const QString &id) const
         return depositReport(s_->drawers, s_->closedToday, open, ctx, s_->refundsToday);
     }
     return salesSummary(s_->closedToday, ctx, &s_->refundsToday);
+}
+
+Report PosService::timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
+                                   const std::vector<TimePunch> &punches, bool paper) const
+{
+    TimeClockOptions o;
+    o.from = from;
+    o.to = to;
+    o.employeeId = reportFilter(id);
+    o.paper = paper;
+    o.words = [](const std::string &english) { return ss(i18n::phrase(i18n::current(), qs(english))); };
+    return core::timeClockReport(punches, s_->employees, reportContext({}), o);
 }
 
 // --- reports over a range ---------------------------------------------------------
@@ -1724,6 +1744,36 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
                     {u"from"_s, from.toString(u"yyyy-MM-dd"_s)}, {u"to"_s, to.toString(u"yyyy-MM-dd"_s)}};
     emit sessionChanged();
 
+    // Time Clock: the punches clocked in on these days - those in memory (today's, the last week's,
+    // Time Punches' month, as a manager may just have fixed them), then the rest from the store.
+    if (isTimeClock(id)) {
+        std::vector<TimePunch> known;
+        std::set<std::int64_t> ids;
+        for (const std::vector<TimePunch> *list : {&s_->punches, &s_->earlierPunches, &s_->olderPunches})
+            for (const TimePunch &p : *list)
+                if (p.clockIn >= a && p.clockIn < b && ids.insert(p.id).second)
+                    known.push_back(p);
+        auto punchHistory = s_->punchHistory;
+        QPointer<PosService> self(this);
+        QThreadPool::globalInstance()->start([=, known = std::move(known), ids = std::move(ids)]() mutable {
+            if (punchHistory)
+                for (TimePunch &p : punchHistory(a, b))
+                    if (ids.insert(p.id).second)
+                        known.push_back(std::move(p));
+            QMetaObject::invokeMethod(self, [self, request, id, a, b, known = std::move(known)] {
+                if (!self || request != self->rangeRequest_)
+                    return;   // a newer request replaced it
+                self->timeClockPaper_ = self->timeClockReport(id, a, b, known, true);
+                QVariantMap out = self->rangeReport_;
+                out.insert(u"loading"_s, false);
+                out.insert(u"report"_s, toVariant(self->timeClockReport(id, a, b, known, false)));
+                self->rangeReport_ = out;
+                emit self->sessionChanged();
+            }, Qt::QueuedConnection);
+        });
+        return true;
+    }
+
     // Read the checks away from the screen, then build here.
     auto history = s_->history;
     auto refundHistory = s_->refundHistory;
@@ -1785,13 +1835,16 @@ QVariantMap PosService::report(const QString &id, qint64 dayId)
     for (const PastDay &p : s_->pastDays) {
         if (p.day.id == dayId) {
             // A closed day's reports were saved at End of Day, unfiltered.
-            const QJsonObject stored = p.reports.value(isEmployeeItems(id) ? u"employee_items"_s : id).toObject();
+            const QJsonObject stored = p.reports.value(isEmployeeItems(id) ? u"employee_items"_s
+                                                       : isTimeClock(id) ? u"timeclock"_s : id).toObject();
             if (stored.isEmpty())
                 return {{u"title"_s, tr("No report")}, {u"rows"_s, QVariantList()}};
             Report r = reportFromJson(stored);
             if (!reportFilter(id).empty())
                 r.rows.insert(r.rows.begin(), ReportRow{ReportRow::Kind::Note,
-                    {tr("A past day shows every item; to filter, pick Dates… (that day to that day).").toStdString()}});
+                    {(isTimeClock(id) ? tr("A past day shows everyone; for one person, pick Dates… (that day to that day).")
+                                      : tr("A past day shows every item; to filter, pick Dates… (that day to that day)."))
+                         .toStdString()}});
             return toVariant(r);
         }
     }
@@ -1809,12 +1862,19 @@ bool PosService::printReport(const QString &id, qint64 dayId)
         if (forecast_.rows.empty())
             return fail(tr("Show the forecast first."));
         r = forecast_;
+    } else if (isTimeClock(id) && dayId < 0) {   // the days last shown (Last Week, Dates…)
+        if (timeClockPaper_.rows.empty())
+            return fail(tr("Show the report first."));
+        r = timeClockPaper_;
+    } else if (isTimeClock(id) && (dayId == 0 || dayId == s_->day.id)) {   // today, two lines a punch
+        const QDate today = QDateTime::fromMSecsSinceEpoch(now()).date();
+        r = timeClockReport(id, startOfDay(today), startOfDay(today.addDays(1)), s_->punches, true);
     } else if (dayId == 0 || dayId == s_->day.id) {
         r = buildReport(id);
     } else {
         for (const PastDay &p : s_->pastDays) {
             if (p.day.id == dayId)
-                r = reportFromJson(p.reports.value(id).toObject());
+                r = reportFromJson(p.reports.value(isTimeClock(id) ? u"timeclock"_s : id).toObject());
         }
     }
     s_->printer->printReport(s_->settings, r, receiptPrinter());

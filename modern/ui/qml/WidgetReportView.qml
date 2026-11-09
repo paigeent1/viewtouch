@@ -41,6 +41,7 @@ Item {
         { id: "servers", label: qsTr("Servers") }, { id: "employee_items", label: qsTr("By Employee") },
         { id: "tips", label: qsTr("Tips") },
         { id: "labor", label: qsTr("Labor") },
+        { id: "timeclock", label: qsTr("Time Clock") },
         { id: "drawer", label: qsTr("Drawer") }, { id: "expenses", label: qsTr("Expenses") }, { id: "purchases", label: qsTr("Purchases") }, { id: "stock", label: qsTr("Stock") }, { id: "audit", label: qsTr("Audit") },
         { id: "exceptions", label: qsTr("Exceptions") }, { id: "changes", label: qsTr("Changes") }, { id: "deposit", label: qsTr("Deposit") }, { id: "customers", label: qsTr("Customers") },
         { id: "royalty", label: qsTr("Royalty") }, { id: "accounting", label: qsTr("Accounting") },
@@ -57,9 +58,13 @@ Item {
     // Sales by Employee and Item: only items whose name, UPC or category has this text.
     property string itemFilter: ""
     readonly property bool isEmployeeItems: reportId === "employee_items"
-    // What is asked of the server: "employee_items|cohiba" carries the filter.
+    // Time Clock (the ILSA printout's layout): everyone, or one employee (their id).
+    readonly property bool isTimeClock: reportId === "timeclock"
+    property string timeClockEmployee: ""
+    // What is asked of the server: "employee_items|cohiba" / "timeclock|78" carries the filter.
     readonly property string requestId: isEmployeeItems && itemFilter.trim() !== ""
-                                        ? "employee_items|" + itemFilter.trim() : reportId
+                                        ? "employee_items|" + itemFilter.trim()
+                                        : isTimeClock && timeClockEmployee !== "" ? "timeclock|" + timeClockEmployee : reportId
     readonly property bool isGiftCardReport: reportId === "accounts" || reportId.indexOf("gc_") === 0
     readonly property var gcModes: [
         { id: "accounts", label: qsTr("Summary") },
@@ -125,7 +130,15 @@ Item {
             return
         pos.requestRangeReport(requestId, period, fromDate, toDate, compare)
     }
-    onReportIdChanged: refresh()
+    // Time Clock starts on last week (the pay week, Sunday to Sunday by default), as payroll is done.
+    onReportIdChanged: {
+        if (isTimeClock && period === "day") {
+            period = "lastWeek"   // refreshes
+            return
+        }
+        refresh()
+    }
+    onTimeClockEmployeeChanged: if (isTimeClock) refresh()
     onPeriodChanged: refresh()
     onCompareChanged: refresh()
     onWithIlsaChanged: Qt.callLater(refresh)
@@ -308,6 +321,32 @@ Item {
             }
         }
 
+        // Time Clock: everyone, or one person.
+        RowLayout {
+            visible: w.isTimeClock
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.fillHeight: false
+            spacing: w.unit * 0.4
+            Text { text: qsTr("Employee"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.9 }
+            ComboBox {
+                id: timeClockWho
+                objectName: "timeClockEmployee"
+                Layout.fillWidth: true
+                Layout.maximumWidth: w.unit * 18
+                Layout.fillHeight: true
+                font.pixelSize: w.unit * 0.8
+                readonly property var opts: [{ value: "", text: qsTr("All employees") }]
+                    .concat((w.pos ? w.pos.staff : []).map(e => ({ value: e.id, text: e.name })))
+                model: opts
+                textRole: "text"
+                valueRole: "value"
+                currentIndex: Math.max(0, opts.findIndex(o => o.value === w.timeClockEmployee))
+                onActivated: index => w.timeClockEmployee = opts[index].value
+            }
+            Item { Layout.fillWidth: true }
+        }
+
         // Dates… : from and to, chosen on the calendar (DateField); shown as soon as both are.
         RowLayout {
             visible: w.period === "custom"
@@ -391,12 +430,13 @@ Item {
                 onClicked: if (w.dayIndex > 0) w.dayIndex--
             }
             WidgetKey {
-                visible: w.period === "day" || w.forecasting
+                // Time Clock over days too: the one shown, two lines a punch on receipt paper (-1).
+                visible: w.period === "day" || w.forecasting || w.isTimeClock
                 Layout.preferredWidth: w.unit * 5
                 Layout.fillHeight: true
                 text: qsTr("Print")
                 fontScale: 0.36
-                onClicked: w.pos.printReport(w.requestId, w.day.id)
+                onClicked: w.pos.printReport(w.requestId, w.isTimeClock && w.period !== "day" ? -1 : w.day.id)
             }
             WidgetKey {
                 Layout.preferredWidth: w.unit * 4
@@ -460,11 +500,13 @@ Item {
                     readonly property bool isPinCol: wide && colName === "PIN"
                     readonly property bool isName14Col: wide && (colName === "First Name" || colName === "Last Name")
                     readonly property bool isAmtCol: wide && index === colCount - 1
-                    Layout.fillWidth: wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
+                    // Time Clock: Begin and End (dates and times) share the room, left; the hours narrow.
+                    readonly property bool tc: w.report.id === "timeclock" && colCount >= 4
+                    Layout.fillWidth: tc ? index < 2 : wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
                     Layout.minimumWidth: isCardCol ? w.unit * 7.2 : (isPinCol ? w.unit * 2.8 : (isName14Col ? w.unit * 5.8 : 0))
-                    Layout.preferredWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
+                    Layout.preferredWidth: tc ? (index < 2 ? -1 : w.unit * 6.5) : isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
                     Layout.maximumWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : 9999)))
-                    horizontalAlignment: (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
+                    horizontalAlignment: (tc && index < 2) || (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
                     text: modelData
                     color: "#90cdf4"
                     font.family: w.face
@@ -514,11 +556,13 @@ Item {
                     readonly property bool isPinCol: wide && colName === "PIN"
                     readonly property bool isName14Col: wide && (colName === "First Name" || colName === "Last Name")
                     readonly property bool isAmtCol: wide && index === colCount - 1
-                    Layout.fillWidth: wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
+                    // Time Clock: Begin and End (dates and times) share the room, left; the hours narrow.
+                    readonly property bool tc: w.report.id === "timeclock" && colCount >= 4
+                    Layout.fillWidth: tc ? index < 2 : wide ? (!isCardCol && !isPinCol && !isName14Col && !isAmtCol) : (index === 0)
                     Layout.minimumWidth: isCardCol ? w.unit * 7.2 : (isPinCol ? w.unit * 2.8 : (isName14Col ? w.unit * 5.8 : 0))
-                    Layout.preferredWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
+                    Layout.preferredWidth: tc ? (index < 2 ? -1 : w.unit * 6.5) : isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : (wide ? w.width * 0.14 : (index === 0 ? -1 : w.unit * 7)))))
                     Layout.maximumWidth: isCardCol ? w.unit * 7.4 : (isPinCol ? w.unit * 3.0 : (isName14Col ? w.unit * 6.2 : (isAmtCol ? w.unit * 4.6 : 9999)))
-                            horizontalAlignment: (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
+                            horizontalAlignment: (tc && index < 2) || (wide && index < colCount - 1) || index === 0 ? Text.AlignLeft : Text.AlignRight
                             text: modelData
                             color: row.modelData.kind === "note" ? "#8a94a6" : w.ink
                             font.family: w.face

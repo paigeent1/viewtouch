@@ -261,6 +261,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         }
         s_->settings.storeName = ss(name);
         if (record.contains(u"storeZip"_s)) s_->settings.storeZip = ss(record.value(u"storeZip"_s).toString().trimmed());
+        if (record.contains(u"storeAddress"_s)) s_->settings.storeAddress = ss(record.value(u"storeAddress"_s).toString().trimmed());
+        if (record.contains(u"storePhone"_s)) s_->settings.storePhone = ss(record.value(u"storePhone"_s).toString().trimmed());
         if (record.contains(u"giftCardLocation"_s)) s_->settings.giftCardLocation = ss(record.value(u"giftCardLocation"_s).toString().trimmed());
         if (record.contains(u"topRibbonShowWeather"_s)) s_->settings.topRibbonShowWeather = record.value(u"topRibbonShowWeather"_s).toBool();
         s_->settings.currencySymbol = ss(record.value(u"currencySymbol"_s).toString());
