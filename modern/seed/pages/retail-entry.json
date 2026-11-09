@@ -19,6 +19,9 @@
         "y": 16,
         "w": 640,
         "h": 656
+      },
+      "props": {
+        "touchToSelect": true
       }
     },
     {
@@ -434,7 +437,7 @@
     {
       "id": "rtl-void",
       "kind": "button",
-      "label": "VOID PREV ITEM",
+      "label": "{voidKey}",
       "shape": "pill",
       "behavior": "blink",
       "rect": {
@@ -453,32 +456,6 @@
         {
           "type": "command",
           "name": "removeLine"
-        }
-      ]
-    },
-    {
-      "id": "rtl-clock",
-      "kind": "button",
-      "label": "TIME CLOCK",
-      "shape": "rect",
-      "behavior": "blink",
-      "rect": {
-        "x": 1732,
-        "y": 260,
-        "w": 172,
-        "h": 88
-      },
-      "style": {
-        "normal": {
-          "fill": "#67e8f9",
-          "text": "#111827"
-        }
-      },
-      "actions": [
-        {
-          "type": "jump",
-          "mode": "push",
-          "page": "time-clock"
         }
       ]
     },
@@ -612,7 +589,7 @@
     {
       "id": "rtl-misc",
       "kind": "button",
-      "label": "MISC TXBL",
+      "label": "MISC MDSE",
       "shape": "pill",
       "behavior": "blink",
       "rect": {
@@ -629,8 +606,41 @@
       },
       "actions": [
         {
-          "type": "addItem",
-          "item": "Misc Txbl"
+          "type": "command",
+          "name": "openDepartment",
+          "args": {
+            "department": "Misc Merchandise",
+            "tax": "merchandise"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rtl-miscfood",
+      "kind": "button",
+      "label": "MISC FOOD/BEV",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 1732,
+        "y": 364,
+        "w": 172,
+        "h": 84
+      },
+      "style": {
+        "normal": {
+          "fill": "#38bdf8",
+          "text": "#ffffff"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "openDepartment",
+          "args": {
+            "department": "Misc Food/Bev",
+            "tax": "food"
+          }
         }
       ]
     },
@@ -641,10 +651,10 @@
       "shape": "pill",
       "behavior": "blink",
       "rect": {
-        "x": 1732,
-        "y": 364,
-        "w": 172,
-        "h": 84
+        "x": 1640,
+        "y": 468,
+        "w": 264,
+        "h": 136
       },
       "style": {
         "normal": {
@@ -667,9 +677,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1640,
-        "y": 468,
+        "y": 620,
         "w": 264,
-        "h": 112
+        "h": 136
       },
       "style": {
         "normal": {
@@ -694,9 +704,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1640,
-        "y": 596,
+        "y": 772,
         "w": 264,
-        "h": 112
+        "h": 136
       },
       "style": {
         "normal": {
@@ -719,9 +729,9 @@
       "behavior": "blink",
       "rect": {
         "x": 1640,
-        "y": 724,
+        "y": 924,
         "w": 264,
-        "h": 340
+        "h": 136
       },
       "style": {
         "normal": {

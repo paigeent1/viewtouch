@@ -705,10 +705,19 @@ public:
     void selectLine(qint64 lineId) override;
     void selectPayment(qint64 paymentId) override;
     bool voidItem();
-    // Retail screen VOID PREV ITEM: the selected (else newest) line comes off the sale but stays on the
-    // check, voided and marked as an error correct, for the cashier to see; the Exceptions report counts it.
-    // A line already sent is voided as usual (voidItem).
+    // Retail screen VOID ITEM: the line the cashier touched (never the newest by itself) comes off the sale
+    // but stays on the check, voided and marked as an error correct, for the cashier to see; the Exceptions
+    // report counts it. A line already sent is voided as usual (voidItem). On a struck-through line it is
+    // RESTORE ITEM (restoreLine).
     bool errorCorrect();
+    // RESTORE ITEM: the touched error-corrected line back as it was rung (price, modifiers, how many),
+    // while the check is open and unpaid; "Restored <item>" in its history and on the Exceptions report.
+    bool restoreLine();
+    // Retail open-department key (MISC MDSE, MISC FOOD/BEV): the amount typed on the keypad (cents) rings
+    // as one line in that department (a category of that name; made, with its item, the first time),
+    // taxed in taxClass ("merchandise", "food"...); a class whose rate is 0 in Store Settings > Taxes
+    // rings at the Merchandise rate instead.
+    bool ringOpenDepartment(const QString &department, const QString &taxClass);
     // Where retail items (cigars, merchandise) go when ordered on a bar or table check, for a runner to
     // bring them out: the humidor's printer and/or station screen (id or name "humidor"); empty when the
     // store has neither (then they go nowhere, not to the kitchen).

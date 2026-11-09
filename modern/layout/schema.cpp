@@ -535,6 +535,7 @@ QJsonArray actionTypes()
                             {"xReport", "X report (print sales and drawer so far; nothing resets)"},
                             {"cancelSale", "Cancel sale (asks why; Cancel #n, an exception)"},
                             {"priceCheck", "Price check on/off (scans show the item, not rung in)"},
+                            {"openDepartment", "Open department: the amount typed, in args.department, taxed as args.tax"},
                             {"itemDiscount", "Item discount: args.percent (or \"typed\") off the last item"},
                             {"subtotalDiscount", "Subtotal discount: args.percent (or \"typed\") off the sale"},
                             {"login", "Log in"}, {"logout", "Log out"}, {"clockIn", "Clock in"},

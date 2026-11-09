@@ -610,7 +610,8 @@ TEST_CASE("Retail: the UPC prints above the item; an error correct stays on the 
     CHECK(c.lines[1].upc == "012345678905");
     const auto before = c.totals(pos.shared()->settings.tax).items;
 
-    REQUIRE(pos.errorCorrect());                             // VOID PREV ITEM: the newest line
+    pos.selectLine(c.lines[1].id);                           // touched on the check
+    REQUIRE(pos.errorCorrect());                             // VOID ITEM: that line
     CHECK(c.lines.size() == 2);                              // still on the check, for the cashier
     CHECK(c.lines[1].voided);
     CHECK(c.lines[1].corrected);

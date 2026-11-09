@@ -72,7 +72,7 @@
 <h1>What's new since November 2, 2026</h1>
 <p>What changed in this store edition after the manual was rebuilt on November 2:</p>
 <ul>
-<li><b>The Retail screen</b> has <b>CASHIER DUTY</b> (X report, drawer, No Sale, past receipts, open checks, time clock), <b>CANCEL SALE</b> with a reason, <b>VOID PREV ITEM</b> as an error correct, <b>DISCOUNTS</b> for an item or the whole sale, <b>PRICE CHECK</b> mode, <b>📷 SCAN</b> for the tablet camera, and <b>ALPHA LOOK UP</b> opening the new <b>Item Look Up</b> screen (chapter 19).</li>
+<li><b>The Retail screen</b> has <b>CASHIER DUTY</b> (X report, drawer, No Sale, past receipts, open checks, time clock), <b>CANCEL SALE</b> with a reason, <b>VOID ITEM</b> / <b>RESTORE ITEM</b> on the touched line, <b>DISCOUNTS</b> for an item or the whole sale, <b>PRICE CHECK</b> mode, <b>📷 SCAN</b> for the tablet camera, and <b>ALPHA LOOK UP</b> opening the new <b>Item Look Up</b> screen (chapter 19).</li>
 <li><b>ID checks</b> for tobacco and alcohol: scan the back of the ID before the sale goes on (chapter 23).</li>
 <li><b>The guest screen</b>: the order during a sale; messages, pictures and videos between guests, added by touch from Dropbox (chapter 24). <b>Billboards</b>: TVs around the store showing the same pictures and videos (chapter 25).</li>
 <li><b>Labels from any screen</b>, tablets included: End of shift → <b>Labels…</b> (chapter 26). The <b>Label Utility</b> is now v1.2, with Quick Label, Test Print, Save As and Rename, and manager-only template changes (chapter 20).</li>
@@ -346,7 +346,7 @@
 <h2>On the check: ID checks, error corrects and voids</h2>
 <ul>
 <li>When an ID was checked, the check shows a line like <i>ID checked 21+ · DOB MM/DD/YYYY · expired ID</i>. The Retail screen shows the same line (chapter 23, ID checks for age-restricted sales).</li>
-<li>A retail item taken off with <b>VOID PREV ITEM</b> (an error correct) shows struck through with <b>ERR CORR</b>; a voided line shows <b>VOID</b> (chapter 19).</li>
+<li>A retail item taken off with <b>VOID ITEM</b> (an error correct) shows struck through with <b>ERR CORR</b>; a voided line shows <b>VOID</b> (chapter 19).</li>
 </ul>
 
 <h2>More of an item: − 2 + and Again</h2>
@@ -1495,7 +1495,7 @@
 <tr><td><b>ALPHA LOOK UP</b></td><td>Opens <b>Item Look Up</b> (below).</td></tr>
 <tr><td><b>PRICE CHECK</b></td><td>Turns price check mode on or off (below).</td></tr>
 <tr><td><b>📦 BOX ↔ STICK</b></td><td>Switches the item between the box and a single.</td></tr>
-<tr><td><b>VOID PREV ITEM</b></td><td>Takes off the last item, or the one touched, as an error correct (below).</td></tr>
+<tr><td><b>VOID ITEM</b> / <b>RESTORE ITEM</b></td><td>Takes off the item touched on the check, as an error correct; on a struck-through item it puts it back (below).</td></tr>
 <tr><td><b>CANCEL SALE</b></td><td>Cancels the whole sale, with a reason (below).</td></tr>
 <tr><td><b>DISCOUNTS</b></td><td>A percent off one item or the whole sale (below).</td></tr>
 <tr><td><b>ITEM RETURN</b></td><td>Opens <b>Find a Check</b>: find the sale, then a manager uses <b>Refund…</b> (chapter 11). Scanning the receipt's barcode opens the check too (chapter 29).</td></tr>
@@ -1503,12 +1503,12 @@
 <tr><td><b>CASHIER DUTY</b></td><td>The Cashier Duty screen (below).</td></tr>
 <tr><td><b>Reprint Receipt</b></td><td>Opens Open checks (mine / all). Past receipts are under CASHIER DUTY → LOOK UP CHECKS.</td></tr>
 <tr><td><b>Gift Cards</b></td><td>The Gift Card screen (chapter 7).</td></tr>
-<tr><td><b>TIME CLOCK</b></td><td>The Time Clock (chapter 2).</td></tr>
-<tr><td><b>Lighter Refill</b>, <b>EMPTY BOX</b>, <b>MISC TXBL</b></td><td>Ring in the menu items with those names (they must be on the menu).</td></tr>
-<tr><td><b>SUSPEND</b> / <b>RESUME</b></td><td>Put the sale aside and bring it back.</td></tr>
+<tr><td><b>Lighter Refill</b>, <b>EMPTY BOX</b></td><td>Ring in the menu items with those names (they must be on the menu).</td></tr>
+<tr><td><b>MISC MDSE</b>, <b>MISC FOOD/BEV</b></td><td>Open departments: type the amount on the keypad, then the key. It rings in <i>Misc Merchandise</i> (Merchandise tax) or <i>Misc Food/Bev</i> (Food tax, the meals rate). The rates are in Store Settings → Taxes; with no Food tax set, MISC FOOD/BEV uses the Merchandise rate. The departments are made the first time they are used.</td></tr>
+<tr><td><b>SUSPEND</b> / <b>RESUME</b></td><td>Put the sale aside and bring it back (at the top of the right column, over CLEAR and SUB TOTAL).</td></tr>
 <tr><td><b>SUB TOTAL (PAY)</b></td><td>Goes to Pay (chapter 6).</td></tr>
 </table>
-<p>The keypad's decimal key is blank, and the number keys are big. Scanning an ID-check item (tobacco, or alcohol when that's on) asks for the buyer's ID first (chapter 23, ID checks for age-restricted sales).</p>
+<p>The keypad's decimal key is blank, and the number keys are big. Staff clock in and out on the login screen's Time Clock. After a time-out the screen logs back in to Retail Mode with the sale still on it; a terminal's Start screen (Manager → Terminals, which can be the Retail screen) comes first. Scanning an ID-check item (tobacco, or alcohol when that's on) asks for the buyer's ID first (chapter 23, ID checks for age-restricted sales).</p>
 
 <h2>Cashier Duty</h2>
 <p><b>CASHIER DUTY</b> on the Retail screen opens a page of the cashier's tasks:</p>
@@ -1550,14 +1550,15 @@
 <li>Touch the window to close it. Touch <b>PRICE CHECK</b> again to go back to selling.</li>
 </ol>
 
-<h2>Error correct: VOID PREV ITEM</h2>
-<p><b>VOID PREV ITEM</b> takes off the touched line, or the newest one, as long as it hasn't been sent. It is an error correct: no manager, nothing goes to the kitchen. The cashier's screen shows it struck through with <b>ERR CORR</b>, the customer's receipt leaves it off, and the Exceptions and Audit reports list it. A line already sent is voided as usual (a manager).</p>
+<h2>Error correct: VOID ITEM, RESTORE ITEM</h2>
+<p>Touch the item on the check (it lights up with a yellow ring), then <b>VOID ITEM</b>. With nothing touched it says <i>Touch the item on the check first</i> and takes nothing off. The item must not have been sent. It is an error correct: no manager, nothing goes to the kitchen. The cashier's screen shows it struck through with <b>ERR CORR</b>, the customer's receipt leaves it off, and the Exceptions and Audit reports list it. A line already sent is voided as usual (a manager).</p>
+<p>Touch a struck-through item and the key says <b>RESTORE ITEM</b>: it puts the item back as it was, while the sale is open and unpaid. The check's history shows both; a void that was restored is not an exception (Exceptions report, exception tickets). Voided again, it counts again.</p>
 
 <h2>Cancel Sale</h2>
 <ul>
 <li><b>CANCEL SALE</b> asks <b>Why cancel the sale?</b> (to start: Price, Customer changed mind, No ID). Managers set the reasons in Store Settings → Voids, comps, No Sale and Cancel Sale → <i>Reasons for Cancel Sale</i>.</li>
 <li>The sale is kept as <i>Cancel #1</i>, <i>#2</i>… for the day. It isn't a sale: sent lines go back to stock, the kitchen gets a void, and a held card is let go.</li>
-<li>A sale with payments on it needs them taken back first. An empty sale is just put away, with no number.</li>
+<li>A sale with payments on it needs them taken back first. An empty sale is just put away, with no number. A sale whose items were all taken off is cancelled and closed like any other, not left open.</li>
 <li>It counts as an exception (chapter 12).</li>
 </ul>
 
@@ -1738,7 +1739,7 @@
 <tr><td>Gift receipt (no prices)</td><td>Look Up Checks → Reprint… → Gift receipt</td></tr>
 <tr><td>Reprint with date of birth</td><td>Look Up Checks → Reprint… → With date of birth (manager)</td></tr>
 <tr><td>Cancel a retail sale</td><td>Retail → CANCEL SALE → the reason</td></tr>
-<tr><td>Error-correct the last item</td><td>Retail → VOID PREV ITEM</td></tr>
+<tr><td>Error-correct an item</td><td>Retail → touch it → VOID ITEM</td></tr>
 <tr><td>Item or subtotal % discount</td><td>Retail → DISCOUNTS → ITEM DISCOUNT / SUBTOTAL DISCOUNT</td></tr>
 <tr><td>Find an item by name or department</td><td>Retail → ALPHA LOOK UP</td></tr>
 <tr><td>A return</td><td>Retail → ITEM RETURN → the check → Refund… (manager), or scan the receipt's barcode</td></tr>

@@ -292,3 +292,103 @@ TEST_CASE("Retail Reprint Receipt opens Look Up Checks; Cancel goes back to wher
     c.goBack();
     CHECK(c.pageId() == u"cashier-duty"_s);
 }
+
+TEST_CASE("Retail register keys: the right column on the keypad rows, MISC MDSE / MISC FOOD/BEV ring the amount typed",
+          "[retail][controller][layout]")
+{
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    const vt::layout::Page *page = l->page(u"retail-entry"_s);
+    REQUIRE(page);
+    const auto zone = [&](const QString &id) -> const vt::layout::Zone * {
+        for (const vt::layout::Zone &z : page->zones)
+            if (z.id == id)
+                return &z;
+        return nullptr;
+    };
+    // SUSPEND, RESUME, CLEAR, SUB TOTAL down the right, each beside a keypad row and as tall as a key.
+    const QString column[] = {u"rtl-suspend"_s, u"rtl-resume"_s, u"rtl-clear"_s, u"rtl-subtotal"_s};
+    const QString rows[] = {u"rtl-key-9"_s, u"rtl-key-6"_s, u"rtl-key-3"_s, u"rtl-key-."_s};
+    for (int i = 0; i < 4; ++i) {
+        const vt::layout::Zone *z = zone(column[i]), *key = zone(rows[i]);
+        REQUIRE(z);
+        REQUIRE(key);
+        CHECK(z->rect.y() == key->rect.y());
+        CHECK(z->rect.height() == key->rect.height());
+        CHECK(z->rect.x() >= key->rect.right());
+    }
+    // MISC FOOD/BEV where SUSPEND was; MISC MDSE beside it; no TIME CLOCK; the void key names itself.
+    REQUIRE(zone(u"rtl-miscfood"_s));
+    CHECK(zone(u"rtl-miscfood"_s)->rect == QRect(1732, 364, 172, 84));
+    CHECK(zone(u"rtl-misc"_s)->label == u"MISC MDSE"_s);
+    CHECK(zone(u"rtl-miscfood"_s)->label == u"MISC FOOD/BEV"_s);
+    CHECK_FALSE(zone(u"rtl-clock"_s));
+    CHECK(zone(u"rtl-void"_s)->label == u"{voidKey}"_s);
+    CHECK(zone(u"retail-check"_s)->props.value(u"touchToSelect"_s).toBool());
+    CHECK(zone(u"rtl-cancel"_s)->actions.front().str(u"name") == u"cancelCheck"_s);   // Cancel Sale (cancelSale)
+
+    PosService pos(test::seedPosData(), nullptr);
+    pos.shared()->settings.tax.merchandisePpm = 63500;
+    pos.shared()->settings.tax.foodPpm = 73500;
+    LayoutController c(*l);
+    c.setMealPeriod(u"lunch"_s);
+    c.setPos(&pos);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(c.jumpTo(u"retail-entry"_s));
+    for (const QString &k : {u"rtl-key-1"_s, u"rtl-key-2"_s, u"rtl-key-00"_s})   // $12.00
+        c.activate(k);
+    c.activate(u"rtl-misc"_s);
+    c.activate(u"rtl-key-5"_s);
+    c.activate(u"rtl-key-00"_s);   // $5.00
+    c.activate(u"rtl-miscfood"_s);
+    const QVariantList lines = pos.lines();
+    REQUIRE(lines.size() == 2);
+    CHECK(lines[0].toMap()[u"name"_s].toString() == u"Misc Merchandise"_s);
+    CHECK(lines[0].toMap()[u"price"_s].toString() == pos.format(core::Money::fromCents(1200)));
+    CHECK(lines[1].toMap()[u"name"_s].toString() == u"Misc Food/Bev"_s);
+    REQUIRE(pos.shared()->open.size() == 1);
+    const core::Check &check = pos.shared()->open.begin()->second;
+    CHECK(check.lines[0].taxClass == core::TaxClass::Merchandise);
+    CHECK(check.lines[1].taxClass == core::TaxClass::Food);
+    CHECK(c.pageId() == u"retail-entry"_s);
+}
+
+TEST_CASE("A login lands back in the mode the screen was in: Retail Mode with its sale, or hospitality",
+          "[retail][controller][login]")
+{
+    auto l = vt::test::loadTestLayout();
+    REQUIRE(l);
+    PosService pos(test::seedPosData(), nullptr);
+    LayoutController c(*l);
+    c.setMealPeriod(u"lunch"_s);
+    c.setPos(&pos);
+
+    // The Retail register can be a terminal's Start screen (Manager -> Terminals).
+    const QVariantList starts = c.pageChoices(u"start"_s);
+    CHECK(std::ranges::any_of(starts, [](const QVariant &v) { return v.toMap()[u"value"_s].toString() == u"retail-entry"_s; }));
+
+    // Retail Mode, a sale under way, the screen times out: back in, Retail Mode with that sale.
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(c.jumpTo(u"retail-entry"_s));
+    REQUIRE(pos.addItem(u"caesar"_s));
+    const qint64 sale = pos.checkInfo()[u"id"_s].toLongLong();
+    pos.logout();
+    CHECK(c.pageId() != u"retail-entry"_s);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.pageId() == u"retail-entry"_s);   // not the hospitality order screen
+    REQUIRE(pos.hasCheck());
+    CHECK(pos.checkInfo()[u"id"_s].toLongLong() == sale);
+
+    // No sale open: still Retail Mode.
+    pos.releaseCheck();
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.pageId() == u"retail-entry"_s);
+
+    // Hospitality Mode (the floor): a login lands where it always did, not on the Retail register.
+    c.activate(u"hosp-mode"_s);
+    REQUIRE(c.pageId() == u"tables"_s);
+    pos.logout();
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.pageId() != u"retail-entry"_s);
+}

@@ -474,6 +474,11 @@ private:
     QVariantMap widgetState_;
     bool setupOpen_ = false;
     QString afterLogin_;
+    // This screen's mode the last time someone was logged in: the Retail register or hospitality (the
+    // floor, the menus). A login lands back in it when the terminal has no Start screen (owner 2026-11-09).
+    bool retailMode_ = false;
+    void noteMode();
+    QString retailPage() const;
     QSet<QString> installedFonts_;   // by content hash
     bool asleep_ = false;
     int batteryLevel_ = -1;

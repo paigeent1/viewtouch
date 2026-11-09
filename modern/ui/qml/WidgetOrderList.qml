@@ -29,6 +29,9 @@ Item {
     // and no editing; an Order list can be made the same with props.controls false.
     readonly property bool controls: !(zone && ((zone.props && zone.props.controls === false) || zone.kind === "orderSummary"))
     readonly property bool taxByClass: !!zone && zone.kind === "orderSummary"
+    // props.touchToSelect (the Retail screen): only a line the cashier touched is lit (VOID ITEM takes off
+    // that one), not the one just rung in; it gets a yellow ring too.
+    readonly property bool touchToSelect: !!zone && !!zone.props && zone.props.touchToSelect === true
     // The course Fire would send next (the lowest one on hold).
     readonly property int nextCourse: {
         let next = 0
@@ -419,7 +422,10 @@ Item {
                 width: ListView.view.width - listBar.room
                 height: col.implicitHeight + w.unit * 0.4
                 radius: 6
-                color: modelData.selected ? "#2f6fd6" : "transparent"
+                readonly property bool lit: w.touchToSelect ? !!modelData.touched : modelData.selected
+                color: lit ? "#2f6fd6" : "transparent"
+                border.width: w.touchToSelect && lit ? 3 : 0
+                border.color: "#fde047"
 
                 TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.pos.selectedLine = row.modelData.id } }
                 // Swipe left: off the check (a void once sent). Swipe right: one more.
