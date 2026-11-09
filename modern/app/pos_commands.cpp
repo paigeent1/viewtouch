@@ -230,6 +230,9 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"sendMessage"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.sendMessage(a.value(0).toString(), a.value(1).toString(), a.value(2).toLongLong())); }},
         {u"removeMessage"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeMessage(a.value(0).toString())); }},
+        {u"findTablet"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findTablet(a.value(0).toString())); }},
+        {u"stopFindingTablet"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.stopFindingTablet(a.value(0).toString())); }},
+        {u"foundTablet"_s, [](PosService &p, const QVariantList &) { p.foundTablet(); return QVariant(true); }},
         {u"cancelApproval"_s, [](PosService &p, const QVariantList &) { return QVariant(p.cancelApproval()); }},
         {u"setTraining"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setTraining(a.value(0).toBool())); }},
         {u"toggleTraining"_s, [](PosService &p, const QVariantList &) { return QVariant(p.setTraining(!p.training())); }},

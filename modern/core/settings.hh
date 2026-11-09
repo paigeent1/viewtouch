@@ -67,6 +67,9 @@ struct TerminalConfig {
     std::string id;
     std::string key;
     std::int64_t pairedAt = 0;
+    // What it said it runs when it last connected ("android-arm64", "linux-x86_64"; empty: not yet
+    // heard): Find a Tablet lists the tablets by it.
+    std::string platform;
     // Pages to show: "phone" (phone versions), "standard", "selfOrder" (a
     // self-order kiosk for guests), "timeClock", "billboard" (signage only: the
     // guest-screen slides, never a check), or empty to decide from the screen size.

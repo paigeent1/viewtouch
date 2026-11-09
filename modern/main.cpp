@@ -1079,6 +1079,8 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"billboards"},     // Billboards (TVs with the guest-screen slides)
                 {u"admin-store", u"billboards"},         // Store Settings > Billboards…
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
+                {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
+                {u"logout-phone", u"find-tablet"},       // ...and on phones
             };
             bool zonesAdded = false;
             for (const auto &[pageId, zoneId] : givenZones) {

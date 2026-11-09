@@ -82,7 +82,9 @@ bool onRequest(const QString &key)
     // The Labels screen and Item Look Up (retailLabels) likewise: only to a screen showing one.
     // Menu Builder's own list (builderItems) too.
     // Find's answer (itemSearch) too.
-    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems" || key == u"itemSearch";
+    // Find a Tablet's list (tablets) too.
+    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems" || key == u"itemSearch"
+           || key == u"tablets";
 }
 
 // All a billboard is ever sent (the owner: signage only, never any customer or sale): who it is,
@@ -316,6 +318,16 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
                                        << socket->peerAddress().toString();
     });
     connect(shared_, &app::PosShared::adminChanged, this, &PosServer::dropRevoked);
+    // Find a Tablet: a message to one paired screen (not a billboard: a TV gets only its slides).
+    shared_->sendToScreen = [this](const std::string &terminalId, const QJsonObject &message) {
+        bool sent = false;
+        for (auto &c : connections_)
+            if (c->session && !c->billboard && !c->standby && c->terminalId.toStdString() == terminalId) {
+                c->channel->send(message);
+                sent = true;
+            }
+        return sent;
+    };
     // Terminals find this server again by its id after an address change;
     // the standby connects with the store's server key.
     if (shared_->settings.serverId.empty() || shared_->settings.replicaKey.empty()) {
@@ -389,7 +401,13 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
 
 PosServer::~PosServer()
 {
+    shared_->sendToScreen = {};
     for (auto &c : connections_) {
+        if (c->session && !c->terminalId.isEmpty()) {
+            app::PosShared::ScreenLink &link = shared_->screenLinks[c->terminalId.toStdString()];
+            link.links = std::max(0, link.links - 1);
+            link.lastSeen = shared_->now();
+        }
         c->socket->disconnect(this);
         c->socket->abort();
     }
@@ -527,6 +545,22 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         c->session = std::make_unique<app::PosService>(shared_, name);
         app::PosService *s = c->session.get();
         c->billboard = paired->screen == "billboard";
+        // Find a Tablet: connected now, and what it runs (kept, so a tablet that is off is still
+        // listed). Saved quietly: no screen needs to hear of it (adminChanged would also have
+        // every screen fetch the store's settings again).
+        {
+            app::PosShared::ScreenLink &link = shared_->screenLinks[paired->id];
+            ++link.links;
+            link.since = link.lastSeen = shared_->now();
+            if (!c->platform.isEmpty() && c->platform.toStdString() != paired->platform)
+                for (core::TerminalConfig &t : shared_->settings.terminals)
+                    if (t.id == paired->id) {
+                        t.platform = c->platform.toStdString();
+                        if (shared_->sink)
+                            shared_->sink->saveSettings(shared_->settings);
+                    }
+            QMetaObject::invokeMethod(shared_, &app::PosShared::networkChanged, Qt::QueuedConnection);
+        }
         if (c->billboard) {   // a TV with the store's slides: nothing else, ever
             welcomeBillboard(c);
             return;
@@ -1032,6 +1066,12 @@ void PosServer::drop(Connection *c)
     c->socket->deleteLater();
     // Destroying the session releases the check it had open; tell the rest.
     const bool hadSession = c->session != nullptr;
+    if (hadSession && !c->terminalId.isEmpty()) {   // Find a Tablet: gone; last seen now
+        app::PosShared::ScreenLink &link = shared_->screenLinks[c->terminalId.toStdString()];
+        link.links = std::max(0, link.links - 1);
+        link.lastSeen = shared_->now();
+        emit shared_->networkChanged();
+    }
     connections_.erase(it);
     if (hadSession)
         emit shared_->checksChanged();

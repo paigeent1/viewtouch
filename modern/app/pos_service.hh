@@ -480,6 +480,24 @@ public:
     // The store's computers and printers, for Manager -> Network (set by
     // the app): {role, term, terminals, standby, printers}.
     std::function<QVariantMap()> network;
+    // Find a Tablet (pos_find.cpp). The paired screens connected now, kept by the store's server
+    // (PosServer): terminal id -> how many connections it has open, since when, and when it was
+    // last heard (ms). Only in memory: "last seen" starts over when ViewTouch restarts.
+    struct ScreenLink {
+        int links = 0;
+        std::int64_t since = 0;
+        std::int64_t lastSeen = 0;
+    };
+    std::map<std::string, ScreenLink> screenLinks;
+    // A message to one paired screen over its connection (set by PosServer); false: it isn't
+    // connected (or this computer serves no screens).
+    std::function<bool(const std::string &terminalId, const QJsonObject &message)> sendToScreen;
+    // The screens beeping now: terminal id -> the screen that asked, and until when (ms).
+    struct Finding {
+        QString from;
+        std::int64_t until = 0;
+    };
+    std::map<std::string, Finding> finding;
     // The menu's categories: those set up, in order, then any family an item
     // names that isn't (older menus), named after it.
     std::vector<core::MenuCategory> categories() const;
@@ -1133,6 +1151,18 @@ public:
     bool leaveHandoffNote(const QString &text);
     bool readHandoffNotes();
     QVariantMap networkInfo() const override;
+    // --- Find a Tablet (End of shift; any staff; pos_find.cpp) ---------------------------------
+    // The store's tablets: [{id, name, connected, lastSeen (ms, 0: not since ViewTouch started),
+    // lastSeenText, beeping, from}], by name. Paired screens only, never a billboard, a computer's
+    // screen or this one.
+    QVariantList tablets() const override;
+    // That tablet beeps at alarm volume and shows "Here I am" for findSeconds, or until stopped
+    // (here, or tapped there). False (and says so) when it isn't connected.
+    bool findTablet(const QString &terminalId);
+    bool stopFindingTablet(const QString &terminalId);
+    // This screen was found ("Here I am" tapped): the asking screen stops showing it beeping.
+    void foundTablet();
+    static constexpr int findSeconds = 120;
     QVariantList printerAlerts() const override;
     QString language() const override;
     QVariantMap userPrefs() const override;

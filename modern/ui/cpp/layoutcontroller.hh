@@ -192,6 +192,9 @@ public:
     Q_INVOKABLE void pollSysStatus();
     // The touch that wakes the screen does nothing else (Main.qml's dim layer takes it).
     Q_INVOKABLE void wake();
+    // Find a Tablet: this screen is being looked for - loud beeps (a tablet: at alarm volume, the
+    // screen woken) until off, or `seconds` (findalarm.cpp). FindMeOverlay.qml shows "Here I am".
+    Q_INVOKABLE void findMeAlarm(bool on, int seconds = 120);
     void setScreenSaverForTesting(int ms) { sleepOverrideMs_ = ms; restartSleep(); }
     EditorController *editor() const { return editor_; }
     bool busy() const { return pending_ > 0; }
@@ -441,6 +444,8 @@ private:
     QVariantMap screens_;        // vt-screens --json, last look
     bool screensBusy_ = false;
     QTimer screenCheckTimer_;
+    QTimer *findAlarmEnd_ = nullptr;   // Find a Tablet: the beeping ends by itself
+    QObject *findSound_ = nullptr;     // what plays it (findalarm.cpp)
     vt::app::IlsaSync *ilsaSync_ = nullptr;
     QString screenProblemsSaid_;   // the problems last put on the status line (said once each)
     QVariantMap guestPictures_;    // vt-guest-pictures list, last look

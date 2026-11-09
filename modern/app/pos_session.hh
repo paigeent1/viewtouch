@@ -180,6 +180,9 @@ class PosSession : public QObject {
     // address, user, since}], standby: {address, since} | null, printers:
     // [{name, type, where, status: ok|failed|unknown, error, at}]}.
     Q_PROPERTY(QVariantMap network READ networkInfo NOTIFY dayChanged)
+    // Find a Tablet: the store's tablets [{id, name, connected, lastSeen, lastSeenText, beeping,
+    // from}] (sent only to a screen showing the list).
+    Q_PROPERTY(QVariantList tablets READ tablets NOTIFY dayChanged)
     // Printers that need someone: [{id, name, problem, text, urgent}] (every screen).
     Q_PROPERTY(QVariantList printerAlerts READ printerAlerts NOTIFY dayChanged)
     // Modifiers being chosen for the item just ordered: {active, item, groups:
@@ -396,6 +399,7 @@ public:
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
+    virtual QVariantList tablets() const = 0;
     virtual QVariantList printerAlerts() const = 0;
     virtual bool training() const = 0;
     virtual QVariantMap checklists() const = 0;
@@ -690,6 +694,11 @@ public:
         invoke(QStringLiteral("sendMessage"), {to, text, qint64(until)});
     }
     Q_INVOKABLE void removeMessage(const QString &id) { invoke(QStringLiteral("removeMessage"), {id}); }
+    // Find a Tablet: that tablet beeps and shows "Here I am" (about 2 minutes), or stops; this
+    // screen was found (its "Here I am" tapped).
+    Q_INVOKABLE void findTablet(const QString &terminalId) { invoke(QStringLiteral("findTablet"), {terminalId}); }
+    Q_INVOKABLE void stopFindingTablet(const QString &terminalId) { invoke(QStringLiteral("stopFindingTablet"), {terminalId}); }
+    Q_INVOKABLE void foundTablet() { invoke(QStringLiteral("foundTablet")); }
     Q_INVOKABLE void leaveHandoffNote(const QString &text) { invoke(QStringLiteral("leaveHandoffNote"), {text}); }
     Q_INVOKABLE void readHandoffNotes() { invoke(QStringLiteral("readHandoffNotes"), {}); }
     Q_INVOKABLE void cancelApproval() { invoke(QStringLiteral("cancelApproval")); }
@@ -800,6 +809,9 @@ signals:
     void notice(const QString &message);
     void loggedInChanged(bool loggedIn);
     void checkClosed(qint64 checkId);
+    // Another screen is looking for this one (Find a Tablet): {on, from (that screen), by (who),
+    // seconds}. on false: stop.
+    void findMe(const QVariantMap &info);
 
 private:
     // tableStatus for every table at once: the open checks grouped by table
