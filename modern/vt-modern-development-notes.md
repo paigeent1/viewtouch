@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 10:58 ET — Bob (Claude) — BHDAN receipts back on the network printer (.77); USB printing parked
+- **What:** Owner decision: BHDAN's receipt printer goes back to its network connection (printer 'Receipt', 192.168.1.77); Terminals send receipts there. The VT-BHDAN-RECEIPT (/dev/usb/lp0) entry stays unused.
+- **Why:** Owner 2026-11-09: on USB (Epson UB-U09 card from 2003) the same file printed fast at times and a line every few seconds at other times, with no USB errors logged; not worth more time while BHDAN isn't live.
+- **Files:** (none)
+- **Next person must know:** USB fixes on main (write like cat on its own thread, 60 s limit, one ticket at a time) stay: they are correct for any USB printer. If USB is tried again, start with a newer printer or USB card.
+
 ### 2026-11-09 10:38 ET — Bob (Claude) — ILSA recheck: buydowns already in the item's price explained; what customers paid; refund tax sign; Tender Cash 'fits?'; ..._DISCT line discounts
 - **What:** Owner's 2026-11-08 run: 35,230 of the 46,288 receipts of copy bhdan 10-29-2026 that don't add up differ by exactly their promotion line (class 15, dept 20) = PDetail.BUYDOWN_AMT: tobacco manufacturer buydowns (10c/20c a pack, $1/$2 a carton and multiples) that ILSA wrote into the item's price and again as a buydown line, so the total takes them off once. --recheck now counts these as explained, likewise a line's own discount columns, and prints for every kind of receipt that isn't plain lines + tax what the customer paid (tenders less change = the total / = lines + tax / neither / no tenders) and by year. Tax rate check: tax on the price before buydowns, and refunds whose tax ILSA kept positive, count as the day's rate. Tender Cash differences are labelled 'fits?' when they equal receipts whose tenders don't come to their total, buydowns on cash receipts, or receipts with lines but no tenders (never counted as matching). Journal gaps: receipts with lines but no tenders broken down by kind, department and year. --explain-receipts prints two receipts of each of the three most common differences line by line (numbers only). Import: line discount columns named ..._DISCT (PERCENT_DISCT, SUBTOTAL_DISCT) are read too (an import with --replace fills them; amounts unchanged).
 - **Why:** Coordinator/owner 2026-11-09: explain the recurring small differences (no bag fees or deposits) and fix ours.
