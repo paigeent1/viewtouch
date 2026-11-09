@@ -600,3 +600,94 @@ TEST_CASE("Self-order: what a dish contains; what the guest avoided reaches the 
     REQUIRE(c);
     CHECK(c->allergies == std::vector<std::string>{"peanut", "sesame"});
 }
+
+TEST_CASE("Find a Tablet: one left lying around beeps until it's found, tapped Stop, or gone", "[kiosk][net][find]")
+{
+    auto layout = vt::test::loadTestLayout();
+    REQUIRE(layout);
+    app::PosShared shared(test::seedPosData(), nullptr);
+    net::LayoutHub hub(*layout);
+    net::PosServer server(&shared, &hub);
+    REQUIRE(server.listen(QHostAddress::LocalHost, 0));
+    // Two paired tablets and a billboard's TV (never listed: it shows only the slides).
+    const auto pairedScreen = [&](const char *name, const std::string &screen) {
+        core::TerminalConfig t;
+        t.name = name;
+        t.id = net::newDeviceId().toStdString();
+        const QByteArray key = net::newDeviceKey();
+        t.key = key.toBase64().toStdString();
+        t.screen = screen;
+        shared.settings.terminals.push_back(t);
+        net::Credentials c;
+        c.host = u"127.0.0.1"_s;
+        c.port = server.port();
+        c.terminalId = QString::fromStdString(t.id);
+        c.terminalName = QString::fromLatin1(name);
+        c.key = key;
+        return c;
+    };
+    const net::Credentials bar1 = pairedScreen("Bar 1", {});
+    const net::Credentials bar2 = pairedScreen("Bar 2", {});
+    pairedScreen("Front TV", "billboard");
+
+    app::PosService till(&shared, u"Register"_s);
+    CHECK_FALSE(till.findTablet(bar1.terminalId));   // nobody logged in
+    REQUIRE(till.loginWithPin(u"1111"_s));            // any staff: not only a manager
+    const auto row = [&](int i) { return till.tablets().value(i).toMap(); };
+    REQUIRE(till.tablets().size() == 2);
+    CHECK(row(0)[u"name"_s] == u"Bar 1"_s);
+    CHECK(row(1)[u"name"_s] == u"Bar 2"_s);
+    CHECK_FALSE(row(0)[u"connected"_s].toBool());
+    CHECK(row(0)[u"lastSeen"_s].toLongLong() == 0);
+
+    // Not connected: said plainly, and nothing beeps.
+    QStringList notices;
+    QObject::connect(&till, &app::PosSession::notice, &till, [&](const QString &t) { notices << t; });
+    CHECK_FALSE(till.findTablet(bar2.terminalId));
+    REQUIRE_FALSE(notices.isEmpty());
+    CHECK(notices.last() == u"Bar 2 is not connected — it may be off, asleep with Wi-Fi off, or out of battery."_s);
+    CHECK_FALSE(row(1)[u"beeping"_s].toBool());
+
+    auto tablet = std::make_unique<net::RemoteSession>(u"Bar 1"_s);
+    tablet->setCredentials(bar1);
+    tablet->connectTo(bar1.host, bar1.port);
+    REQUIRE(tablet->waitForWelcome(5000));
+    // It said what it runs (kept); this test runs on a computer, so as a tablet would say it.
+    for (core::TerminalConfig &t : shared.settings.terminals)
+        if (t.name == "Bar 1") {
+            CHECK_FALSE(t.platform.empty());
+            t.platform = "android-arm64";
+        }
+    REQUIRE(waitFor([&] { return row(0)[u"connected"_s].toBool(); }));
+
+    // Find: the tablet hears who is looking for it, and for how long.
+    QSignalSpy heard(tablet.get(), &app::PosSession::findMe);
+    REQUIRE(till.findTablet(bar1.terminalId));
+    CHECK(notices.last() == u"Bar 1 is beeping. Tap Stop once you've found it."_s);
+    REQUIRE(heard.wait(5000));
+    const QVariantMap info = heard.last().at(0).toMap();
+    CHECK(info[u"on"_s].toBool());
+    CHECK(info[u"from"_s] == u"Register"_s);
+    CHECK(info[u"seconds"_s].toInt() == app::PosService::findSeconds);
+    CHECK(row(0)[u"beeping"_s].toBool());
+    CHECK(row(0)[u"from"_s] == u"Register"_s);
+
+    // Tapped there ("Here I am"): the register's list stops showing it beeping.
+    tablet->foundTablet();
+    REQUIRE(waitFor([&] { return !row(0)[u"beeping"_s].toBool(); }));
+
+    // Again, then Stop on the register: the tablet is told to stop.
+    REQUIRE(till.findTablet(bar1.terminalId));
+    REQUIRE(waitFor([&] { return heard.size() == 2; }));
+    REQUIRE(till.stopFindingTablet(bar1.terminalId));
+    REQUIRE(waitFor([&] { return heard.size() == 3; }));
+    CHECK_FALSE(heard.last().at(0).toMap()[u"on"_s].toBool());
+    CHECK_FALSE(row(0)[u"beeping"_s].toBool());
+
+    // Gone (off, out of range): not connected, last seen just now, and a find says so.
+    tablet.reset();
+    REQUIRE(waitFor([&] { return !row(0)[u"connected"_s].toBool(); }));
+    CHECK(row(0)[u"lastSeen"_s].toLongLong() > 0);
+    CHECK_FALSE(row(0)[u"lastSeenText"_s].toString().isEmpty());
+    CHECK_FALSE(till.findTablet(bar1.terminalId));
+}

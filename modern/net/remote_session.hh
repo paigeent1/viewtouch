@@ -172,6 +172,7 @@ public:
     QVariantList handoff() const override { return v(u"handoff").toList(); }
     bool standbyReady() const override { return !welcomed_ && !standbyHost_.isEmpty(); }
     QVariantMap networkInfo() const override { return v(u"network").toMap(); }
+    QVariantList tablets() const override { return v(u"tablets").toList(); }
     QVariantList printerAlerts() const override { return v(u"printerAlerts").toList(); }
     QString language() const override { return v(u"language").toString(); }
     QVariantMap userPrefs() const override { return v(u"userPrefs").toMap(); }

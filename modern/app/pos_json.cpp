@@ -1086,7 +1086,7 @@ QJsonObject toJson(const PosSettings &s)
     for (const TerminalConfig &t : s.terminals)
         terminals.append(QJsonObject{{u"name"_s, qs(t.name)}, {u"receiptPrinter"_s, qs(t.receiptPrinter)},
                                      {u"drawer"_s, qs(t.drawer)}, {u"id"_s, qs(t.id)}, {u"key"_s, qs(t.key)},
-                                     {u"pairedAt"_s, qint64(t.pairedAt)}, {u"screen"_s, qs(t.screen)}, {u"look"_s, qs(t.look)},
+                                     {u"pairedAt"_s, qint64(t.pairedAt)}, {u"platform"_s, qs(t.platform)}, {u"screen"_s, qs(t.screen)}, {u"look"_s, qs(t.look)},
                                      {u"station"_s, qs(t.station)}, {u"keyboard"_s, qs(t.keyboard)},
                                      {u"requireName"_s, qs(t.requireName)}, {u"cardReader"_s, qs(t.cardReader)},
                                      {u"afterPaying"_s, qs(t.afterPaying)}, {u"startCategory"_s, qs(t.startCategory)}, {u"startPage"_s, qs(t.startPage)},
@@ -1424,6 +1424,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         c.id = ss(t.value(u"id").toString());
         c.key = ss(t.value(u"key").toString());
         c.pairedAt = i64(t.value(u"pairedAt"));
+        c.platform = ss(t.value(u"platform").toString());
         c.screen = ss(t.value(u"screen").toString());
         c.station = ss(t.value(u"station").toString());
         c.look = ss(t.value(u"look").toString());

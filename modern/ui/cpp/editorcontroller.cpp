@@ -268,6 +268,7 @@ QString EditorController::kindName(const QString &kind) const
         {u"guestMessages"_s, QT_TR_NOOP("Customer display: messages and pictures in turn")},
         {u"siteSetup"_s, QT_TR_NOOP("Site Setup: this Pi's scanner, guest display, tablets and TVs")},
         {u"screenCheck"_s, QT_TR_NOOP("Screen check: which monitor is the register, ports and touchscreens")},
+        {u"findTablet"_s, QT_TR_NOOP("Find a Tablet: the store's tablets; one left lying around beeps until it's found")},
         {u"billboards"_s, QT_TR_NOOP("Billboards: each billboard TV's hours, sound and on / off")},
         {u"receiptLookup"_s, QT_TR_NOOP("Look Up Checks: past receipts as printed; reprint or print a gift receipt")},
         {u"itemLookup"_s, QT_TR_NOOP("Item Look Up: find any item by name, UPC or the department tree; ring it in or check its price")},

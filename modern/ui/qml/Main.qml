@@ -1573,6 +1573,12 @@ ApplicationWindow {
         function onIdCardScanned() { scanAddOverlay.closeOverlay() }
     }
     AgeCheckOverlay { controller: root.controller }
+    // Find a Tablet: another screen is looking for this one ("Here I am", beeping), over everything.
+    FindMeOverlay {
+        parent: Overlay.overlay
+        anchors.fill: parent
+        controller: root.controller
+    }
     Connections {
         target: root.controller
         function onStatusChanged() { root.toast(root.controller.statusText) }
