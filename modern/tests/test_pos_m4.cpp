@@ -828,7 +828,9 @@ TEST_CASE("Cancel Sale closes a sale whose items were all error-corrected: not l
         p.pos.selectLine(line);
         REQUIRE(p.pos.errorCorrect());
     }
-    CHECK_FALSE(p.pos.cancelSale());   // asks why
+    bool ok = true;
+    p.pos.invoke(u"cancelSale"_s, {}, [&](const QVariant &r) { ok = r.toBool(); });   // as the key runs it
+    CHECK_FALSE(ok);                                 // asks why
     REQUIRE(p.pos.reasonAsk()[u"kind"_s] == u"cancel"_s);
     REQUIRE(p.pos.giveReason(u"Price"_s));
     CHECK(p.pos.shared()->open.empty());             // not put away (suspended) for later
