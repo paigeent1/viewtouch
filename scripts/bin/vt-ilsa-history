@@ -594,7 +594,7 @@ def stage(db, export, day_from, day_to, done, say, source_id=0, only_days=None):
     # Lines of the receipts to import.
     h, it = rows(export, "PDetail"); r = Row(h)
     desc_col = next((c for c in ("DETAIL_DESC", "PLU_DESC", "DESCRIPTION") if c in h), None)
-    line_disc = [c for c in h if "DISC" in c and ("AMT" in c or c.endswith("DISC"))]
+    line_disc = [c for c in h if "DISC" in c and ("AMT" in c or c.endswith(("DISC", "DISCT")))]
     if line_disc:
         say("  line discount columns: " + ", ".join(line_disc))
     batch, n, seq = [], 0, 0
@@ -695,23 +695,43 @@ FROM legacy_tenders t JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day 
 # Each sales receipt: its total, tax, receipt discount and what its lines add up to.
 RECEIPT_SUMS_SQL = """
 SELECT r.z_id, r.total_cents, r.tax_cents, r.disc_cents,
-  (SELECT COALESCE(SUM(amount_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id)
+  (SELECT COALESCE(SUM(amount_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id),
+  (SELECT COALESCE(SUM(amount_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id AND l.kind = 'promo'),
+  (SELECT COALESCE(SUM(disc_cents), 0) FROM legacy_lines l WHERE l.receipt_id = r.id),
+  (SELECT SUM(amount_cents - change_cents) FROM legacy_tenders t WHERE t.receipt_id = r.id)
 FROM legacy_receipts r WHERE r.day = ? AND r.mode = 0"""
 RECEIPT_STATS = Counter()     # how each receipt's total was explained (printed by --recheck)
 RECEIPT_DIFFS = Counter()     # the unexplained differences (total - lines - tax), cents
+RECEIPT_PAID = defaultdict(Counter)   # kind of receipt -> what its tenders (less change) come to
+RECEIPT_YEARS = defaultdict(Counter)  # kind of receipt -> year -> receipts
+PROMO_IN_PRICE = "lines + tax, promotion (buydown) line not taken off the total: already in the item's price"
 
 
-def receipt_explained(total, tax, disc, lines):
-    """Whether a receipt's total is its lines + tax, less (or plus) its receipt discount, to the cent."""
+def receipt_explained(total, tax, disc, lines, promo=0, ldisc=0, paid=None, year=""):
+    """Whether a receipt's total is its lines + tax, less (or plus) its receipt discount, to the cent; or
+    that without its promotion (buydown) lines or its lines' own discounts, which ILSA wrote as lines and
+    as part of the item's amount both (the total, and the tenders, don't take them off twice)."""
     base = total - lines - tax
+    kind = None
     if abs(base) <= 1:
-        RECEIPT_STATS["lines + tax"] += 1
-        return True
-    if disc and abs(base + disc) <= 1:
-        RECEIPT_STATS["lines + tax - receipt discount"] += 1
-        return True
-    if disc and abs(base - disc) <= 1:
-        RECEIPT_STATS["lines + tax + receipt discount (sign kept the other way)"] += 1
+        kind = "lines + tax"
+    elif disc and abs(base + disc) <= 1:
+        kind = "lines + tax - receipt discount"
+    elif disc and abs(base - disc) <= 1:
+        kind = "lines + tax + receipt discount (sign kept the other way)"
+    elif promo and abs(base + promo) <= 1:
+        kind = PROMO_IN_PRICE
+    elif ldisc and min(abs(base - ldisc), abs(base + ldisc)) <= 1:
+        kind = "lines + tax, the lines' own discount not taken off the total again"
+    elif promo and ldisc and min(abs(base + promo - ldisc), abs(base + promo + ldisc)) <= 1:
+        kind = "lines + tax, neither promotion line nor line discount taken off the total again"
+    if kind != "lines + tax":
+        k = kind or "unexplained"
+        RECEIPT_PAID[k]["no tenders" if paid is None else "tenders = the total" if abs(paid - total) <= 1
+                        else "tenders = lines + tax" if abs(paid - lines - tax) <= 1 else "tenders = neither"] += 1
+        RECEIPT_YEARS[k][year] += 1
+    if kind:
+        RECEIPT_STATS[kind] += 1
         return True
     RECEIPT_STATS["unexplained"] += 1
     RECEIPT_DIFFS[base] += 1
@@ -738,10 +758,10 @@ def ours_for_day(db, day, zset=None):
         change[z] += ch or 0
     for z, ch in change.items():   # all change given comes out of cash (also on card / gift overtenders)
         out[z]["ours:tender:1"] = out[z].get("ours:tender:1", 0) - ch
-    for z, total, tax, disc, lines in db.execute(RECEIPT_SUMS_SQL, (day,)):
+    for z, total, tax, disc, lines, promo, ldisc, paid in db.execute(RECEIPT_SUMS_SQL, (day,)):
         if zset is not None and z not in zset:
             continue
-        if not receipt_explained(total, tax, disc or 0, lines):
+        if not receipt_explained(total, tax, disc or 0, lines, promo or 0, ldisc or 0, paid, day[:4]):
             out[z]["ours:receipts_off"] += 1
     for o in out.values():
         o["ours:gross"] = o.get("ours:net", 0) + o.get("ours:tax", 0)
@@ -773,6 +793,37 @@ CASH_EXPLAIN = {
                                             "JOIN legacy_receipts r ON r.id = t.receipt_id WHERE r.day = ? AND t.type = 1 "
                                             "AND r.mode <> 0 GROUP BY r.z_id",
 }
+
+
+# Tender Cash differences: what they fit (labelled "fits?", never counted as matching).
+CASH_FITS_SQL = {
+    "sales receipts whose tenders don't come to their total":
+        "SELECT r.z_id, SUM(r.total_cents - p.paid), COUNT(*) FROM legacy_receipts r JOIN (SELECT receipt_id, "
+        "SUM(amount_cents - change_cents) paid FROM legacy_tenders GROUP BY receipt_id) p ON p.receipt_id = r.id "
+        "WHERE r.day = ? AND r.mode = 0 AND ABS(r.total_cents - p.paid) > 1 GROUP BY r.z_id",
+    "promotion (buydown) lines on receipts paid in cash":
+        "SELECT r.z_id, -SUM(l.amount_cents), COUNT(DISTINCT r.id) FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id "
+        "WHERE r.day = ? AND r.mode = 0 AND l.kind = 'promo' AND EXISTS (SELECT 1 FROM legacy_tenders t "
+        "WHERE t.receipt_id = r.id AND t.type = 1) GROUP BY r.z_id",
+    "receipts with lines but no tenders":
+        "SELECT r.z_id, SUM(r.total_cents), COUNT(*) FROM legacy_receipts r WHERE r.day = ? AND r.mode = 0 AND r.total_cents <> 0 "
+        "AND NOT EXISTS (SELECT 1 FROM legacy_tenders t WHERE t.receipt_id = r.id) "
+        "AND EXISTS (SELECT 1 FROM legacy_lines l WHERE l.receipt_id = r.id) GROUP BY r.z_id",
+}
+CASH_FITS = Counter()
+
+
+def cash_fits(db, day, zid, diff, cache):
+    """' (fits?: ...)' when this Z's cash difference equals one of CASH_FITS_SQL, or minus it."""
+    for name, sql in CASH_FITS_SQL.items():
+        key = "fits:" + name
+        if key not in cache:
+            cache[key] = {z: (v, n) for z, v, n in db.execute(sql, (day,))}
+        v, n = cache[key].get(zid, (0, 0))
+        if v and (abs(diff - v) <= 1 or abs(diff + v) <= 1):
+            CASH_FITS[name] += 1
+            return f" (fits?: {n} {name}, {money(v)})"
+    return ""
 
 
 JOURNAL_GAPS = Counter()   # differences that ILSA's journal gaps may explain (labelled, never forced to match)
@@ -860,7 +911,10 @@ def check_day(db, day, store):
                 if why:
                     EXPLAINED["cash: " + why] += 1
                     continue
-            mine.append((day, zid, what + gap_label(db, day, zid, what, a - b, cache), a, b))
+            label = gap_label(db, day, zid, what, a - b, cache)
+            if not label and what.startswith("Tender Cash"):
+                label = cash_fits(db, day, zid, a - b, cache)
+            mine.append((day, zid, what + label, a, b))
         # Receipts that don't add up matter only when the Z doesn't tie either.
         if o.get("ours:receipts_off"):
             if mine:
@@ -1232,6 +1286,12 @@ def explain_receipts(export, db_path, say, limit=5):
     if not diff:
         return {}
     hits = Counter()
+    # Two receipts of each of the three most common differences, to show line by line.
+    common = [d for d, _ in Counter(b for b, _ in diff.values()).most_common(3)]
+    sample_keys = set()
+    for d in common:
+        sample_keys |= set(sorted(k for k, (b, _) in diff.items() if b == d)[-2:])
+    samples = defaultdict(list)
     for f in sorted(os.listdir(export)):
         if not f.lower().endswith(".csv"):
             continue
@@ -1244,6 +1304,7 @@ def explain_receipts(export, db_path, say, limit=5):
                 "DETAIL_CLASS", "DETAIL_TYPE", "TENDER_TYPE", "SEQ", "ID"}
         cols = [c for c in h if c not in skip and not PRIVATE.search(c)]
         per = defaultdict(lambda: defaultdict(int))
+        money_cols = [c for c in cols if re.search(r"AMT|DISC|PRC|BUYDOWN", c) and c not in ("DETAIL_LINE_AMT", "ITEM_COST")]
         for r.r in it:
             k = (integer(r("REG_NUM")), integer(r("RECEIPT_NUM")))
             if k not in diff:
@@ -1260,6 +1321,10 @@ def explain_receipts(export, db_path, say, limit=5):
                 code = f"line {cls},{'*' if cls in (15, 16) else typ}" + (" (not imported)" if kind_of(cls, typ) is None else "")
                 t[code] += cents(r("DETAIL_LINE_AMT"))
                 t[f"{code} dept {integer(r('DEPT', 'DEPT_NUM'), 0)}"] += cents(r("DETAIL_LINE_AMT"))
+                if k in sample_keys:
+                    extra = ", ".join(f"{c} {money(cents(r(c)))}" for c in money_cols if cents(r(c)))
+                    samples[k].append((cls, typ, integer(r("DEPT", "DEPT_NUM"), 0), r("DETAIL_FOR_QTY").strip() or "-",
+                                       cents(r("DETAIL_LINE_AMT")), extra))
         for k, t in per.items():
             want = diff[k][0]
             for c, v in t.items():
@@ -1267,6 +1332,12 @@ def explain_receipts(export, db_path, say, limit=5):
                     hits[(table, c, "")] += 1
                 elif v and abs(v + want) <= 1:
                     hits[(table, c, "minus ")] += 1
+    if samples:
+        say("  A few of those receipts, line by line (numbers only):")
+        for k, ls in samples.items():
+            say(f"    receipt {k[0]}-{k[1]} (Z {diff[k][1]}): total - lines - tax = {money(diff[k][0])}")
+            for cls, typ, dept, q, amt, extra in ls[:12]:
+                say(f"      line {cls},{typ} dept {dept} qty {q} amount {money(amt)}" + (f"; {extra}" if extra else ""))
     say("  The difference (total - lines - tax) equals, on how many of those receipts:")
     for (table, c, sign), n in hits.most_common(15):
         say(f"    {sign}{table}.{c}: {n:,}")
@@ -1403,13 +1474,14 @@ def tax_rate_check(db, store, day_from, day_to, out_dir, stamp, say):
     than that is allowed (tax-exempt lines); more, or the other period's rate, is listed."""
     rows_ = db.execute(f"""SELECT r.day, r.receipt_num, r.tax_cents, COALESCE(s.store, 'BHDAN'),
                              SUM(CASE WHEN l.kind IN ('item', 'promo') AND l.lottery = 0 THEN l.amount_cents ELSE 0 END),
-                             SUM(CASE WHEN l.kind IN ('item', 'promo') AND l.lottery = 0 THEN 1 ELSE 0 END)
+                             SUM(CASE WHEN l.kind IN ('item', 'promo') AND l.lottery = 0 THEN 1 ELSE 0 END),
+                             SUM(CASE WHEN l.kind = 'item' AND l.lottery = 0 THEN l.amount_cents ELSE 0 END)
                            FROM legacy_receipts r JOIN legacy_sources s ON s.id = r.source_id
                            LEFT JOIN legacy_lines l ON l.receipt_id = r.id
                            WHERE r.mode = 0 AND s.store = ? AND r.day BETWEEN ? AND ? GROUP BY r.id""",
                        (store, day_from or "0000", day_to or "9999")).fetchall()
     count, listed = Counter(), []
-    for day, num, tax, st, base, n in rows_:
+    for day, num, tax, st, base, n, items in rows_:
         if not base and not tax:
             continue
         ppm = rate_on(st, day)
@@ -1417,6 +1489,13 @@ def tax_rate_check(db, store, day_from, day_to, out_dir, stamp, say):
         slack = max(1, n or 0)
         if abs(tax - want) <= slack:
             count["at the day's rate"] += 1
+            continue
+        fit = lambda b: abs(tax - int(round(b * ppm / 1_000_000))) <= slack
+        if items != base and fit(items):
+            count["at the day's rate on the price before promotions (buydowns)"] += 1
+            continue
+        if base < 0 < tax and (fit(-base) or fit(-items)):
+            count["at the day's rate, a refund whose tax ILSA kept positive"] += 1
             continue
         other = [q for _, q in TAX_RATES.get(st, TAX_RATES["BHDAN"]) if q != ppm]
         if any(abs(tax - int(round(base * q / 1_000_000))) <= slack for q in other):
@@ -1557,6 +1636,7 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
                 + f"); days left out: {gone:,}")
         for st in stores:
           RECEIPT_STATS.clear(); RECEIPT_DIFFS.clear(); NO_SAVED_TENDERS.clear(); EXPLAINED.clear(); JOURNAL_GAPS.clear()
+          RECEIPT_PAID.clear(); RECEIPT_YEARS.clear(); CASH_FITS.clear()
           days = [d for (d,) in db.execute("SELECT day FROM legacy_days WHERE store = ? AND day BETWEEN ? AND ? ORDER BY day",
                                            (st, day_from or "0000", day_to or "9999"))]
           say(f"\n######## Store {st}: {len(days):,} day(s)" + (f", {days[0]} .. {days[-1]}" if days else ""))
@@ -1571,6 +1651,11 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
           if RECEIPT_DIFFS:
               say("  unexplained, most common differences (total - lines - tax): "
                   + ", ".join(f"{money(d)} x{n:,}" for d, n in RECEIPT_DIFFS.most_common(8)))
+          if RECEIPT_PAID:
+              say("  what the customer paid (tenders less change), on the receipts that aren't plain lines + tax:")
+              for k, c in sorted(RECEIPT_PAID.items(), key=lambda kv: -sum(kv[1].values())):
+                  say(f"    {k}: " + ", ".join(f"{w} {n:,}" for w, n in c.most_common()))
+                  say("      by year: " + ", ".join(f"{y} {n:,}" for y, n in sorted(RECEIPT_YEARS[k].items())))
           if EXPLAINED:
               say("\n== Differences explained (counted as matching)")
               for k, n in EXPLAINED.most_common():
@@ -1597,6 +1682,21 @@ def recheck(db_path, day_from, day_to, dry, out_dir, quiet=False, store=None):
               say(f"  {kind}: {n:,} on {nd:,} day(s), totals {money(tot)}")
           for k, n in JOURNAL_GAPS.most_common():
               say(f"  differences on Z's with {k} (labelled 'ILSA journal gap?'): {n:,}")
+          nt_sql = f"""FROM legacy_lines l JOIN legacy_receipts r ON r.id = l.receipt_id WHERE r.mode = 0 AND r.total_cents <> 0
+                       AND r.day BETWEEN ? AND ? AND r.z_id IN ({STORE_ZS})
+                       AND NOT EXISTS (SELECT 1 FROM legacy_tenders t WHERE t.receipt_id = r.id)"""
+          args = (day_from or "0000", day_to or "9999", st)
+          by_dept = db.execute(f"SELECT l.kind, l.dept, COUNT(DISTINCT r.id), SUM(l.amount_cents) {nt_sql} "
+                               "GROUP BY l.kind, l.dept ORDER BY 3 DESC LIMIT 8", args).fetchall()
+          if by_dept:
+              names = dict(db.execute("SELECT dept, name FROM legacy_depts").fetchall()) if db.execute(
+                  "SELECT 1 FROM sqlite_master WHERE name = 'legacy_depts'").fetchone() else {}
+              say("  receipts with lines but no tenders, by what they rang: " + "; ".join(
+                  f"{k} dept {d}{' ' + names[d] if names.get(d) else ''} {n:,} ({money(v)})" for k, d, n, v in by_dept))
+              say("    by year: " + ", ".join(f"{y} {n:,}" for y, n in db.execute(
+                  f"SELECT substr(r.day, 1, 4), COUNT(DISTINCT r.id) {nt_sql} GROUP BY 1", args)))
+          for k, n in CASH_FITS.most_common():
+              say(f"  Tender Cash differences that fit {k} (labelled 'fits?'): {n:,}")
           report(db, days, out_dir, stamp, say, st)
           last_stats = dict(RECEIPT_STATS)
         dates_report(db, say)
@@ -1839,6 +1939,20 @@ def extras_self_test(tmp, out, now, check):
           and db.execute("SELECT total_cents FROM legacy_receipts WHERE id = ?", (rid,)).fetchone() == (1063,))
     db.executemany(f"INSERT INTO legacy_lines VALUES ({','.join('?' * len(saved[0]))})", saved)
     db.execute("UPDATE legacy_z_values SET cents = cents + 1063 WHERE name = 'ilsa:tender:1'"); db.commit(); db.close()
+    RECEIPT_STATS.clear(); RECEIPT_PAID.clear()
+    ok = receipt_explained(1063, 63, 0, 1000 - 100, -100, 0, 1063, "2026")
+    check("a buydown already in the item's price (total = item + tax; the promotion line a record of it): explained, paid = total",
+          ok and RECEIPT_STATS[PROMO_IN_PRICE] == 1 and RECEIPT_PAID[PROMO_IN_PRICE]["tenders = the total"] == 1)
+    db = sqlite3.connect(dbp)
+    db.execute("UPDATE legacy_receipts SET tax_cents = 63 WHERE receipt_num = 2")
+    rid2 = db.execute("SELECT id FROM legacy_receipts WHERE receipt_num = 2").fetchone()[0]
+    db.execute("INSERT INTO legacy_lines (receipt_id, seq, day, kind, dept, amount_cents) "
+               "SELECT ?, 99, day, 'promo', 20, -100 FROM legacy_receipts WHERE id = ?", (rid2, rid2))
+    db.commit()
+    counts = tax_rate_check(db, "BHDAN", None, None, out, "test", lambda *a: None)
+    db.execute("DELETE FROM legacy_lines WHERE receipt_id = ? AND seq = 99", (rid2,)); db.commit(); db.close()
+    check("tax on the price before a buydown counts as the day's rate",
+          counts.get("at the day's rate on the price before promotions (buydowns)") == 1)
     hits = explain_receipts(d, dbp, lambda *a: None)
     check("--explain-receipts finds the column that holds a receipt's fee", hits.get("RegSale.BAG_FEE") == 1)
 

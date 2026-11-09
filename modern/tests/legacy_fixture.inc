@@ -139,5 +139,5 @@ INSERT INTO legacy_days (store, day, source_id, partial, receipts, variances, im
 INSERT INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at) VALUES ('BHDAN', '2026-10-27', 1, 0, 2, 0, '2026-11-07 00:00:00');
 INSERT INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at) VALUES ('BHDAN', '2026-10-28', 1, 1, 4, 1, '2026-11-07 00:00:00');
 INSERT INTO legacy_days (store, day, source_id, partial, receipts, variances, imported_at) VALUES ('BHNM', '2026-10-15', 3, 1, 1, 0, '2026-11-07 00:00:00');
-INSERT INTO legacy_variances (id, day, z_id, what, ilsa_cents, ours_cents) VALUES (1, '2026-10-28', 2, 'Tender Cash (1)', -2305, -2405);
+INSERT INTO legacy_variances (id, day, z_id, what, ilsa_cents, ours_cents) VALUES (1, '2026-10-28', 2, 'Tender Cash (1) (fits?: 1 promotion (buydown) lines on receipts paid in cash, $1.00)', -2305, -2405);
 )SQL"
