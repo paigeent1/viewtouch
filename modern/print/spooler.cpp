@@ -12,6 +12,7 @@
 #include <QProcess>
 #endif
 #include <QTcpSocket>
+#include <QSet>
 #include <QTimer>
 
 #include <atomic>
@@ -271,6 +272,17 @@ private:
         return toFile(path, data, error);
 #else
         const QByteArray name = QFile::encodeName(path);
+        // A ticket given up on earlier may still be going out (its thread waits on): never
+        // start a second one beside it, or the printer gets both, one after the other.
+        static std::mutex busyMutex;
+        static QSet<QString> busy;
+        {
+            std::lock_guard lock(busyMutex);
+            if (busy.contains(path)) {
+                *error = u"the printer is still taking the last ticket (%1)"_s.arg(path);
+                return false;
+            }
+        }
         int fd;
         do   // O_NONBLOCK for the open only: a pipe with no reader fails at once (ENXIO) instead of waiting
             fd = ::open(name.constData(), O_WRONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
@@ -294,7 +306,11 @@ private:
             int err = 0;
         };
         auto st = std::make_shared<State>();
-        std::thread([st, fd, data] {
+        {
+            std::lock_guard lock(busyMutex);
+            busy.insert(path);
+        }
+        std::thread([st, fd, data, path] {
             qint64 off = 0;
             bool ok = true;
             int err = 0;
@@ -311,6 +327,10 @@ private:
                 break;
             }
             ::close(fd);
+            {
+                std::lock_guard lock(busyMutex);
+                busy.remove(path);
+            }
             std::lock_guard lock(st->m);
             st->done = true;
             st->ok = ok;

@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 10:39 ET — Bob (Claude) — USB printer: 60 s to take a ticket, and never two tickets at once
+- **What:** PrintSpooler: DeviceWriteMs 10 s -> 60 s. toDevice keeps a set of devices whose writing thread is still running; while one is, a new ticket for that device fails at once ('still taking the last ticket') instead of opening it again (it's kept for Reprint as before).
+- **Why:** Owner 2026-11-09 on BHDAN (d84fb33): a receipt with the logo was given up after 10 s (red banner), then that ticket and a retry both printed and cut on their own a little later: the old TM-T88IV over USB was just slow on the logo, and the given-up write was still going out when the retry started.
+- **Files:** (none)
+- **Next person must know:** Ask the owner how long the logo receipt takes; if it's always slow, look at the logo's size or band height for this printer.
+
 ### 2026-11-09 10:58 ET — Bob (Claude) — BHDAN receipts back on the network printer (.77); USB printing parked
 - **What:** Owner decision: BHDAN's receipt printer goes back to its network connection (printer 'Receipt', 192.168.1.77); Terminals send receipts there. The VT-BHDAN-RECEIPT (/dev/usb/lp0) entry stays unused.
 - **Why:** Owner 2026-11-09: on USB (Epson UB-U09 card from 2003) the same file printed fast at times and a line every few seconds at other times, with no USB errors logged; not worth more time while BHDAN isn't live.
