@@ -37,9 +37,9 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"number"_s, tr("Number"), u"string"_s,
                   tr("To ring it in by number: type it on Find, or on a keyboard then Enter. Digits, each item its own.")),
             field(u"upc"_s, tr("UPC (Primary Barcode)"), u"string"_s,
-                  tr("Primary UPC/EAN barcode, as printed (digits only; no other item may have it).")),
+                  tr("Primary UPC/EAN barcode, as printed (no other item may have it).")),
             field(u"altupc"_s, tr("Alt UPC (Secondary Barcodes)"), u"string"_s,
-                  tr("Alternate UPC barcode(s), comma-separated (digits only; no other item may have them).")),
+                  tr("Alternate UPC barcode(s), comma-separated (no other item may have them).")),
             field(u"price"_s, tr("Price"), u"money"_s),
             field(u"family"_s, tr("Family"), u"string"_s, tr("Groups items on the sales report")),
             with(field(u"taxClass"_s, tr("Tax"), u"enum"_s), u"options"_s,
@@ -348,7 +348,7 @@ QVariantList PosService::adminFields(const QString &panel)
                   tr("On: every receipt, reprint and gift receipt ends with a barcode of its check (R-1234, with the check prefix: RHCA-1234). "
                      "Scanned at the register, Find a check opens that check, for a return or a reprint.")),
             field(u"checkPrefix"_s, tr("Check prefix"), u"string"_s,
-                  tr("This store's letters on receipt barcodes, e.g. HCA, BHDAN or BHNM (letters and digits, up to 8). "
+                  tr("This store's letters on receipt barcodes, e.g. BHD, BHG or HCA (letters and digits, up to 8). "
                      "A receipt with another store's prefix is from there. Empty: none.")),
             field(u"soldOutBackNextDay"_s, tr("86'd items come back the next day"), u"bool"_s,
                   tr("On: items marked sold out during service are back after End of Day. Off: until someone turns them back on. Marked sold out in the Menu Builder: always until changed there.")),

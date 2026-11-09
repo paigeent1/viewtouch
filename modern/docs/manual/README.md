@@ -15,3 +15,24 @@ The PDF is published on the `modern-manual-<version>` GitHub release (linked fro
 ```sh
 magick docs/manual/shots/m02-tables.png -resize 1200x -strip -quality 82 docs/screenshots/floor-plan.jpg
 ```
+
+## Editions (rebuilding the manual as ViewTouch changes)
+
+Every rebuild is an edition named by its date, **Ver. YYMMDD**, with the program build it describes on the cover
+("Effective with paigeent1 ver 0.9.NNN", NNN = `git rev-list --count HEAD` of the commit it describes, the number
+ViewTouch shows). Editions are never overwritten: each PDF is kept as
+`editions/ViewTouch User Manual Ver YYMMDD.pdf` here and in Dropbox > POS project > Manuals.
+
+Last rebuilt: **Ver. 261108**, from the development notes through 2026-11-08 18:30 ET (commit `4417d05`).
+The next rebuild starts from the notes after that point.
+
+Steps:
+1. Inventory: read every development-notes entry since "Last rebuilt" against `manual.html`; list what users need
+   (new, changed, now wrong), with on-screen names checked in the source. Leave out internal changes, anything legal
+   and any camera/video work.
+2. Update the chapters and add new ones; keep the style (short sentences, `.tip`, `.warn`); "subscription", never
+   "member". New pictures are marked `<!-- SHOT: ... -->`.
+3. Pictures of THIS store (not the demo restaurant): on the store's Pi run `vt-manual-shots` (a scrubbed copy of the
+   store, every page, to Google Drive "POS project tmp/manual-shots/<date>/"); fit them in place of the SHOT marks.
+4. Cover: Ver. YYMMDD and "Effective with paigeent1 ver 0.9.NNN"; update "Last rebuilt" above.
+5. PDF: `soffice --headless --convert-to "pdf:writer_web_pdf_Export" manual.html`, check it, save it as the edition.

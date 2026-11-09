@@ -123,6 +123,18 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-08 19:20 ET — Bob (Claude) — User manual Ver. 261108: chapters 23-31, edition cover, rebuild steps
+- **What:** manual.html: new chapters 23 ID checks, 24 guest screen, 25 Billboards, 26 Labels screen, 27 ILSA price book sync, 28 ILSA sales history, 29 Receipts/barcodes/check numbers, 30 Site Setup/Hardware Configuration/Screen check, 31 store computer commands; cover now 'Ver. 261108' and 'Effective with paigeent1 ver 0.9.478'. README: editions (Ver. YYMMDD, kept in editions/ and Dropbox > POS project > Manuals), the 'last rebuilt' marker and the rebuild steps. Store Settings hints: UPC / Alt UPC no longer say 'digits only' (the save accepts letters and digits); Check prefix examples BHD, BHG, HCA.
+- **Why:** Owner: rebuild the manual (last done 2026-11-02, ~370 changes since), dated editions kept, a process to rerun as work continues; retail pictures from the 219 Pi.
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/docs/manual/README.md`, `modern/docs/manual/manual.html`
+- **Next person must know:** Pictures: SHOT placeholders wait for vt-manual-shots pictures from the 219 (first run 2026-11-08 18:33). The edition PDF goes in modern/docs/manual/editions/ once the pictures are in.
+
+### 2026-11-08 18:33 ET — Bob (Claude) — Manual chapters 1-22 brought up to date (post-11-02 changes)
+- **What:** Updated modern/docs/manual/manual.html in place from the 11-08 manual inventory: Contents now lists chapters 1-31; new 'What's new since November 2, 2026' block and fixed fork bullets; chapters 1-22 updated (Retail screen rewritten in ch 19 with Cashier Duty, Look Up Checks, Item Look Up, Price check, error correct, Cancel Sale, Discounts, ITEM RETURN -> Find a Check; Label Utility v1.2 in ch 20; ribbon/DIRECTV/tablets/two touchscreens in ch 21; new quick-reference rows in ch 22). SHOT placeholders added as HTML comments. Cover page untouched; chapters 23-31 not written (cross-references only).
+- **Why:** The manual described pre-11-02 behavior (GS1 check digits added, file names, v1.1, old customer display setup, No Sale without a reason).
+- **Files:** `modern/docs/manual/manual.html`
+- **Next person must know:** Not committed (merger commits). Code hint text for UPC says 'digits only' but the save check accepts 4-40 letters and digits; manual follows the code.
+
 ### 2026-11-08 18:26 ET — Bob (Claude) — Retail: ALPHA LOOK UP opens Item Look Up; ITEM RETURN opens Find a Check; barcode hints
 - **What:** Starter Retail page (seed retail-entry.json): ALPHA LOOK UP now jumps to the Item Look Up page (item-lookup; it opens in ring mode) instead of Find; ITEM RETURN (had no action) now opens Find a Check, where Refund… is. Manager > Menu UPC / Alt UPC hints no longer claim a GS1 check-digit check (since 2026-11-04 only digits and duplicates are checked).
 - **Why:** Found while rebuilding the user manual: the earlier ALPHA LOOK UP change went only into the unused WidgetRetailEntry.qml, ITEM RETURN did nothing, and the hint text was wrong. Owner: fix all three.
