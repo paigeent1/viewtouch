@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 16:03 ET — Bob (Claude) — Test: Find and price check timed on the register's screen with a 31,700-item price book
+- **What:** New UI test in test_pos_flow.cpp ('UI: Find and price check with a 31,700-item price book', [find][catalog]): imports 31,700 ILSA-shaped items, then on the drawn screen times a PRICE CHECK scan (found, not on file, read as an EAN-13), each key typed on Find ('oliva v'), how long until the rows show the answer, and any change while Find shows; prints [find-ui] times; checks the rows are readable (list takes the width, PG UP / PG DN on the right, 5-10 rows, name / UPC / price), the search line is active with a status, and Retail Mode on the order screen. Generous limits (a Pi is about 3x the CI machine).
+- **Why:** Owner 2026-11-09 15:43 / 15:50: price check find still lags; on BHDAN the Find results were unreadable (big arrows in the middle). Measured first (this commit alone runs on bob/fast-item-search-before for the before numbers), then fixed in the next commit.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-09 14:45 ET — Bob (Claude) — Serial scanner test: fix a crash in the test itself
 - **What:** test_serial_scanner.cpp compared begin() and end() of two copies of scanners() (each detached), which crashed the test run in CI (SIGSEGV, all later tests skipped). Now one copy.
 - **Why:** CI run 42684857705 on bob/two-scanners.
