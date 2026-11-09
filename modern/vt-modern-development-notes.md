@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 14:08 ET — Bob (Claude) — Backlog: cash drawer setting clarity (not built; owner: upstream idea)
+- **What:** Backlog only, no code. Today Printers > Cash drawer (a drawer is wired to this printer) and Terminals > Receipts and cash drawer on (which printer this station uses) can disagree; TicketPrinter::openDrawer / printNoSale then quietly use the first other printer with a drawer (BHDAN 2026-11-09: No Sale went to Receipt .77 while the terminal was set to VT-BHDAN-RECEIPT, which had Cash drawer off). Idea: Terminals shows has-drawer/no-drawer per printer and warns, with a button to turn it on; never send a kick or No Sale to another printer without saying so on screen. Check whether original ViewTouch behaves the same; if so, suggest it upstream.
+- **Why:** Owner 2026-11-09: confusing to have the drawer choice in two places; not changing it now, wants it in the notes as an upstream suggestion.
+- **Files:** (none)
+
 ### 2026-11-09 13:41 ET — Bob (Claude) — BHDAN USB receipt printer: Rongta RP850(A) works
 - **What:** A Rongta RP850(A) (built-in USB, serial and Ethernet; ESC/POS) on BHDAN's USB as /dev/usb/lp0 prints ViewTouch's full receipt (logo, barcode, privacy notice) correctly. VT-BHDAN-RECEIPT stays a Text file printer at /dev/usb/lp0, ESC/POS. The TM-T88IV with the 2003 UB-U09 card is retired from USB (it errors on any Raspberry Pi, fine on a PC).
 - **Why:** Owner 2026-11-09: USB receipt printing is required for the retail launch; owner is buying Rongta RP850(A) printers (about $89).
