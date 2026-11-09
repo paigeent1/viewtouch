@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 16:43 ET — Bob (Claude) — Retail Cancel Sale test: run it as the key does
+- **What:** The new Cancel Sale test calls cancelSale through invoke (as the key does), so it asks for a reason; called directly it doesn't ask (haveReason only asks for a screen's operation).
+- **Why:** CI: the test expected the reason prompt from a direct call.
+- **Files:** `modern/tests/test_pos_m4.cpp`
+
 ### 2026-11-09 16:23 ET — Bob (Claude) — Retail register tests: Money is vt::Money
 - **What:** New tests used core::Money; it is vt::Money.
 - **Why:** CI build failed on bob/retail-misc-keys (test_pos_m4.cpp).
