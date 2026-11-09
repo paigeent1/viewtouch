@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Send ViewTouch's receipt (~/receipt-dump.bin) to /dev/usb/lp0 in variants, one at a time."""
+import os, re, sys, time
+src = open(os.path.expanduser("~/receipt-dump.bin"), "rb").read()
+ESC, GS = b"\x1b", b"\x1d"
+def no_codepage(d): return d.replace(ESC + b"t\x13", b"")
+def no_fontb(d):    return d.replace(ESC + b"M\x01", ESC + b"M\x00")
+def no_size(d):     return re.sub(re.escape(GS + b"!") + b".", b"", d, flags=re.S)
+def no_bold(d):     return re.sub(re.escape(ESC + b"E") + b".", b"", d, flags=re.S)
+def no_align(d):    return re.sub(re.escape(ESC + b"a") + b".", b"", d, flags=re.S)
+def no_barcode(d):  return re.sub(re.escape(GS + b"k") + b"I(.)", lambda m: b"", d, flags=re.S)
+def plain(d):       return ESC + b"@" + bytes(c for c in d if c in b"\n" or 32 <= c < 127)
+variants = [
+    ("A  plain text only (every printer command taken out)", plain),
+    ("B  no character set (ESC t 19)", no_codepage),
+    ("C  no small font (ESC M 1)", no_fontb),
+    ("D  no big letters (GS !)", no_size),
+    ("E  no bold (ESC E)", no_bold),
+    ("F  no centering (ESC a)", no_align),
+    ("G  the receipt exactly as ViewTouch made it", lambda d: d),
+]
+only = sys.argv[1:] 
+for name, f in variants:
+    if only and name[0] not in only: continue
+    data = f(src) + b"\n\n\n\n" + GS + b"V\x42\x00"
+    input(f"\nNext: {name}. Press Enter to send it (Ctrl+C to stop)... ")
+    t = time.time()
+    with open("/dev/usb/lp0", "wb") as out:
+        out.write(b"\x1b@" + name.encode() + b"\n")
+        out.write(data)
+    print(f"   sent in {time.time() - t:.1f} s. Fast or line-by-line on paper?")

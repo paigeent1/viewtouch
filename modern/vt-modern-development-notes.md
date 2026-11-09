@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 11:04 ET — Bob (Claude) — vt-usb-variants: find which receipt command slows a USB printer
+- **What:** New test tool: sends ~/receipt-dump.bin (a ViewTouch receipt saved to a file) to /dev/usb/lp0 seven ways, one printer command type removed each time (character set, small font, size, bold, centering), plus plain text and as-is, each slip labelled, waiting for Enter between.
+- **Why:** Owner 2026-11-09: BHDAN's TM-T88IV prints ViewTouch's receipt line by line over USB, even sent with cat with ViewTouch stopped, while hand-written test lines printed fast; the owner believes the code is the cause.
+- **Files:** (none)
+
 ### 2026-11-09 10:39 ET — Bob (Claude) — USB printer: 60 s to take a ticket, and never two tickets at once
 - **What:** PrintSpooler: DeviceWriteMs 10 s -> 60 s. toDevice keeps a set of devices whose writing thread is still running; while one is, a new ticket for that device fails at once ('still taking the last ticket') instead of opening it again (it's kept for Reprint as before).
 - **Why:** Owner 2026-11-09 on BHDAN (d84fb33): a receipt with the logo was given up after 10 s (red banner), then that ticket and a retry both printed and cut on their own a little later: the old TM-T88IV over USB was just slow on the logo, and the given-up write was still going out when the retry started.
