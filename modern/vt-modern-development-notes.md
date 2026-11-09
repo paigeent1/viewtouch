@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 13:41 ET — Bob (Claude) — BHDAN USB receipt printer: Rongta RP850(A) works
+- **What:** A Rongta RP850(A) (built-in USB, serial and Ethernet; ESC/POS) on BHDAN's USB as /dev/usb/lp0 prints ViewTouch's full receipt (logo, barcode, privacy notice) correctly. VT-BHDAN-RECEIPT stays a Text file printer at /dev/usb/lp0, ESC/POS. The TM-T88IV with the 2003 UB-U09 card is retired from USB (it errors on any Raspberry Pi, fine on a PC).
+- **Why:** Owner 2026-11-09: USB receipt printing is required for the retail launch; owner is buying Rongta RP850(A) printers (about $89).
+- **Files:** (none)
+- **Next person must know:** BHDAN still boots the old 6.18.50 set (os_prefix=old/ in /boot/firmware/config.txt): restore config.txt.before-old-kernel and reboot to return to 6.18.60.
+
 ### 2026-11-09 13:07 ET — Bob (Claude) — BHDAN USB receipt printer: findings 2026-11-09 (not software)
 - **What:** TM-T88IV (M129H) with UB-U09 USB card (2003): prints line by line and goes into error when FEED or the cutter runs, but only while its USB is connected to a Raspberry Pi (BHDAN Pi 5, HCA Pi 5, and an older Pi not updated since about Jan 2024). On a Windows PC: no error. Ruled out: ViewTouch (cat with ViewTouch stopped), receipt content (plain text too), the usblp driver (FEED errors with it unbound), kernel 6.18.60 and its device tree/overlays (full 6.18.50 set booted: same), EEPROM (not updated), USB autosuspend, cable (known-good cable), power brick (swapped), DIP switches (match the fast .77 unit), unread status (printer sends nothing). Receipts run on the network TM-T88IV (Receipt, .77) meanwhile.
 - **Why:** Owner needs USB receipt printing for retail launch at BHDAN.
