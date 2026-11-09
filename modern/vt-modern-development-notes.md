@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 09:44 ET — Bob (Claude) — Backlog: test original ViewTouch with a jammed USB printer
+- **What:** Backlog item only, no code: after the stores are live, run original (upstream) ViewTouch with a USB receipt printer in an error state and see whether the register freezes; report it upstream if it does.
+- **Why:** Owner 2026-11-09: wants to help other ViewTouch users if the hang we saw is in the original code too (not shown yet; we only saw it in vtmodern).
+- **Files:** (none)
+
 ### 2026-11-09 09:29 ET — Bob (Claude) — USB printer: wait for the ticket to go out before closing the device
 - **What:** PrintSpooler toDevice (USB /dev/usb/lp0, pipes): after the last write, poll for POLLOUT until the driver says the write has completed, then close (same 10 s limit). With O_NONBLOCK the Linux usblp driver accepts a write as soon as it is queued; closing right away cancels the unsent data (usblp_release unlinks the URBs), so receipts came out cut off or not at all.
 - **Why:** Owner 2026-11-09: on BHDAN nothing printed from ViewTouch after the printer fix (554fb09), while the same printer printed and cut fine from the shell (printf > /dev/usb/lp0, a blocking write).
