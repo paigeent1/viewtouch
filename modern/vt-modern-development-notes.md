@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-09 10:39 ET — Bob (Claude) — USB printer: 60 s to take a ticket, and never two tickets at once
+- **What:** PrintSpooler: DeviceWriteMs 10 s -> 60 s. toDevice keeps a set of devices whose writing thread is still running; while one is, a new ticket for that device fails at once ('still taking the last ticket') instead of opening it again (it's kept for Reprint as before).
+- **Why:** Owner 2026-11-09 on BHDAN (d84fb33): a receipt with the logo was given up after 10 s (red banner), then that ticket and a retry both printed and cut on their own a little later: the old TM-T88IV over USB was just slow on the logo, and the given-up write was still going out when the retry started.
+- **Files:** (none)
+- **Next person must know:** Ask the owner how long the logo receipt takes; if it's always slow, look at the logo's size or band height for this printer.
+
 ### 2026-11-09 10:16 ET — Bob (Claude) — USB printer: write like cat (waiting writes on their own thread)
 - **What:** PrintSpooler toDevice: the device is still opened with O_NONBLOCK (a pipe with no reader fails at once) but O_NONBLOCK is then cleared, and the ticket is written with ordinary waiting writes on a short-lived thread of its own; the spooler waits up to the device time limit (10 s) for it, else gives the ticket up (kept for Reprint) while that thread waits on and closes the device when the printer takes the rest or goes away. Replaces 055736a's poll-before-close.
 - **Why:** Owner 2026-11-09 on BHDAN: ViewTouch's receipt, saved to a file and sent with cat > /dev/usb/lp0, printed perfectly, but sent by ViewTouch (non-blocking writes, even with 055736a's wait) it left the TM-T88IV stuck or in error. So the receipt is fine and only the non-blocking USB writes were wrong.

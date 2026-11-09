@@ -34,7 +34,7 @@ class PrintSpooler : public QObject {
 public:
     static constexpr int MaxAttempts = 3;
     static constexpr int DeviceAttempts = 2;
-    static constexpr int DeviceWriteMs = 10'000;
+    static constexpr int DeviceWriteMs = 60'000;   // an old printer can take a while over a logo
     static constexpr int DeviceRetryMs = 15'000;
     // Held tickets kept per printer (the oldest go first).
     static constexpr int MaxHeld = 50;
