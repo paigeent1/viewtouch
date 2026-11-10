@@ -23,7 +23,7 @@ Every rebuild is an edition named by its date, **Ver. YYMMDD**, with the program
 ViewTouch shows). Editions are never overwritten: each PDF is kept as
 `editions/ViewTouch User Manual Ver YYMMDD.pdf` here and in Dropbox > POS project > Manuals.
 
-Last rebuilt: **Ver. 261108**, from the development notes through 2026-11-08 18:30 ET (commit `4417d05`).
+Last rebuilt: **Ver. 261110** (text; pictures and PDF still to come), from the development notes through 2026-11-09 18:24 ET (commit `f3b7d43`, ver 0.9.505).
 The next rebuild starts from the notes after that point.
 
 Steps:

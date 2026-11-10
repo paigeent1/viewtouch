@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ViewTouch User Manual Ver. 261108</title>
+<title>ViewTouch User Manual Ver. 261110</title>
 <style>
   @page { size: letter; margin: 14mm 14mm 14mm 14mm; }
   body { font-family: "DejaVu Sans", "Liberation Sans", sans-serif; font-size: 10.5pt; line-height: 1.4; color: #1b1b1b; }
@@ -28,8 +28,8 @@
 <h1 class="first">ViewTouch</h1>
 <p style="font-size:18pt; color:#555">User Manual — Custom Retail &amp; Hospitality Edition</p>
 <p style="font-size:11pt; color:#555">For cashiers, bartenders, servers, kitchen staff and managers</p>
-<p style="font-size:16pt; color:#1f4fa8; font-weight:bold">Ver. 261108</p>
-<p style="font-size:11pt; color:#555">Effective with paigeent1 ver 0.9.478 (Custom Fork Edition, <code>paigeent1/viewtouch</code>)</p>
+<p style="font-size:16pt; color:#1f4fa8; font-weight:bold">Ver. 261110</p>
+<p style="font-size:11pt; color:#555">Effective with paigeent1 ver 0.9.505 (Custom Fork Edition, <code>paigeent1/viewtouch</code>)</p>
 <p class="shot"><img src="shots/m02-tables.png" width="520" height="292"></p>
 </div>
 
@@ -55,7 +55,7 @@
 <li>Keep running if a computer fails</li>
 <li>Retail POS Workstation, UPC Barcodes &amp; Parent/Child Costing</li>
 <li>ViewTouch Label Utility v1.2 &amp; ZPL Barcode Printing</li>
-<li>Custom Hardware, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</li>
+<li>Custom Hardware, USB Receipt Printer, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</li>
 <li>Quick reference</li>
 <li>ID checks for age-restricted sales</li>
 <li>The guest screen</li>
@@ -67,6 +67,21 @@
 <li>Site Setup, Hardware Configuration and Screen check</li>
 <li>Store computer commands (owner appendix)</li>
 </ol>
+
+<!-- ======================================================================= -->
+<h1>What's new in Ver. 261110</h1>
+<p>What changed after the November 8 edition (Ver. 261108):</p>
+<ul>
+<li><b>Dates on a touch calendar.</b> Every screen that asks for a date or a time opens a calendar instead of the keyboard: months on the left, the days in the middle, the year with big + and − on the right, then <b>OK</b>. The date fields are bigger and show the day in words (<i>Tue, Sep 1, 2026</i>). Reports → <b>Dates…</b> now shows the days you pick right away (chapter 2, Choosing a date).</li>
+<li><b>Time Clock report</b> for payroll: Reports → <b>Time Clock</b>, laid out like the old ILSA printout, on the screen, on paper and as a PDF. New Store Settings: <i>Store address</i> and <i>Store phone</i> (chapter 12).</li>
+<li><b>The cash drawer</b> opens only on the terminal's own printer, and only when that printer's cash drawer setting is on. It never opens another printer's drawer. When it can't open, the screen says why in red (chapter 10).</li>
+<li><b>USB receipt printer</b> on the store's Pi: the Rongta RP850 works, logo, barcode and all (chapter 21).</li>
+<li><b>The Retail screen</b>: <b>MISC MDSE</b> and <b>MISC FOOD/BEV</b> open departments, <b>VOID ITEM</b> / <b>RESTORE ITEM</b> on the item touched, <b>CANCEL SALE</b> always closes the sale, a new right column, and <b>Reprint Receipt</b> opens Look Up Checks. After a time-out the screen comes back to Retail Mode (chapter 19).</li>
+<li><b>Find</b> is quicker with the big price book and easy to read: the list takes the width, <b>PG UP</b> / <b>PG DN</b> are on the right, and the search line says <i>Searching…</i> or how many it found. A <b>🏷️ Retail Mode</b> button on the order screen, Tables and Open checks goes back to the Retail screen (chapter 2).</li>
+<li><b>Find a Tablet…</b> on the End of shift screen makes a lost tablet beep and flash until someone finds it (chapter 14).</li>
+<li><b>Two serial scanners on one register</b> (one for products, one for IDs): ViewTouch listens on every USB-serial port by itself (chapters 2, 23 and 30).</li>
+<li><b>Store computers</b> (owner): <code>vt-share</code> file names say which computer they came from, <code>vt-touch-map --watch</code> notices a touchscreen that came back untied, and <code>vt-wipe-transactions --remove-gift-cards</code> (chapter 31).</li>
+</ul>
 
 <!-- ======================================================================= -->
 <h1>What's new since November 2, 2026</h1>
@@ -313,7 +328,7 @@
 <h2>Time off and shift swaps</h2>
 <p>On the Time Clock, after typing your PIN:</p>
 <ul>
-<li><b>Ask for Time Off…</b>: pick the day (up to four weeks out), a reason if you like, and <b>Ask</b>.</li>
+<li><b>Ask for Time Off…</b>: pick the day (the next four weeks are shown; <b>Another day…</b> picks one further off on the calendar), a reason if you like, and <b>Ask</b>.</li>
 <li><b>Give Away</b> next to one of your shifts: it shows up under <b>Up for grabs</b> on everyone else's Time Clock, where a coworker can <b>Take It</b>.</li>
 </ul>
 <p class="shot"><img src="shots/m115-up-for-grabs.png" width="560" height="315"></p>
@@ -323,7 +338,7 @@
 <p>When someone is within two hours of overtime (by the store's daily and weekly rules, Manager → Store), the Time Clock tells them how long they have left, clocking in says so, and the manager's Dashboard marks them in amber. Once they're in overtime it turns red.</p>
 
 <h2>Fixing a time punch</h2>
-<p>Someone forgot to clock out, or clocked in late by mistake? Go to <b>Manager → Schedule → Time Punches…</b>. Choose the punch (the last month's are there), fix <b>Clocked in</b>, <b>Clocked out</b>, the breaks or the job, write the <b>Reason for the change</b>, and <b>Save</b>. <b>+ Add</b> adds a punch someone missed; to remove one made by mistake, tick <b>Remove this punch</b>, give the reason, and Save.</p>
+<p>Someone forgot to clock out, or clocked in late by mistake? Go to <b>Manager → Schedule → Time Punches…</b>. Choose the punch (the last month's are there), fix <b>Clocked in</b>, <b>Clocked out</b> (both on the calendar, with the time; <b>Clear</b> on Clocked out means still clocked in), the breaks or the job, write the <b>Reason for the change</b>, and <b>Save</b>. <b>+ Add</b> adds a punch someone missed; to remove one made by mistake, tick <b>Remove this punch</b>, give the reason, and Save.</p>
 <p>Every change is kept: the <b>Labor</b> report marks changed punches with a * and lists what changed, who changed it and why.</p>
 <p>At <b>End of Day</b>, anyone still clocked in is listed (in red if it's been over 12 hours) with <b>Clock Out Now</b>.</p>
 <p class="shot"><img src="shots/m112-eod-clocked-in.png" width="560" height="315"></p>
@@ -332,6 +347,19 @@
 <p>On the login screen, touch <b>Time Clock &amp; My Schedule</b> and type your PIN. You see whether you're clocked in, your hours today, and your shifts for the next two weeks. Touch <b>Clock In</b>, <b>Start Break</b> / <b>End Break</b> or <b>Clock Out</b>. It never logs you in to the register, and goes back to the keypad by itself (or touch <b>Done</b>).</p>
 <p class="shot"><img src="shots/m111-time-clock.png" width="560" height="315"></p>
 <p>Want a screen just for this, like a tablet by the back door? In <b>Manager → Terminals</b>, choose that terminal and set <b>Screen</b> to <b>Time Clock</b>. It then always shows the Time Clock; <b>Log In to the Register…</b> at the bottom is for managers who need the rest.</p>
+
+<h2>Choosing a date: the calendar</h2>
+<p>A box that asks for a date shows the day in words, like <i>Tue, Sep 1, 2026</i>. Touch it and a calendar opens, not the keyboard. It says <b>Choose a date</b> (or <b>Choose a time</b>, <b>Choose a date and time</b>).</p>
+<ul>
+<li><b>The month:</b> the 12 month keys on the left.</li>
+<li><b>The day:</b> the month's days in the middle, weeks from Sunday. Today has a ring around it.</li>
+<li><b>The year:</b> on the right, with big <b>+</b> and <b>−</b>.</li>
+<li><b>A time:</b> hour keys 12 to 11, minute keys by 5 with <b>−1</b> / <b>+1</b>, and <b>AM</b> / <b>PM</b>.</li>
+<li><b>Today</b> (or <b>Now</b>, or <b>Current Date and Time</b>) jumps there. The red <b>Clear</b> empties the box, only where it may be empty. <b>Cancel</b> leaves it as it was. The green <b>OK</b> keeps your choice.</li>
+</ul>
+<p>The calendar is on every screen with dates: Reports → <b>Dates…</b> (From and To), ILSA History's From and to, Look Up Checks and Find a Check (<b>Since…</b>), the ILSA receipts (<b>Day…</b>), Time Punches, Promotions (<i>First day</i>, <i>Last day</i>, <i>From</i>, <i>Until</i>), a menu item's event date, Meal periods (<i>Starts at</i>), the Schedule (a shift's times and <b>Go to the day</b>), time off and reservations (<b>Another day…</b>) and the Menu Builder's price changes for later.</p>
+<!-- SHOT: the date calendar open over Reports > Dates… (From): month keys left, days middle, year + / − right, OK (page reports, DatePickerPopup) -->
+<div class="tip">The ID check's date of birth is still typed on its own keypad (MM DD YYYY): that's quicker than 40 taps on the year.</div>
 
 <h2>Discounts are a manager's</h2>
 <p>Only managers give discounts: <b>10% Off</b>, <b>Comp</b>, <b>Staff Meal</b> and custom ones. When a server, bartender or cashier touches one, the <b>Manager approval</b> pad asks for a manager's PIN. A staff meal is still recorded as the server's meal.</p>
@@ -427,13 +455,22 @@
 <li>An 11-digit code (a UPC-A without its last digit) finds the 12-digit item.</li>
 <li>A code with letters that is no coupon or gift card says <i>That code isn't a product barcode.</i> It is never offered as a new item and never shown on the screen (so a driver's license number isn't displayed).</li>
 </ul>
-<div class="tip">Owner: scanners on a USB-serial adapter work too, on any port and as many as there are ports (one for products and one for IDs, say): ViewTouch listens on every USB-serial port except a printer's. Their settings are in <b>Site Setup → Scanner</b>: <i>Serial scanner port</i> (Auto, Off or a port), <i>Speed (baud)</i>, a live test (<i>Test: scan anything with this screen showing</i>) and <b>Restart ViewTouch (new port or speed)</b>. USB scanners that type like a keyboard need no setup, including a second one just for IDs (chapter 23).</div>
+<div class="tip">Owner: scanners on a USB-serial adapter work too, on any port and as many as there are ports (one for products and one for IDs, say): ViewTouch listens on every USB-serial port except a printer's, and finds a scanner plugged in later by itself. A driver's license is known by what it says, whichever scanner reads it. Their settings are in <b>Site Setup → Scanner</b>: <i>Serial scanner port</i> (Auto, Off or a port), <i>Speed (baud)</i>, a live test (<i>Test: scan anything with this screen showing</i>) and <b>Restart ViewTouch (new port or speed)</b>. USB scanners that type like a keyboard need no setup, including a second one just for IDs (chapter 23).</div>
 
 <h2>Find an item by typing</h2>
 <p>Don't know where something is on the menu? Touch <b>Find</b> at the top of the order screen and type part of its name: <i>cob</i> finds Cobb, <i>bur</i> every burger. Every word you type must be somewhere in the name, in any order: <i>oliva mel</i> finds OLIVA V MELANIO. An item's own number or UPC comes first, then names that start with the first word, then the rest.</p>
-<p>The results are full-width bars, the name on the left and the price on the right, with big up and down buttons to page through them. Allergy warnings and SOLD OUT show on the bar. Touch a bar to order the item; the text clears for the next one.</p>
+<ul>
+<li><b>The search line</b> has a bright yellow border and a blinking cursor as soon as Find opens: just type, no need to touch it first. A keyboard plugged in types there too (its digits still ring item numbers and scans).</li>
+<li>At the right end of the line it says <i>Searching…</i>, then <i>12 matches</i>, <i>1 match</i> or <i>No match for …</i>.</li>
+<li><b>The results</b> take the width of the screen. Each row has the name in bold, under it the UPC and the item number, and the price on the right. About six rows show at a time.</li>
+<li><b>▲ PG UP</b> and <b>▼ PG DN</b> are on the right: each touch goes one page. The best 50 come first; <b>More…</b> under the last row shows the next 50.</li>
+<li>Allergy warnings and SOLD OUT show on the row. Touch a row to order the item; the text clears for the next one.</li>
+</ul>
+<p>Find is quick even with the 31,700-item price book, and so is a price check scan.</p>
+<p><b>Back to the Retail screen:</b> the order screen, Tables and Open checks have a <b>🏷️ Retail Mode</b> button (on the order screen, just above the check). One touch goes back to the Retail screen.</p>
 <p class="shot"><img src="shots/m100-find-item.png" width="560" height="315"></p>
-<!-- SHOT: Find with the word search and full-width result bars (page find-item) -->
+<!-- SHOT: Find with a few words typed: the yellow search line saying "12 matches", rows with name / UPC / price, PG UP / PG DN on the right (page find-item) -->
+<!-- SHOT: the order screen with the 🏷️ Retail Mode button above the check (page order-template) -->
 
 <h2>Sold by weight</h2>
 <p>Some things are sold by the pound, like the demo's <b>Smoked Brisket</b>. Touch it and the <b>Weigh</b> page asks how much: type the weight from the scale (<i>125</i> is 1.25 lb) and it shows the price as you type. Touch <b>Add</b>. The check says "Smoked Brisket 1.25 lb" with its price.</p>
@@ -475,6 +512,7 @@
 <li><b>My Bank…</b> is where you check out your cash at the end of the shift (chapter 10).</li>
 <li>Your <b>next shift</b> from the schedule is shown under your name.</li>
 <li><b>Labels…</b> opens the Labels screen to print shelf, price and cigar labels, on any screen, phones and tablets too. No manager is needed (chapter 26, Labels from any screen).</li>
+<li><b>Find a Tablet…</b> makes a tablet left lying around beep until it's found (chapter 14, Find a tablet). Anyone can use it.</li>
 </ul>
 
 <!-- ======================================================================= -->
@@ -501,7 +539,8 @@
 <li><b>A name before Send:</b> Store Settings → <i>Phone orders need a name before Send</i> stops a takeout without a name (or a delivery without an address) from going to the kitchen. Each person (Employees) and each screen (Terminals) can say otherwise; the screen's setting wins, then the person's, then the store's.</li>
 </ul>
 <p class="shot"><img src="shots/m124-same.jpg" width="560" height="315"></p></li>
-<li><b>Open Checks:</b> your open checks (and, for whoever takes payments, the kiosk's orders waiting at the counter); touch one to open it. <b>All Checks</b> shows everyone's: someone else's is dimmed with a 🔒, and opening it asks for a manager's PIN. Managers and cashiers can open anyone's; give anyone else that with Manager → Employees → <i>Open other people's checks</i>. A driver can open the deliveries they're carrying. On the Retail screen, <b>Reprint Receipt</b> opens Open checks too (mine / all); past receipts are under CASHIER DUTY → LOOK UP CHECKS (chapter 19).</li>
+<li><b>Open Checks:</b> your open checks (and, for whoever takes payments, the kiosk's orders waiting at the counter); touch one to open it. <b>All Checks</b> shows everyone's: someone else's is dimmed with a 🔒, and opening it asks for a manager's PIN. Managers and cashiers can open anyone's; give anyone else that with Manager → Employees → <i>Open other people's checks</i>. A driver can open the deliveries they're carrying. Past receipts are on the Retail screen's <b>Reprint Receipt</b> (Look Up Checks, chapter 19).</li>
+<li><b>🏷️ Retail Mode</b> (on Tables and Open checks) goes back to the Retail screen.</li>
 <li><b>Host Stand:</b> seating, table states, the waitlist and reservations (chapter 8).</li>
 </ul>
 <p class="shot"><img src="shots/m03-guest-count.png" width="480" height="270"></p>
@@ -514,6 +553,7 @@
 <p class="shot"><img src="shots/m04-menu-index.png" width="560" height="315"></p>
 <p class="caption">The order screen: the check on the left, the menu on the right, the order bar at the bottom.</p>
 <p>The tabs at the top switch between the <b>Breakfast</b>, <b>Lunch</b> and <b>Dinner</b> menus. The menu that fits the time of day opens by itself. Touch a category (Burgers, Salads, Drinks) to see its items, and touch an item to add it to the check.</p>
+<p>In a store with a Retail screen, <b>🏷️ Retail Mode</b> above the check goes back to it (not on phones).</p>
 <p class="shot"><img src="shots/m05-items.png" width="560" height="315"></p>
 <p class="caption">An item page. Touch an item to add it.</p>
 
@@ -782,7 +822,7 @@
 <li><b>Add to the waitlist:</b> name, phone, party size, a note. The quote (minutes) is worked out for you; change it with −5 / +5. Waits past the quote turn red.</li>
 <li><b>Table Ready: Notify</b> texts the guest (when texting is set up), or reminds you to tell them.</li>
 <li><b>Seat Them…</b> lists the free tables, the smallest that fits first. Pick the server and the table: the table's check opens for that server with the party size and name.</li>
-<li><b>Reservations:</b> book today or up to six days ahead. <b>They're Here</b> puts them at the front of the line; <b>No-Show</b> or <b>Cancel Booking</b> takes them off.</li>
+<li><b>Reservations:</b> book today or up to six days ahead, or touch <b>Another day…</b> for a day further off on the calendar. The time is picked on the time picker (chapter 2, Choosing a date). <b>They're Here</b> puts them at the front of the line; <b>No-Show</b> or <b>Cancel Booking</b> takes them off.</li>
 </ul>
 <p class="shot"><img src="shots/m75-host-seat.png" width="560" height="315"></p>
 <p class="caption">Seating a party of 4: 4-seat tables first, smaller ones dimmed.</p>
@@ -853,10 +893,26 @@
 <ol>
 <li>Touch <b>NO SALE</b> (on the Retail screen, on Cashier Duty, or on the Drawer page).</li>
 <li>It asks <b>Why open the drawer?</b> Touch a reason (to start: Make Change, Forgot to put cash in, Retrieved Item, Other). <b>Cancel</b> keeps the drawer shut.</li>
-<li>The drawer opens, and a slip prints on the drawer's printer: <b>****No Sale****</b>, the day's No Sale number, the drawer, who, why, the date and the time.</li>
+<li>The drawer opens, and a slip prints on the terminal's printer: <b>****No Sale****</b>, the day's No Sale number, the drawer, who, why, the date and the time.</li>
 </ol>
 <p>Managers: the reasons are in Store Settings → <b>Voids, comps, No Sale and Cancel Sale</b> → <i>Reasons for No Sale</i>. An empty list turns the question off. The Exceptions report has a <i>No sale: why</i> section.</p>
 <!-- SHOT: the Why open the drawer? reasons -->
+
+<h2>Which printer opens the drawer</h2>
+<p>A cash drawer is plugged into a receipt printer, and the printer opens it. ViewTouch opens a drawer only when both of these are right:</p>
+<ol>
+<li><b>Manager → Terminals</b> → the register → <i>Receipts (and cash drawer) print on</i>: the printer this register uses. Each printer in the list says <i>has cash drawer</i> or <i>no cash drawer</i>.</li>
+<li><b>Manager → Printers</b> → that printer → <i>Cash drawer is connected to this printer</i> is on. Under it, the printer lists the terminals that use it for receipts and the cash drawer.</li>
+</ol>
+<ul>
+<li>A terminal never opens another printer's drawer instead. If its own printer has no drawer, nothing opens.</li>
+<li>Then that screen shows a red printer alert: <i>No cash drawer on &lt;printer&gt; (Printers &gt; Cash drawer is Off) — the drawer was not opened.</i> It stays until it's fixed or the drawer opens. Store Check lists it too.</li>
+<li>No Sale is still recorded, and its slip still prints on the terminal's printer.</li>
+<li>In Terminals, when the chosen printer has no drawer, a note says <i>This printer has no cash drawer, so cash sales and No Sale won't open one.</i> Touch <b>This printer has the drawer</b> to turn its cash drawer on (it's saved and shows on the Changes report).</li>
+<li>Screens not listed in Terminals use the <i>Receipt</i> printer and its drawer, as before. Terminals with <i>Cash drawer: No cash drawer</i> (and server banks) don't open one at all.</li>
+</ul>
+<!-- SHOT: Manager > Terminals, the register open: "Receipts (and cash drawer) print on" with has cash drawer / no cash drawer, and the This printer has the drawer note (page admin-terminals) -->
+<div class="warn">Moving the register to a new printer (a USB one, say)? Turn on <i>Cash drawer is connected to this printer</i> for the new one, or the drawer won't open.</div>
 
 <h2>X Report: the day so far</h2>
 <p>An X report prints <b>X REPORT</b> on the receipt printer: today's Sales report and the Drawer report so far. Nothing resets; End of Day is still the Z. Anyone allowed to open the drawer can print it:</p>
@@ -961,7 +1017,7 @@
 </ul>
 <h3>New in this edition's Store Settings</h3>
 <ul>
-<li><b>The store:</b> <i>Gift card location</i> (chapter 7), <i>Store ZIP code (for weather)</i> (chapter 21) and <i>ILSA history store</i> (for example BHDAN; chapter 28).</li>
+<li><b>The store:</b> <i>Store address</i> (street, then city, state and ZIP, one per line) and <i>Store phone</i>, printed on the Time Clock report (chapter 12); <i>Gift card location</i> (chapter 7), <i>Store ZIP code (for weather)</i> (chapter 21) and <i>ILSA history store</i> (for example BHDAN; chapter 28).</li>
 <li><b>Receipts:</b> <i>Free choices on receipts</i>, <i>Voids and error corrects on receipts</i>, <i>Customer on receipts</i>, <i>Print a barcode on receipts</i>, <i>Check prefix</i> and <i>Reprint with date of birth: manager only</i> (below, and chapter 29).</li>
 <li><b>Privacy notice:</b> <i>Privacy notice on receipts</i>, <i>Short privacy notice (receipt and customer display)</i> and <i>Full privacy notice</i> (below).</li>
 <li><b>Age-restricted sales:</b> <i>Minimum age for alcohol</i> and <i>Minimum age for tobacco</i> (21 to start; chapter 23).</li>
@@ -985,14 +1041,16 @@
 <ul>
 <li><b>Taxes</b> also sets <b>Cash rounding</b> where pennies are gone: a check paid in cash is rounded to the nearest 5 (or 10) cents and shows a <i>Cash rounding</i> line; cards stay exact.</li>
 <li><b>Payment types</b>: a discount can be a <b>Staff meal</b> (the demo has <i>Staff Meal</i>, 50%). Ring your meal, touch Staff Meal on the payment screen, and it records who ate; the Sales report counts staff meals.</li>
-<li><b>Printers</b>: network (TCP 9100, ESC/POS), CUPS, or a text file for testing; label printers too (Format: ZPL or TSPL, and the label size). After saving a printer, touch <b>Test Print</b>: it prints your logo, text in each size, a sample item and total, and a row of digits that should exactly fill one line (if it wraps or falls short, change <b>Characters per line</b>), then cuts the paper. With a drawer wired to the printer, <b>Test Print + Open Drawer</b> also opens it. A message says when the printer took the page, or why it didn't.</li>
+<li><b>Printers</b>: network (TCP 9100, ESC/POS), CUPS, or a text file for testing; label printers too (Format: ZPL or TSPL, and the label size). After saving a printer, touch <b>Test Print</b>: it prints your logo, text in each size, a sample item and total, and a row of digits that should exactly fill one line (if it wraps or falls short, change <b>Characters per line</b>), then cuts the paper. With a drawer wired to the printer, <b>Test Print + Open Drawer</b> also opens it. A message says when the printer took the page, or why it didn't.
+<br>A <b>USB receipt printer</b> on the store's Pi is a <i>Text file</i> printer: <i>File or queue</i> <code>/dev/usb/lp0</code>, <i>Format</i> ESC/POS (chapter 21).
+<br><i>Cash drawer is connected to this printer</i>: turn it on only for the printer the drawer's cable is plugged into. Under it the printer lists the terminals that use it (chapter 10, Which printer opens the drawer).</li>
 <li><b>86'd items come back the next day</b> (on unless turned off): an item marked sold out during service (on the order screen or the sold-out list) is back after End of Day. Marked sold out in the Menu Builder, it stays so until changed there (for something out of season).</li>
 <li><b>Cards when the internet is down</b> (Store Settings, off until turned on; Stripe readers running ViewTouch only): with <b>Take cards when the internet is down</b>, the reader keeps a card it can't send and sends it to Stripe when the internet is back, up to the amount a card and the amount waiting in all that you set. The check shows it as taken offline; it can't be refunded until Stripe has it. The bank only sees it then: if it's declined, the store doesn't get that money, and managers see a red alert with the check and the amount until they touch OK. A reader beside the register driven by this computer (not running ViewTouch) can't take cards offline: Stripe needs the internet for those.</li>
 <li><b>Receipts while the internet is down:</b> a printed receipt prints as usual, with <i>Approval pending (taken offline)</i> under the card (once it's declined: <i>Declined once sent: not paid</i>), so the guest can leave. An <b>emailed</b> receipt is kept with the check and Stripe sends it as soon as every card on the check has reached Stripe (and, with the internet down, it's tried again every couple of minutes until it goes). A <b>texted</b> receipt or message that can't go out waits and is tried again every minute, for up to a day.</li>
 <li><b>Updating the tablets</b>: Manager → Network shows the build each screen runs and which need an update. Copy the new tablet app (<i>ViewTouch-b…-arm64-v8a.apk</i>) into the <i>updates</i> folder it names on the store's computer; then, on a tablet that's behind, a manager touches <b>Update Now</b> on the strip at the bottom, and Android asks to install it (the first time, allow ViewTouch to install apps, then <b>Install</b>).</li>
 <li><b>Allergies</b>: on the order screen, Check… → <b>Allergy…</b>, touch what the guest is allergic to. Items that contain it get a red border and a ⚠ label on the menu, adding one warns, and the kitchen ticket starts with <b>!! ALLERGY !!</b> and marks each item that has it (<b>!! CONTAINS EGG</b>); the kitchen screen shows the same in red. On the kiosk, each dish says what it contains, guests can touch <b>Allergies</b> to hide dishes with what they avoid, and the kitchen sees that as an allergy too.</li>
 <li><b>Terminals → Start orders on</b>: a category orders opened on that screen start on (the bar's: Drinks); <b>‹ Menu</b> still shows the meal's categories.</li>
-<li><b>Terminals</b>: each screen's receipt printer, cash drawer and screen layout (standard, phone, <b>Self-order kiosk</b>, <b>Time Clock</b>, or <b>Billboard</b>: a TV showing the guest-screen pictures and videos, with no sales; chapter 25), its <b>Customer display</b> (chapter 6), and <b>Pair a Device</b>.</li>
+<li><b>Terminals</b>: each screen's receipt printer (<i>Receipts (and cash drawer) print on</i>; each printer says <i>has cash drawer</i> or <i>no cash drawer</i>, chapter 10), its cash drawer and screen layout (standard, phone, <b>Self-order kiosk</b>, <b>Time Clock</b>, or <b>Billboard</b>: a TV showing the guest-screen pictures and videos, with no sales; chapter 25), its <b>Customer display</b> (chapter 6), and <b>Pair a Device</b>.</li>
 </ul>
 
 <h3>What receipts show</h3>
@@ -1022,6 +1080,7 @@
 <ol>
 <li>ViewTouch tries a ticket twice.</li>
 <li>Then it keeps the ticket (up to 50 for each printer) and stops sending it by itself.</li>
+<li>A USB printer gets up to a minute to take a ticket (an older printer can be slow on the logo), and only one ticket at a time: while it is still taking one, the next waits for Reprint (<i>the printer is still taking the last ticket</i>).</li>
 <li>Every screen, tablets too, shows <i>Printer &lt;name&gt;: not printing (error at the printer). Fix it, then Reprint.</i> with a <b>Reprint</b> button. Fix the printer, then touch <b>Reprint</b>.</li>
 </ol>
 <p>Manager → Network says <i>Not printing (error at the printer): tickets wait for Reprint</i>, and Store Check lists it. Kept tickets are lost if ViewTouch restarts; reprint them from Look Up Checks then.</p>
@@ -1029,7 +1088,7 @@
 <h3>Receipts on handhelds</h3>
 <p>A handheld has no printer of its own. Its receipts print on a printer on the store's network:</p>
 <ul>
-<li><b>Which printer:</b> Manager → Terminals → the handheld → <b>Receipts and cash drawer on</b>. Pick one printer, or <b>Ask each time</b>: then <b>Print Receipt</b> shows the printers to choose from (the bar, the host stand…), so the server prints wherever they're standing. Only printers with <b>Prints receipts</b> on (Manager → Printers) are offered; the kitchen's aren't.</li>
+<li><b>Which printer:</b> Manager → Terminals → the handheld → <b>Receipts (and cash drawer) print on</b>. Pick one printer, or <b>Ask each time</b>: then <b>Print Receipt</b> shows the printers to choose from (the bar, the host stand…), so the server prints wherever they're standing. Only printers with <b>Prints receipts</b> on (Manager → Printers) are offered; the kitchen's aren't.</li>
 <li><b>After a check is paid</b> (Manager → Terminals): <i>Nothing</i> (touch Print Receipt when the guest wants one), <i>Print a receipt</i> (every time, by itself), or <i>Ask</i>: Print / Email / No Receipt comes up as the check closes.</li>
 <li><b>Email:</b> for a card taken on a Stripe reader, type the guest's email (or let them type it) and touch <b>Email</b>. Stripe sends its receipt for the card payment; no email server is needed. A customer's email on file is filled in, and one typed for a customer without one is saved. Stripe only sends these with a live key, not in test mode. Cash and typed-in cards can only be printed.</li>
 <li><b>A copy later:</b> Find a Check → the check → <b>Reprint Receipt</b>. On a handheld set to Ask each time, it asks where.</li>
@@ -1037,7 +1096,7 @@
 
 <h2>Meal periods</h2>
 <p class="shot"><img src="shots/m39-meal-periods.png" width="480" height="270"></p>
-<p>When breakfast, lunch and dinner start. Each runs until the next one begins.</p>
+<p>When breakfast, lunch and dinner start (<i>Starts at</i>, on the time picker). Each runs until the next one begins.</p>
 
 <h2>Inventory</h2>
 <p class="shot"><img src="shots/m40-inventory.png" width="560" height="315"></p>
@@ -1073,7 +1132,7 @@
 </ul>
 <h2>Store Check</h2>
 <p><b>Manager → Store Check</b> answers "are we ready to open?": every printer answering (and none <i>not printing</i>, above), a backup in the last day, room on the disk, the standby computer, the clock (not behind the last sale, which a dead clock battery causes), the cash drawers started and the opening checklist. Each line is ✓ or ⚠, and the top says <b>Ready to open</b> or how many to look at.</p>
-<p>It also notes what keeps the store safe and within the law, without holding up opening: sample staff still on (their PINs are in this manual for anyone to read), the store's state not chosen, backups not encrypted (set a backup password), a full Stripe secret key where a restricted one (<i>rk_…</i>, only Terminal and refunds) would do, and meal breaks past due.</p>
+<p>It also notes what keeps the store safe and within the law, without holding up opening: sample staff still on (their PINs are in this manual for anyone to read), the store's state not chosen, backups not encrypted (set a backup password), a full Stripe secret key where a restricted one (<i>rk_…</i>, only Terminal and refunds) would do, and meal breaks past due. <i>Cash drawer printers</i> lists drawers that won't open (the terminal's printer has no cash drawer, or isn't set up), and <i>Screens not in Terminals</i> lists screens that use the Receipt printer because Terminals has no line for them (chapter 10).</p>
 <p class="shot"><img src="shots/m144-store-check.jpg" width="560" height="315"></p>
 <p>Beside it, <b>Problems, the last 7 days</b>: things that went wrong while nobody was looking. A printer out of paper or not answering, a save to the database or a backup that failed, the standby computer losing touch, and ViewTouch having closed without being told to (a crash, or the power went off). New ones are marked, and the Manager page's button says how many (<b>Store Check ⚠ 2</b>); <b>Mark as seen</b> clears that.</p>
 
@@ -1081,7 +1140,7 @@
 <p class="shot"><img src="shots/m41-promotions.png" width="560" height="315"></p>
 <ul>
 <li>Percent off chosen categories or items, or "buy N, get M at percent off".</li>
-<li>Set the days (Mon-Fri, Tue, Sat, Sun) and the hours.</li>
+<li>Set the days (Mon-Fri, Tue, Sat, Sun) and the hours. <i>First day</i> and <i>Last day</i> are picked on the calendar (Clear: from now, or no end), <i>From</i> and <i>Until</i> on the time picker.</li>
 <li>They apply by themselves while they run. Demo: Happy Hour (weekdays 3-6 PM, half-price draft beer and wine) and Burger Tuesday (second burger half off).</li>
 </ul>
 
@@ -1100,7 +1159,7 @@
 <h2>Schedule</h2>
 <p class="shot"><img src="shots/m42-schedule.png" width="560" height="315"></p>
 <ul>
-<li>A week at a time (‹ ›). Touch a day, pick the person and the times, and touch <b>Add Shift</b>. A shift that ends before it starts runs past midnight.</li>
+<li>A week at a time (‹ ›), or <b>Go to the day</b> to pick a day on the calendar (two weeks back to eight ahead). Touch a day, pick the person and the times (on the time picker), and touch <b>Add Shift</b>. A shift that ends before it starts runs past midnight.</li>
 <li>Touch a shift to remove it, or <b>Clock Them In</b>.</li>
 <li>Each person's hours for the week are listed below, in red over the overtime line.</li>
 </ul>
@@ -1115,7 +1174,7 @@
 <p class="caption">Find a Check: every check from the last year.</p>
 <p><b>Find a Check…</b> (Manager, or <i>Find an Older Check…</i> on the Reopen page) finds any check ever closed. Every check is kept forever, through End of Day, for as long as the store runs: nothing is ever thrown away.</p>
 <ul>
-<li><b>How far back:</b> Today, Week, Month, Year, 2 Years, 5 Years, 50 Years or All.</li>
+<li><b>How far back:</b> Today, Week, Month, Year, 2 Years, 5 Years, 50 Years or All, or <b>Since…</b>: pick a day on the calendar, and the checks since then show (that day too).</li>
 <li><b>Search:</b> a check number (<code>#123</code>), an amount (<code>17.62</code>), or part of a name, phone number, table, server, item or gift card number. <b>Show All</b> lists every check in that range instead, newest first; <b>Older ›</b> and <b>‹ Newer</b> go through them a page at a time.</li>
 <li>Touch one to see its items, payments, any refunds, and its <b>History</b>: everything that happened to it, when and by whom (sent, voids, discounts, approvals, payments, reopened, refunds). That's the audit trail. Each line says who rang it and each payment who took it (chapter 5). <b>Reprint Receipt</b> prints a copy.</li>
 <li><b>Scan a receipt's barcode</b> here (or type its reference in the search) and the check opens, from any day (chapter 29).</li>
@@ -1150,6 +1209,7 @@
 <tr><td>X Report</td><td>Today so far (Sales and Drawer) on the receipt printer; nothing resets (chapter 10).</td></tr>
 <tr><td>Tips</td><td>Card tips, gratuity, tip-outs, pool shares, paid and owed.</td></tr>
 <tr><td>Labor</td><td>Clock in/out, breaks, hours today and this week, regular hours, overtime and double time by the store's state law, late or missed meal breaks, and <b>labor cost</b>: each person's pay, overtime at time and a half, double time at double, and <b>labor % of sales</b>.</td></tr>
+<tr><td>Time Clock</td><td>Each person's punches with their hours, for payroll, laid out like the old ILSA Time Clock report (below).</td></tr>
 <tr><td>Drawer</td><td>Each bank or drawer: start, cash, pay outs, expected, counted, over/short.</td></tr>
 <tr><td>Expenses</td><td>Cash paid out for expenses, by category (produce, ice, repairs…), then each one with who and why.</td></tr>
 <tr><td>Audit</td><td>Every void, discount, reopen, transfer, move and merge, with who and when.</td></tr>
@@ -1168,6 +1228,13 @@
 <p class="caption">Forecast: Wednesday from the last four Wednesdays.</p>
 <h2>Periods and last year</h2>
 <p><b>Day</b> shows one business day (◀ ▶ for earlier days). <b>This Week</b>, <b>Last Week</b>, <b>This Month</b>, <b>Last Month</b>, <b>This Year</b> and <b>Dates…</b> cover a range. <b>vs Last Year</b> adds the same days a year before and the change.</p>
+<h3>Your own days: Dates…</h3>
+<ul>
+<li>Touch <b>Dates…</b>. <b>From</b> and <b>to</b> start on the days just shown (Last Month's, say), or this month so far, and the calendar opens for From at once (chapter 2, Choosing a date).</li>
+<li>Pick a day and touch <b>OK</b>: the report shows those days right away.</li>
+<li>While the boxes and the report don't agree, the heading says <i>Choose the days, then Show</i>, and no old report is shown. Touch <b>Show</b>.</li>
+</ul>
+<!-- SHOT: Reports > Dates… with the big From / to boxes showing the days in words, the heading in step with them (page reports) -->
 <p class="shot"><img src="shots/m47-report-month-vs-last-year.png" width="560" height="315"></p>
 <p class="caption">Items last month against the same month a year before.</p>
 <table cellpadding="4"><tr>
@@ -1202,6 +1269,26 @@
 <p class="caption">The Changes report.</p>
 <p><b>Print</b> prints a report on the receipt printer. <b>CSV</b> (for spreadsheets) and <b>PDF</b> save it to the <code>exports</code> folder.</p>
 
+<h2>Time Clock report (payroll)</h2>
+<p><b>Manager → Reports → Time Clock</b>, next to Labor. It is laid out like the old ILSA <i>Time Clock Report</i>.</p>
+<ol>
+<li>It opens on <b>Last Week</b>: the pay week (Store Settings → <i>Pay week starts on</i>). <b>Day</b> is today; <b>Dates…</b> picks other days on the calendar.</li>
+<li><b>Employee</b>: <i>All employees</i>, or one person.</li>
+<li><b>Print</b> prints it on the receipt paper, over any days. <b>PDF</b> and <b>CSV</b> save it (the PDF is a full page, sideways).</li>
+</ol>
+<p>What it shows:</p>
+<ul>
+<li>At the top: <i>Time Clock Report</i>, the days (<i>11/01/2026 12:00AM thru …</i>), the store's name, address and phone, and when it was printed. The address and phone come from Store Settings → The store → <i>Store address</i> and <i>Store phone</i>; when both are empty, the receipt header's lines are used.</li>
+<li>For each person (employee number and name): one line for each time they clocked in, with the <b>Begin</b> and <b>End</b> date and time, the <b>Hours &amp; Minutes</b> (HH:MM) and the <b>Total Hours</b> as a decimal (3.12). Then a <b>Total</b> for the person, and at the end the <b>Grand Total Hours</b>.</li>
+<li>On paper each punch takes two lines: <i>In</i>, then <i>Out</i> with the hours.</li>
+<li><b>Rounding:</b> each punch is rounded to the nearest minute, as ILSA did. 8:06:37 am to 11:13:22 am is 3 hours 6 minutes 45 seconds, so it shows <i>03:07</i> and <i>3.12</i>. The totals add the minutes, then turn them into hours.</li>
+<li><b>Breaks:</b> paid time, the same as the Labor report. An unpaid break is listed under its punch and taken off; a paid one is listed and counted.</li>
+<li><b>Still clocked in:</b> shows as <i>(still clocked in)</i> and is <b>not</b> in the totals, since it has no end yet. A note at the bottom says so. Clock them out, or fix the punch in Manager → Time Punches, then print again.</li>
+<li><b>*edited</b> marks a punch a manager changed. Who changed it and why are on the Labor report.</li>
+</ul>
+<!-- SHOT: Reports > Time Clock, Last Week, All employees: store heading, one employee's punches with Begin / End / Hours & Minutes / Total Hours, Total and Grand Total Hours (page reports, report timeclock) -->
+<div class="tip">Before running payroll, make sure nobody is still clocked in for the week: those hours aren't counted until the punch has an end.</div>
+
 <h2>End of Day</h2>
 <p class="shot"><img src="shots/m45-end-of-day.png" width="480" height="270"></p>
 <ul>
@@ -1234,7 +1321,7 @@
 <div class="tip">Template pages share buttons: the order bar is on one template page, and every menu page uses it. Change it once and it changes everywhere.</div>
 
 <h2>When ViewTouch adds a button to your edited pages</h2>
-<p>Once a store has edited a page, a newer ViewTouch doesn't change it. A few new buttons are the exception: they're added once to the store's edited copy (Hardware Configuration's new buttons, Store Settings → <b>Billboards…</b>, Reports → <b>ILSA History</b>). If the store deletes one, it stays deleted. On the Retail page, the <b>CASHIER DUTY</b> and <b>Reprint Receipt</b> buttons' jumps, the blank decimal key and the bigger digits are also put in once, only where they're still as they came. Any other change to the starter pages doesn't reach a page the store has edited: make it yourself in the editor.</p>
+<p>Once a store has edited a page, a newer ViewTouch doesn't change it. A few new buttons are the exception: they're added once to the store's edited copy (Hardware Configuration's new buttons, Store Settings → <b>Billboards…</b>, Reports → <b>ILSA History</b>, End of shift → <b>Find a Tablet…</b>, and <b>🏷️ Retail Mode</b> on the order screen, Tables and Open checks). If the store deletes one, it stays deleted. A Retail Mode button is never put over something the store placed there: then add it in the editor. On the Retail page, the <b>CASHIER DUTY</b> and <b>Reprint Receipt</b> buttons' jumps (Reprint Receipt to Look Up Checks), the blank decimal key, the bigger digits, the new right column with <b>MISC FOOD/BEV</b>, <b>MISC MDSE</b> and <b>VOID ITEM</b> / <b>RESTORE ITEM</b> are also put in once, only where they're still as they came. Any other change to the starter pages doesn't reach a page the store has edited: make it yourself in the editor.</p>
 
 <h2>The Customer Display page</h2>
 <p>The guest screen is a page you can edit too: <b>Edit Pages → Customer Display</b> (managers). Its parts are the guest header, a picture or video panel (between guests), the order (during a sale) and the turning messages. On the right: the picture's <i>Fit</i> and <i>Size %</i> (under 100% always shows the whole picture), a line above each message and the seconds each shows, the rewards box and asking for an email, and the header's color. Buttons placed there don't do anything. Leaving the editor while on Customer Display brings the register back to its own pages. See chapter 24, The guest screen.</p>
@@ -1354,6 +1441,21 @@
 <li>It closes as soon as it reads the code, or with <b>Cancel</b>. It gives up after 20 seconds for a product, 30 for an ID.</li>
 </ul>
 <!-- SHOT: the tablet camera window with the red guide line (Retail 📷 SCAN) -->
+
+<h2>Find a tablet</h2>
+<p>A tablet left lying around somewhere? Make it beep.</p>
+<ol>
+<li>On any screen: <b>Log Out</b> → <b>Find a Tablet…</b> (phones too). Anyone can use it.</li>
+<li>The list shows the store's tablets, each <i>Connected</i> or <i>Not connected · last seen …</i>.</li>
+<li>Touch <b>Find</b> next to the tablet. It beeps loudly (at full alarm volume, put back after), its screen wakes and flashes <b>Here I am — tap to stop</b>, with the name of the screen looking for it.</li>
+<li>It stops when someone taps the tablet, when you touch <b>Stop</b>, or after about 2 minutes.</li>
+</ol>
+<ul>
+<li><i>&lt;tablet&gt; is not connected — it may be off, asleep with Wi-Fi off, or out of battery.</i> A tablet whose screen was turned off with its power button can't beep until it's woken.</li>
+<li><i>Last seen</i> starts over when ViewTouch restarts on the store's computer.</li>
+</ul>
+<!-- SHOT: the Find a Tablet page with two tablets, one Connected with Find, one Not connected · last seen (page find-tablet) -->
+<!-- SHOT: a tablet showing the flashing "Here I am — tap to stop" (on a tablet, FindMeOverlay; not a page) -->
 
 <h2>A big price book on a tablet</h2>
 <p>Tablets don't get the whole retail price book. Find, Item Look Up and Labels ask the main computer, and a scan on a tablet is looked up on the main computer, so they stay quick with 30,000 items.</p>
@@ -1488,7 +1590,7 @@
 <h2>The Retail screen</h2>
 <p>Registers set up for counter sales open straight on the <b>Retail POS Entry</b> screen. It is made for quick cigar, cigarette and convenience checkout: scan or type a UPC or PLU on the keypad in the middle, and the item goes on the sale. To make a register start there, set Manager → Terminals → the register → <i>Start screen</i>.</p>
 <!-- SHOT: the Retail POS Entry screen with a sale on it (page retail-entry) -->
-<div class="tip"><b>Retail and Hospitality:</b> <b>🍽️ Hospitality Mode</b> goes to the restaurant and bar screens with one touch; Find a Check's <b>🏷️ Retail Mode</b> comes back.</div>
+<div class="tip"><b>Retail and Hospitality:</b> <b>🍽️ Hospitality Mode</b> goes to the restaurant and bar screens with one touch. <b>🏷️ Retail Mode</b> comes back: it is on the order screen (above the check), Tables, Open checks and Find a Check.</div>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>Button</th><th>What it does</th></tr>
 <tr><td><b>📷 SCAN</b></td><td>Scans with the tablet's camera (chapter 14). On the Pi it says to use the handheld scanner.</td></tr>
@@ -1501,14 +1603,16 @@
 <tr><td><b>ITEM RETURN</b></td><td>Opens <b>Find a Check</b>: find the sale, then a manager uses <b>Refund…</b> (chapter 11). Scanning the receipt's barcode opens the check too (chapter 29).</td></tr>
 <tr><td><b>NO SALE</b></td><td>Asks why, opens the drawer and prints a slip (chapter 10).</td></tr>
 <tr><td><b>CASHIER DUTY</b></td><td>The Cashier Duty screen (below).</td></tr>
-<tr><td><b>Reprint Receipt</b></td><td>Opens Open checks (mine / all). Past receipts are under CASHIER DUTY → LOOK UP CHECKS.</td></tr>
+<tr><td><b>Reprint Receipt</b></td><td>Opens <b>Look Up Checks</b>, the same as CASHIER DUTY → LOOK UP CHECKS (below). <b>Cancel</b> there comes back to the Retail screen.</td></tr>
 <tr><td><b>Gift Cards</b></td><td>The Gift Card screen (chapter 7).</td></tr>
 <tr><td><b>Lighter Refill</b>, <b>EMPTY BOX</b></td><td>Ring in the menu items with those names (they must be on the menu).</td></tr>
 <tr><td><b>MISC MDSE</b>, <b>MISC FOOD/BEV</b></td><td>Open departments: type the amount on the keypad, then the key. It rings in <i>Misc Merchandise</i> (Merchandise tax) or <i>Misc Food/Bev</i> (Food tax, the meals rate). The rates are in Store Settings → Taxes; with no Food tax set, MISC FOOD/BEV uses the Merchandise rate. The departments are made the first time they are used.</td></tr>
-<tr><td><b>SUSPEND</b> / <b>RESUME</b></td><td>Put the sale aside and bring it back (at the top of the right column, over CLEAR and SUB TOTAL).</td></tr>
+<tr><td><b>SUSPEND</b> / <b>RESUME</b></td><td>Put the sale aside and bring it back.</td></tr>
+<tr><td><b>CLEAR</b></td><td>Clears what was typed on the keypad.</td></tr>
 <tr><td><b>SUB TOTAL (PAY)</b></td><td>Goes to Pay (chapter 6).</td></tr>
 </table>
-<p>The keypad's decimal key is blank, and the number keys are big. Staff clock in and out on the login screen's Time Clock. After a time-out the screen logs back in to Retail Mode with the sale still on it; a terminal's Start screen (Manager → Terminals, which can be the Retail screen) comes first. Scanning an ID-check item (tobacco, or alcohol when that's on) asks for the buyer's ID first (chapter 23, ID checks for age-restricted sales).</p>
+<p><b>The right column</b> is SUSPEND, RESUME, CLEAR and SUB TOTAL (PAY), each one key tall, beside the 7-8-9, 4-5-6, 1-2-3 and 0-00 rows. MISC FOOD/BEV is in the top row, next to MISC MDSE.</p>
+<p>The keypad's decimal key is blank, and the number keys are big. Staff clock in and out on the login screen's Time Clock (the Retail screen has no TIME CLOCK key; CASHIER DUTY has one). After a time-out or a login, a screen that was in Retail Mode comes back to the Retail screen with the sale still on it, not to the order screen; a terminal's Start screen (Manager → Terminals, where the Retail screen is in the list) comes first. A quick retail sale stays on the Retail screen. (Which mode a screen was in is forgotten when ViewTouch restarts.) Scanning an ID-check item (tobacco, or alcohol when that's on) asks for the buyer's ID first (chapter 23, ID checks for age-restricted sales).</p>
 
 <h2>Cashier Duty</h2>
 <p><b>CASHIER DUTY</b> on the Retail screen opens a page of the cashier's tasks:</p>
@@ -1525,9 +1629,10 @@
 
 <h2>Look Up Checks: past receipts</h2>
 <ul>
-<li>The receipts are on the right: <b>Today</b>, <b>Week</b>, <b>Month</b>, <b>Year</b> or <b>All</b>, with <b>‹ Newer</b> / <b>Older ›</b> and up and down.</li>
+<li>Open it from the Retail screen's <b>Reprint Receipt</b>, or CASHIER DUTY → <b>LOOK UP CHECKS</b>.</li>
+<li>The receipts are on the right: <b>Today</b>, <b>Week</b>, <b>Month</b>, <b>Year</b> or <b>All</b>, or <b>Since…</b> to pick a day on the calendar, with <b>‹ Newer</b> / <b>Older ›</b> and up and down.</li>
 <li>Touch one: the receipt shows on the left as it printed.</li>
-<li><b>Reprint…</b> asks which copy: customer copy, gift receipt, or with the date of birth (chapter 5). <b>Cancel</b> leaves.</li>
+<li><b>Reprint…</b> asks which copy: customer copy, gift receipt, or with the date of birth (chapter 5). Look Up Checks stays open after a reprint. <b>Cancel</b> goes back where you came from: the Retail screen, or Cashier Duty.</li>
 <li><b>ILSA history</b> opens the old ILSA receipts (chapter 28, ILSA sales history).</li>
 </ul>
 <!-- SHOT: Look Up Checks with a receipt shown (page receipt-lookup) -->
@@ -1537,11 +1642,11 @@
 <ul>
 <li>Type part of a name, or scan or type a UPC, in the search box at the top. <b>Clear</b> empties it.</li>
 <li>Or go down the tree: department group › department › brand › product group › sub group, each with how many items. <b>Show all N items here</b> lists every item at the level you're on.</li>
-<li>The items show with their prices and UPCs; the big <b>▲</b> and <b>▼</b> page through them. Touch an item to ring it in.</li>
+<li>The items show with their prices and UPCs; <b>▲ PG UP</b> and <b>▼ PG DN</b> on the right page through them, as on Find. Touch an item to ring it in.</li>
 <li><b>‹ Back</b> or <b>✕ Close</b> goes back to the sale.</li>
 </ul>
 <!-- SHOT: Item Look Up, partway down the tree (page item-lookup) -->
-<div class="tip">A store whose Retail page was changed in the page editor may still have the old buttons. In edit mode, set <b>ALPHA LOOK UP</b> to <i>Jump to page</i> → <b>Item Look Up</b>, and <b>ITEM RETURN</b> to <i>Jump to page</i> → <b>Find a Check</b> (chapter 13).</div>
+<div class="tip">A store whose Retail page was changed in the page editor may still have the old buttons. In edit mode, set <b>ALPHA LOOK UP</b> to <i>Jump to page</i> → <b>Item Look Up</b>, <b>ITEM RETURN</b> to <i>Jump to page</i> → <b>Find a Check</b>, and <b>Reprint Receipt</b> to <i>Jump to page</i> → <b>Look Up Checks</b> (chapter 13).</div>
 
 <h2>Price check</h2>
 <ol>
@@ -1551,7 +1656,7 @@
 </ol>
 
 <h2>Error correct: VOID ITEM, RESTORE ITEM</h2>
-<p>Touch the item on the check (it lights up with a yellow ring), then <b>VOID ITEM</b>. With nothing touched it says <i>Touch the item on the check first</i> and takes nothing off. The item must not have been sent. It is an error correct: no manager, nothing goes to the kitchen. The cashier's screen shows it struck through with <b>ERR CORR</b>, the customer's receipt leaves it off, and the Exceptions and Audit reports list it. A line already sent is voided as usual (a manager).</p>
+<p>Touch the item on the check (only that one lights up, with a yellow ring), then <b>VOID ITEM</b>. With nothing touched it says <i>Touch the item on the check first</i> and takes nothing off. The item must not have been sent. It is an error correct: no manager, nothing goes to the kitchen. The cashier's screen shows it struck through with <b>ERR CORR</b>, the customer's receipt leaves it off, and the Exceptions and Audit reports list it. A line already sent is voided as usual (a manager).</p>
 <p>Touch a struck-through item and the key says <b>RESTORE ITEM</b>: it puts the item back as it was, while the sale is open and unpaid. The check's history shows both; a void that was restored is not an exception (Exceptions report, exception tickets). Voided again, it counts again.</p>
 
 <h2>Cancel Sale</h2>
@@ -1665,7 +1770,7 @@
 </tr></table>
 
 <!-- ======================================================================= -->
-<h1>21. Custom Hardware, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</h1>
+<h1>21. Custom Hardware, USB Receipt Printer, Top Status Ribbon, DIRECTV &amp; Tablet Fleet</h1>
 
 <h2>Top Status &amp; Live ZIP Weather Ribbon</h2>
 <p>A status bar can run across the top of every screen with the <b>Store Name</b>, <b>Live Local Weather &amp; Temperature</b>, the <b>Customer count</b>, <b>Wi-Fi Signal Strength</b>, <b>Tablet Battery %</b> and the <b>12-Hour Clock</b>. It has its own section, <b>Manager → Store Settings → Top status ribbon</b>:</p>
@@ -1682,6 +1787,22 @@
 <li><b>Free Modifiers Printed:</b> Zero-priced modifier choices (such as cooking temperatures, side choices, or ice/garnish instructions) print on the guest receipt, unless Store Settings → Receipts → <i>Free choices on receipts</i> is turned off (chapter 11).</li>
 <li><b>Compact Font B Sub-Lines &amp; Timestamps:</b> Indented modifier sub-lines, the UPC above each item, the short privacy notice, and the <code>Opened &lt;time&gt; - closed &lt;time&gt;</code> check footer automatically switch the Epson printer to <b>Font B</b> (9×17 dots, 56 characters per line vs. 42 characters in Font A) so item descriptions and right-aligned prices stay visually distinct.</li>
 </ul>
+
+<h2>A USB receipt printer on the store's Pi (owner)</h2>
+<p>A receipt printer can plug straight into the Pi's USB. The <b>Rongta RP850</b> (USB, serial and network built in; ESC/POS) prints ViewTouch's whole receipt over USB: the logo, the barcode and the privacy notice.</p>
+<ol>
+<li>Plug the printer into the Pi's USB. It shows up as <code>/dev/usb/lp0</code> (a second one is <code>/dev/usb/lp1</code>).</li>
+<li><b>Manager → Printers → + Add</b>: <i>Connection</i> <b>Text file</b>, <i>File or queue</i> <code>/dev/usb/lp0</code>, <i>Format</i> <b>ESC/POS (thermal)</b>.</li>
+<li><i>Characters per line</i>: <b>48</b> for the RP850 on 80 mm paper. Touch <b>Test Print</b>: the row of digits should exactly fill one line.</li>
+<li>Turn on <i>Cut paper after each ticket</i> and, if the drawer's cable is plugged into this printer, <i>Cash drawer is connected to this printer</i>.</li>
+<li><b>Manager → Terminals</b> → the register → <i>Receipts (and cash drawer) print on</i>: this printer (chapter 10, Which printer opens the drawer).</li>
+</ol>
+<ul>
+<li><b>Fonts:</b> items and totals print in the printer's regular font (Font A, 48 to a line). The UPC above each item, choices, the privacy notice and the <i>Opened … closed …</i> line print in the small font (Font B, about a third more to a line).</li>
+<li>A USB printer gets up to a minute to take each ticket, one ticket at a time. One in error shows the red <i>not printing</i> banner with <b>Reprint</b> (chapter 11, When a printer needs someone).</li>
+</ul>
+<!-- SHOT: Manager > Printers with the USB receipt printer open: Text file, /dev/usb/lp0, ESC/POS, 48 characters, Cash drawer is connected to this printer, the terminals using it (page admin-printers) -->
+<div class="warn">The old Epson TM-T88IV with its 2003 USB card (UB-U09) doesn't work over USB on a Raspberry Pi: it errors when it feeds or cuts. Use it on the network, or use a newer printer for USB.</div>
 
 <h2>DIRECTV Multi-Receiver Tuning Screens</h2>
 <p>Touching the blue <b>DIRECTV</b> button on the floor plan opens the receiver selector for the bar and lounge boxes (<b>BAR 1</b>, <b>BAR 2</b>, <b>BAR FRONT</b>, <b>BOX .72</b>, <b>VIP</b>, or <b>ALL 5 BOXES</b>). Each tuning page has a <b>Frequently Used</b> column on the left, a 20-network sports/news center grid, and direct remote keys on the right. The Frequently Used column stays as it is set; change it in the page editor (chapter 13). Tune counts are still kept.</p>
@@ -1735,17 +1856,23 @@
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>To…</th><th>Go to</th></tr>
 <tr><td>Print an X report (nothing resets)</td><td>Retail → CASHIER DUTY → X REPORT, or Reports → X Report</td></tr>
-<tr><td>Look up / reprint a past receipt</td><td>Retail → CASHIER DUTY → LOOK UP CHECKS → the receipt → Reprint…</td></tr>
+<tr><td>Look up / reprint a past receipt</td><td>Retail → Reprint Receipt (or CASHIER DUTY → LOOK UP CHECKS) → the receipt → Reprint…; Cancel goes back</td></tr>
 <tr><td>Gift receipt (no prices)</td><td>Look Up Checks → Reprint… → Gift receipt</td></tr>
 <tr><td>Reprint with date of birth</td><td>Look Up Checks → Reprint… → With date of birth (manager)</td></tr>
 <tr><td>Cancel a retail sale</td><td>Retail → CANCEL SALE → the reason</td></tr>
-<tr><td>Error-correct an item</td><td>Retail → touch it → VOID ITEM</td></tr>
+<tr><td>Error-correct an item</td><td>Retail → touch it → VOID ITEM (touch it again → RESTORE ITEM)</td></tr>
+<tr><td>Ring an amount with no item</td><td>Retail → type the amount → MISC MDSE or MISC FOOD/BEV</td></tr>
+<tr><td>Back to the Retail screen</td><td>🏷️ Retail Mode (order screen, Tables, Open checks)</td></tr>
 <tr><td>Item or subtotal % discount</td><td>Retail → DISCOUNTS → ITEM DISCOUNT / SUBTOTAL DISCOUNT</td></tr>
 <tr><td>Find an item by name or department</td><td>Retail → ALPHA LOOK UP</td></tr>
 <tr><td>A return</td><td>Retail → ITEM RETURN → the check → Refund… (manager), or scan the receipt's barcode</td></tr>
 <tr><td>Price check</td><td>Retail → PRICE CHECK, scan; PRICE CHECK again to stop</td></tr>
 <tr><td>Scan with the tablet camera</td><td>Retail → 📷 SCAN</td></tr>
 <tr><td>Print shelf / price / cigar labels on a tablet</td><td>Log Out → Labels…</td></tr>
+<tr><td>Find a lost tablet</td><td>Log Out → Find a Tablet… → Find</td></tr>
+<tr><td>Hours for payroll</td><td>Reports → Time Clock (Last Week) → Print or PDF</td></tr>
+<tr><td>Pick a date</td><td>Touch the date box: month, day, year, OK</td></tr>
+<tr><td>The cash drawer doesn't open</td><td>Terminals → Receipts (and cash drawer) print on, and that printer's Cash drawer is connected to this printer</td></tr>
 <tr><td>Move a gift card balance / replace a lost card</td><td>Gift Card → Transfer / Replace Card… (manager)</td></tr>
 <tr><td>Open a check from a receipt</td><td>Scan the receipt's barcode</td></tr>
 <tr><td>Old ILSA receipts</td><td>Look Up Checks (or Find a Check) → ILSA history</td></tr>
@@ -1816,6 +1943,7 @@
 
 <h2>The scanner and cigar labels</h2>
 <p>Many licenses also have a small, thin barcode beside the big one. While an ID check is waiting, and for 3 seconds after a license is scanned, ViewTouch ignores that small barcode. You never get an "Item not on file" from it. So the scanner can keep reading every kind of barcode, as the cigar labels need.</p>
+<p><b>Two scanners on one register</b> work too: one for products and one for IDs, on USB (keyboard mode) or on any port of a USB-serial adapter. Nothing is set in ViewTouch for which is which: a license is known by what it says, whichever scanner reads it. On a Honeywell scanner, Code 128 can be turned off on the ID scanner (so it reads only the license's big barcode) and left on for the product scanner (for cigars with only a Code 128 label); that is done with the scanner maker's setup barcodes, not in ViewTouch (chapter 30, Site Setup → Scanner).</p>
 
 <h2>What is kept</h2>
 <ul>
@@ -2085,7 +2213,7 @@
 <p>The screen says <i>ILSA history (read-only)</i> at the top. To find a receipt:</p>
 <ol>
 <li>Pick the store under <b>Stores</b>, if more than one is listed (below).</li>
-<li>Type in the search box. You can type:
+<li>Type in the search box, or touch <b>Day…</b> beside it to pick a day on the calendar. You can type:
 <ul>
 <li>a day: <code>2026-10-28</code> (every receipt that day);</li>
 <li>a receipt number: <code>BHDAN-836100</code>, <code>bhdan836100</code> or just <code>836100</code>;</li>
@@ -2113,7 +2241,7 @@
 <h2>ILSA History reports</h2>
 <p><b>Manager → Reports → ILSA History</b>. <b>‹ Reports</b> goes back.</p>
 <!-- SHOT: Reports > ILSA History, Daily Z for one day (page ilsa-history) -->
-<p>Pick a report, then the days: <b>Yesterday</b>, <b>This Month</b>, <b>Last Month</b>, <b>This Year</b>, <b>Last Year</b>, <b>All</b>, or your own <b>From</b> … <b>to</b> and <b>Show</b>.</p>
+<p>Pick a report, then the days: <b>Yesterday</b>, <b>This Month</b>, <b>Last Month</b>, <b>This Year</b>, <b>Last Year</b>, <b>All</b>, or your own <b>From</b> … <b>to</b> (on the calendar, chapter 2) and <b>Show</b>.</p>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>Report</th><th>What it shows</th></tr>
 <tr><td><b>Daily Z</b></td><td>Each day's Z, as ILSA counted it. Days that also have ViewTouch sales show ViewTouch's own checks for the same days under it.</td></tr>
@@ -2414,6 +2542,8 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <h3>vt-touch-map: tie touchscreens to their monitors</h3>
 <p>Same as Screen check's <b>Tie touchscreens again</b>. <code>--verbose</code> says where each one went. The Pi runs it by itself after a restart.</p>
 <pre>vt-touch-map --verbose; beep3</pre>
+<p><code>vt-touch-map --watch</code> keeps watching and ties them again whenever a touchscreen comes back (a reboot, a USB hiccup, a printer unplugged from the same hub) or the monitors change, even when the touchscreen comes back under the same name with its tie lost. The guest display starts it by itself (<code>vt-guest-display</code>); only one runs at a time. Start it by hand if the register's touches land in the wrong place after unplugging something:</p>
+<pre>(setsid vt-touch-map --watch &gt;/dev/null 2&gt;&amp;1 &amp;); beep3</pre>
 
 <h3>vt-mirror: the same picture on both monitors</h3>
 <p>For a Pi with no guest screen: the second monitor copies the first. <code>vt-mirror off</code> undoes it (after a restart).</p>
@@ -2484,6 +2614,11 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <h3>vt-share: share a command's output</h3>
 <p>Runs a command and also saves what it printed to Google Drive (<i>POS project tmp → pi-output</i>), so you don't have to copy and paste results. It only sends; it never downloads or runs anything.</p>
 <pre>vt-share vt-screens; beep3</pre>
+<ul>
+<li>Each file's name has the date and time, this computer's name and the command, like <code>2026-11-10_093015-<i>computer</i>-vt-screens.txt</code>, so the output of two store Pis is never mixed up. The newest is also saved as <code>latest.txt</code>.</li>
+<li>A copy stays on the Pi in <code>~/vt-output/</code> (the last 200).</li>
+<li>Several commands at once: <code>vt-share sh -c "git pull myfork main &amp;&amp; vt-server"</code>.</li>
+</ul>
 <div class="warn">Don't share output that shows card numbers, IDs or customer details.</div>
 
 <h3>vt-pi-updates: what Pi updates are waiting</h3>
@@ -2506,6 +2641,7 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <tr><th>Command</th><th>What it does</th></tr>
 <tr><td><code>vt-fast</code></td><td>A quick rebuild and restart, without the extras <code>vt-server</code> checks (guest screen, scanner, standby setting). Use <code>vt-server</code> at the store.</td></tr>
 <tr><td><code>vt-upstream</code></td><td>Compares this store's ViewTouch with the official ViewTouch: <code>list</code>, <code>mydiff</code>, <code>show</code>, <code>check</code>, <code>apply</code>.</td></tr>
+<tr><td><code>vt-usb-variants</code>, <code>vt-usb-readback</code></td><td>USB receipt printer tests: send a saved receipt (<code>~/receipt-dump.bin</code>) to <code>/dev/usb/lp0</code> with one kind of printer command left out each time, or read what the printer sends back while it prints. Only for tracking down a slow or stuck USB printer.</td></tr>
 </table>
 
 </body>
