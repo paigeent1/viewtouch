@@ -1,0 +1,28 @@
+Admin screen: touching a record opens its form
+Barcodes: on an item's card, one item's each; scanned: an item, a coupon, a / gift card
+Every seed page renders cleanly, running and editing
+Every tap handler on a page ignores the keyboard's touches
+On-screen keyboard: on by default, over the screen, lifts a covered field, off / by setting
+Self-order: what the slip says, on any paper
+UI editor: holding a zone opens its menu (a touchscreen has no right button)
+UI: Menu Builder: a choice priced by size
+UI: Menu Builder: a color theme for every category
+UI: Menu Builder: a new item like another
+UI: Menu Builder: a printed menu, as a PDF
+UI: Menu Builder: a ready-made picture for an item, on the order screen
+UI: Menu Builder: an item's sizes
+UI: Menu Builder: find an item, its More settings, prices up for a category
+UI: Menu Builder: prices set to change tomorrow
+UI: Menu Builder: several items at once; an item dragged onto another category
+UI: Reports -> Forecast: a coming day, chosen by its key
+UI: a barcode scanner: an item rung in on the menu; a coupon on Pay; typing by / hand isn't a scan
+UI: a card not saved is kept while the Menu Builder is left
+UI: allergies: set on the check, marked on the menu; contained, on the item's / card; avoided on the kiosk
+UI: an older store switches its menu pages to self-filling, then saves
+UI: colors: the store's, picked by touch; one mixed is kept for the store
+UI: in the Menu Builder, hold an item and drag it to its new place
+UI: the Menu Builder adds an item, with what's on it, and a category
+UI: the Menu Builder adds several at once, and duplicates one
+UI: the Menu Builder asks before dropping changes; a new choice group comes / back to its item
+UI: the Menu Builder makes a choice group, row by row
+UI: the order screen: sections, a new row, shades; the Menu Builder's preview
