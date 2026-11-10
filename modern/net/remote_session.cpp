@@ -2,9 +2,10 @@
 
 #include "net/build_info.hh"
 
-#include <QDateTime>
-#if defined(Q_OS_ANDROID)
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QPointer>
+#if defined(Q_OS_ANDROID)
 #include <QJniObject>
 #endif
 #include "net/standby.hh"
@@ -558,7 +559,33 @@ void RemoteSession::handle(const QJsonObject &m)
         }
     } else if (type == u"error") {
         emit notice(m.value(u"text").toString());
+    } else if (type == u"usbPrint") {
+        onUsbPrint(m);
     }
+}
+
+void RemoteSession::onUsbPrint(const QJsonObject &m)
+{
+    const qint64 id = m.value(u"id").toInteger();
+    if (!usbPrinter_) {
+        send({{u"t"_s, u"usbPrinted"_s}, {u"id"_s, id}, {u"ok"_s, false},
+              {u"error"_s, u"%1 can't print to a USB printer (not a tablet)"_s.arg(terminalName())}});
+        return;
+    }
+    const QByteArray data = QByteArray::fromBase64(m.value(u"data").toString().toLatin1());
+    const int ms = std::clamp(m.value(u"ms").toInt(60'000), 1000, 300'000);
+    // The answer from the printing thread, sent from this one (if this session is still here:
+    // the store gives up on a tablet that went away anyway).
+    QPointer<RemoteSession> self(this);
+    usbPrinter_(m.value(u"sel").toString(), data, ms, [self, id](bool ok, const QString &error) {
+        QCoreApplication *app = QCoreApplication::instance();
+        if (!app)
+            return;
+        QMetaObject::invokeMethod(app, [self, id, ok, error] {
+            if (self && self->welcomed_)
+                self->send({{u"t"_s, u"usbPrinted"_s}, {u"id"_s, id}, {u"ok"_s, ok}, {u"error"_s, error}});
+        }, Qt::QueuedConnection);
+    });
 }
 
 QVariantList RemoteSession::openChecks() const

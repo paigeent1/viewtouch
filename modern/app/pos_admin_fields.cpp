@@ -260,10 +260,22 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"name"_s, tr("Name"), u"string"_s), readonlyId,
             with(field(u"type"_s, tr("Connection"), u"enum"_s), u"options"_s,
                  options({{"network", "Network (raw TCP, port 9100)"}, {"cups", "CUPS queue"},
-                          {"file", "Text file"}, {"none", "Off"}})),
+                          {"file", "Text file"}, {"usb", "USB on a tablet"}, {"none", "Off"}})),
             field(u"host"_s, tr("Address"), u"string"_s, tr("Network printers: IP address or host name")),
             with(field(u"port"_s, tr("Port"), u"int"_s), u"min"_s, 1),
-            field(u"path"_s, tr("File or queue"), u"string"_s, tr("File path, or the CUPS queue name")),
+            field(u"path"_s, tr("File or queue"), u"string"_s,
+                  tr("File path, or the CUPS queue name. USB on a tablet: empty for the printer plugged in, "
+                     "or usb:<serial number or name> when several are")),
+            // USB on a tablet: the tablets (paired devices, not billboards), by name.
+            with(field(u"terminal"_s, tr("Plugged into tablet"), u"enum"_s,
+                       tr("USB on a tablet: the tablet the receipt printer is plugged into (through a powered USB-C hub).")),
+                 u"options"_s, [this] {
+                     QVariantList o = options({{"", "(not on a tablet)"}});
+                     for (const TerminalConfig &t : s_->settings.terminals)
+                         if (!t.id.empty() && t.screen != "billboard")
+                             o.append(QVariantMap{{u"value"_s, qs(t.name)}, {u"text"_s, qs(t.name)}});
+                     return o;
+                 }()),
             with(field(u"format"_s, tr("Format"), u"enum"_s), u"options"_s,
                  options({{"", "Automatic"}, {"escpos", "ESC/POS (thermal)"}, {"text", "Plain text"},
                           {"zpl", "Label printer: ZPL (Zebra and compatible)"},

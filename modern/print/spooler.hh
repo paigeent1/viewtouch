@@ -7,6 +7,8 @@
 #include <QString>
 #include <QThread>
 
+#include <functional>
+
 namespace vt::print {
 
 // Sends print jobs from a worker thread. submit() returns immediately; a slow
@@ -28,6 +30,12 @@ namespace vt::print {
 // that tripped into an error state is never sent the same ticket again and
 // again (2026-11-08: a TM-T88IV on USB was re-sent its ticket every time it
 // was turned back on, and went straight back into error).
+//
+// A "usb" printer is plugged into a tablet (print/usb_print.hh): its tickets are
+// handed to the tablet sender (setTabletSender: the store's server sends them to
+// that tablet) and wait, one at a time, until the tablet says every byte went
+// out, or DeviceWriteMs. It is a device printer like the one above: held
+// tickets, printerError(), Reprint.
 class PrintSpooler : public QObject {
     Q_OBJECT
 
@@ -62,6 +70,16 @@ public:
     // A device path ("file" printer) that is not a plain file: a character
     // device or a pipe (or under /dev/ and not there).
     static bool isDevice(const QString &path);
+
+    // "usb" printers (on a tablet): `send` is called on the printer thread with the
+    // ticket and the time it has (DeviceWriteMs), and must call `done` once, from any
+    // thread. The ticket has printed only when done(true) comes; nothing within the
+    // time (+ TabletGraceMs): it failed. Without a sender, "usb" tickets fail.
+    using TabletDone = std::function<void(bool ok, const QString &error)>;
+    using TabletSender = std::function<void(const core::PrinterConfig &printer, const QByteArray &data,
+                                            int timeoutMs, TabletDone done)>;
+    static constexpr int TabletGraceMs = 5'000;
+    void setTabletSender(TabletSender send);
 
 signals:
     void jobPrinted(const QString &printer, const QString &description);

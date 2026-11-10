@@ -93,6 +93,18 @@ object Kiosk {
         }
     }
 
+    // Android's own questions (System UI: "Allow ViewTouch to access the USB printer?") may show
+    // over the pinned ViewTouch until it comes back to the front (apply() pins ViewTouch alone again).
+    @JvmStatic
+    fun allowSystemDialogs(context: Context) {
+        policy(context)?.let { dpm ->
+            try {
+                dpm.setLockTaskPackages(admin(context), arrayOf(context.packageName, "com.android.systemui"))
+            } catch (e: Exception) {
+            }
+        }
+    }
+
     // Manager -> Reboot on Android Login screen: hardware reboot via DevicePolicyManager.
     // Wi-Fi kept at full power while ViewTouch runs: Android's power saving otherwise turns the
     // radio down when the screen is off, and the tablet drops off the network (Bar 3, 2026-11-03).

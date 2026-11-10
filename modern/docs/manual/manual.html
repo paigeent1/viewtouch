@@ -1041,7 +1041,7 @@
 <ul>
 <li><b>Taxes</b> also sets <b>Cash rounding</b> where pennies are gone: a check paid in cash is rounded to the nearest 5 (or 10) cents and shows a <i>Cash rounding</i> line; cards stay exact.</li>
 <li><b>Payment types</b>: a discount can be a <b>Staff meal</b> (the demo has <i>Staff Meal</i>, 50%). Ring your meal, touch Staff Meal on the payment screen, and it records who ate; the Sales report counts staff meals.</li>
-<li><b>Printers</b>: network (TCP 9100, ESC/POS), CUPS, or a text file for testing; label printers too (Format: ZPL or TSPL, and the label size). After saving a printer, touch <b>Test Print</b>: it prints your logo, text in each size, a sample item and total, and a row of digits that should exactly fill one line (if it wraps or falls short, change <b>Characters per line</b>), then cuts the paper. With a drawer wired to the printer, <b>Test Print + Open Drawer</b> also opens it. A message says when the printer took the page, or why it didn't.
+<li><b>Printers</b>: network (TCP 9100, ESC/POS), CUPS, <b>USB on a tablet</b> (a receipt printer plugged into a tablet: see <i>A USB receipt printer on a tablet</i> below), or a text file for testing; label printers too (Format: ZPL or TSPL, and the label size). After saving a printer, touch <b>Test Print</b>: it prints your logo, text in each size, a sample item and total, and a row of digits that should exactly fill one line (if it wraps or falls short, change <b>Characters per line</b>), then cuts the paper. With a drawer wired to the printer, <b>Test Print + Open Drawer</b> also opens it. A message says when the printer took the page, or why it didn't.
 <br>A <b>USB receipt printer</b> on the store's Pi is a <i>Text file</i> printer: <i>File or queue</i> <code>/dev/usb/lp0</code>, <i>Format</i> ESC/POS (chapter 21).
 <br><i>Cash drawer is connected to this printer</i>: turn it on only for the printer the drawer's cable is plugged into. Under it the printer lists the terminals that use it (chapter 10, Which printer opens the drawer).</li>
 <li><b>86'd items come back the next day</b> (on unless turned off): an item marked sold out during service (on the order screen or the sold-out list) is back after End of Day. Marked sold out in the Menu Builder, it stays so until changed there (for something out of season).</li>
@@ -1084,6 +1084,18 @@
 <li>Every screen, tablets too, shows <i>Printer &lt;name&gt;: not printing (error at the printer). Fix it, then Reprint.</i> with a <b>Reprint</b> button. Fix the printer, then touch <b>Reprint</b>.</li>
 </ol>
 <p>Manager → Network says <i>Not printing (error at the printer): tickets wait for Reprint</i>, and Store Check lists it. Kept tickets are lost if ViewTouch restarts; reprint them from Look Up Checks then.</p>
+
+<h3>A USB receipt printer on a tablet</h3>
+<p>A tablet (the Lenovo tablets, any Android tablet running ViewTouch) can have its own receipt printer and cash drawer on USB. Any USB receipt printer works: ViewTouch looks for a device that says it is a printer, so no make or model has to be set up.</p>
+<ol>
+<li><b>The hub.</b> Use a <b>powered</b> USB-C hub with <b>PD pass-through</b> (power delivery): the tablet's charger goes into the hub's PD port, the hub's cable into the tablet, and the printer's USB cable into one of the hub's USB ports. The tablet keeps charging while it prints. A hub without power can't run a printer, and the tablet's battery runs down.</li>
+<li><b>The printer</b> gets its own power as usual. A cash drawer goes into the printer's drawer port, as on the register.</li>
+<li><b>Plug it in.</b> Android asks <i>Open ViewTouch to handle &lt;printer&gt;?</i> (or <i>Allow ViewTouch to access &lt;printer&gt;?</i>). Tick <b>Always open ViewTouch when &lt;printer&gt; is connected</b> and touch <b>OK</b>. With <i>Always</i> ticked, Android doesn't ask again for that printer, even after it is unplugged or the tablet restarts. Without it, Android asks again the next time the printer is plugged in, or at the first ticket after that.</li>
+<li><b>Set it up</b> in Manager → Printers: <b>+ Add</b> (or the printer to change), <b>Connection</b>: <i>USB on a tablet</i>, <b>Plugged into tablet</b>: the tablet's name (as in Manager → Terminals). Leave <b>File or queue</b> empty. Only when the tablet has two printers, type which one: <code>usb:</code> and its serial number or name (<code>usb:TM-T20II</code>). Turn on <i>Cash drawer is connected to this printer</i> if one is.</li>
+<li>In Manager → Terminals, choose this printer for the tablet's receipts and drawer.</li>
+<li>Touch <b>Test Print</b> (or <b>Test Print + Open Drawer</b>). If Android hasn't been allowed yet, its question comes up on the tablet now: touch OK there within a minute and the page prints.</li>
+</ol>
+<p>The store's computer sends each ticket to the tablet, and counts it as printed only once the printer has taken every byte. A ticket that can't go out (the tablet off or away from the store's network, the printer unplugged, off, out of paper) is tried twice, then kept for <b>Reprint</b> with the red <i>not printing</i> banner, as for any USB printer (above). A ticket goes to the printer only after the one before it is done.</p>
 
 <h3>Receipts on handhelds</h3>
 <p>A handheld has no printer of its own. Its receipts print on a printer on the store's network:</p>

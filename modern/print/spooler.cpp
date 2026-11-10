@@ -139,7 +139,96 @@ private:
 
     static bool onDevice(const Job &job)
     {
-        return job.printer.type == "file" && PrintSpooler::isDevice(QString::fromStdString(job.printer.path));
+        return job.printer.type == "usb"
+               || (job.printer.type == "file" && PrintSpooler::isDevice(QString::fromStdString(job.printer.path)));
+    }
+
+public:
+    // Owner thread.
+    void setTabletSender(PrintSpooler::TabletSender send)
+    {
+        std::lock_guard lock(tabletMutex_);
+        tabletSender_ = std::move(send);
+    }
+
+    // Owner thread (closing): a ticket waiting for a tablet's answer is given up now.
+    void cancelWaits()
+    {
+        std::lock_guard lock(tabletMutex_);
+        stopping_ = true;
+        if (const std::shared_ptr<TabletWait> w = tabletWait_) {
+            std::lock_guard l(w->m);
+            if (!w->done) {
+                w->done = true;
+                w->ok = false;
+                w->error = u"ViewTouch is closing"_s;
+            }
+            w->cv.notify_all();
+        }
+    }
+
+private:
+    struct TabletWait {
+        std::mutex m;
+        std::condition_variable cv;
+        bool done = false;
+        bool ok = false;
+        QString error;
+    };
+
+    // A "usb" printer: the ticket to its tablet, waiting (this thread only: one ticket at a
+    // time) until the tablet says it all went out, it failed, or the time is up.
+    bool toTablet(const core::PrinterConfig &p, const QByteArray &data, QString *error)
+    {
+        if (p.terminal.empty()) {
+            *error = u"which tablet the USB printer is plugged into isn't set (Store Settings > Printers)"_s;
+            return false;
+        }
+        PrintSpooler::TabletSender send;
+        auto wait = std::make_shared<TabletWait>();
+        {
+            std::lock_guard lock(tabletMutex_);
+            send = tabletSender_;
+            if (stopping_) {
+                *error = u"ViewTouch is closing"_s;
+                return false;
+            }
+            tabletWait_ = wait;
+        }
+        const auto finished = [this] {
+            std::lock_guard lock(tabletMutex_);
+            tabletWait_.reset();
+        };
+        if (!send) {
+            finished();
+            *error = u"this computer doesn't serve the tablets, so it can't reach %1's USB printer"_s
+                         .arg(QString::fromStdString(p.terminal));
+            return false;
+        }
+        send(p, data, deviceWriteMs, [wait](bool ok, const QString &e) {
+            std::lock_guard lock(wait->m);
+            if (wait->done)
+                return;   // given up on already
+            wait->done = true;
+            wait->ok = ok;
+            wait->error = e;
+            wait->cv.notify_all();
+        });
+        std::unique_lock lock(wait->m);
+        const bool answered = wait->cv.wait_for(lock, std::chrono::milliseconds(deviceWriteMs + PrintSpooler::TabletGraceMs),
+                                                [&] { return wait->done; });
+        if (!answered)
+            wait->done = true;   // a late answer is dropped
+        const bool ok = answered && wait->ok;
+        if (!answered)
+            *error = u"%1 did not say the ticket printed within %2 s"_s.arg(QString::fromStdString(p.terminal))
+                         .arg((deviceWriteMs + 999) / 1000);
+        else if (!ok)
+            *error = wait->error.isEmpty() ? u"%1 could not print it"_s.arg(QString::fromStdString(p.terminal))
+                                           : wait->error;
+        lock.unlock();
+        finished();
+        return ok;
     }
 
     void run()
@@ -239,6 +328,8 @@ private:
             return toSocket(QString::fromStdString(p.host), quint16(p.port), job.data, error);
         if (p.type == "cups")
             return toCups(QString::fromStdString(p.path), job.data, error);
+        if (p.type == "usb")
+            return toTablet(p, job.data, error);
         *error = u"unknown printer type '%1'"_s.arg(QString::fromStdString(p.type));
         return false;
     }
@@ -421,6 +512,10 @@ private:
     QHash<QString, int> heldCount_;          // under busyMutex_
     QHash<QString, std::deque<Job>> held_;   // worker thread
     QHash<QString, Device> devices_;         // worker thread
+    std::mutex tabletMutex_;
+    PrintSpooler::TabletSender tabletSender_;    // under tabletMutex_
+    std::shared_ptr<TabletWait> tabletWait_;     // under tabletMutex_: the ticket waiting for a tablet
+    bool stopping_ = false;                      // under tabletMutex_
     PrintSpooler *owner_;
     std::deque<Job> queue_;
     std::atomic<int> pending_{0};
@@ -438,6 +533,7 @@ PrintSpooler::PrintSpooler(QObject *parent)
 
 PrintSpooler::~PrintSpooler()
 {
+    worker_->cancelWaits();   // a ticket waiting for a tablet doesn't hold up closing
     QMetaObject::invokeMethod(worker_, [w = worker_] { w->stop(); }, Qt::BlockingQueuedConnection);
     thread_.quit();
     thread_.wait();
@@ -489,6 +585,11 @@ int PrintSpooler::held(const QString &printerId) const
 void PrintSpooler::retryHeld(const QString &printerId)
 {
     worker_->retryHeld(printerId);
+}
+
+void PrintSpooler::setTabletSender(TabletSender send)
+{
+    worker_->setTabletSender(std::move(send));
 }
 
 bool PrintSpooler::isDevice(const QString &path)

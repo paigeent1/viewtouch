@@ -11,6 +11,8 @@ class ViewTouchApplication : QtApplication() {
     override fun onCreate() {
         super.onCreate()
         TerminalApplicationDelegate.onCreate(this)
+        // A receipt printer on the tablet's USB: permission answers, plugged in / unplugged (UsbPrint.kt).
+        UsbPrint.init(this)
         // A tablet only for ViewTouch: pinned whenever it's in front (Kiosk.kt).
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) = Kiosk.apply(activity)

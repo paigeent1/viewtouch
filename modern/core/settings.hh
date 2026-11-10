@@ -23,11 +23,14 @@ namespace vt::core {
 struct PrinterConfig {
     std::string id;
     std::string name;
-    std::string type = "none";   // network | file | cups | none
+    std::string type = "none";   // network | file | cups | usb | none
     std::string host;            // network
     int port = 9100;             // network (raw / JetDirect)
-    std::string path;            // file path, or CUPS queue name
-    std::string format;          // escpos | text; empty = escpos for network, else text
+    std::string path;            // file path, or CUPS queue name; usb: which one ("" or "usb:<serial or name>")
+    // usb: a receipt printer plugged into a tablet (through a powered USB-C hub): that tablet's
+    // name (Manager -> Terminals). Its tickets go to the tablet, which prints them (print/usb_print.hh).
+    std::string terminal;
+    std::string format;          // escpos | text; empty = escpos for network and usb, else text
     int width = 42;              // characters per line
     bool cutter = true;
     bool drawerKick = false;     // cash drawer is wired to this printer
@@ -45,7 +48,10 @@ struct PrinterConfig {
     int labelWidthMm = 51;
     int labelHeightMm = 25;
 
-    std::string effectiveFormat() const { return !format.empty() ? format : type == "network" ? "escpos" : "text"; }
+    std::string effectiveFormat() const
+    {
+        return !format.empty() ? format : type == "network" || type == "usb" ? "escpos" : "text";
+    }
     bool operator==(const PrinterConfig &) const = default;
 };
 

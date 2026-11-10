@@ -77,7 +77,7 @@ QVariantList PosService::adminRecords(const QString &panel)
     } else if (panel == u"printers") {
         for (const PrinterConfig &p : s_->settings.printers) {
             QVariantMap r = toJson(p).toVariantMap();
-            for (const char16_t *k : {u"host", u"path", u"format", u"charset"}) {
+            for (const char16_t *k : {u"host", u"path", u"terminal", u"format", u"charset"}) {
                 if (!r.contains(QString::fromUtf16(k)))
                     r.insert(QString::fromUtf16(k), QString());
             }
@@ -94,8 +94,10 @@ QVariantList PosService::adminRecords(const QString &panel)
             r.insert(u"_usedBy"_s, users.isEmpty() ? tr("No terminal prints its receipts here.")
                                                    : tr("Terminals using it for receipts and the cash drawer: %1").arg(users.join(u", "_s)));
             const QString how = p.type == "network" ? tr("Network") : p.type == "cups" ? tr("CUPS queue")
-                              : p.type == "file" ? tr("Text file") : p.type == "none" ? tr("Off") : qs(p.type);
-            add(r, qs(p.name), how + (p.host.empty() ? QString() : u" · "_s + qs(p.host)));
+                              : p.type == "file" ? tr("Text file") : p.type == "usb" ? tr("USB on a tablet")
+                              : p.type == "none" ? tr("Off") : qs(p.type);
+            const std::string &where = p.type == "usb" ? p.terminal : p.host;
+            add(r, qs(p.name), how + (where.empty() ? QString() : u" · "_s + qs(where)));
         }
     } else if (panel == u"taxes") {
         const TaxRates &t = s_->settings.tax;
@@ -393,7 +395,7 @@ QVariantMap PosService::adminNewRecord(const QString &panel)
                 {u"note"_s, QString()}};
     if (panel == u"printers")
         return {{u"id"_s, QString()}, {u"name"_s, QString()}, {u"type"_s, u"network"_s}, {u"host"_s, QString()},
-                {u"port"_s, 9100}, {u"path"_s, QString()}, {u"format"_s, QString()}, {u"width"_s, 42},
+                {u"port"_s, 9100}, {u"path"_s, QString()}, {u"terminal"_s, QString()}, {u"format"_s, QString()}, {u"width"_s, 42},
                 {u"labelWidthMm"_s, 51}, {u"labelHeightMm"_s, 25},
                 {u"cutter"_s, true}, {u"drawerKick"_s, false}, {u"receipts"_s, true}, {u"charset"_s, QString()}, {u"watch"_s, true}};
     return {};

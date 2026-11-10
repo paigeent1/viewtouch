@@ -75,6 +75,15 @@ public:
     // Who is connected, for the Network screen: [{name, address, since, standby}].
     QVariantList connections() const;
 
+    // A ticket for a receipt printer plugged into a tablet ("usb" printers, print/usb_print.hh):
+    // sent to the tablet named `terminal` (Manager -> Terminals), which prints it on the USB
+    // printer `selector` picks and answers. `done` is called once, on this object's thread:
+    // with the tablet's answer, or false when it isn't connected, goes away, or hasn't
+    // answered `timeoutMs` (+ a few seconds) later.
+    using PrintDone = std::function<void(bool ok, const QString &error)>;
+    void printOnTablet(const QString &terminal, const QString &selector, const QByteArray &data, int timeoutMs,
+                       PrintDone done);
+
 signals:
     void terminalsChanged();
     void standbyChanged();
@@ -122,6 +131,15 @@ private:
     QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
     void sendUpdate(Connection *c);   // a terminal that answered pings, silent this long: gone
     std::function<QByteArray()> snapshot_;
+    // Tickets on their way to a tablet's USB printer, by id (printOnTablet).
+    struct TabletPrint {
+        Connection *to = nullptr;
+        PrintDone done;
+        QTimer *timer = nullptr;
+    };
+    QHash<qint64, TabletPrint> tabletPrints_;
+    qint64 nextTabletPrint_ = 1;
+    void finishTabletPrint(qint64 id, bool ok, const QString &error);
 };
 
 } // namespace vt::net

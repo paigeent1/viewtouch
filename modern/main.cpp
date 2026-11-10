@@ -19,6 +19,7 @@
 #include "net/stress.hh"
 #include "print/printer_monitor.hh"
 #include "print/spooler.hh"
+#include "print/usb_print.hh"
 #include "print/ticket_printer.hh"
 #include "storage/async_writer.hh"
 #include "app/pos_demo.hh"
@@ -37,6 +38,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <functional>
+#include <thread>
+#include <QPointer>
 #include <QLocale>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -809,6 +812,21 @@ int runTerminal(const Args &cli, const Options &o)
 
         vt::net::RemoteSession remote(creds->terminalName);
         remote.setCredentials(*creds);
+#ifdef Q_OS_ANDROID
+        // A receipt printer plugged into this tablet (through a powered USB-C hub): the store sends
+        // its tickets here. Each is written on a thread of its own (it can take a while); the store
+        // hears "printed" only once every byte has gone out (print/usb_print.hh).
+        remote.setUsbPrinter([](const QString &selector, const QByteArray &data, int timeoutMs,
+                                std::function<void(bool, const QString &)> done) {
+            std::thread([selector, data, timeoutMs, done = std::move(done)] {
+                QString error;
+                const bool ok = vt::print::usbPrint(selector, data, timeoutMs, &error);
+                if (!ok)
+                    qWarning().noquote() << "USB printer:" << error;
+                done(ok, error);
+            }).detach();
+        });
+#endif
         if (cli.isSet(o.selfOrder))
             remote.setRequestedScreen(u"selfOrder"_s);
         else if (cli.value(o.screen) == u"timeClock" || cli.value(o.screen) == u"billboard")
@@ -1721,6 +1739,20 @@ int runStore(const Args &cli, const Options &o)
         // Updates for the screens: put the new tablet app (and Linux packages) here.
         server->setUpdatesDir(QDir(dataDirOf(cli, o)).filePath(u"updates"_s));
         QDir().mkpath(server->updatesDir());
+        // "USB on a tablet" printers: each ticket goes to that tablet, which prints it and says
+        // so (print/usb_print.hh). Asked on the printer thread; the server is reached on this one.
+        spooler.setTabletSender([to = QPointer<vt::net::PosServer>(server.get())](
+                                    const vt::core::PrinterConfig &p, const QByteArray &data, int timeoutMs,
+                                    vt::print::PrintSpooler::TabletDone done) {
+            QMetaObject::invokeMethod(qApp, [to, p, data, timeoutMs, done = std::move(done)]() mutable {
+                if (!to) {
+                    done(false, u"the store stopped serving the tablets"_s);
+                    return;
+                }
+                to->printOnTablet(QString::fromStdString(p.terminal), vt::print::usbSelector(p.path), data,
+                                  timeoutMs, std::move(done));
+            }, Qt::QueuedConnection);
+        });
         // The standby's copy: the whole database when it connects, then
         // every change the writer saves.
         if (writer) {
@@ -1835,6 +1867,9 @@ int runStore(const Args &cli, const Options &o)
                 row[u"problem"_s] = QString::fromStdString(it->second);
             row[u"type"_s] = QString::fromStdString(p.type);
             row[u"where"_s] = p.type == "network" ? u"%1:%2"_s.arg(QString::fromStdString(p.host)).arg(p.port)
+                              : p.type == "usb"   ? u"USB on %1"_s.arg(QString::fromStdString(p.terminal))
+                                                        + (vt::print::usbSelector(p.path).isEmpty()
+                                                               ? QString() : u" (%1)"_s.arg(vt::print::usbSelector(p.path)))
                                                   : QString::fromStdString(p.path);
             printers << row;
         }

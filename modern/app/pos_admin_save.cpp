@@ -1131,7 +1131,7 @@ bool PosService::savePrinterRecord(int index, const QVariantMap &record)
     PrinterConfig p = printerFromJson(QJsonObject::fromVariantMap(record));
     if (p.name.empty() || record.value(u"name"_s).toString().trimmed().isEmpty())
         return fail(tr("The printer needs a name."));
-    if (!QStringList{u"network"_s, u"cups"_s, u"file"_s, u"none"_s}.contains(qs(p.type)))
+    if (!QStringList{u"network"_s, u"cups"_s, u"file"_s, u"usb"_s, u"none"_s}.contains(qs(p.type)))
         return fail(tr("Choose how the printer is connected."));
     if (!QStringList{QString(), u"escpos"_s, u"text"_s, u"zpl"_s, u"tspl"_s}.contains(qs(p.format)))
         return fail(tr("Choose what the printer understands."));
@@ -1139,6 +1139,8 @@ bool PosService::savePrinterRecord(int index, const QVariantMap &record)
         return fail(tr("Network printers need an address."));
     if (p.type == "file" && p.path.empty())
         return fail(tr("Choose a file to print into."));
+    if (p.type == "usb" && p.terminal.empty())
+        return fail(tr("Choose the tablet the USB printer is plugged into."));
     if (index >= 0) {
         const PrinterConfig &was = s_->settings.printers[index];
         p.id = was.id;

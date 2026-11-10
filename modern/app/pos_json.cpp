@@ -935,6 +935,7 @@ QJsonObject toJson(const PrinterConfig &p)
     if (!p.host.empty()) o.insert(u"host"_s, qs(p.host));
     if (p.port != 9100) o.insert(u"port"_s, p.port);
     if (!p.path.empty()) o.insert(u"path"_s, qs(p.path));
+    if (!p.terminal.empty()) o.insert(u"terminal"_s, qs(p.terminal));
     if (!p.format.empty()) o.insert(u"format"_s, qs(p.format));
     if (p.labelWidthMm != 51) o.insert(u"labelWidthMm"_s, p.labelWidthMm);
     if (p.labelHeightMm != 25) o.insert(u"labelHeightMm"_s, p.labelHeightMm);
@@ -952,6 +953,7 @@ PrinterConfig printerFromJson(const QJsonObject &o)
     p.host = ss(o.value(u"host").toString());
     p.port = o.value(u"port").toInt(9100);
     p.path = ss(o.value(u"path").toString());
+    p.terminal = ss(o.value(u"terminal").toString().trimmed());
     p.format = ss(o.value(u"format").toString());
     p.width = std::clamp(o.value(u"width").toInt(42), 16, 80);
     p.cutter = o.value(u"cutter").toBool(true);

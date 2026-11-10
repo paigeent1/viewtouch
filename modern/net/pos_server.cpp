@@ -402,6 +402,8 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
 PosServer::~PosServer()
 {
     shared_->sendToScreen = {};
+    for (const qint64 id : tabletPrints_.keys())
+        finishTabletPrint(id, false, u"the store stopped serving the tablets"_s);
     for (auto &c : connections_) {
         if (c->session && !c->terminalId.isEmpty()) {
             app::PosShared::ScreenLink &link = shared_->screenLinks[c->terminalId.toStdString()];
@@ -609,6 +611,12 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
     }
     if (c->billboard) {
         handleBillboard(c, m);
+        return;
+    }
+    if (type == u"usbPrinted") {   // a tablet's answer for a ticket on its USB printer
+        const qint64 id = m.value(u"id").toInteger();
+        if (const auto it = tabletPrints_.constFind(id); it != tabletPrints_.cend() && it->to == c)
+            finishTabletPrint(id, m.value(u"ok").toBool(), m.value(u"error").toString());
         return;
     }
     if (type == u"want") {
@@ -1064,6 +1072,10 @@ void PosServer::drop(Connection *c)
         QMetaObject::invokeMethod(this, &PosServer::standbyChanged, Qt::QueuedConnection);
     }
     c->socket->deleteLater();
+    // A ticket on its way to this tablet's USB printer: it can't say now whether it printed.
+    for (const qint64 id : tabletPrints_.keys())
+        if (tabletPrints_.value(id).to == c)
+            finishTabletPrint(id, false, u"the tablet lost its connection to the store while printing"_s);
     // Destroying the session releases the check it had open; tell the rest.
     const bool hadSession = c->session != nullptr;
     if (hadSession && !c->terminalId.isEmpty()) {   // Find a Tablet: gone; last seen now
@@ -1077,6 +1089,57 @@ void PosServer::drop(Connection *c)
         emit shared_->checksChanged();
     emit terminalsChanged();
     scheduleFlushAll();
+}
+
+// --- a receipt printer on a tablet's USB ---------------------------------------------------
+
+void PosServer::printOnTablet(const QString &terminal, const QString &selector, const QByteArray &data,
+                              int timeoutMs, PrintDone done)
+{
+    // The tablet by its name now (Manager -> Terminals), on its newest connection.
+    Connection *to = nullptr;
+    for (auto &c : connections_) {
+        if (!c->session || c->billboard || c->standby || c->terminalId.isEmpty())
+            continue;
+        const core::TerminalConfig *t = shared_->settings.pairedTerminal(c->terminalId.toStdString());
+        if (!t || QString::fromStdString(t->name).compare(terminal.trimmed(), Qt::CaseInsensitive) != 0)
+            continue;
+        if (!to || c->since >= to->since)
+            to = c.get();
+    }
+    if (!to) {
+        if (done)
+            done(false, u"the tablet %1 is not connected to the store"_s.arg(terminal));
+        return;
+    }
+    const qint64 id = nextTabletPrint_++;
+    auto *timer = new QTimer(this);
+    timer->setSingleShot(true);
+    connect(timer, &QTimer::timeout, this, [this, id, terminal, timeoutMs] {
+        finishTabletPrint(id, false, u"the tablet %1 did not answer within %2 s"_s.arg(terminal).arg((timeoutMs + 999) / 1000));
+    });
+    tabletPrints_.insert(id, {to, std::move(done), timer});
+    timer->start(timeoutMs + 3000);
+    to->channel->send({{u"t"_s, u"usbPrint"_s}, {u"id"_s, id}, {u"sel"_s, selector}, {u"ms"_s, timeoutMs},
+                       {u"data"_s, QString::fromLatin1(data.toBase64())}});
+    qCInfo(lcServer).noquote() << "ticket for the USB printer on" << terminal << ":" << data.size() << "bytes";
+}
+
+void PosServer::finishTabletPrint(qint64 id, bool ok, const QString &error)
+{
+    const auto it = tabletPrints_.find(id);
+    if (it == tabletPrints_.end())
+        return;
+    TabletPrint job = std::move(*it);
+    tabletPrints_.erase(it);
+    if (job.timer) {
+        job.timer->stop();
+        job.timer->deleteLater();
+    }
+    if (!ok)
+        qCWarning(lcServer).noquote() << "the USB printer on a tablet did not print:" << error;
+    if (job.done)
+        job.done(ok, error);
 }
 
 } // namespace vt::net

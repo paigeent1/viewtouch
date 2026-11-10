@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- USB devices ViewTouch offers to open when they're plugged in (AndroidManifest.xml): any printer
+     (USB class 7, the device's or one of its interfaces'). No printer model is named here on
+     purpose: every receipt printer that says it's a printer is offered (UsbPrint.kt). -->
+<resources>
+    <usb-device class="7"/>
+</resources>

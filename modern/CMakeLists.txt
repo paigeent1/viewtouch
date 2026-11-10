@@ -85,6 +85,7 @@ if(Qt6_FOUND)
         print/day_summary.hh print/day_summary.cpp
         print/raster.hh print/raster.cpp
         print/printer_monitor.hh print/printer_monitor.cpp
+        print/usb_print.hh print/usb_print.cpp   # a receipt printer on a tablet's USB (Android)
     )
     target_link_libraries(vtm_print PUBLIC vtm_pos Qt6::Network Qt6::Gui)
 

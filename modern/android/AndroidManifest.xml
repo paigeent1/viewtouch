@@ -29,6 +29,8 @@
     <!-- A billboard on a TV (Fire TV, Android TV: Billboard.kt): no touch screen there, and the
          TV's home screen lists the app (LEANBACK_LAUNCHER, with its banner). Neither is needed. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+    <!-- A receipt printer on the tablet's USB, through a powered hub (UsbPrint.kt). Not needed. -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
 
     <supports-screens android:anyDensity="true" android:largeScreens="true"
@@ -56,6 +58,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
+            <!-- A USB printer plugged in: Android offers ViewTouch for it ("Always" remembers that,
+                 and lets ViewTouch use it from then on). Any printer: res/xml/device_filter.xml. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+            </intent-filter>
+            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter"/>
             <meta-data android:name="android.app.lib_name" android:value="-- %%INSERT_APP_LIB_NAME%% --"/>
             <meta-data android:name="android.app.arguments" android:value="-- %%INSERT_APP_ARGUMENTS%% --"/>
         </activity>

@@ -11,7 +11,10 @@
 //   {t: "hello", terminal}                       first message
 //   {t: "call", id, m, a: [...]}                 PosSession::invoke
 //   {t: "saveLayout", id, layout}                 page editor save
+//   {t: "usbPrinted", id, ok, error}              answer to usbPrint (every byte sent, or why not)
 // Server to terminal:
+//   {t: "usbPrint", id, sel, ms, data}           a ticket for the USB printer on this tablet
+//                                                (data base64; sel picks the printer; ms to do it in)
 //   {t: "welcome", layout, state}                after hello
 //   {t: "state", set: {key: value...}}           changed session properties
 //   {t: "reply", id, r}                          answer to call / saveLayout

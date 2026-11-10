@@ -10,6 +10,7 @@
 #include <QSslSocket>
 #include <QTimer>
 
+#include <functional>
 #include <memory>
 
 namespace vt::net {
@@ -33,6 +34,13 @@ public:
     // The server takes it when Manager -> Terminals hasn't said otherwise.
     void setRequestedScreen(const QString &screen) { requestedScreen_ = screen; }
     ~RemoteSession() override;
+
+    // A receipt printer on this tablet's USB (print/usb_print.hh): the store sends its tickets
+    // here ({t: "usbPrint"}); `print` writes one off the screen's thread and calls `done` once,
+    // from any thread, and the answer goes back to the store. Not set: "can't print here".
+    using UsbPrinter = std::function<void(const QString &selector, const QByteArray &data, int timeoutMs,
+                                          std::function<void(bool ok, const QString &error)> done)>;
+    void setUsbPrinter(UsbPrinter print) { usbPrinter_ = std::move(print); }
 
     void setCredentials(const Credentials &credentials);
     const Credentials &credentials() const { return credentials_; }
@@ -230,6 +238,8 @@ private:
     void onReadyRead();
     void onDisconnected();
     void handle(const QJsonObject &m);
+    void onUsbPrint(const QJsonObject &m);
+    UsbPrinter usbPrinter_;
     void applyState(const QJsonObject &set, bool replaceAll);
     void send(const QJsonObject &m);
     // Cached query: returns what is known now and asks the server if needed.

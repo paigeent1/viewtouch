@@ -7,6 +7,7 @@ if(TARGET vtm_layout)
         test_pos_service.cpp test_pos_store.cpp test_pos_flow.cpp
         test_print.cpp test_pos_m4.cpp test_pages_ui.cpp test_net.cpp test_pos_m6.cpp test_pos_m7.cpp test_server_bank.cpp test_pairing.cpp test_phone.cpp test_checks.cpp test_menu.cpp test_reports.cpp test_staff.cpp test_safety.cpp test_customers.cpp test_waitlist.cpp test_kitchen.cpp test_inventory.cpp test_loyalty.cpp test_standby.cpp test_i18n.cpp test_kiosk.cpp test_search.cpp test_phone_orders.cpp test_cards.cpp test_refunds.cpp test_robust.cpp test_receipts.cpp test_menu_builder.cpp test_menu_screens.cpp test_stress.cpp test_ilsa_sync.cpp test_audit_trail.cpp test_labor_law.cpp test_timeclock.cpp test_soak.cpp test_receipt_barcode.cpp
     test_images.cpp test_billboard.cpp
+    test_usb_print.cpp   # a receipt printer on a tablet's USB (the parts that run without a tablet)
     test_serial_scanner.cpp   # serial barcode scanners (several ports, pseudo-terminals)
     test_wipe.cpp     # the cutover step (scripts/bin/vt-wipe-transactions)
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
