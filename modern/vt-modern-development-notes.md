@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-10 09:18 ET — Bob (Claude) — Part Three brief: tablet USB printing ready to try
+- **What:** HANDOFF_PART_THREE.md: helper/android-usb-print is built (ead4e68, CI 42829499562 only the 28 known failures, Android CI 42829504688 APK b507), how to try it (the Pi build from the branch plus the b507 APK on the tablet) and the setup steps.
+- **Why:** The helper finished after the handoff was written.
+- **Files:** `modern/docs/HANDOFF_PART_THREE.md`
+- **Next person must know:** Release helper/android-usb-print (fast-forward) only after the owner's tablet test.
+
 ### 2026-11-10 09:12 ET — Bob (Claude) — Handoff: where Part Two left off
 - **What:** New modern/docs/HANDOFF_PART_THREE.md: the starting brief for the next chat (owner's rules, where things stand, work in progress, owner's to-do list, hardware facts, backlog). CI and notes helpers now kept in the repo: modern/tools/ci/ci_fails.py (failing test names from a CI log), modern/tools/ci/main.fails (main's 28 known failures), modern/tools/ci/fix_notes_conflict.py (cherry-pick conflicts in the dev notes, incoming entries on top).
 - **Why:** The owner is starting a new chat (ViewTouch Development Part Three) with full reference to Parts One and Two.

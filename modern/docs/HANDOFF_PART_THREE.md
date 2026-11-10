@@ -54,8 +54,19 @@ and in `git log`.
    - The owner chose to build it. A helper is building it on branch **helper/android-usb-print**: Android USB Host
      API, any printer-class device, a permission prompt, blocking writes with a 60 s limit, one ticket at a time,
      and the drawer kick through the printer.
-   - Check the branch's commits, its dev-notes entry and its CI.
-   - Release only after its CI shows only the known failures **and the owner has tried it on a tablet**.
+   - **Built:** commit `ead4e68` on top of main 7c47e07.
+     - CI modern-checks run 42829499562 shows only the 28 known failures, and its 7 new tests pass.
+     - CI Android run 42829504688 built both APKs, `ViewTouch-b507-<abi>.apk`.
+   - **How it works:** printing runs on the store's Pi, which sends each ticket to the tablet over the terminal
+     connection. So the test needs the branch build on the Pi **and** the b507 APK on the tablet.
+   - **Setup:**
+     1. Use a powered hub with PD pass-through.
+     2. When Android asks for permission, tick "Always".
+     3. Manager > Printers > + Add: Connection "USB on a tablet", "Plugged into tablet" = that tablet.
+     4. Manager > Terminals: choose this printer for that tablet's receipts.
+     5. Tap "Test Print + Open Drawer".
+   - **Untested on real hardware**, including the permission prompt over the kiosk lock.
+   - Release (fast-forward main) only after the owner has tried it on a tablet.
    - USB keyboard-mode scanners (the NETUM M5S) already work on tablets with no new code.
 2. **User manual Ver. 261110** (`modern/docs/manual/`, README has the rebuild steps).
    - The text is released (7c47e07).
