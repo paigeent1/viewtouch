@@ -55,8 +55,8 @@ post() {   # $1 token, $2 body file, $3 content type; prints the HTTP status
     curl -s -o "$WORK/answer" -w '%{http_code}' -H "X-VT-Token: $1" -H "Content-Type: $3" --data-binary @"$2" "$URL/upload.php"
 }
 
-TODAY=$(TZ=America/New_York php -r 'echo (new DateTime("now"))->modify("-6 hours")->format("Y-m-d");')
-YDAY=$(TZ=America/New_York php -r 'echo (new DateTime("now"))->modify("-6 hours")->modify("-1 day")->format("Y-m-d");')
+TODAY=$(TZ=America/New_York php -r 'echo (new DateTime("now"))->format("Y-m-d");')
+YDAY=$(TZ=America/New_York php -r 'echo (new DateTime("now"))->modify("-1 day")->format("Y-m-d");')
 bundle "$(report sales "$YDAY" 40 '$1,200.50' 31 false)" "$(report sales "$TODAY" 41 '$300.25' 9 true)" \
        "$(report timeclock "$TODAY" 41 '$0.00' 0 true)" | gzip -c > "$WORK/b1.gz"
 bundle "$(report sales "$TODAY" 7 '$99.75' 4 true)" > "$WORK/b2.json"

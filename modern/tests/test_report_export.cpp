@@ -175,9 +175,9 @@ TEST_CASE("Report export: a closed day and the open day as JSON, the database on
     CHECK(sha(path) == before);
 }
 
-TEST_CASE("Report export: a business day counts from 6 AM", "[reportexport]")
+TEST_CASE("Report export: a business day is dated by its End of Day", "[reportexport]")
 {
-    CHECK(vt::storage::businessDate(at(2026, 3, 11, 2)) == QDate(2026, 3, 10));    // a bar closing at 2 AM
+    CHECK(vt::storage::businessDate(at(2026, 3, 11, 2)) == QDate(2026, 3, 11));    // End of Day at 2 AM
     CHECK(vt::storage::businessDate(at(2026, 3, 10, 23)) == QDate(2026, 3, 10));
     CHECK(vt::storage::businessDate(at(2026, 3, 11, 7)) == QDate(2026, 3, 11));
 }

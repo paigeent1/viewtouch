@@ -30,7 +30,6 @@ namespace vt::storage {
 
 namespace {
 
-constexpr int kDayStartsAtHour = 6;   // a business day closed before 6 AM counts for the day before
 const QString kDot = u"••••"_s;   // ••••
 
 QString nextConnectionName()
@@ -139,7 +138,7 @@ struct ClosedDay {
 
 QDate businessDate(std::int64_t closedAt)
 {
-    return QDateTime::fromMSecsSinceEpoch(closedAt).addSecs(-kDayStartsAtHour * 3600).date();
+    return QDateTime::fromMSecsSinceEpoch(closedAt).date();   // the day End of Day was pressed (owner 2026-11-10)
 }
 
 core::Report maskPrivate(core::Report r)
@@ -239,7 +238,7 @@ ReportExportResult exportReports(const ReportExportOptions &options)
                 QSqlQuery q(c);
                 if (q.exec(u"SELECT COALESCE(MAX(closed_at), 0) FROM business_days WHERE closed_at != 0"_s) && q.next()
                     && q.value(0).toLongLong() > 0)
-                    openDate = std::max(openDate, businessDate(q.value(0).toLongLong()).addDays(1));
+                    openDate = std::max(openDate, businessDate(q.value(0).toLongLong()));
                 to = options.to.isValid() ? options.to : openDate;
                 from = options.from.isValid() ? options.from : to;
                 if (to < from)

@@ -28,7 +28,7 @@ function vtr_config(): array
         'stores' => ['BHDAN' => 'BHDAN', 'HCA' => 'HCA'],   // code => name on the buttons
         'timezone' => 'America/New_York',
         'week_starts' => 0,          // 0 Sunday, 1 Monday... (Store Settings' week)
-        'day_starts_hour' => 6,      // a business day counts from 6 AM, as on the Pi
+        'day_starts_hour' => 0,      // a business day is dated by its End of Day, as on the Pi
         'stale_minutes' => 30,       // warn when a store hasn't sent for this long
         'max_upload_bytes' => 8 * 1024 * 1024,     // one upload, as sent (gzipped)
         'max_json_bytes' => 64 * 1024 * 1024,      // one upload, unzipped

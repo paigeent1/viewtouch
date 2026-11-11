@@ -20,8 +20,8 @@ namespace vt::storage {
 // days carry the reports saved at End of Day (what Reports shows for a past day); the day still
 // open is built now by the same code as the Reports screen's "Today".
 //
-// A business day's date: the day it was closed in, counted from 6 AM (a bar closing at 2 AM
-// counts for the day before); the open day: today's, and always after the last closed day.
+// A business day's date: the day its End of Day was pressed (closed at 2 AM Saturday: Saturday's);
+// the open day: today's, and never before the last closed day.
 //
 // Never in a file: gift card PINs (always ••••), full card numbers (•••• and the last 4), and
 // anything from an ID (dates of birth, license numbers).

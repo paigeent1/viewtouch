@@ -153,8 +153,8 @@ Nothing else is needed. Both addresses show the same reports.
 
 - **Numbers match the register.** A closed day shows the reports saved at End of Day. The day still
   open shows them as of the last update.
-- **A business day counts from 6 AM**, as on the Pi. A day closed at 2 AM belongs to the day before.
-  End of Day done before midnight starts tomorrow's day.
+- **A business day is dated by its End of Day**, as on the Pi: a day closed at 2 AM Saturday is
+  Saturday's. The day still open shows under today's date until its End of Day.
 - **Several days, or All stores:** these reports are added up: Sales, Items, Categories, By Hour,
   Servers, By Employee, Tips, Expenses, Deposit, Royalty and Accounting. Shares (%) and averages are
   left blank in a total. The other reports (Time Clock, Labor, Drawer, Audit, Gift Cards…) show each
