@@ -1624,6 +1624,11 @@ Report PosService::buildReport(const QString &id) const
     return salesSummary(s_->closedToday, ctx, &s_->refundsToday);
 }
 
+QStringList PosService::endOfDayReportIds()
+{
+    return kReportIds;
+}
+
 Report PosService::timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
                                    const std::vector<TimePunch> &punches, bool paper) const
 {

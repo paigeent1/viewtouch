@@ -1,0 +1,225 @@
+#!/bin/bash
+# Sends this store's reports to the web reporting page (web/vt-reports in the repo, on the
+# store's website behind a password) every 15 minutes, so they can be read from anywhere.
+#   vt-web-reports --setup <https URL of upload.php> <store token>   save them, start sending
+#   vt-web-reports --now       send now: the last few days (and the last 60 once a night)
+#   vt-web-reports --all       send the last 60 days now
+#   vt-web-reports --status    when it last worked, and whether it is on
+#   vt-web-reports --off       stop sending (the saved URL and token stay; --setup starts it again)
+#   vt-web-reports --add <https URL of upload.php> <store token>   also send to a second website
+# The URL and token are kept in ~/.config/viewtouch/web-reports.conf (only this user can read it),
+# never in Git. The reports come from `vtmodern --export-reports`: the very reports the Reports
+# screen shows, read from a copy of the database (safe while ViewTouch runs). Gift card PINs, card
+# numbers and ID details are never sent. If the website can't be reached, the next run (15 minutes
+# later) sends them again. Its log: ~/.vt-web-reports.log.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+SELF="$(readlink -f "$0")"
+CONF="$VT_CONF_DIR/web-reports.conf"
+LAST="$VT_CONF_DIR/web-reports.last"           # the last run that worked: "<time> <files>"
+FAILED="$VT_CONF_DIR/web-reports.failed"       # the last run that didn't, and why
+FULL="$VT_CONF_DIR/web-reports.full"           # the date the last 60 days were last sent
+LOG="${VT_WEB_REPORTS_LOG:-$HOME/.vt-web-reports.log}"
+UNIT_DIR="$HOME/.config/systemd/user"
+DAYS_BACK="${VT_WEB_REPORTS_DAYS:-60}"
+
+usage() { sed -n '2,14p' "$SELF" | sed 's/^# \{0,1\}//'; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+say() { echo "$*"; log "$*"; }
+
+vt_bin() {
+    if [ -n "$VT_WEB_REPORTS_BIN" ]; then echo "$VT_WEB_REPORTS_BIN"
+    elif [ -x "$VT_REPO/modern/build/vtmodern" ]; then echo "$VT_REPO/modern/build/vtmodern"
+    else echo /usr/local/bin/vtmodern; fi
+}
+
+load_conf() {
+    # shellcheck disable=SC1090
+    [ -f "$CONF" ] && . "$CONF"
+    if [ -z "$VT_WEB_REPORTS_URL" ] || [ -z "$VT_WEB_REPORTS_TOKEN" ]; then
+        echo "Not set up yet. Run: vt-web-reports --setup https://<website>/vt-reports/upload.php <store token>"
+        return 1
+    fi
+    # Where to send: the website, and any added with --add (VT_WEB_REPORTS_URL_2 ...).
+    URLS=("$VT_WEB_REPORTS_URL") TOKENS=("$VT_WEB_REPORTS_TOKEN")
+    local i u t
+    for i in 2 3 4 5; do
+        u="VT_WEB_REPORTS_URL_$i" t="VT_WEB_REPORTS_TOKEN_$i"
+        if [ -n "${!u}" ] && [ -n "${!t}" ]; then URLS+=("${!u}"); TOKENS+=("${!t}"); fi
+    done
+    return 0
+}
+
+valid_dest() {
+    if [[ ! "$1" =~ ^https://[^[:space:]]+$ ]] || [[ ! "$2" =~ ^[A-Za-z0-9._:-]{16,200}$ ]]; then
+        echo "Usage: vt-web-reports $3 https://<website>/vt-reports/upload.php <store token>"
+        echo "(The address must start with https://; the token is the one make-token.php gave for this store.)"
+        return 1
+    fi
+}
+
+# Send one business day's files (one JSON bundle, gzipped). $1: the export folder, $2: "<date>_<day id>",
+# $3: the upload address, $4: its token.
+send_day() {
+    local dir="$1" day="$2" url="$3" token="$4" bundle hdr code sep="" f
+    bundle=$(mktemp) && hdr=$(mktemp) || return 1
+    chmod 600 "$hdr"
+    {
+        printf '{"format":"viewtouch-upload/1","files":['
+        for f in "$dir"/*/"$day".json; do
+            [ -f "$f" ] || continue
+            printf '%s' "$sep"; cat "$f"; sep=,
+        done
+        printf ']}'
+    } | gzip -c > "$bundle"
+    # The token from a file, not the command line (other users can see command lines).
+    printf 'X-VT-Token: %s\n' "$token" > "$hdr"
+    code=$(curl -sS --max-time 120 --retry 2 --retry-delay 5 -o "$bundle.answer" -w '%{http_code}' \
+        -H @"$hdr" -H 'Content-Type: application/gzip' --data-binary @"$bundle" "$url" 2>"$bundle.err")
+    local status=$?
+    if [ $status -ne 0 ] || [ "$code" != 200 ]; then
+        ANSWER="$(head -c 300 "$bundle.answer" 2>/dev/null) $(head -c 300 "$bundle.err" 2>/dev/null)"
+        ANSWER="HTTP $code: ${ANSWER//$'\n'/ }"
+        rm -f "$bundle" "$bundle.answer" "$bundle.err" "$hdr"
+        return 1
+    fi
+    rm -f "$bundle" "$bundle.answer" "$bundle.err" "$hdr"
+    return 0
+}
+
+# One run: export, then send each day. $1: "full" for the last $DAYS_BACK days.
+run_once() {
+    load_conf || return 1
+    mkdir -p "$VT_CONF_DIR"
+    # One run at a time (a nightly 60 days may take longer than 15 minutes on a slow line).
+    exec 9>"$VT_CONF_DIR/web-reports.lock"
+    if ! flock -n 9; then log "Still sending from the run before; skipped."; return 0; fi
+    local mode="$1" today from to out bin n=0 days=0 failed=0 day
+    today=$(date +%F)
+    if [ "$mode" != full ] && { [ ! -f "$FULL" ] || { [ "$(cat "$FULL" 2>/dev/null)" != "$today" ] && [ "$(date +%-H)" -ge 3 ]; }; }; then
+        mode=full   # the first run, and once a night after 3 AM
+    fi
+    if [ "$mode" = full ]; then from=$(date -d "$DAYS_BACK days ago" +%F); else from=$(date -d "2 days ago" +%F); fi
+    to=$(date -d tomorrow +%F)   # the day still open may already count as tomorrow's (End of Day before midnight)
+    out=$(mktemp -d) || return 1
+    bin=$(vt_bin)
+    local extra=()
+    [ -n "$VT_DATA_DIR" ] && extra=(--data-dir "$VT_DATA_DIR")
+    if ! "$bin" "${extra[@]}" --export-reports "$out" --from "$from" --to "$to" > "$out.log" 2>&1; then
+        local why; why=$(grep -v '^[[:space:]]*$' "$out.log" | tail -n 3 | tr '\n' ' ')
+        grep -q -i "unknown option" "$out.log" && why="this ViewTouch is too old for --export-reports: update it (vt-server). $why"
+        say "Couldn't read the reports: $why"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Couldn't read the reports: $why" > "$FAILED"
+        rm -rf "$out" "$out.log"
+        return 1
+    fi
+    rm -f "$out.log"
+    for day in $(find "$out" -mindepth 2 -maxdepth 2 -name "*.json" -printf "%f\n" | sed "s/\.json$//" | sort -u); do
+        days=$((days + 1))
+        local sent=yes i
+        for i in "${!URLS[@]}"; do
+            if ! send_day "$out" "$day" "${URLS[$i]}" "${TOKENS[$i]}"; then
+                sent=no
+                log "Couldn't send $day to ${URLS[$i]}: $ANSWER"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') Couldn't send $day to ${URLS[$i]}: $ANSWER" > "$FAILED"
+            fi
+        done
+        if [ $sent = yes ]; then
+            n=$((n + $(ls "$out"/*/"$day".json 2>/dev/null | wc -l)))
+        else
+            failed=$((failed + 1))
+        fi
+    done
+    rm -rf "$out"
+    if [ $failed -gt 0 ]; then
+        say "Sent $((days - failed)) of $days business days ($n reports); $failed didn't go: $ANSWER (tries again in 15 minutes)."
+        return 1
+    fi
+    [ "$mode" = full ] && echo "$today" > "$FULL"
+    rm -f "$FAILED"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $n reports, $days business days ($from to $to)" > "$LAST"
+    log "Sent $n reports for $days business days ($from to $to)."
+    [ -t 1 ] && echo "Sent $n reports for $days business days ($from to $to)."
+    # The log keeps its last 2000 lines.
+    if [ "$(wc -l < "$LOG")" -gt 2000 ]; then tail -n 1000 "$LOG" > "$LOG.new" && mv -f "$LOG.new" "$LOG"; fi
+    return 0
+}
+
+timer_on() {
+    mkdir -p "$UNIT_DIR"
+    cat > "$UNIT_DIR/vt-web-reports.service" <<EOF
+[Unit]
+Description=ViewTouch: send the reports to the web reporting page (vt-web-reports)
+
+[Service]
+Type=oneshot
+ExecStart=$SELF --timer
+EOF
+    cat > "$UNIT_DIR/vt-web-reports.timer" <<'EOF'
+[Unit]
+Description=ViewTouch: send the reports to the web reporting page every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+OnBootSec=3min
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
+EOF
+    # Runs even when no one is logged in on the Pi.
+    loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q yes || sudo loginctl enable-linger "$USER" 2>/dev/null \
+        || echo "Note: couldn't let it run while no one is logged in (sudo loginctl enable-linger $USER)."
+    systemctl --user daemon-reload && systemctl --user enable --now vt-web-reports.timer >/dev/null 2>&1
+}
+
+case "$1" in
+    --setup)
+        url="$2" token="$3"
+        valid_dest "$url" "$token" --setup || exit 1
+        mkdir -p "$VT_CONF_DIR"
+        ( umask 077
+          { echo "# vt-web-reports: where this store sends its reports (never put this file in Git)."
+            printf 'VT_WEB_REPORTS_URL=%q\n' "$url"
+            printf 'VT_WEB_REPORTS_TOKEN=%q\n' "$token"
+          } > "$CONF" )
+        chmod 600 "$CONF"
+        rm -f "$FULL"   # the first run sends the last 60 days
+        if timer_on; then say "Set up: the reports go to $url every 15 minutes."
+        else say "Saved, but the 15-minute timer didn't start (systemctl --user). Run vt-web-reports --now by hand."; fi
+        echo "Sending the last $DAYS_BACK days now (a minute or two)..."
+        run_once full && echo "It works. Open the reporting page to see them." || { echo "See vt-web-reports --status"; exit 1; }
+        ;;
+    --add)
+        load_conf || exit 1
+        valid_dest "$2" "$3" --add || exit 1
+        if [ ${#URLS[@]} -ge 5 ]; then echo "Five websites at most."; exit 1; fi
+        n=$((${#URLS[@]} + 1))
+        { printf 'VT_WEB_REPORTS_URL_%s=%q\n' "$n" "$2"; printf 'VT_WEB_REPORTS_TOKEN_%s=%q\n' "$n" "$3"; } >> "$CONF"
+        chmod 600 "$CONF"
+        rm -f "$FULL"   # the next run sends the last 60 days (to every website)
+        say "Added: the reports also go to $2. Sending the last $DAYS_BACK days now..."
+        run_once full && echo "It works." || { echo "See vt-web-reports --status"; exit 1; }
+        ;;
+    --now) run_once "" || exit 1 ;;
+    --all) run_once full || exit 1 ;;
+    --timer) run_once "" >/dev/null || exit 1 ;;
+    --status)
+        load_conf >/dev/null 2>&1 && echo "Sends to: ${URLS[*]}" || echo "Not set up (vt-web-reports --setup ...)."
+        if systemctl --user is-active vt-web-reports.timer >/dev/null 2>&1; then
+            echo "Every 15 minutes: on (next: $(systemctl --user list-timers vt-web-reports.timer --no-legend 2>/dev/null | awk '{print $1, $2, $3}'))"
+        else
+            echo "Every 15 minutes: off"
+        fi
+        echo "Last worked: $(cat "$LAST" 2>/dev/null || echo never)"
+        [ -f "$FAILED" ] && echo "Last problem: $(cat "$FAILED")"
+        echo "Log: $LOG"
+        ;;
+    --off)
+        systemctl --user disable --now vt-web-reports.timer >/dev/null 2>&1
+        rm -f "$UNIT_DIR/vt-web-reports.timer" "$UNIT_DIR/vt-web-reports.service"
+        systemctl --user daemon-reload >/dev/null 2>&1
+        say "Stopped: the reports aren't sent any more (the settings stay; --setup starts it again)."
+        ;;
+    *) usage; exit 1 ;;
+esac

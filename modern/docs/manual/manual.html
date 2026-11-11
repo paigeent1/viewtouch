@@ -1289,6 +1289,20 @@
 <!-- SHOT: Reports > Time Clock, Last Week, All employees: store heading, one employee's punches with Begin / End / Hours & Minutes / Total Hours, Total and Grand Total Hours (page reports, report timeclock) -->
 <div class="tip">Before running payroll, make sure nobody is still clocked in for the week: those hours aren't counted until the punch has an end.</div>
 
+<h2>Reports on the website (from anywhere)</h2>
+<p>Every report on the Reports screen can also be read on the store's website, behind a password, from a phone or any computer. Each store's Pi sends its reports every 15 minutes (<code>vt-web-reports</code>, chapter 31). One login sees every store.</p>
+<ul>
+<li>Open the reports page (for example <i>https://hatcityale.com/vt-reports/</i>) and log in.</li>
+<li>Pick the store (<b>BHDAN</b>, <b>HCA</b> or <b>All stores</b>), the report, and the days: <b>Today</b>, <b>Yesterday</b>, <b>This week</b>, <b>Last week</b>, <b>This month</b>, <b>Last month</b>, or any days with <b>From</b> and <b>To</b>. <b>◀ Day before</b> and <b>Day after ▶</b> step through single days.</li>
+<li>The numbers are the register's own: a closed day shows the reports saved at End of Day; the day still open shows it as of the last update (<i>still open, as of 2:15 PM</i>).</li>
+<li><b>All stores</b> adds the stores together where that makes sense (Sales, Items, Categories, By Hour, Servers, By Employee, Tips, Expenses, Deposit, Royalty, Accounting) and shows each store's report under it. Several days of those reports are added up the same way. Shares (%) and averages are left blank in a total, since they can't be added. The other reports show each day on its own.</li>
+<li>At the top, each store's <i>last updated</i> time. A store that hasn't sent for over 30 minutes is marked: check that its Pi is on and online.</li>
+<li><b>Print</b> prints the page plainly; <b>Download CSV</b> saves it for a spreadsheet.</li>
+<li>Gift card PINs and card numbers are never sent (a card shows as <i>••••1234</i>). The Forecast isn't sent: it looks ahead, so see it at the store.</li>
+<li>A business day counts from 6 AM: a day closed at 2 AM belongs to the day before.</li>
+</ul>
+<p>Setting up the website is a one-time job: the steps are in <code>web/vt-reports/README.md</code> in the code.</p>
+
 <h2>End of Day</h2>
 <p class="shot"><img src="shots/m45-end-of-day.png" width="480" height="270"></p>
 <ul>
@@ -2625,6 +2639,17 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <p>Lists the Raspberry Pi OS updates waiting, and which could change how ViewTouch runs. It never installs anything. The list also goes to Google Drive. <code>--daily</code> runs it every day at 4:50 AM; <code>--no-daily</code> stops that.</p>
 <pre>vt-pi-updates; beep3</pre>
 <div class="tip">Install updates that could touch ViewTouch only after checking them, and never during business hours.</div>
+
+<h3>vt-web-reports: the reports on the website</h3>
+<p>Sends this store's reports to the reports page on the website (chapter 12, Reports on the website) every 15 minutes. Set it up once on each store's Pi, with the address and the store's own token from the website's token page:</p>
+<pre>vt-web-reports --setup https://hatcityale.com/vt-reports/upload.php <i>token</i>; beep3</pre>
+<ul>
+<li>The first time, it sends the last 60 days; then today's and the last two days' every 15 minutes, and the last 60 days again once a night (so a day closed late, or changed, is always right on the website).</li>
+<li>It reads a copy of the database, so it's safe while ViewTouch runs: nothing prints and no screen is touched.</li>
+<li>If the website can't be reached, it simply tries again 15 minutes later.</li>
+<li><code>vt-web-reports --status</code>: when it last worked, and the last problem. <code>--now</code> sends right away. <code>--off</code> stops it (<code>--setup</code> starts it again). <code>--add</code> <i>address token</i> also sends to a second website.</li>
+<li>The address and token stay on this Pi only, in a file only you can read (<code>~/.config/viewtouch/web-reports.conf</code>). Its log is <code>~/.vt-web-reports.log</code>.</li>
+</ul>
 
 <h2>Run by ViewTouch itself</h2>
 <p>These run when you touch a button. You don't need to type them.</p>

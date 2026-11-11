@@ -1,0 +1,36 @@
+# ViewTouch web reporting (web/vt-reports): Apache settings for this folder.
+
+# Always over HTTPS (the password and the reports never cross the internet in the clear).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# --- The password (Basic Auth) ------------------------------------------------------------------
+# EITHER cPanel > Files > Directory Privacy on this folder (it writes its own lines at the end of
+# this file and keeps the password file outside public_html) - the easy way;
+# OR take the # off the four lines below, put your cPanel user name in the path, and make the
+# password file with:  htpasswd -c /home/<cPanel user>/.htpasswds/vt-reports <login name>
+#AuthType Basic
+#AuthName "Store Reports"
+#AuthUserFile /home/CPANELUSER/.htpasswds/vt-reports
+#Require valid-user
+
+# The Pis' uploads don't use the password: each store has its own token instead (upload.php).
+<Files "upload.php">
+    Require all granted
+</Files>
+
+# Never shown to anyone: the shared code, the settings, the tests and the notes.
+<FilesMatch "^(lib\.php|config\.php|README\.md|\.ht.*)$">
+    Require all denied
+</FilesMatch>
+RedirectMatch 404 /tests(/|$)
+
+Options -Indexes
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow"
+    Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>

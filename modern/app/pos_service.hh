@@ -953,6 +953,9 @@ public:
     QVariantMap report(const QString &id, qint64 dayId = 0) override;
     bool printReport(const QString &id, qint64 dayId = 0);
     core::Report buildReport(const QString &id) const;
+    // The reports saved at End of Day (every one Reports lists but the Forecast), in order; also what
+    // `vtmodern --export-reports` writes for the web reporting page.
+    static QStringList endOfDayReportIds();
 
     // --- admin (manager) -------------------------------------------------------------
     // panel: menu | employees | tenders | printers | taxes | store

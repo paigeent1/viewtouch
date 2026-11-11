@@ -26,6 +26,7 @@
 #include "storage/sealed.hh"
 #include "storage/layout_store.hh"
 #include "storage/pos_store.hh"
+#include "storage/report_export.hh"
 
 #include <QCommandLineParser>
 #include <QDir>
@@ -168,6 +169,14 @@ struct Options {
     QCommandLineOption exportDir{u"export-dir"_s,
         u"Where reports are saved as CSV / PDF (default: <data dir>/exports)."_s, u"dir"_s};
     QCommandLineOption backup{u"backup"_s, u"Back up the database now (safe while ViewTouch runs) and exit."_s};
+    QCommandLineOption exportReports{u"export-reports"_s,
+        u"Write every report (as Reports shows it) for each business day as JSON files in <dir>, for the web "
+         "reporting page (vt-web-reports), and exit. Safe while ViewTouch runs: the database is only read. "
+         "Days: --from and --to (default: the day still open)."_s, u"dir"_s};
+    QCommandLineOption reportsFrom{u"from"_s, u"With --export-reports: the first business day (YYYY-MM-DD)."_s,
+        u"date"_s};
+    QCommandLineOption reportsTo{u"to"_s, u"With --export-reports: the last business day (YYYY-MM-DD)."_s,
+        u"date"_s};
     QCommandLineOption pairingCode{u"pairing-code"_s,
         u"Ask the ViewTouch server running on this machine (same --data-dir) for a code to pair a "
         "terminal with, print it, and exit."_s};
@@ -2005,6 +2014,34 @@ int runPairingCode(const Args &cli, const Options &o)
     return 0;
 }
 
+// --- reports for the web reporting page (vt-web-reports) ------------------------------------
+
+int runExportReports(const Args &cli, const Options &o)
+{
+    vt::storage::ReportExportOptions options;
+    options.database = dbPathOf(cli, o);
+    options.outDir = cli.value(o.exportReports);
+    for (const auto &[option, date] : {std::pair{&o.reportsFrom, &options.from}, std::pair{&o.reportsTo, &options.to}}) {
+        if (!cli.isSet(*option))
+            continue;
+        *date = QDate::fromString(cli.value(*option).trimmed(), u"yyyy-MM-dd"_s);
+        if (!date->isValid()) {
+            qCritical().noquote() << u"--%1: dates are written like 2026-11-09."_s.arg(option->names().constFirst());
+            return 1;
+        }
+    }
+    const vt::storage::ReportExportResult r = vt::storage::exportReports(options);
+    if (!r.ok) {
+        qCritical().noquote() << "Exporting the reports failed:" << r.error;
+        return 1;
+    }
+    qInfo().noquote() << u"Wrote %1 report files for %2 business day(s) to %3"_s.arg(r.files.size())
+                             .arg(r.days.size()).arg(QDir(options.outDir).absolutePath());
+    for (const QString &d : r.days)
+        qInfo().noquote() << "  day" << d;
+    return 0;
+}
+
 // --- backups from the command line ---------------------------------------------------------
 
 int runBackup(const Args &cli, const Options &o)
@@ -2322,6 +2359,7 @@ void prepareEnvironment(int argc, char *argv[])
         const bool command = arg == "--backup" || arg == "--restore" || arg.startsWith("--restore=")
                              || arg == "--factory-reset" || arg == "--demo-data"
                              || arg == "--pairing-code" || arg == "-h"
+                             || arg == "--export-reports" || arg.startsWith("--export-reports=")
                              || arg == "--help" || arg == "--help-all" || arg == "-v" || arg == "--version";
         // One-shot commands answer on the terminal, even through a pipe
         // (Qt would otherwise send the messages to the journal).
@@ -2395,6 +2433,7 @@ int main(int argc, char *argv[])
     const QList<QCommandLineOption> all = {o.config, o.dataDir, o.db, o.layout, o.resetLayout, o.resetMenu, o.serve,
         o.port, o.listen, o.headless, o.connect, o.pair, o.terminal, o.kiosk, o.selfOrder, o.touchKeyboard, o.customerDisplay, o.factoryReset, o.demoData, o.standby, o.pairOnly, o.windowed, o.screen, o.login, o.page, o.afterLogin, o.station, o.edit, o.select, o.size,
         o.screenshot, o.backupDir, o.backupKeep, o.backupEvery, o.backup, o.restore, o.pairingCode, o.exportDir,
+        o.exportReports, o.reportsFrom, o.reportsTo,
         o.stress, o.stressMinutes, o.stressSpeed, o.stressServers, o.stressHours, o.stressLoad, o.stressExit};
     cli.addOptions(all);
     cli.process(app);
@@ -2430,6 +2469,8 @@ int main(int argc, char *argv[])
         return runDemoData(args, o);
     if (args.isSet(o.backup))
         return runBackup(args, o);
+    if (args.isSet(o.exportReports))
+        return runExportReports(args, o);
     if (args.isSet(o.restore))
         return runRestore(args, o);
     if (args.isSet(o.pairingCode))

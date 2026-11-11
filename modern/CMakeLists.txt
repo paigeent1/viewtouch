@@ -95,6 +95,7 @@ if(Qt6_FOUND)
         storage/async_writer.hh storage/async_writer.cpp
         storage/backup.hh storage/backup.cpp
         storage/sealed.hh storage/sealed.cpp
+        storage/report_export.hh storage/report_export.cpp   # vtmodern --export-reports (web reporting)
     )
     target_link_libraries(vtm_storage PUBLIC vtm_layout vtm_pos Qt6::Sql)
 
