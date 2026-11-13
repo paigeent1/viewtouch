@@ -1,4 +1,5 @@
 #!/bin/bash
+# Reads the monitors with xrandr --current (plain xrandr re-probes them: some monitors blank for a moment).
 # Ties each touchscreen to its own monitor (X11): the guest's touchscreen (learned once with
 # `vt-guest-display touch`, remembered by the USB port it's plugged into) to the second monitor,
 # every other touchscreen to the first (the POS). Run by vt-guest-display and after every reboot.
@@ -15,18 +16,18 @@ if [ "$1" = --watch ]; then
         # Each one's tie (its transformation matrix) too: a touchscreen that reconnects under the
         # same id comes back untied (the whole screen), and the ids alone wouldn't show that.
         ties=$(for i in $ids; do xinput list-props "$i" 2>/dev/null | grep -m1 'Coordinate Transformation Matrix'; done)
-        now="$ids $ties $(xrandr 2>/dev/null | grep ' connected')"
+        now="$ids $ties $(xrandr --current 2>/dev/null | grep ' connected')"
         if [ "$now" != "$last" ]; then
             sleep 1
             "$0"
             # Read again after tying, so the tie it just made isn't taken for a change.
             ids=$(xinput list 2>/dev/null | grep -i -E 'touch|ctp|ilitek|goodix|egalax|eeti' | grep -o 'id=[0-9]*' | cut -d= -f2)
             ties=$(for i in $ids; do xinput list-props "$i" 2>/dev/null | grep -m1 'Coordinate Transformation Matrix'; done)
-            last="$ids $ties $(xrandr 2>/dev/null | grep ' connected')"
+            last="$ids $ties $(xrandr --current 2>/dev/null | grep ' connected')"
         fi
     done
 fi
-outs=$(xrandr 2>/dev/null | awk '/ connected/{print $1}')
+outs=$(xrandr --current 2>/dev/null | awk '/ connected/{print $1}')
 first=$(echo "$outs" | sed -n 1p); second=$(echo "$outs" | sed -n 2p)
 # The register's monitor, when the store said which (vt-guest-display on HDMI-2): first, whatever the order.
 pos=$(cat "$HOME/.vt-pos-output" 2>/dev/null)

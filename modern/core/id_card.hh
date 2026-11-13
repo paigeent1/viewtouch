@@ -21,7 +21,10 @@ struct IdCard {
 // Looks like a license barcode (scanners send it whole, or a keyboard-mode scanner types it).
 inline bool looksLikeIdCard(const std::string &raw)
 {
-    return raw.find("ANSI ") != std::string::npos || raw.find("AAMVA") != std::string::npos
+    const std::size_t ansi = raw.find("ANSI");
+    const bool ansiHeader = ansi != std::string::npos && ansi + 4 < raw.size()
+        && (raw[ansi + 4] == ' ' || std::isdigit(static_cast<unsigned char>(raw[ansi + 4])));
+    return ansiHeader || raw.find("AAMVA") != std::string::npos
         || (raw.rfind('@', 0) == 0 && raw.find("DBB") != std::string::npos);
 }
 
@@ -59,6 +62,41 @@ inline IdDate idDate(const std::string &v)
     IdDate ca{num(0, 4), num(4, 2), num(6, 2)};
     return ca.valid() ? ca : IdDate{};
 }
+
+// Some keyboard-mode scanners drop the barcode's line breaks: the fields arrive run together
+// ("...DAQT64235789DCSSAMPLEDACTESTDBB01151990DBA..."). A date field is then its code followed by
+// 8 digits that make a real date.
+inline IdDate gluedDate(const std::string &raw, const char *code)
+{
+    for (std::size_t at = raw.find(code); at != std::string::npos; at = raw.find(code, at + 1)) {
+        if (at + 11 > raw.size())
+            break;
+        const IdDate d = idDate(raw.substr(at + 3, 8));
+        if (d.valid())
+            return d;
+    }
+    return {};
+}
+// The ID number run together with what follows: letters and digits up to the next field's code.
+inline std::string gluedNumber(const std::string &raw)
+{
+    static const char *const next[] = {"DCS", "DCT", "DAC", "DAD", "DCF", "DCG", "DBA", "DBB", "DBC", "DBD",
+                                       "DAA", "DAB", "DAG", "DAI", "DAJ", "DAK", "DAU", "DAY", "DCA", "DCB",
+                                       "DCD", "DDE", "DDF", "DDG", "DAW", "DAZ", "DCK", "DDA", "DDB", "DDK"};
+    const std::size_t at = raw.find("DAQ");
+    if (at == std::string::npos)
+        return {};
+    std::string v;
+    for (std::size_t i = at + 3; i < raw.size() && v.size() < 25; ++i) {
+        bool fieldStarts = false;
+        for (const char *c : next)
+            fieldStarts = fieldStarts || raw.compare(i, 3, c) == 0;
+        if (fieldStarts || !std::isalnum(static_cast<unsigned char>(raw[i])))
+            break;
+        v += raw[i];
+    }
+    return v;
+}
 } // namespace detail
 
 inline std::optional<IdCard> parseIdCard(const std::string &raw)
@@ -67,10 +105,17 @@ inline std::optional<IdCard> parseIdCard(const std::string &raw)
         return std::nullopt;
     IdCard card;
     card.birth = detail::idDate(detail::idField(raw, "DBB"));
+    if (card.birth.valid()) {
+        card.expires = detail::idDate(detail::idField(raw, "DBA"));
+        card.number = detail::idField(raw, "DAQ");
+        return card;
+    }
+    // The fields run together (a keyboard-mode scanner that drops the line breaks).
+    card.birth = detail::gluedDate(raw, "DBB");
     if (!card.birth.valid())
         return std::nullopt;
-    card.expires = detail::idDate(detail::idField(raw, "DBA"));
-    card.number = detail::idField(raw, "DAQ");
+    card.expires = detail::gluedDate(raw, "DBA");
+    card.number = detail::gluedNumber(raw);
     return card;
 }
 
