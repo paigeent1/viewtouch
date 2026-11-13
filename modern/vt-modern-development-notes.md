@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 11:29 ET — Bob (Claude) — Manual PDF built by CI (Modern manual workflow)
+- **What:** New .github/workflows/modern-manual.yml: on Run workflow or a push to helper/manual-*, builds ViewTouch on Debian 13, makes the demo screenshots (README step 1, shots/ is not in git), builds manual.pdf with LibreOffice, fails if any <img> the manual uses is missing, and uploads the PDF and shots as the artifact ViewTouch-manual.
+- **Why:** The Ver. 261110 PDF built without shots/ had 181 blank pictures; no machine here has a Qt build to make them. The owner wants the rebuild process saved to rerun.
+- **Files:** (none)
+
 ### 2026-11-13 11:28 ET — Helper (Claude) for Bob — User manual Ver. 261110: the store's pictures
 - **What:** Put 16 pictures of this store into modern/docs/manual/manual.html (13 screenshots from the 2026-11-13 vt-manual-shots run on BHDAN, 3 phone photos with the owner's name hidden) in the new committed folder modern/docs/manual/img/ (PNG8/JPEG, 20-150 KB each). 12 SHOT marks filled; 4 pictures added beside marks that stay open (retail-entry, receipt-lookup, billboards, find-check: the scrubbed store has no sale/receipt/billboard form to show); 26 marks left. Cover: effective with ver 0.9.511. README Last rebuilt updated.
 - **Why:** The Ver. 261110 edition needed pictures of this store in place of its SHOT marks.
