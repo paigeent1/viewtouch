@@ -131,6 +131,12 @@ ApplicationWindow {
     }
 
     onEditingChanged: if (!editing) pageView.forceActiveFocus()
+    // The page is switched off while something covers it, and that takes its keyboard focus: give it back
+    // when the cover goes, or a keyboard-mode scanner types into nothing (BHDAN 2026-11-13: no UPC rang
+    // after the receipt sheet / an ID check until ViewTouch restarted). Also when focus is left nowhere.
+    onPageCoveredChanged: if (!pageCovered && !editing) Qt.callLater(() => pageView.forceActiveFocus())
+    onActiveFocusItemChanged: if (!activeFocusItem && !editing && !pageCovered)
+                                  Qt.callLater(() => { if (!root.activeFocusItem) pageView.forceActiveFocus() })
 
     // Something over the whole screen (see the page's `enabled`).
     readonly property bool pageCovered: selfOrder.visible || root.controller.asleep || cardWait.visible

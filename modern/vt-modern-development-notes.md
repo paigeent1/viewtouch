@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 15:36 ET — Bob (Claude) — Scanner keys: the page gets its keyboard focus back when a cover closes
+- **What:** Main.qml: when nothing covers the page any more (receipt sheet, approval pad, screen saver, sheets: pageCovered false) or focus is left on nothing, the page takes the keyboard focus back (forceActiveFocus), so a keyboard-mode scanner's UPCs ring again.
+- **Why:** Owner 2026-11-13 BHDAN: after an ID-checked sale no UPC scan rang (even after reopening a check in Retail Mode) though the scanner typed the UPC and Enter: the page had lost its focus when it was covered and never got it back.
+- **Files:** (none)
+
 ### 2026-11-13 15:25 ET — Bob (Claude) — Keyboard-mode license scans collected whole until the scanner goes quiet
 - **What:** Main.qml's scan catcher: once a scan starts with @ (a license), every key is part of it until 400 ms of quiet: printable keys including the space, and line breaks as Enter or Ctrl keys; the scanner's pauses around its Ctrl keys no longer end it. Before, the space in 'ANSI ' (and any pause over 60 ms) emptied it, so only a piece reached the ID check. New UI test types a license with Ctrl+J and pauses.
 - **Why:** Owner 2026-11-13: BHDAN's Symbol scan still didn't pass the ID check after 5c0fd15; Site Setup's scanner test showed 'A code with letters' (a piece of the license).
