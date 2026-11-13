@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 14:22 ET — Bob (Claude) — License scans with the fields run together; touch mapper doesn't re-probe monitors
+- **What:** core/id_card.hh: when the date of birth isn't at a line start, the license is read as fields run together (a code followed by 8 digits that make a real date for DBB/DBA; DAQ up to the next field's code); the ANSI header is also recognized without its space. Test in test_customers.cpp. scripts/bin/vt-touch-map reads the monitors with xrandr --current.
+- **Why:** BHDAN's Symbol keyboard-mode scanner reads the license PDF417 (315 characters, one Enter) but drops its line breaks, so no date of birth was found. Plain xrandr re-probes the monitors and blanked a Wimaxit on BHDAN.
+- **Files:** `modern/core/id_card.hh`, `modern/tests/test_customers.cpp`, `scripts/bin/vt-touch-map`
+- **Commit:** checks run 43491658243 on bob/id-glued: only the 28 known failures.
+
 ### 2026-11-13 14:30 ET — Bob (Claude) — Manual: the billboard TV photo
 - **What:** img/billboard-tv.jpg (owner's photo of fire5, cropped, 1200 px, EXIF stripped) in place of the billboard TV SHOT mark in chapter 25.
 - **Why:** Owner 2026-11-13: use the photos he just sent for now (they show the starter messages).

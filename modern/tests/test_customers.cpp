@@ -734,6 +734,16 @@ TEST_CASE("ID checks: alcohol asks for the ID; a scan of the license lets it in,
     CHECK(pos.currentCheck()->ageIdExpired);
     CHECK(pos.lines().size() == 1);
 
+    // A keyboard-mode scanner that drops the line breaks (BHDAN's Symbol, 2026-11-13): fields run together.
+    REQUIRE(pos.startCheck(core::CheckType::Takeout));
+    CHECK_FALSE(pos.addItem(u"draft-beer"_s));
+    QString glued = license(mmddyyyy(30), mmddyyyy(-3));
+    glued.remove(u'\n').remove(u'\r').remove(QChar(0x1e));
+    REQUIRE(pos.verifyAgeScan(glued));
+    CHECK(pos.currentCheck()->ageId4 == "5789");
+    CHECK_FALSE(pos.currentCheck()->ageIdExpired);
+    CHECK(pos.lines().size() == 1);
+
     // A new check: an ID that won't scan, the date of birth typed (the exception).
     REQUIRE(pos.startCheck(core::CheckType::Takeout));
     CHECK_FALSE(pos.addItem(u"draft-beer"_s));
