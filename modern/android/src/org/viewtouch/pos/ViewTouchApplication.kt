@@ -13,10 +13,13 @@ class ViewTouchApplication : QtApplication() {
         TerminalApplicationDelegate.onCreate(this)
         // A tablet only for ViewTouch: pinned whenever it's in front (Kiosk.kt).
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityResumed(activity: Activity) = Kiosk.apply(activity)
+            override fun onActivityResumed(activity: Activity) {
+                Billboard.inFront = true   // a billboard opened at start isn't opened again (Billboard.boot)
+                Kiosk.apply(activity)
+            }
             override fun onActivityCreated(activity: Activity, state: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}
-            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) { Billboard.inFront = false }
             override fun onActivityStopped(activity: Activity) {}
             override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}

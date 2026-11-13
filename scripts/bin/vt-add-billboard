@@ -97,6 +97,17 @@ start_app() {
     adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
 }
 
+# The billboard opens again by itself when the TV turns on (a power cut, a restart: Billboard.kt).
+# Android 10+ lets an app open itself from the background only if it may "display over other apps":
+# allowed here once (kept until the app is uninstalled; again on every Deploy / Update app).
+allow_boot_start() {
+    if adb -s "$DEV" shell appops set org.viewtouch.pos SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1; then
+        echo "The billboard will open by itself whenever the TV turns on (after a power cut too)."
+    else
+        echo "This TV didn't allow the app to open by itself when it turns on: after a power cut, use Restart app."
+    fi
+}
+
 if [ "$MODE" = sleep ]; then
     echo "[2/2] Putting $NAME to sleep..."
     if ! adb -s "$DEV" shell input keyevent KEYCODE_SLEEP >/dev/null 2>&1; then
@@ -124,6 +135,7 @@ if [ "$MODE" = restart ]; then
         echo "The ViewTouch app isn't on $NAME yet: tap Deploy."
         exit 1
     fi
+    allow_boot_start >/dev/null   # a TV added before this opens by itself from now on too
     start_app
     echo "✓ Restarted the app on $NAME."
     exit 0
@@ -155,6 +167,7 @@ if ! OUT=$(adb -s "$DEV" install -r -d "$APK" 2>&1); then
 fi
 if [ -n "$HAD" ] && [ -z "$PAIR_AGAIN" ]; then
     # Already a billboard: the new app keeps its pairing.
+    allow_boot_start
     echo "[6/6] Starting it..."
     start_app
     echo "✓ Updated $NAME ($IP)."
@@ -184,6 +197,7 @@ echo "[5/6] Handing $NAME its pairing..."
 adb -s "$DEV" shell am force-stop org.viewtouch.pos
 adb -s "$DEV" push "$CRED" /data/local/tmp/terminal.json >/dev/null
 rm -rf "$PAIR"
+allow_boot_start
 echo "[6/6] Starting it..."
 adb -s "$DEV" shell am start -n org.viewtouch.pos/org.qtproject.qt.android.bindings.QtActivity >/dev/null 2>&1
 sleep 10

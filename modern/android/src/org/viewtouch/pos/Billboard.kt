@@ -4,7 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import java.io.File
 
@@ -49,17 +53,49 @@ object Billboard {
         }
     }
 
-    // The TV turned on: a billboard starts again (Android 10+ may refuse an app starting itself
-    // from the background; Fire OS 7 is Android 9 and lets it).
+    // In front right now (ViewTouchApplication sets it): the boot start below doesn't open it again.
+    @Volatile
+    @JvmStatic
+    var inFront = false
+
+    private var booted = false
+
+    // The TV turned on (a power cut, a restart): a billboard opens again by itself, with no remote.
+    // Android 10+ (Fire OS 8, Android TV) refuses an app opening itself from the background unless it
+    // may "display over other apps": vt-add-billboard allows that once over adb
+    // (appops set org.viewtouch.pos SYSTEM_ALERT_WINDOW allow). Fire OS 7 (Android 9) needs nothing.
+    // The TV's home screen comes up after this and may cover it, so it's opened again a little later
+    // while it isn't in front. Never while the screen is off: the store put the TV to sleep (outside its
+    // hours, --sleep) and that stays so. Inside or outside its hours, the store then says on or dark.
     fun boot(context: Context) {
-        if (!isBillboard(context))
+        if (!isBillboard(context) || booted)
             return
+        booted = true
+        val app = context.applicationContext
+        val overlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(app)
+        Log.i(TAG, "Billboard: the TV turned on; opening the billboard (may start by itself: $overlay)")
+        open(app)
+        val main = Handler(Looper.getMainLooper())
+        for (delay in longArrayOf(10_000L, 25_000L, 45_000L))
+            main.postDelayed({ if (!inFront && awake(app)) open(app) }, delay)
+    }
+
+    private const val TAG = "ViewTouch"
+
+    private fun awake(context: Context): Boolean = try {
+        (context.getSystemService(Context.POWER_SERVICE) as PowerManager).isInteractive
+    } catch (_: Exception) {
+        true
+    }
+
+    private fun open(context: Context) {
         try {
             val pm = context.packageManager
             val start = pm.getLaunchIntentForPackage(context.packageName)
                 ?: pm.getLeanbackLaunchIntentForPackage(context.packageName) ?: return
-            context.startActivity(start.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (_: Exception) {
+            context.startActivity(start.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
+        } catch (e: Exception) {
+            Log.w(TAG, "Billboard: couldn't open the billboard at start: $e")
         }
     }
 }
