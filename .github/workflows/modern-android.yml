@@ -12,9 +12,11 @@ on:
   push:
     tags:
       - 'modern-v*'
+    branches:
+      - helper/qt612   # the move to Qt 6.12 (owner 2026-11-13)
 
 env:
-  QT_VERSION: 6.11.2
+  QT_VERSION: 6.12.0   # as modern/tools/qt-version
   NDK_VERSION: 27.2.12479018
   ANDROID_PLATFORM: android-35
   BUILD_TOOLS: 35.0.0
@@ -38,7 +40,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'   # what Qt 6.12 for Android builds with
 
       - name: Android SDK pieces
         run: |

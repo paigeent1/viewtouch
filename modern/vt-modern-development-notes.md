@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 12:07 ET — Helper (Claude) for Bob — Qt 6.12: CI on helper/qt612, Android on 6.12, lists from C++ (upstream eb937a7)
+- **What:** modern-checks-qt612.yml also runs on pushes to helper/qt612. modern-android.yml: Qt 6.12.0 (was 6.11.2) and JDK 21, also built on helper/qt612 pushes; Qt Multimedia module and artifact names kept. Ported upstream eb937a7: ActionListEditor, FieldEditor and WidgetMenuBuilder accept Qt's list from C++ as well as a JavaScript Array (from Qt 6.12 a list passed through C++ is no longer an Array). Works on Qt 6.8 too.
+- **Why:** Owner 2026-11-13: move the fork to the official Qt 6.12 before BHDAN goes live, so it can keep up with official ViewTouch (on 6.12 since 4f08fd8).
+- **Files:** `.github/workflows/modern-android.yml`, `.github/workflows/modern-checks-qt612.yml`, `modern/ui/qml/ActionListEditor.qml`, `modern/ui/qml/FieldEditor.qml`, `modern/ui/qml/WidgetMenuBuilder.qml`
+
 ### 2026-11-13 12:07 ET — Helper (Claude) for Bob — Manual pictures: one script makes all of them (tools/manual_shots.sh)
 - **What:** New modern/tools/manual_shots.sh: runs the [manual] tests (OpenGL under xvfb-run), then every other test plus hidden [hostShots]/[phoneFloors] with VTM_SHOTS, names their pictures for the manual (MAP table, e.g. 51-find-item -> m100-find-item), joins the 50-settle-* layouts into m99, copies the lu-* Label Utility pictures from docs/label-utility/, converts PNG/JPEG to the extension manual.html asks for, takes pictures no test makes any more from upstream ViewTouch's committed copy (pinned commit), and lists anything still missing. The Modern manual workflow calls it (imagemagick added, timeout 100 min); README step 1 points to it.
 - **Why:** The manual PDF had blank spaces: 104 of its pictures were never made by the workflow (different test names, other tests, Label Utility pictures).
