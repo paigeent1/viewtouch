@@ -213,6 +213,15 @@ ApplicationWindow {
                     if (event.text.length === 1 && event.text > " ") {
                         root.scanBuffer = burst ? root.scanBuffer + event.text : event.text
                         if (root.scanBuffer.startsWith("@")) idScanEnd.restart()
+                    } else if (burst && root.scanBuffer.startsWith("@")
+                               && ((event.text.length === 1 && event.text.charCodeAt(0) < 32)
+                                   || (event.modifiers & Qt.ControlModifier))) {
+                        // A license's line breaks typed as control keys (Ctrl+J, Ctrl+M, Ctrl+^: some
+                        // keyboard-mode scanners, BHDAN's Symbol 2026-11-13): a line break, not the end.
+                        root.scanBuffer += "\n"
+                        idScanEnd.restart()
+                        event.accepted = true
+                        return
                     } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && burst
                                && root.scanBuffer.startsWith("@")) {
                         // The back of a license: many lines; it's sent whole when the scanner stops.

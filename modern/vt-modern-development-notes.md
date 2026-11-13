@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 14:54 ET — Bob (Claude) — Keyboard-mode license scans: control keys are line breaks
+- **What:** Main.qml's scan catcher: during a burst that started with @ (a license), a key whose text is a control character or that comes with Ctrl (Ctrl+J, Ctrl+M, Ctrl+^) is a line break, not the end of the scan; before, any such key emptied what had been collected.
+- **Why:** BHDAN's Symbol reads the license (315 characters) but the ID check still asked: its line breaks arrive as control keys, each one wiped the scan, and only the last scrap reached ViewTouch.
+- **Files:** (none)
+
 ### 2026-11-13 14:31 ET — Helper (Claude) for Bob — A billboard TV opens the billboard by itself when it turns on
 - **What:** Billboard.boot (Android): on BOOT_COMPLETED (and QUICKBOOT_POWERON, billboard only) a billboard install opens the billboard, then again at 10/25/45 s while it isn't in front and the screen is on (the TV's home screen can come up over it; a TV the store put to sleep is left asleep). ViewTouchApplication tracks Billboard.inFront. Manifest declares SYSTEM_ALERT_WINDOW. vt-add-billboard allows it once per TV over adb (appops set org.viewtouch.pos SYSTEM_ALERT_WINDOW allow) on Deploy, Update app and Restart, with a plain-words line. Modern Android builds helper/billboard-* pushes. Manual ch. 25: the billboard comes back by itself after a power cut.
 - **Why:** Owner 2026-11-13: after a power cut fire5 sat on the Fire TV home screen until someone pressed Restart. Android 10+ (Fire OS 8, Android TV 12+) blocks an app opening itself from the background unless it may display over other apps; no device-specific code, works on any Fire TV / Android TV billboard. Tablets: unchanged (BOOT_COMPLETED still goes to Kiosk.boot; the permission is only declared, never granted on them).
