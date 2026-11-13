@@ -29,7 +29,7 @@
 <p style="font-size:18pt; color:#555">User Manual — Custom Retail &amp; Hospitality Edition</p>
 <p style="font-size:11pt; color:#555">For cashiers, bartenders, servers, kitchen staff and managers</p>
 <p style="font-size:16pt; color:#1f4fa8; font-weight:bold">Ver. 261110</p>
-<p style="font-size:11pt; color:#555">Effective with paigeent1 ver 0.9.505 (Custom Fork Edition, <code>paigeent1/viewtouch</code>)</p>
+<p style="font-size:11pt; color:#555">Effective with paigeent1 ver 0.9.511 (Custom Fork Edition, <code>paigeent1/viewtouch</code>)</p>
 <p class="shot"><img src="shots/m02-tables.png" width="520" height="292"></p>
 </div>
 
@@ -470,7 +470,8 @@
 <p><b>Back to the Retail screen:</b> the order screen, Tables and Open checks have a <b>🏷️ Retail Mode</b> button (on the order screen, just above the check). One touch goes back to the Retail screen.</p>
 <p class="shot"><img src="shots/m100-find-item.png" width="560" height="315"></p>
 <!-- SHOT: Find with a few words typed: the yellow search line saying "12 matches", rows with name / UPC / price, PG UP / PG DN on the right (page find-item) -->
-<!-- SHOT: the order screen with the 🏷️ Retail Mode button above the check (page order-template) -->
+<p class="shot"><img src="img/order-retail-mode.png" width="560" height="350"></p>
+<p class="caption">The order screen: <b>🏷️ Retail Mode</b> is just above the check.</p>
 
 <h2>Sold by weight</h2>
 <p>Some things are sold by the pound, like the demo's <b>Smoked Brisket</b>. Touch it and the <b>Weigh</b> page asks how much: type the weight from the scale (<i>125</i> is 1.25 lb) and it shows the price as you type. Touch <b>Add</b>. The check says "Smoked Brisket 1.25 lb" with its price.</p>
@@ -934,7 +935,8 @@
 <p class="shot"><img src="shots/m30-manager.png" width="560" height="315"></p>
 <p class="caption">The Manager screen (PIN 1234).</p>
 <p><b>Network…</b> shows the store's computers and printers (chapter 18), and <b>Self-Order Kiosk</b> turns this screen into a kiosk for guests (chapter 16).</p>
-<!-- SHOT: the store's Manager screen with System Config, Label Utility, Store Setup and Displays (page manager) -->
+<p class="shot"><img src="img/manager.png" width="560" height="350"></p>
+<p class="caption">The Manager screen.</p>
 <p>This edition's Manager screen also has <b>System Config</b> (opens Hardware Configuration), <b>Label Utility</b> (chapter 20), <b>Store Setup</b> and <b>Displays</b> (the kitchen, bar and expo screens). Hardware Configuration has <b>Terminals</b>, <b>Printers</b>, the tablet buttons, <b>Learn guest touchscreen (2x Tap)</b>, <b>Site Setup</b>, <b>Bluetooth scanner</b>, <b>Screen check</b> and <b>Billboards</b> (chapter 30, Site Setup, Hardware Configuration and Screen check). A store whose Hardware Configuration or Reports page was edited gets these new buttons once, by itself.</p>
 <p>Every Manager screen works the same way: the list on the left, the details on the right. Touch a record, change it, touch <b>Save</b> (or <b>Undo changes</b>). <b>+ Add</b> makes a new one; <b>Remove</b> deletes it.</p>
 
@@ -1468,8 +1470,10 @@
 <li><i>&lt;tablet&gt; is not connected — it may be off, asleep with Wi-Fi off, or out of battery.</i> A tablet whose screen was turned off with its power button can't beep until it's woken.</li>
 <li><i>Last seen</i> starts over when ViewTouch restarts on the store's computer.</li>
 </ul>
-<!-- SHOT: the Find a Tablet page with two tablets, one Connected with Find, one Not connected · last seen (page find-tablet) -->
-<!-- SHOT: a tablet showing the flashing "Here I am — tap to stop" (on a tablet, FindMeOverlay; not a page) -->
+<p class="shot"><img src="img/find-tablet.jpg" width="480" height="274"></p>
+<p class="caption">Find a tablet, on a tablet: Bar 2 Tablet is beeping (Stop ends it); Bar 1 Tablet is not connected.</p>
+<p class="shot"><img src="img/find-me-tablet.jpg" width="420" height="218"></p>
+<p class="caption">The tablet being looked for flashes <i>Here I am — tap to stop</i>.</p>
 
 <h2>A big price book on a tablet</h2>
 <p>Tablets don't get the whole retail price book. Find, Item Look Up and Labels ask the main computer, and a scan on a tablet is looked up on the main computer, so they stay quick with 30,000 items.</p>
@@ -1603,6 +1607,8 @@
 
 <h2>The Retail screen</h2>
 <p>Registers set up for counter sales open straight on the <b>Retail POS Entry</b> screen. It is made for quick cigar, cigarette and convenience checkout: scan or type a UPC or PLU on the keypad in the middle, and the item goes on the sale. To make a register start there, set Manager → Terminals → the register → <i>Start screen</i>.</p>
+<p class="shot"><img src="img/retail-entry.png" width="560" height="350"></p>
+<p class="caption">The Retail POS Entry screen.</p>
 <!-- SHOT: the Retail POS Entry screen with a sale on it (page retail-entry) -->
 <div class="tip"><b>Retail and Hospitality:</b> <b>🍽️ Hospitality Mode</b> goes to the restaurant and bar screens with one touch. <b>🏷️ Retail Mode</b> comes back: it is on the order screen (above the check), Tables, Open checks and Find a Check.</div>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
@@ -1639,7 +1645,8 @@
 <li><b>TIME CLOCK</b>.</li>
 <li><b>‹ Back</b> goes back to the sale.</li>
 </ul>
-<!-- SHOT: the Cashier Duty page (page cashier-duty) -->
+<p class="shot"><img src="img/cashier-duty.png" width="560" height="350"></p>
+<p class="caption">Cashier Duty.</p>
 
 <h2>Look Up Checks: past receipts</h2>
 <ul>
@@ -1649,6 +1656,8 @@
 <li><b>Reprint…</b> asks which copy: customer copy, gift receipt, or with the date of birth (chapter 5). Look Up Checks stays open after a reprint. <b>Cancel</b> goes back where you came from: the Retail screen, or Cashier Duty.</li>
 <li><b>ILSA history</b> opens the old ILSA receipts (chapter 28, ILSA sales history).</li>
 </ul>
+<p class="shot"><img src="img/receipt-lookup.png" width="560" height="350"></p>
+<p class="caption">Look Up Checks.</p>
 <!-- SHOT: Look Up Checks with a receipt shown (page receipt-lookup) -->
 
 <h2>Item Look Up</h2>
@@ -1659,7 +1668,8 @@
 <li>The items show with their prices and UPCs; <b>▲ PG UP</b> and <b>▼ PG DN</b> on the right page through them, as on Find. Touch an item to ring it in.</li>
 <li><b>‹ Back</b> or <b>✕ Close</b> goes back to the sale.</li>
 </ul>
-<!-- SHOT: Item Look Up, partway down the tree (page item-lookup) -->
+<p class="shot"><img src="img/item-lookup.png" width="560" height="350"></p>
+<p class="caption">Item Look Up at the top of the tree: the department groups, each with how many items.</p>
 <div class="tip">A store whose Retail page was changed in the page editor may still have the old buttons. In edit mode, set <b>ALPHA LOOK UP</b> to <i>Jump to page</i> → <b>Item Look Up</b>, <b>ITEM RETURN</b> to <i>Jump to page</i> → <b>Find a Check</b>, and <b>Reprint Receipt</b> to <i>Jump to page</i> → <b>Look Up Checks</b> (chapter 13).</div>
 
 <h2>Price check</h2>
@@ -1688,7 +1698,8 @@
 <li><b>SUBTOTAL DISCOUNT</b>: everything in the sale.</li>
 </ul>
 <p>Each opens 5%, 10%, 15%, 20%, 25%, 30%, 35%, <b>COMP 100%</b> and <b>VARIABLE %</b> (type the percent, then Apply). Items marked No discounts (cigarettes) are never discounted. <b>‹ Back to the sale</b> goes back.</p>
-<!-- SHOT: Discount: which? (page retail-discounts) -->
+<p class="shot"><img src="img/retail-discounts.png" width="560" height="350"></p>
+<p class="caption">Discount: which?</p>
 
 <h2>3-Way Menu Builder &amp; Full-Screen Retail Item Workstation</h2>
 <p>Opening <b>Manager → Menu Builder</b> presents a 3-way mode chooser—<b>Hospitality (F&amp;B)</b>, <b>Retail Inventory</b>, and <b>Events &amp; Admissions</b>—with per-category visibility toggles so retail merchandise categories stay separate from restaurant and bar screens (<b>🏷 Retail screen only</b>, chapter 11). The Retail screen's <b>🔍 Item / UPC Builder</b> opens it too.</p>
@@ -2060,6 +2071,8 @@
 <li><b>Manager → System Config → Billboards</b></li>
 </ul>
 <p>It is laid out like Terminals. The list on the left starts with <b>Billboard defaults</b> (the usual hours, volume and mute), then a row for each billboard: its address, Online or Offline, on or dark (or asleep, waking), and muted or its sound level. Touch a row to see its form on the right.</p>
+<p class="shot"><img src="img/billboards.png" width="560" height="350"></p>
+<p class="caption">Billboards: Billboard defaults and each billboard on the left.</p>
 <!-- SHOT: Billboards page (page billboards), list on the left, a billboard's form on the right -->
 
 <h2>Adding a billboard</h2>
@@ -2120,7 +2133,8 @@
 <li>On a tablet: <b>Manager → Label Utility</b> opens this screen too.</li>
 </ul>
 <p>The red <b>✕ Close</b> at the top right leaves it. Each step is its own screen; <b>‹ Back</b> steps back one.</p>
-<!-- SHOT: Labels screen (page labels), step 1 "Choose a label" -->
+<p class="shot"><img src="img/labels-choose.png" width="560" height="350"></p>
+<p class="caption">Labels, step 1: choose a label.</p>
 
 <h2>Printing labels, step by step</h2>
 <ol>
@@ -2254,7 +2268,8 @@
 
 <h2>ILSA History reports</h2>
 <p><b>Manager → Reports → ILSA History</b>. <b>‹ Reports</b> goes back.</p>
-<!-- SHOT: Reports > ILSA History, Daily Z for one day (page ilsa-history) -->
+<p class="shot"><img src="img/ilsa-history.png" width="560" height="350"></p>
+<p class="caption">Reports → ILSA History, Daily Z for one day.</p>
 <p>Pick a report, then the days: <b>Yesterday</b>, <b>This Month</b>, <b>Last Month</b>, <b>This Year</b>, <b>Last Year</b>, <b>All</b>, or your own <b>From</b> … <b>to</b> (on the calendar, chapter 2) and <b>Show</b>.</p>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>Report</th><th>What it shows</th></tr>
@@ -2310,7 +2325,8 @@
 <h2>The receipt barcode</h2>
 <p><b>To turn it on:</b> Manager → Store Settings → <b>Receipts</b> → <i>Print a barcode on receipts</i> (off to start), and Save.</p>
 <p>From then on every receipt, reprint and gift receipt ends with a barcode. Under it is the check's reference: <b>R</b>, the store letters, a dash and the check number, like <code>RHCA-100245</code>. A store with no letters prints <code>R-100245</code>.</p>
-<!-- SHOT: a printed receipt ending with its barcode RHCA-100245 -->
+<p class="shot"><img src="img/receipt-barcode.jpg" width="220" height="400"></p>
+<p class="caption">A receipt ending with its barcode and reference.</p>
 
 <h3>Using it: returns and reprints</h3>
 <ol>
@@ -2319,6 +2335,8 @@
 <li>Reprint it, or (a manager) touch <b>Refund…</b> for a return (chapter 11).</li>
 </ol>
 <p>No scanner, or a smudged barcode? Type the reference (<code>RHCA-100245</code>) in Find a Check's search box.</p>
+<p class="shot"><img src="img/find-check.png" width="560" height="350"></p>
+<p class="caption">Find a Check.</p>
 <!-- SHOT: Find a Check opened by a scanned receipt barcode, the check picked (page find-check) -->
 <h3>What the messages mean</h3>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
@@ -2345,7 +2363,8 @@
 
 <h2>Hardware Configuration</h2>
 <p><b>Manager → System Config</b> opens <b>Hardware Configuration</b>.</p>
-<!-- SHOT: Hardware Configuration (page hardware-config) -->
+<p class="shot"><img src="img/hardware-config.png" width="560" height="350"></p>
+<p class="caption">Hardware Configuration.</p>
 <table border="1" cellpadding="5" cellspacing="0" width="100%">
 <tr><th>Button</th><th>What it does</th></tr>
 <tr><td><b>Terminals</b></td><td>The screens and tablets (Manager → Terminals, chapter 11).</td></tr>
@@ -2421,7 +2440,8 @@
 
 <h2>Screen check</h2>
 <p><b>Manager → System Config → Screen check</b>. The screen says <i>Screen check: monitors and touchscreens</i>. Use it when the register shows on the wrong monitor, a touch lands on the wrong screen, or a monitor flickers.</p>
-<!-- SHOT: Screen check with two monitors and two touchscreens (page screen-check) -->
+<p class="shot"><img src="img/screen-check.png" width="560" height="350"></p>
+<p class="caption">Screen check: two monitors and their touchscreens, with one thing to fix at the top.</p>
 <h3>What it shows</h3>
 <ul>
 <li><b>The answer at the top:</b> <i>All good: register on &lt;port&gt;, guest screen on &lt;port&gt;</i>, or <i>&lt;n&gt; thing(s) to fix:</i> and a list.</li>

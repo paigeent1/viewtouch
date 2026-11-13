@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 11:28 ET — Helper (Claude) for Bob — User manual Ver. 261110: the store's pictures
+- **What:** Put 16 pictures of this store into modern/docs/manual/manual.html (13 screenshots from the 2026-11-13 vt-manual-shots run on BHDAN, 3 phone photos with the owner's name hidden) in the new committed folder modern/docs/manual/img/ (PNG8/JPEG, 20-150 KB each). 12 SHOT marks filled; 4 pictures added beside marks that stay open (retail-entry, receipt-lookup, billboards, find-check: the scrubbed store has no sale/receipt/billboard form to show); 26 marks left. Cover: effective with ver 0.9.511. README Last rebuilt updated.
+- **Why:** The Ver. 261110 edition needed pictures of this store in place of its SHOT marks.
+- **Files:** `modern/docs/manual/README.md`, `modern/docs/manual/img/billboards.png`, `modern/docs/manual/img/cashier-duty.png`, `modern/docs/manual/img/find-check.png`, `modern/docs/manual/img/find-me-tablet.jpg`, `modern/docs/manual/img/find-tablet.jpg`, `modern/docs/manual/img/hardware-config.png`, `modern/docs/manual/img/ilsa-history.png`, `modern/docs/manual/img/item-lookup.png`, `modern/docs/manual/img/labels-choose.png`, `modern/docs/manual/img/manager.png`, `modern/docs/manual/img/order-retail-mode.png`, `modern/docs/manual/img/receipt-barcode.jpg`, `modern/docs/manual/img/receipt-lookup.png`, `modern/docs/manual/img/retail-discounts.png`, `modern/docs/manual/img/retail-entry.png`, `modern/docs/manual/img/screen-check.png`, `modern/docs/manual/manual.html`
+- **Next person must know:** The PDF built here (179 pages) has blank spaces where the 181 demo pictures in shots/ go: shots/ is not in git and was not available, so build the edition PDF where the vtm_tests [manual] shots exist. Site Setup shots showed only 'Site Setup is for admins.' (run the shot user as admin); customer-display failed to open (run.log).
+
 ### 2026-11-13 10:18 ET — Bob (Claude) — vt-manual-shots: take every page, not just the first
 - **What:** Each ViewTouch run in vt-manual-shots now gets </dev/null. It was reading the page list the loop feeds on stdin, so the loop ended after the first page (2 pictures of 111 on BHDAN, 2026-11-13 10:17).
 - **Why:** Owner ran vt-manual-shots on BHDAN for the user manual Ver. 261110 pictures and got only 2.
