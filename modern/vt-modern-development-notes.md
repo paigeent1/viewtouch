@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 11:40 ET — Bob (Claude) — Modern manual workflow: OpenGL on a virtual X screen
+- **What:** The [manual] screenshots run under xvfb-run with Mesa's software OpenGL (QT_QPA_PLATFORM=xcb), LANG=C.UTF-8.
+- **Why:** In CI the offscreen platform had no OpenGL context: the [manual] test aborted (QRhiGles2: Failed to create context) and only 4 pictures were made.
+- **Files:** (none)
+
 ### 2026-11-13 11:30 ET — Bob (Claude) — Modern manual workflow: no libreoffice-writer-web package
 - **What:** Dropped libreoffice-writer-web from the install (Debian 13 has no such package; the writer_web PDF filter comes with Writer).
 - **Why:** The first run failed at apt-get install.
