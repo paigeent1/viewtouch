@@ -19,6 +19,10 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- A tablet only for ViewTouch starts it when it turns on (Kiosk.kt). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- A billboard TV opens again by itself when it turns on (Billboard.kt): Android 10+ lets an app
+         open itself from the background only with this, allowed once per TV by vt-add-billboard
+         (appops set ... SYSTEM_ALERT_WINDOW allow). Never asked for on a tablet. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <!-- Granted once per tablet with adb (pm grant): turns wireless debugging back on after a restart. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
     <!-- The Stripe Terminal SDK needs location to start (a Stripe reader
@@ -85,6 +89,8 @@
         <receiver android:name="org.viewtouch.pos.KioskBoot" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
         <!-- Lets Android's installer read an update ViewTouch fetched (Updater.kt). -->

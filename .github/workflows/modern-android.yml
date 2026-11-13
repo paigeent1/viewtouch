@@ -14,6 +14,7 @@ on:
       - 'modern-v*'
     branches:
       - helper/qt612   # the move to Qt 6.12 (owner 2026-11-13)
+      - 'helper/billboard-*'   # billboard work (a TV opening the billboard by itself, 2026-11-13)
 
 env:
   QT_VERSION: 6.12.0   # as modern/tools/qt-version
