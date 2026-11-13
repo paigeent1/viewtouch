@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 14:30 ET — Bob (Claude) — Manual: the billboard TV photo
+- **What:** img/billboard-tv.jpg (owner's photo of fire5, cropped, 1200 px, EXIF stripped) in place of the billboard TV SHOT mark in chapter 25.
+- **Why:** Owner 2026-11-13: use the photos he just sent for now (they show the starter messages).
+- **Files:** (none)
+
 ### 2026-11-13 12:50 ET — Helper (Claude) for Bob — Pi scripts can build and run on Qt 6.12 (QT_PREFIX, vt-qt612)
 - **What:** New site setting QT_PREFIX (vt-site / vt-site-lib): empty = Debian's Qt and modern/build exactly as before; /opt/qt/6.12.0 = cmake with CMAKE_PREFIX_PATH into modern/build-qt612. vt-server, vt-start, vt-fast, vt-manual-shots, vt-web-reports, vt-add-tablet, vt-add-billboard, vt-status, vt-check-tablets and vt-install use $VT_BUILD; vt-server skips the Debian Qt Multimedia apt steps when QT_PREFIX is set, makes build-qt612 the first time (fresh again if made for another Qt folder) and refuses to build if the Qt folder is gone. New vt-qt612: install (database backup to ~/vt-backups, missing packages only with --no-upgrade, get-qt.sh into /opt/qt/6.12.0, plain OK/PROBLEM/WARNING checks of the Wayland and xcb screen plugins and the FFmpeg video backend, then QT_PREFIX + vt-server; switches back to 6.8 by itself if the build or start fails), off (QT_PREFIX empty + vt-server), status (which libQt6Core the running vtmodern loaded). QT612_MOVE.md sections 2-5 now use vt-qt612.
 - **Why:** Phase 2 of the Qt 6.12 move (QT612_MOVE.md): one setting per Pi picks the Qt, so HCA can move first and any Pi can roll back with one command, while Pis that haven't opted in behave exactly as before.
