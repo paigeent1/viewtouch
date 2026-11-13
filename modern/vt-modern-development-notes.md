@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 15:25 ET — Bob (Claude) — Keyboard-mode license scans collected whole until the scanner goes quiet
+- **What:** Main.qml's scan catcher: once a scan starts with @ (a license), every key is part of it until 400 ms of quiet: printable keys including the space, and line breaks as Enter or Ctrl keys; the scanner's pauses around its Ctrl keys no longer end it. Before, the space in 'ANSI ' (and any pause over 60 ms) emptied it, so only a piece reached the ID check. New UI test types a license with Ctrl+J and pauses.
+- **Why:** Owner 2026-11-13: BHDAN's Symbol scan still didn't pass the ID check after 5c0fd15; Site Setup's scanner test showed 'A code with letters' (a piece of the license).
+- **Files:** (none)
+
 ### 2026-11-13 14:54 ET — Bob (Claude) — Keyboard-mode license scans: control keys are line breaks
 - **What:** Main.qml's scan catcher: during a burst that started with @ (a license), a key whose text is a control character or that comes with Ctrl (Ctrl+J, Ctrl+M, Ctrl+^) is a line break, not the end of the scan; before, any such key emptied what had been collected.
 - **Why:** BHDAN's Symbol reads the license (315 characters) but the ID check still asked: its line breaks arrive as control keys, each one wiped the scan, and only the last scrap reached ViewTouch.

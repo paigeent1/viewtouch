@@ -8857,3 +8857,31 @@ TEST_CASE("UI: Find and price check with a 31,700-item price book", "[flow][ui][
     CHECK(s.c.pageId() == u"retail-entry"_s);
     qputenv("HOME", oldHome);
 }
+
+TEST_CASE("UI: a keyboard-mode scanner types a license: spaces, Ctrl line breaks and pauses", "[flow][ui][age]")
+{
+    // As BHDAN's Symbol does (2026-11-13): "@", line breaks as Ctrl+J, a pause around them, spaces.
+    Screen s;
+    REQUIRE(s.pos.loginWithPin(u"2222"_s));
+    s.pos.shared()->settings.idCheckAlcohol = true;
+    s.c.activate(u"quick"_s);
+    REQUIRE(s.pos.hasCheck());
+    s.c.orderItem(u"draft-beer"_s);
+    REQUIRE_FALSE(s.pos.ageAsk().isEmpty());
+    const QString dob = QDate::currentDate().addYears(-30).toString(u"MMddyyyy"_s);
+    const QString lic = u"@\nANSI 636000090002DL00410200ZC02410012DLDAQT64235789\nDCSSAMPLE\nDACTEST\nDBB"_s + dob
+                      + u"\nDBA"_s + QDate::currentDate().addYears(3).toString(u"MMddyyyy"_s) + u"\nDAJCT"_s;
+    for (const QChar ch : lic) {
+        if (ch == u'\n') {
+            QTest::qWait(80);   // the scanner's pause around a control key: longer than a burst's 60 ms
+            QTest::keyClick(s.window, Qt::Key_J, Qt::ControlModifier);
+            QTest::qWait(80);
+        } else {
+            QTest::sendKeyEvent(QTest::Click, s.window, Qt::Key_unknown, ch.toLatin1(), Qt::NoModifier);
+        }
+    }
+    QTest::keyClick(s.window, Qt::Key_Return);
+    QTest::qWait(600);   // the license is sent once the scanner goes quiet
+    CHECK(s.pos.ageAsk().isEmpty());
+    CHECK(s.pos.lines().size() == 1);
+}

@@ -34,7 +34,7 @@ ApplicationWindow {
     // A license barcode typed by a keyboard-mode scanner (a Bluetooth one on a tablet): done when it stops.
     Timer {
         id: idScanEnd
-        interval: 200
+        interval: 400
         onTriggered: {
             if (!root.scanBuffer.startsWith("@")) return
             const code = root.scanBuffer
@@ -206,10 +206,27 @@ ApplicationWindow {
                     // then Enter.
                     const now = Date.now()
                     const burst = now - root.scanLast < 60
+                    // A license (it starts with @) is collected whole until the scanner goes quiet
+                    // (idScanEnd): its spaces, line breaks (Enter or Ctrl+J / Ctrl+M / Ctrl+^) and the
+                    // scanner's pauses around them are part of it (BHDAN's Symbol, 2026-11-13: the space
+                    // in "ANSI " and the Ctrl keys used to empty it).
+                    const inLicense = root.scanBuffer.startsWith("@") && now - root.scanLast < 400
                     // Shift (capital letters in a license barcode) is part of the burst, not its end.
-                    if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control || event.key === Qt.Key_Alt)
+                    if (event.key === Qt.Key_Shift || event.key === Qt.Key_Control || event.key === Qt.Key_Alt) {
+                        if (inLicense) root.scanLast = now
                         return
+                    }
                     root.scanLast = now
+                    if (inLicense) {
+                        const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+                        if (event.text.length === 1 && event.text >= " " && !ctrl)
+                            root.scanBuffer += event.text
+                        else if (ctrl || event.text.length === 1 || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                            root.scanBuffer += "\n"
+                        idScanEnd.restart()
+                        event.accepted = true
+                        return
+                    }
                     if (event.text.length === 1 && event.text > " ") {
                         root.scanBuffer = burst ? root.scanBuffer + event.text : event.text
                         if (root.scanBuffer.startsWith("@")) idScanEnd.restart()
