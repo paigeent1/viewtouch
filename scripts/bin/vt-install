@@ -42,8 +42,11 @@ EOF
 fi
 
 step "5. Configure the build"
-if [ ! -f modern/build/build.ninja ]; then
-    cmake -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+# For this site's Qt (vt-site QT_PREFIX; a new Pi: Debian's, modern/build). The official Qt 6.12
+# afterwards: vt-qt612 install (modern/docs/QT612_MOVE.md).
+. "$REPO/scripts/bin/vt-site-lib"
+if [ ! -f "$VT_BUILD/build.ninja" ] && vt_qt_ok; then
+    vt_configure
 fi
 
 step "6. Start ViewTouch at every boot, and a desktop shortcut (vt-start)"

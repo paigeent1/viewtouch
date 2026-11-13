@@ -1,7 +1,8 @@
 # Sourced by the vt-* scripts: this site's hardware, from files on this Pi (never in Git), so a new
 # store is set up with `vt-site`, not by changing code.
 #   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
-#                                   STANDBY_ALLOWED (yes/no; not set = yes)
+#                                   STANDBY_ALLOWED (yes/no; not set = yes), QT_PREFIX (empty = Debian's Qt;
+#                                   /opt/qt/6.12.0 = the official Qt 6.12: vt-qt612 install / off)
 #     SERIAL_SCANNER: empty or all = every USB-serial port (any number of scanners); off = none; or a
 #     list of ports by commas or spaces, each @speed if wanted ("/dev/ttyUSB0, /dev/ttyUSB1@19200").
 #     vt-server / vt-start pass it to ViewTouch as VT_SERIAL_SCANNER (see modern/ui/cpp/serialscanner.hh).
@@ -15,6 +16,36 @@ VT_REPO="${VT_REPO:-$HOME/viewtouch-main}"
 [ -f "$VT_SITE_CONF" ] && . "$VT_SITE_CONF"
 SERVER_PORT="${SERVER_PORT:-7719}"
 SERIAL_SCANNER_BAUD="${SERIAL_SCANNER_BAUD:-9600}"
+
+# Which Qt ViewTouch is built with and runs on (site.conf QT_PREFIX; vt-qt612 switches it):
+#   not set / empty   Debian's Qt (6.8), build folder modern/build: as before QT_PREFIX existed.
+#   /opt/qt/6.12.0    the official Qt there (modern/tools/get-qt.sh), build folder modern/build-qt612.
+# The 6.12 program finds that Qt by itself: CMake writes /opt/qt/6.12.0/lib into it (RUNPATH), and
+# Qt finds its plugins and QML beside its own libraries. So nothing is set when it starts, and
+# /opt/qt/6.12.0 must stay where it is. Each Qt keeps its own build folder, so switching back
+# (vt-qt612 off) finds modern/build as it was. See modern/docs/QT612_MOVE.md.
+QT_PREFIX="${QT_PREFIX:-}"
+QT_PREFIX="${QT_PREFIX%/}"
+if [ -n "$QT_PREFIX" ]; then
+    # build-qt612 for /opt/qt/6.12.x (build-qt for a folder not named by its version).
+    VT_QT_TAG=$(basename "$QT_PREFIX" | sed -n 's/^\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1\2/p')
+    VT_BUILD="$VT_REPO/modern/build-qt$VT_QT_TAG"
+    # Folders of another Qt named in the environment would mix two Qts in one program.
+    unset QT_PLUGIN_PATH QML_IMPORT_PATH QML2_IMPORT_PATH
+else
+    VT_BUILD="$VT_REPO/modern/build"
+fi
+
+# Set up the build folder for this site's Qt: vt_configure [--fresh]
+vt_configure() {
+    cmake "$@" -S "$VT_REPO/modern" -B "$VT_BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${QT_PREFIX:+"-DCMAKE_PREFIX_PATH=$QT_PREFIX"}
+}
+
+# Is QT_PREFIX a Qt CMake can build with? (Empty: Debian's, always yes.)
+vt_qt_ok() {
+    [ -z "$QT_PREFIX" ] || [ -f "$QT_PREFIX/lib/cmake/Qt6/Qt6Config.cmake" ]
+}
 
 # The ViewTouch server's address: SERVER_ADDR, else this Pi's own.
 vt_server_addr() {

@@ -16,9 +16,9 @@ adb -s "$USB" install -r "$APK" >/dev/null
 adb -s "$USB" shell dpm set-device-owner org.viewtouch.pos/.KioskAdmin >/dev/null 2>&1 || true
 adb -s "$USB" shell "settings put system accelerometer_rotation 0; settings put system user_rotation 1; settings put system screen_off_timeout 2147483647; settings put global adb_wifi_enabled 1; settings put global stay_on_while_plugged_in 7; settings put global wifi_sleep_policy 2"
 adb -s "$USB" shell "mkdir -p /sdcard/Android/data/org.viewtouch.pos/files" >/dev/null 2>&1 || true
-CODE=$(QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
+CODE=$(QT_QPA_PLATFORM=offscreen "$VT_BUILD/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
 rm -rf /tmp/vt_pair && mkdir -p /tmp/vt_pair
-QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --data-dir /tmp/vt_pair --connect "$SERVER" --pair "$CODE" --terminal "$NAME" --pair-only >/dev/null 2>&1
+QT_QPA_PLATFORM=offscreen "$VT_BUILD/vtmodern" --data-dir /tmp/vt_pair --connect "$SERVER" --pair "$CODE" --terminal "$NAME" --pair-only >/dev/null 2>&1
 adb -s "$USB" push "$(find /tmp/vt_pair -name "terminal.json" | head -n 1)" /data/local/tmp/terminal.json >/dev/null
 adb -s "$USB" tcpip 5555 >/dev/null 2>&1 && sleep 2
 if [ -n "$IP" ]; then

@@ -21,9 +21,9 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-BIN="$VT_REPO/modern/build/vtmodern"
+BIN="$VT_BUILD/vtmodern"
 [ -x "$BIN" ] || BIN=/usr/local/bin/vtmodern
-[ -x "$BIN" ] || { echo "No ViewTouch build found (modern/build/vtmodern)."; exit 1; }
+[ -x "$BIN" ] || { echo "No ViewTouch build found ($VT_BUILD/vtmodern)."; exit 1; }
 LIVE_DIR="${VT_DATA_DIR:-$HOME/.local/share/ViewTouch/ViewTouch}"
 LIVE_DB="$LIVE_DIR/viewtouch.db"
 [ -f "$LIVE_DB" ] || { echo "No store database at $LIVE_DB"; exit 1; }

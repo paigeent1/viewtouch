@@ -3,7 +3,8 @@
 #   vt-site                               show them
 #   vt-site init "Store name"             start them for a new site (keeps what's there)
 #   vt-site set KEY value                 SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
-#                                         STANDBY_ALLOWED (yes / no: may this computer become a standby)
+#                                         STANDBY_ALLOWED (yes / no: may this computer become a standby),
+#                                         QT_PREFIX (which Qt: empty = Debian's 6.8; vt-qt612 sets it)
 #   vt-site set SERIAL_SCANNER ""         serial scanners: every USB-serial port (the default; any number
 #                                         of scanners, printers' ports left alone). Same: all. off: none.
 #                                         Or only some ports, by commas or spaces, each @speed if wanted:
@@ -13,7 +14,7 @@
 #   vt-site edit                          open the settings in nano
 # Printers, taxes, receipts and the rest are set in ViewTouch itself (Manager); TVs with vt-directv scan --save.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD STANDBY_ALLOWED"
+KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD STANDBY_ALLOWED QT_PREFIX"
 
 write_template() {
     mkdir -p "$VT_CONF_DIR"
@@ -47,6 +48,8 @@ case "$1" in
         echo "Server: $(vt_server_addr):$SERVER_PORT"
         echo "Serial scanners: ${SERIAL_SCANNER:-all: every USB-serial port} (speed $SERIAL_SCANNER_BAUD baud unless @speed)"
         echo "May become a standby: ${STANDBY_ALLOWED:-yes (not set)}"
+        qt="$QT_PREFIX"; [ -z "$qt" ] && qt="Debian's (not set)"
+        echo "Qt: $qt   build folder: $VT_BUILD (vt-qt612 status)"
         echo "Tablets:"; t=$(vt_tablets); [ -n "$t" ] && echo "$t" | sed 's/|/  /; s/^/  /' || echo "  (none: vt-site tablet add \"Bar 1\" 192.168.1.x)"
         n=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$VT_CONF_DIR/tvs.json" 2>/dev/null)
         echo "TVs: ${n:-none} (vt-directv list / vt-directv scan --save)" ;;
@@ -66,12 +69,19 @@ case "$1" in
         if [ "$2" = STANDBY_ALLOWED ]; then
             case "$val" in yes|no) ;; *) echo "STANDBY_ALLOWED is yes or no"; exit 2 ;; esac
         fi
+        if [ "$2" = QT_PREFIX ]; then
+            val="${val%/}"
+            if [ -n "$val" ] && [ ! -f "$val/lib/cmake/Qt6/Qt6Config.cmake" ]; then
+                echo "No Qt in $val (vt-qt612 install puts Qt 6.12 in /opt/qt/6.12.0). Not changed."; exit 2
+            fi
+        fi
         if grep -q "^$2=" "$VT_SITE_CONF"; then sed -i "s|^$2=.*|$2=\"$val\"|" "$VT_SITE_CONF"
         else echo "$2=\"$val\"" >> "$VT_SITE_CONF"; fi
         echo "$2=\"$val\""
         case "$2" in
             SERIAL_SCANNER*) echo "Restart ViewTouch for the scanner to use it: vt-server" ;;
             STANDBY_ALLOWED) echo "Takes effect the next time ViewTouch starts (vt-start or vt-server)." ;;
+            QT_PREFIX) echo "Takes effect with vt-server (it builds for that Qt; vt-start runs that build)." ;;
         esac ;;
     tablet)
         case "$2" in
@@ -84,5 +94,5 @@ case "$1" in
     edit)
         [ -f "$VT_SITE_CONF" ] || write_template
         ${EDITOR:-nano} "$VT_SITE_CONF" ;;
-    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

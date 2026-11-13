@@ -28,7 +28,7 @@ say() { echo "$*"; log "$*"; }
 
 vt_bin() {
     if [ -n "$VT_WEB_REPORTS_BIN" ]; then echo "$VT_WEB_REPORTS_BIN"
-    elif [ -x "$VT_REPO/modern/build/vtmodern" ]; then echo "$VT_REPO/modern/build/vtmodern"
+    elif [ -x "$VT_BUILD/vtmodern" ]; then echo "$VT_BUILD/vtmodern"
     else echo /usr/local/bin/vtmodern; fi
 }
 

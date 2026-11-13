@@ -3,7 +3,7 @@
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 /usr/local/bin/vt-adb-ensure >/dev/null 2>&1 || true
 GIT_HASH=$(git -C "$VT_REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
-LATEST=$(cat "$VT_REPO/modern/build/generated/vtm_build_number.hh" "$VT_REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
+LATEST=$(cat "$VT_BUILD/generated/vtm_build_number.hh" "$VT_BUILD/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
 line="Server: ${LATEST:-unknown (not built?)} (Git: ${GIT_HASH})"
 while IFS='|' read -r name ip <&3; do
     [ -z "$ip" ] && continue

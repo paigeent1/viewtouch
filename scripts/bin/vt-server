@@ -1,9 +1,20 @@
 #!/bin/bash
+# Rebuilds ViewTouch from the code here and restarts it (the store server). Builds for this site's
+# Qt (vt-site QT_PREFIX): not set = Debian's Qt in modern/build, as always; /opt/qt/6.12.0 = the
+# official Qt 6.12 in modern/build-qt612 (vt-qt612 install / off switch it; see QT612_MOVE.md).
 set -e
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 cd "$VT_REPO"
+if ! vt_qt_ok; then
+    echo "ViewTouch wasn't rebuilt: this Pi is set to Qt in $QT_PREFIX, but there's no Qt there."
+    echo "Put it there with vt-qt612 install, or go back to Debian's Qt with vt-qt612 off."
+    echo "The ViewTouch already running was left as it was."
+    exit 1
+fi
+# The official Qt brings its own Multimedia (and FFmpeg): the Debian Qt steps below are for Debian's only.
+DEBIAN_QT=; [ -z "$QT_PREFIX" ] && DEBIAN_QT=yes
 # Video on the customer display needs Qt Multimedia: installed once, the first time it's missing.
-if command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
+if [ -n "$DEBIAN_QT" ] && command -v dpkg >/dev/null && ! dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
     echo "Installing Qt Multimedia (video on the customer display)..."
     sudo apt-get install -y qt6-multimedia-dev qml6-module-qtmultimedia >/dev/null \
         && { sudo apt-get install -y qt6-ffmpeg-multimedia-plugin >/dev/null 2>&1 \
@@ -14,7 +25,7 @@ fi
 # Qt Multimedia's build files also need Qt's private GUI files, and playing a video needs a backend
 # (FFmpeg): without them the build says "Qt Multimedia not found" even with qt6-multimedia-dev in
 # (2026-11-06 on the HCA Pi). Installed once when missing; the build then looks again.
-if command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
+if [ -n "$DEBIAN_QT" ] && command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; then
     need=()
     dpkg -s qt6-base-private-dev >/dev/null 2>&1 || need+=(qt6-base-private-dev)
     # A playback backend: Debian's Qt Multimedia brings its own (2026-11-07 the HCA Pi played video
@@ -25,7 +36,7 @@ if command -v dpkg >/dev/null && dpkg -s qt6-multimedia-dev >/dev/null 2>&1; the
         # --fresh: the build folder remembers "Qt Multimedia not found" from before the install
         # (2026-11-06 on the HCA Pi: a fresh project found it, the old build folder didn't).
         sudo apt-get install -y "${need[@]}" >/dev/null 2>&1 \
-            && cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null \
+            && vt_configure --fresh >/dev/null \
             || echo "Couldn't install ${need[*]}; video on the customer display may not play (pictures and GIFs still work)."
     fi
 fi
@@ -41,13 +52,24 @@ if command -v dpkg >/dev/null && ! dpkg -s fonts-noto-color-emoji >/dev/null 2>&
         || echo "Couldn't install the emoji font; the top bar shows boxes for its icons."
 fi
 # Qt Multimedia installed but this build folder still says it isn't there: look again, once.
-if grep -q "Qt6Multimedia_DIR:PATH=.*NOTFOUND" modern/build/CMakeCache.txt 2>/dev/null \
+if [ -n "$DEBIAN_QT" ] && grep -q "Qt6Multimedia_DIR:PATH=.*NOTFOUND" "$VT_BUILD/CMakeCache.txt" 2>/dev/null \
         && [ -f /usr/lib/aarch64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake -o -f /usr/lib/x86_64-linux-gnu/cmake/Qt6Multimedia/Qt6MultimediaConfig.cmake ]; then
     echo "Looking for Qt Multimedia again (video on the customer display)..."
-    cmake --fresh -S modern -B modern/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache >/dev/null \
+    vt_configure --fresh >/dev/null \
         || echo "Couldn't look for Qt Multimedia again; building with the settings already there."
 fi
-if ! cmake --build modern/build --target vtmodern -j${VT_JOBS:-4}; then
+# The official Qt's build folder: made the first time (a full build, about 15-25 minutes on a Pi 5),
+# and made again if it was made for another Qt folder (e.g. 6.12.0, then 6.12.1 in the same folder).
+if [ -n "$QT_PREFIX" ]; then
+    if [ ! -f "$VT_BUILD/build.ninja" ]; then
+        echo "First build for the Qt in $QT_PREFIX, in $VT_BUILD: a full build, about 15-25 minutes."
+        vt_configure || { echo "ViewTouch didn't start: setting up $VT_BUILD failed (see above). The ViewTouch already running was left as it was."; exit 1; }
+    elif ! grep -q "^Qt6_DIR:PATH=$QT_PREFIX/" "$VT_BUILD/CMakeCache.txt" 2>/dev/null; then
+        echo "$VT_BUILD was made for another Qt; setting it up for $QT_PREFIX (a full build)."
+        vt_configure --fresh || { echo "ViewTouch didn't start: setting up $VT_BUILD failed (see above). The ViewTouch already running was left as it was."; exit 1; }
+    fi
+fi
+if ! cmake --build "$VT_BUILD" --target vtmodern -j${VT_JOBS:-4}; then
     echo "ViewTouch didn't start: the build failed (see above). The ViewTouch already running was left as it was."
     exit 1
 fi
@@ -61,8 +83,8 @@ for f in "$VT_REPO"/scripts/bin/vt-*; do
     [ -e "/usr/local/bin/$(basename "$f")" ] && continue
     sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || echo "Note: couldn't link $(basename "$f") into /usr/local/bin (run it as $f)."
 done
-sudo cp -f modern/build/vtmodern /usr/local/bin/vtmodern 2>/dev/null \
-    || echo "Note: couldn't copy the new vtmodern to /usr/local/bin (this script runs the one in modern/build)."
+sudo cp -f "$VT_BUILD/vtmodern" /usr/local/bin/vtmodern 2>/dev/null \
+    || echo "Note: couldn't copy the new vtmodern to /usr/local/bin (this script runs the one in $VT_BUILD)."
 # Stop ViewTouch the polite way first (it saves and closes the database on
 # SIGTERM); force it only if it is still running after 10 seconds.
 if pgrep -x vtmodern >/dev/null; then
@@ -87,7 +109,7 @@ export VT_SERIAL_SCANNER_BAUD="${SERIAL_SCANNER_BAUD:-9600}"
 export VT_STANDBY_ALLOWED="${STANDBY_ALLOWED:-yes}"
 # Its messages go to ~/.vt-run.log (the run before in ~/.vt-run.log.1): what it said if it stops.
 if [ -f "$HOME/.vt-run.log" ]; then mv -f "$HOME/.vt-run.log" "$HOME/.vt-run.log.1" || echo "Note: couldn't keep the last run's log."; fi
-BIN="$VT_REPO/modern/build/vtmodern"
+BIN="$VT_BUILD/vtmodern"
 if [ ! -x "$BIN" ]; then
     echo "ViewTouch didn't start: $BIN is missing after the build."
     exit 1
@@ -113,4 +135,4 @@ if ! kill -0 "$pid" 2>/dev/null; then
     if [ -n "$why" ]; then echo "Its last messages (~/.vt-run.log):"; echo "$why" | sed 's/^/  /'; fi
     exit 1
 fi
-echo "Server rebuilt and restarted.${GUEST:+ Customer display: $GUEST.}"
+echo "Server rebuilt and restarted${QT_PREFIX:+ on the Qt in $QT_PREFIX}.${GUEST:+ Customer display: $GUEST.}"

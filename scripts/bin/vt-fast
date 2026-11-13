@@ -1,12 +1,16 @@
 #!/bin/bash
+# Quick rebuild + restart for testing (no installs, no checks): builds this site's build folder
+# (vt-site QT_PREFIX: modern/build for Debian's Qt, modern/build-qt612 for Qt 6.12) and runs it.
+# For the store, use vt-server.
 set -e
-cd ~/viewtouch-main/modern
-cmake --build build --target vtmodern -j3
-sudo cp -f build/vtmodern /usr/local/bin/vtmodern
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+[ -f "$VT_BUILD/build.ninja" ] || { echo "No build folder $VT_BUILD yet: run vt-server once."; exit 1; }
+cmake --build "$VT_BUILD" --target vtmodern -j3
+sudo cp -f "$VT_BUILD/vtmodern" /usr/local/bin/vtmodern
 # Stop ViewTouch the polite way first (it saves and closes the database on
 # SIGTERM); force it only if it is still running after 10 seconds.
 pkill -TERM -x vtmodern 2>/dev/null || true
 for _ in $(seq 1 20); do pgrep -x vtmodern >/dev/null || break; sleep 0.5; done
 pkill -KILL -x vtmodern 2>/dev/null || true
-WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 ~/viewtouch-main/modern/build/vtmodern --serve >/dev/null 2>&1 &
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$VT_BUILD/vtmodern" --serve >/dev/null 2>&1 &
 echo "✓ vtmodern rebuilt and restarted! ($(ccache -s | grep -E 'Hits|Hit rate' | tr '\n' ' '))"

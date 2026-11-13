@@ -173,10 +173,10 @@ if ip route get "$IP" 2>/dev/null | grep -q " via "; then
     [ -n "$SRC" ] && ADDR="$SRC"
 fi
 SERVER="$ADDR:$SERVER_PORT"
-CODE=$(QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
+CODE=$(QT_QPA_PLATFORM=offscreen "$VT_BUILD/vtmodern" --pairing-code 2>&1 | grep -oE '[A-Z0-9]{5}-[A-Z0-9]{5}' | head -n 1)
 [ -z "$CODE" ] && { echo "No pairing code: is ViewTouch running on this computer?"; exit 1; }
 PAIR=$(mktemp -d /tmp/vt_billboard.XXXXXX)
-QT_QPA_PLATFORM=offscreen "$VT_REPO/modern/build/vtmodern" --data-dir "$PAIR" --connect "$SERVER" --pair "$CODE" \
+QT_QPA_PLATFORM=offscreen "$VT_BUILD/vtmodern" --data-dir "$PAIR" --connect "$SERVER" --pair "$CODE" \
     --terminal "$NAME" --screen billboard --pair-only >/dev/null 2>&1
 CRED=$(find "$PAIR" -name terminal.json | head -n 1)
 [ -z "$CRED" ] && { rm -rf "$PAIR"; echo "Pairing $NAME with the store didn't work."; exit 1; }

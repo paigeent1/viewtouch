@@ -1,7 +1,7 @@
 #!/bin/bash
 # Are this site's tablets on the server's build? (tablets: vt-site)
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-LATEST=$(cat "$VT_REPO/modern/build/generated/vtm_build_number.hh" "$VT_REPO/modern/build/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
+LATEST=$(cat "$VT_BUILD/generated/vtm_build_number.hh" "$VT_BUILD/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
 LATEST="${LATEST:-unknown}"
 behind=0; line=""
 while IFS='|' read -r name ip <&3; do

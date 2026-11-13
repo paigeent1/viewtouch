@@ -1,0 +1,162 @@
+#!/bin/bash
+# Moves this Pi's ViewTouch to the official Qt 6.12, or back to Debian's Qt 6.8 (modern/docs/QT612_MOVE.md):
+#   vt-qt612 install   back up the database, add the few Debian packages Qt 6.12 needs, put Qt 6.12
+#                      in /opt/qt/6.12.0 (modern/tools/get-qt.sh, from download.qt.io), check it,
+#                      then switch this Pi to it (vt-site QT_PREFIX) and rebuild + restart (vt-server).
+#                      The first build is a full one: about 15-25 minutes on a Pi 5.
+#   vt-qt612 off       back to Debian's Qt 6.8 (QT_PREFIX empty) and vt-server. Its build folder,
+#                      modern/build, was never touched by 6.12. Qt 6.12 stays in /opt/qt for next time.
+#   vt-qt612 status    which Qt this Pi is set to, and which Qt the running ViewTouch really uses.
+# Debian's Qt packages are never removed. Safe to run install again: it skips what's done.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+HERE="$(dirname "$(readlink -f "$0")")"
+QT_VERSION=$(cat "$VT_REPO/modern/tools/qt-version" 2>/dev/null || echo 6.12.0)
+NEW_PREFIX="/opt/qt/$QT_VERSION"
+# What get-qt.sh and the official Qt need from Debian (QT612_MOVE.md section 2); none replaces anything.
+PACKAGES="7zip curl python3 libsm6 libice6 libpulse0 libxcb-cursor0 libxcb-icccm4 libxcb-image0
+ libxcb-keysyms1 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libwayland-client0
+ libwayland-cursor0 libwayland-egl1 libgl-dev libegl-dev libssl-dev libfontconfig1 libfreetype6
+ libdbus-1-3 libdrm2 libgbm1 libgssapi-krb5-2 libbrotli1 libzstd1 libopengl0 libglib2.0-0t64"
+step() { echo; echo "=== $* ==="; }
+
+# The libraries a Qt file needs that this Pi doesn't have (nothing printed: all there).
+missing_libs() { LD_LIBRARY_PATH="$NEW_PREFIX/lib" ldd "$1" 2>/dev/null | awk '/not found/ {print $1}' | tr '\n' ' '; }
+
+# The database (and the rest of the data folder's .db files), copied safely while ViewTouch runs.
+backup_db() {
+    local data="${VT_DATA_DIR:-$HOME/.local/share/ViewTouch/ViewTouch}"
+    local dest
+    dest="$HOME/vt-backups/before-qt-$QT_VERSION-$(date +%Y-%m-%d_%H%M)"
+    ls "$data"/*.db >/dev/null 2>&1 || { echo "No database in $data: nothing to back up."; return 0; }
+    mkdir -p "$dest" || return 1
+    python3 - "$data" "$dest" <<'PY' || return 1
+import glob, os, sqlite3, sys
+data, dest = sys.argv[1:]
+for src in sorted(glob.glob(os.path.join(data, "*.db"))):
+    out = os.path.join(dest, os.path.basename(src))
+    with sqlite3.connect(f"file:{src}?mode=ro", uri=True) as a, sqlite3.connect(out) as b:
+        a.backup(b)
+    with sqlite3.connect(out) as b:
+        ok = b.execute("PRAGMA quick_check").fetchone()[0]
+    if ok != "ok":
+        sys.exit(f"The copy of {os.path.basename(src)} didn't check out ({ok}).")
+    print(f"  {os.path.basename(src)}")
+PY
+    echo "Backed up to $dest"
+}
+
+case "$1" in
+install)
+    case "$(uname -m)" in
+        aarch64|arm64|x86_64) ;;
+        *) echo "Qt doesn't publish Qt $QT_VERSION for this kind of computer ($(uname -m)). Nothing was changed."; exit 1 ;;
+    esac
+
+    step "1. Back up the store's database"
+    backup_db || { echo "The backup didn't work (see above). Nothing was changed."; exit 1; }
+
+    step "2. The Debian packages Qt $QT_VERSION needs (nothing is removed)"
+    # Only the missing ones: one already installed is left at its version (vt-pi-updates decides
+    # when those move), so this step updates nothing.
+    need=()
+    for p in $PACKAGES; do
+        # libglib2.0-0t64 is Debian 13's name; older systems call it libglib2.0-0.
+        [ "$p" = libglib2.0-0t64 ] && ! apt-cache show "$p" >/dev/null 2>&1 && p=libglib2.0-0
+        dpkg -s "$p" 2>/dev/null | grep -q '^Status: install ok installed' || need+=("$p")
+    done
+    if [ ${#need[@]} -eq 0 ]; then
+        echo "All there already."
+    else
+        echo "Adding: ${need[*]}"
+        { sudo apt-get update >/dev/null && sudo apt-get install -y --no-upgrade "${need[@]}"; } \
+            || { echo "Installing the packages didn't work (see above). Nothing else was changed; ViewTouch still runs on Debian's Qt."; exit 1; }
+    fi
+
+    step "3. Qt $QT_VERSION into $NEW_PREFIX (a few minutes the first time; about 300 MB)"
+    sudo sh "$VT_REPO/modern/tools/get-qt.sh" "$QT_VERSION" "$NEW_PREFIX" \
+        || { echo "Getting Qt $QT_VERSION didn't work (see above). Nothing else was changed; ViewTouch still runs on Debian's Qt."; exit 1; }
+
+    step "4. Checking Qt $QT_VERSION on this Pi"
+    stop=
+    if [ -f "$NEW_PREFIX/lib/cmake/Qt6/Qt6Config.cmake" ]; then echo "OK   Qt $QT_VERSION is in $NEW_PREFIX."
+    else echo "PROBLEM  Qt's build files aren't in $NEW_PREFIX."; stop=yes; fi
+    # The screen plugins: ViewTouch draws through Wayland or X11 (Xwayland), whichever Qt picks
+    # when it starts, so both must load.
+    for label in Wayland "X11 (xcb)"; do
+        case "$label" in Wayland) pattern="libqwayland*.so" ;; *) pattern="libqxcb.so" ;; esac
+        found=; bad=
+        for f in "$NEW_PREFIX"/plugins/platforms/$pattern; do
+            [ -f "$f" ] || continue
+            found=yes; miss=$(missing_libs "$f")
+            if [ -n "$miss" ]; then echo "PROBLEM  The $label screen plugin $(basename "$f") can't load: this Pi lacks $miss"; bad=yes; fi
+        done
+        if [ -z "$found" ]; then echo "PROBLEM  Qt $QT_VERSION has no $label screen plugin."; stop=yes
+        elif [ -n "$bad" ]; then stop=yes
+        else echo "OK   The $label screen plugin loads."; fi
+    done
+    miss=$(missing_libs "$NEW_PREFIX/lib/libQt6Core.so.6")
+    [ -n "$miss" ] && { echo "PROBLEM  Qt itself can't load: this Pi lacks $miss"; stop=yes; }
+    # Video on the customer display: the official Qt plays it with its own FFmpeg (Debian's
+    # qt6-ffmpeg-multimedia-plugin isn't used). Without it ViewTouch still runs, without video.
+    mm="$NEW_PREFIX/plugins/multimedia/libffmpegmediaplugin.so"
+    if [ ! -f "$mm" ]; then
+        echo "WARNING  No video player (FFmpeg) in Qt $QT_VERSION: video on the customer display won't play (pictures and GIFs still will)."
+    else
+        miss=$(missing_libs "$mm")
+        if [ -n "$miss" ]; then echo "WARNING  The video player can't load (this Pi lacks $miss): video on the customer display won't play."
+        else
+            own=; for f in "$NEW_PREFIX"/lib/libav* "$NEW_PREFIX"/lib/libsw*; do [ -e "$f" ] && { own=", with Qt's own FFmpeg libraries"; break; }; done
+            echo "OK   The video player (FFmpeg) loads$own."
+        fi
+    fi
+    if [ -n "$stop" ]; then
+        echo
+        echo "Not switched: ViewTouch still runs on Debian's Qt, as before. Send Bob the lines above."
+        exit 1
+    fi
+
+    step "5. Switching this Pi to Qt $QT_VERSION and rebuilding (first time: about 15-25 minutes)"
+    "$HERE/vt-site" set QT_PREFIX "$NEW_PREFIX" >/dev/null || { echo "Couldn't change the setting. Nothing else was changed."; exit 1; }
+    if "$HERE/vt-server"; then
+        echo
+        "$0" status
+        echo
+        echo "Done: ViewTouch runs on Qt $QT_VERSION. To go back to Debian's Qt 6.8 any time: vt-qt612 off"
+    else
+        echo
+        echo "ViewTouch didn't build or start on Qt $QT_VERSION (see above). Going back to Debian's Qt 6.8..."
+        "$HERE/vt-site" set QT_PREFIX "" >/dev/null
+        if "$HERE/vt-server"; then echo "Back on Debian's Qt 6.8. Send Bob the messages above (and ~/.vt-run.log)."
+        else echo "Set back to Debian's Qt 6.8, but it didn't start either (see above): send Bob these messages."; fi
+        exit 1
+    fi ;;
+off)
+    if [ -z "$QT_PREFIX" ]; then echo "This Pi is already on Debian's Qt; rebuilding and restarting anyway."; fi
+    "$HERE/vt-site" set QT_PREFIX "" >/dev/null || { echo "Couldn't change the setting."; exit 1; }
+    "$HERE/vt-server" || exit 1
+    echo "Back on Debian's Qt 6.8 (build folder modern/build). Qt 6.12 stays in /opt/qt for next time: vt-qt612 install" ;;
+status)
+    if [ -n "$QT_PREFIX" ]; then echo "Set to: the official Qt in $QT_PREFIX (build folder $VT_BUILD)"
+    else echo "Set to: Debian's Qt (build folder $VT_BUILD)"; fi
+    [ -f "$NEW_PREFIX/lib/cmake/Qt6/Qt6Config.cmake" ] && [ "$QT_PREFIX" != "$NEW_PREFIX" ] \
+        && echo "Qt $QT_VERSION is installed in $NEW_PREFIX but not in use (vt-qt612 install switches to it)."
+    pid=$(pgrep -x vtmodern | head -n 1)
+    if [ -n "$pid" ]; then
+        exe=$(readlink "/proc/$pid/exe" 2>/dev/null)
+        core=$(grep -m1 -o '/[^ ]*libQt6Core\.so[^ ]*' "/proc/$pid/maps" 2>/dev/null)
+        where="ViewTouch is running (${exe:-program unknown})"
+    else
+        exe="$VT_BUILD/vtmodern"; [ -x "$exe" ] || exe=/usr/local/bin/vtmodern
+        core=$(ldd "$exe" 2>/dev/null | awk '/libQt6Core/ {print $3}')
+        core=$(readlink -f "$core" 2>/dev/null || echo "$core")
+        where="ViewTouch isn't running; $exe would use"
+    fi
+    ver=$(basename "${core:-x}" | sed -n 's/^libQt6Core\.so\.\(6\.[0-9.]*\)$/\1/p')
+    case "$core" in
+        "") echo "$where: Qt unknown (couldn't read it)." ;;
+        /opt/*) echo "$where: the official Qt ${ver:-?} ($core)" ;;
+        /usr/*) echo "$where: Debian's Qt ${ver:-?} ($core)" ;;
+        *) echo "$where: Qt ${ver:-?} ($core)" ;;
+    esac ;;
+*) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
