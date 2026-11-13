@@ -1,10 +1,15 @@
 # This fork on the official Qt (modern/tools/qt-version, from download.qt.io via
 # tools/get-qt.sh), as the official ViewTouch builds: the step before moving the
-# store's Pi and tablets from Debian's Qt 6.8. Run by hand (Actions -> Run workflow).
+# store's Pi and tablets from Debian's Qt 6.8 (owner 2026-11-13: move to Qt 6.12
+# before BHDAN goes live). Run by hand (Actions -> Run workflow), and on every
+# push to helper/qt612 while the move is prepared.
 name: Modern checks (official Qt)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - helper/qt612
 
 concurrency:
   group: modern-checks-qt-${{ github.ref }}
