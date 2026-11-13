@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 12:07 ET — Helper (Claude) for Bob — Manual pictures: one script makes all of them (tools/manual_shots.sh)
+- **What:** New modern/tools/manual_shots.sh: runs the [manual] tests (OpenGL under xvfb-run), then every other test plus hidden [hostShots]/[phoneFloors] with VTM_SHOTS, names their pictures for the manual (MAP table, e.g. 51-find-item -> m100-find-item), joins the 50-settle-* layouts into m99, copies the lu-* Label Utility pictures from docs/label-utility/, converts PNG/JPEG to the extension manual.html asks for, takes pictures no test makes any more from upstream ViewTouch's committed copy (pinned commit), and lists anything still missing. The Modern manual workflow calls it (imagemagick added, timeout 100 min); README step 1 points to it.
+- **Why:** The manual PDF had blank spaces: 104 of its pictures were never made by the workflow (different test names, other tests, Label Utility pictures).
+- **Files:** (none)
+
 ### 2026-11-13 11:40 ET — Bob (Claude) — Modern manual workflow: OpenGL on a virtual X screen
 - **What:** The [manual] screenshots run under xvfb-run with Mesa's software OpenGL (QT_QPA_PLATFORM=xcb), LANG=C.UTF-8.
 - **Why:** In CI the offscreen platform had no OpenGL context: the [manual] test aborted (QRhiGles2: Failed to create context) and only 4 pictures were made.

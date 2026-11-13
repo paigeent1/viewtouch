@@ -17,7 +17,7 @@ jobs:
     name: Manual PDF (Debian 13, Qt 6.8)
     runs-on: ubuntu-24.04
     container: debian:trixie
-    timeout-minutes: 60
+    timeout-minutes: 100
     env:
       LANG: C.UTF-8
     steps:
@@ -31,7 +31,7 @@ jobs:
             qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-dialogs \
             qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qttest \
             libqt6sql6-sqlite qt6-qpa-plugins fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji \
-            libreoffice-writer-nogui fonts-liberation2 poppler-utils \
+            libreoffice-writer-nogui fonts-liberation2 poppler-utils imagemagick \
             xvfb xauth libgl1-mesa-dri libegl1 libglx-mesa0
 
       - uses: actions/checkout@v4
@@ -45,14 +45,11 @@ jobs:
           cmake --build build
 
       - name: Screenshots (README step 1)
-        working-directory: modern
         run: |
-          mkdir -p docs/manual/shots
-          # OpenGL (Mesa's software renderer) on a virtual X screen: offscreen has no OpenGL in CI.
-          VTM_SHOTS=$PWD/docs/manual/shots QT_QPA_PLATFORM=xcb QT_QUICK_BACKEND=rhi QSG_RHI_BACKEND=opengl \
-            LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "-screen 0 1920x1200x24" ../build/tests/vtm_tests "[manual]" || true
-          VTM_SHOTS=$PWD/docs/manual/shots QT_QPA_PLATFORM=offscreen ../build/tests/vtm_tests "[display][ui]" || true
-          ls docs/manual/shots | wc -l
+          # Every picture the manual uses, by the same script a person with a Qt build runs.
+          # It does not stop the job: the next step lists anything still missing.
+          bash modern/tools/manual_shots.sh build || true
+          ls modern/docs/manual/shots | wc -l
 
       - name: PDF (README step 2)
         working-directory: modern/docs/manual
