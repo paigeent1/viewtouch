@@ -29,7 +29,7 @@ jobs:
             qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-dialogs \
             qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qttest \
             libqt6sql6-sqlite qt6-qpa-plugins fonts-dejavu-core fonts-noto-cjk fonts-noto-color-emoji \
-            libreoffice-writer-nogui libreoffice-writer-web fonts-liberation2 poppler-utils
+            libreoffice-writer-nogui fonts-liberation2 poppler-utils
 
       - uses: actions/checkout@v4
         with:

@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 11:30 ET — Bob (Claude) — Modern manual workflow: no libreoffice-writer-web package
+- **What:** Dropped libreoffice-writer-web from the install (Debian 13 has no such package; the writer_web PDF filter comes with Writer).
+- **Why:** The first run failed at apt-get install.
+- **Files:** (none)
+
 ### 2026-11-13 11:29 ET — Bob (Claude) — Manual PDF built by CI (Modern manual workflow)
 - **What:** New .github/workflows/modern-manual.yml: on Run workflow or a push to helper/manual-*, builds ViewTouch on Debian 13, makes the demo screenshots (README step 1, shots/ is not in git), builds manual.pdf with LibreOffice, fails if any <img> the manual uses is missing, and uploads the PDF and shots as the artifact ViewTouch-manual.
 - **Why:** The Ver. 261110 PDF built without shots/ had 181 blank pictures; no machine here has a Qt build to make them. The owner wants the rebuild process saved to rerun.
