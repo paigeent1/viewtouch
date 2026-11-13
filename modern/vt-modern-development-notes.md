@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-13 10:18 ET — Bob (Claude) — vt-manual-shots: take every page, not just the first
+- **What:** Each ViewTouch run in vt-manual-shots now gets </dev/null. It was reading the page list the loop feeds on stdin, so the loop ended after the first page (2 pictures of 111 on BHDAN, 2026-11-13 10:17).
+- **Why:** Owner ran vt-manual-shots on BHDAN for the user manual Ver. 261110 pictures and got only 2.
+- **Files:** (none)
+
 ### 2026-11-11 06:12 ET — Bob (Claude) — Web reports: a business day is dated by its End of Day
 - **What:** report_export businessDate is now the local date End of Day was pressed (no 6 AM shift); the open day is today's, never before the last closed day (was the day after it). Website day_starts_hour 0, so Today/Yesterday match. Test, README and manual (ch 12) say the same.
 - **Why:** Owner 2026-11-10: a 1:30 AM sale before End of Day counts on the day End of Day is pressed.

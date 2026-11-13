@@ -85,8 +85,9 @@ echo "[2/4] Taking pictures of $COUNT pages at $SIZE (nothing shows on the scree
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software VT_STANDBY_ALLOWED=no VT_SERIAL_SCANNER=off   # never read the register's scanners
 shoot() {   # name, extra arguments...
     local name="$1"; shift
+    # </dev/null: ViewTouch must not read the page list the loop below feeds on stdin (it ate it: 2 pictures).
     timeout 90 "$BIN" --data-dir "$WORK/data" --size "$SIZE" --screenshot "$OUT/$name.png" "$@" \
-        >>"$OUT/run.log" 2>&1
+        </dev/null >>"$OUT/run.log" 2>&1
     if [ -s "$OUT/$name.png" ]; then printf '.'; else printf 'x'; echo "  (no picture: $name)" >>"$OUT/run.log"; fi
 }
 shoot "00-login"
