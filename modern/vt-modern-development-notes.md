@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 16:46 ET — Bob (Claude) — Keys: tablet taps that roll or press slowly still count
+- **What:** WidgetKey.qml TapHandler: keys without a hold action have no long-press timer (longPressThreshold 0: a slow, firm press is still a tap); dragThreshold widened to the larger of the system's drag distance and a quarter of the key (at most 40 px), so a finger rolling a little while it presses still taps; a real drag still scrolls.
+- **Why:** Owner 2026-11-14 at HCA: all three tablets miss taps at random (HCA 2 most).
+- **Files:** (none)
+
 ### 2026-11-14 15:53 ET — Bob (Claude) — A pairing pushed by the Pi wins over an older saved one
 - **What:** main.cpp: the terminal.json that vt-add-tablet / vt-add-billboard push is used when the device has no pairing saved, or when it's newer than the saved one (before: only when none was saved).
 - **Why:** HCA 2026-11-14: Deploy of HCA Billboard 1 went green but the Fire TV stayed on Join: it kept an old saved pairing (a 192.168.1.x server) and ignored HCA's.

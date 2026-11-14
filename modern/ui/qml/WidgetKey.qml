@@ -48,7 +48,12 @@ Rectangle {
 
     TapHandler {
         id: tap
-        longPressThreshold: key.holdable ? 0.5 : 0.8
+        // Taps a finger makes on a tablet count (HCA 2026-11-14: random taps missed): a key that has no
+        // hold action never turns a slow press into a long press (0: no timer), and a finger rolling a
+        // little while it presses is still a tap (a wider drag allowance than the system's, up to a
+        // quarter of the key), while a real drag still scrolls a list of keys.
+        longPressThreshold: key.holdable ? 0.5 : 0
+        dragThreshold: Math.max(Application.styleHints.startDragDistance, Math.min(40, Math.min(key.width, key.height) * 0.25))
         gesturePolicy: key.takesTouch ? TapHandler.ReleaseWithinBounds : TapHandler.DragThreshold
         onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; key.clicked() }
         onLongPressed: { if (TouchGuard.covered(point.scenePressPosition)) return; if (key.holdable) key.held() }
