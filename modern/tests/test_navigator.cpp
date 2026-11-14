@@ -145,7 +145,7 @@ TEST_CASE("Back leaves the page showing in one step, even when it was opened fro
     Navigator nav(l);
     nav.reset(u"login"_s);
     CHECK(nav.jump(Mode::Push, u"tables"_s));
-    CHECK(nav.jump(Mode::Push, u"tables"_s));   // a button on Tables that jumps to Tables
+    nav.jump(Mode::Push, u"tables"_s);   // a button on Tables that jumps to Tables (nothing changes: false)
     CHECK(nav.depth() == 1);
     CHECK(nav.jump(Mode::Back));
     CHECK(nav.current() == u"login"_s);

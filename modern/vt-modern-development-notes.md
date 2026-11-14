@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 11:48 ET — Bob (Claude) — Back test: a jump to the page showing returns false
+- **What:** test_navigator.cpp: the new Back test no longer expects true from a push to the page already showing (jump reports no change).
+- **Why:** Checks run 43615808167: that one CHECK failed; the rest of the test passed.
+- **Files:** `modern/tests/test_navigator.cpp`
+
 ### 2026-11-14 11:28 ET — Bob (Claude) — Back: one touch, even when the page was remembered twice
 - **What:** app/navigator.cpp: a push to the page already showing no longer remembers it, and Back (and Sequence) skips remembered entries that are the page already showing. Test in test_navigator.cpp.
 - **Why:** Owner 2026-11-14: on BHDAN and HCA, Manager's Back always took two touches: Manager was on the Back stack twice, so the first Back went to Manager.
