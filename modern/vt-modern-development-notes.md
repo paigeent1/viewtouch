@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 15:53 ET — Bob (Claude) — A pairing pushed by the Pi wins over an older saved one
+- **What:** main.cpp: the terminal.json that vt-add-tablet / vt-add-billboard push is used when the device has no pairing saved, or when it's newer than the saved one (before: only when none was saved).
+- **Why:** HCA 2026-11-14: Deploy of HCA Billboard 1 went green but the Fire TV stayed on Join: it kept an old saved pairing (a 192.168.1.x server) and ignored HCA's.
+- **Files:** (none)
+
 ### 2026-11-14 15:16 ET — Helper (Claude) for Bob — vt-touch-guard: replug a USB touchscreen missing after power-up
 - **What:** New scripts/bin/vt-touch-guard (system service vt-touch-guard.service, run as root, Restart=always): learns USB touchscreens (udev ID_INPUT_TOUCHSCREEN=1 on event*, nothing model-specific) into ~/.config/viewtouch/touch-guard (port from ID_PATH, USB device, platform controller + driver from sysfs, vendor:model only to follow a moved cable). 45 s after boot then every 30 s: a remembered touchscreen missing (at once if never seen this boot; after two looks in a row if it was seen and vanished) -> one try: uhubctl per-port power cycle if uhubctl is installed and the hub supports it, else (or if that didn't bring it back in 20 s) unbind/bind of its controller in /sys/bus/platform/drivers/<driver>. At most once per 10 min and 3 per boot (counted in /run/vt-touch-guard), then one give-up line. Never resets a controller with a mounted disk on it. Logs plain words to ~/.local/state/viewtouch/touch-guard.log and the journal (logger -t vt-touch-guard). Commands: status, check, forget, sudo install, sudo uninstall. vt-server installs it once (needs-install: unit missing or older version, and no ~/.config/viewtouch/touch-guard.off from uninstall), else try-restarts it so it runs the pulled version. Manual chapter 31: new vt-touch-guard section after vt-touch-map.
 - **Why:** HCA 2026-11-14: after a power-up the monitor's USB touch controller sometimes never appears (no USB device, no dmesg) until its cable is replugged.

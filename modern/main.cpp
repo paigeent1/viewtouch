@@ -32,6 +32,7 @@
 #include <QDir>
 #include <QEventLoop>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -747,10 +748,19 @@ int runTerminal(const Args &cli, const Options &o)
             qWarning().noquote() << "Could not save the pairing to" << credentialFile << ":" << error;
     };
 
-    if (!QFile::exists(credentialFile)) {
-        for (const QString &ext : {u"/sdcard/Android/data/org.viewtouch.pos/files/terminal.json"_s, u"/data/local/tmp/terminal.json"_s}) {
-            if (QFile::exists(ext)) { QFile::copy(ext, credentialFile); break; }
+    // A pairing pushed by vt-add-tablet / vt-add-billboard: used when there's none yet, or when it's
+    // newer than the one saved (a TV or tablet moved to another store kept its old pairing and
+    // ignored the new one: HCA's billboard, 2026-11-14).
+    for (const QString &ext : {u"/sdcard/Android/data/org.viewtouch.pos/files/terminal.json"_s, u"/data/local/tmp/terminal.json"_s}) {
+        if (!QFile::exists(ext))
+            continue;
+        const QFileInfo pushed(ext), saved(credentialFile);
+        if (!saved.exists() || pushed.lastModified() > saved.lastModified()) {
+            QFile::remove(credentialFile);
+            if (QFile::copy(ext, credentialFile))
+                QFile::setPermissions(credentialFile, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         }
+        break;
     }
     std::optional<vt::net::Credentials> creds = vt::net::Credentials::load(credentialFile);
     if (creds && !creds->valid())   // a terminal needs its own key
