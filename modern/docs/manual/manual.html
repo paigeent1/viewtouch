@@ -2581,6 +2581,17 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <p><code>vt-touch-map --watch</code> keeps watching and ties them again whenever a touchscreen comes back (a reboot, a USB hiccup, a printer unplugged from the same hub) or the monitors change, even when the touchscreen comes back under the same name with its tie lost. The guest display starts it by itself (<code>vt-guest-display</code>); only one runs at a time. Start it by hand if the register's touches land in the wrong place after unplugging something:</p>
 <pre>(setsid vt-touch-map --watch &gt;/dev/null 2&gt;&amp;1 &amp;); beep3</pre>
 
+<h3>vt-touch-guard: a touchscreen that doesn't show up after a power-up</h3>
+<p>Some touch monitors' touch part sometimes doesn't come on after the Pi powers up, until its USB cable is unplugged and plugged in again. The touch guard does that for you. It remembers which USB port this Pi's touchscreen is on (only touchscreens, never keyboards or scanners). 45 seconds after a start, and then every 30 seconds, it looks: if the touchscreen is missing, it switches that USB port off and on, or, when the Pi can't do that, restarts the USB connections the touchscreen is on. At most once every 10 minutes and 3 times per start. <code>vt-server</code> turns it on by itself the first time; a Pi that never had a touchscreen is left alone.</p>
+<div class="tip">Restarting the USB connections also reconnects whatever else is plugged in next to the touchscreen (the USB receipt printer, a scanner, a keyboard). They come back by themselves a few seconds later. It only happens when the touchscreen is already not working. It never happens while a USB stick or disk is in use there.</div>
+<p>What it remembers, whether the touchscreen is there now, and its last tries:</p>
+<pre>vt-touch-guard status; beep3</pre>
+<p>This Pi has no touch monitor any more (so it stops looking for one):</p>
+<pre>vt-touch-guard forget; beep3</pre>
+<p>Turn it off for good (<code>vt-server</code> won't turn it on again), or on again:</p>
+<pre>sudo vt-touch-guard uninstall; beep3</pre>
+<pre>sudo vt-touch-guard install; beep3</pre>
+
 <h3>vt-mirror: the same picture on both monitors</h3>
 <p>For a Pi with no guest screen: the second monitor copies the first. <code>vt-mirror off</code> undoes it (after a restart).</p>
 <pre>vt-mirror; beep3</pre>

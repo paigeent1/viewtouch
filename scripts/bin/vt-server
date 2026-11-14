@@ -83,6 +83,18 @@ for f in "$VT_REPO"/scripts/bin/vt-*; do
     [ -e "/usr/local/bin/$(basename "$f")" ] && continue
     sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || echo "Note: couldn't link $(basename "$f") into /usr/local/bin (run it as $f)."
 done
+# The touch guard (vt-touch-guard): replugs a USB touchscreen that didn't show up after a power-up.
+# Installed once (and again when its service changes); not after vt-touch-guard uninstall. Already on:
+# restarted quietly, so it runs this pull's version.
+TG="$VT_REPO/scripts/bin/vt-touch-guard"
+if [ -x "$TG" ]; then
+    if "$TG" needs-install; then
+        echo "Turning on the touch guard (replugs the touchscreen by itself if it doesn't show up after a power-up)..."
+        sudo "$TG" install || echo "Note: couldn't turn on the touch guard (try: sudo vt-touch-guard install)."
+    else
+        sudo systemctl try-restart vt-touch-guard.service 2>/dev/null
+    fi
+fi
 sudo cp -f "$VT_BUILD/vtmodern" /usr/local/bin/vtmodern 2>/dev/null \
     || echo "Note: couldn't copy the new vtmodern to /usr/local/bin (this script runs the one in $VT_BUILD)."
 # Stop ViewTouch the polite way first (it saves and closes the database on

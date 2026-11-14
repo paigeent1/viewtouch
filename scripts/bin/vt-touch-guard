@@ -1,0 +1,410 @@
+#!/bin/bash
+# vt-touch-guard: brings a USB touchscreen back when it doesn't show up after a power-up.
+#
+# Some touch monitors' USB touch controllers sometimes never appear after the Pi powers up (no USB
+# device at all) until their cable is unplugged and plugged in again (HCA, 2026-11-14). This watchdog
+# does that replug for you:
+#   - It learns that this Pi has a touchscreen: any input device that udev marks as a touchscreen
+#     (ID_INPUT_TOUCHSCREEN=1) on USB. It remembers its USB port in ~/.config/viewtouch/touch-guard.
+#     Only touchscreens; never keyboards, mice or scanners. Nothing about a model is built in.
+#   - 45 seconds after boot, and then every 30 seconds: if a remembered touchscreen is missing, it
+#     resets USB as if the cable were replugged. At most once every 10 minutes and 3 times per boot.
+#     Every try is written to ~/.local/state/viewtouch/touch-guard.log and the journal
+#     (journalctl -t vt-touch-guard).
+#   - The reset: first the gentlest, turning that one USB port off and on with uhubctl (only if
+#     uhubctl is installed and the port supports it; it is never installed by this). If that isn't
+#     possible or didn't help: the USB controller the touchscreen is on is restarted (unbind/bind).
+#     That also reconnects everything else on that controller (a USB receipt printer, a scanner, a
+#     keyboard); they come back by themselves a few seconds later. It only happens when the
+#     touchscreen is already dead. Never when a disk in use (the Pi's own, a USB stick) is on it.
+#   - A Pi that never had a touchscreen: it does nothing.
+#
+# Commands:
+#   vt-touch-guard status      what it remembers, is it there now, the last tries
+#   vt-touch-guard forget      forget the remembered touchscreen(s) (e.g. no touch monitor any more)
+#   sudo vt-touch-guard install    install and start it as a system service (vt-server does this once)
+#   sudo vt-touch-guard uninstall  stop and remove the service (vt-server won't install it again)
+#   vt-touch-guard check       one look now: what it sees (changes nothing)
+#   vt-touch-guard run         the watchdog itself (the service runs this, as root)
+#
+# For tests, every outside path can be pointed elsewhere:
+#   VT_TG_SYS (/sys), VT_TG_PROC (/proc), VT_TG_RUN (/run/vt-touch-guard), VT_TG_HOME (the desktop
+#   user's home), VT_TG_UDEVADM (udevadm), VT_TG_UHUBCTL (uhubctl), VT_TG_LOGGER (logger),
+#   VT_TG_UNIT_DIR (/etc/systemd/system), VT_TG_BOOT_WAIT (45), VT_TG_INTERVAL (30),
+#   VT_TG_MIN_GAP (600), VT_TG_MAX_TRIES (3), VT_TG_SETTLE (20), VT_TG_NOW (the time, for tests),
+#   VT_TG_ONCE=1 (run: one round, then stop).
+
+SYS="${VT_TG_SYS:-/sys}"
+PROC="${VT_TG_PROC:-/proc}"
+RUN="${VT_TG_RUN:-/run/vt-touch-guard}"
+UDEVADM="${VT_TG_UDEVADM:-udevadm}"
+UHUBCTL="${VT_TG_UHUBCTL:-uhubctl}"
+LOGGER="${VT_TG_LOGGER:-logger}"
+UNIT_DIR="${VT_TG_UNIT_DIR:-/etc/systemd/system}"
+BOOT_WAIT="${VT_TG_BOOT_WAIT:-45}"
+INTERVAL="${VT_TG_INTERVAL:-30}"
+MIN_GAP="${VT_TG_MIN_GAP:-600}"
+MAX_TRIES="${VT_TG_MAX_TRIES:-3}"
+SETTLE="${VT_TG_SETTLE:-20}"
+UNIT_NAME=vt-touch-guard.service
+UNIT_VERSION="# vt-touch-guard unit v1"
+
+# The desktop user's home: VT_TG_HOME, else the sudo user's, else this user's.
+if [ -n "${VT_TG_HOME:-}" ]; then
+    UHOME="$VT_TG_HOME"
+elif [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+    UHOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+else
+    UHOME="$HOME"
+fi
+MEM="$UHOME/.config/viewtouch/touch-guard"
+OFF="$UHOME/.config/viewtouch/touch-guard.off"
+LOGFILE="$UHOME/.local/state/viewtouch/touch-guard.log"
+
+now() { if [ -n "${VT_TG_NOW:-}" ]; then echo "$VT_TG_NOW"; else date +%s; fi; }
+uptime_s() { local u; u=$(cut -d. -f1 "$PROC/uptime" 2>/dev/null); echo "${u:-0}"; }
+boot_id() { cat "$PROC/sys/kernel/random/boot_id" 2>/dev/null || echo unknown; }
+
+# Files in the user's home stay the user's, even when root (the service) writes them.
+own() { [ "$(id -u)" = 0 ] && chown --reference="$UHOME" "$@" 2>/dev/null; return 0; }
+
+say() {  # a plain-words line to the log file and the journal
+    local line
+    line="$(date '+%Y-%m-%d %H:%M:%S') $*"
+    mkdir -p "$(dirname "$LOGFILE")" 2>/dev/null && own "$UHOME/.local" "$UHOME/.local/state" "$(dirname "$LOGFILE")"
+    if [ -f "$LOGFILE" ] && [ "$(stat -c %s "$LOGFILE" 2>/dev/null || echo 0)" -gt 200000 ]; then
+        mv -f "$LOGFILE" "$LOGFILE.1" 2>/dev/null
+    fi
+    echo "$line" >>"$LOGFILE" 2>/dev/null && own "$LOGFILE"
+    "$LOGGER" -t vt-touch-guard -- "$*" 2>/dev/null
+    [ -t 1 ] && echo "$*"
+    return 0
+}
+
+# One line per touchscreen on USB now, tab-separated:
+#   port  usbdev  controller  driver  id  name
+#   port: udev's ID_PATH without the interface, e.g. platform-xhci-hcd.1-usb-0:1
+#   usbdev: the USB device in sysfs, e.g. 3-1; controller/driver: e.g. xhci-hcd.1 / xhci-hcd
+#   id: vendor:model (only to notice the same screen on another port), name: for people
+scan() {
+    local ev props port name id d usbdev ctrl driver base
+    for ev in "$SYS"/class/input/event*; do
+        [ -e "$ev" ] || continue
+        props=$("$UDEVADM" info -q property -p "$ev" 2>/dev/null) || continue
+        grep -qx 'ID_INPUT_TOUCHSCREEN=1' <<<"$props" || continue
+        port=$(sed -n 's/^ID_PATH=//p' <<<"$props" | sed 's/\(usb-[0-9]*:[0-9.]*\):[0-9]*\.[0-9]*$/\1/')
+        case "$port" in *-usb-*) ;; *) continue ;; esac   # not on USB (e.g. a built-in panel): nothing to reset
+        id="$(sed -n 's/^ID_VENDOR_ID=//p' <<<"$props"):$(sed -n 's/^ID_MODEL_ID=//p' <<<"$props")"
+        name=$(sed -n 's/^NAME=//p' <<<"$props" | tr -d '"')
+        [ -n "$name" ] || name=$(cat "$ev/device/name" 2>/dev/null)
+        [ -n "$name" ] || name="touchscreen"
+        # Up the sysfs tree: the USB device, then the platform device (the USB controller) with a driver.
+        d=$(readlink -f "$ev"); usbdev=""; ctrl=""; driver=""
+        while [ -n "$d" ] && [ "$d" != "/" ] && [ "$d" != "$SYS" ]; do
+            base=$(basename "$d")
+            if [ -z "$usbdev" ] && [ -f "$d/busnum" ] && [[ "$base" =~ ^[0-9]+-[0-9.]+$ ]]; then
+                usbdev="$base"
+            fi
+            if [ -e "$d/driver" ] && [ "$(basename "$(readlink -f "$d/subsystem")")" = platform ]; then
+                ctrl="$base"; driver=$(basename "$(readlink -f "$d/driver")")
+                break
+            fi
+            d=$(dirname "$d")
+        done
+        [ -n "$ctrl" ] || continue
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$port" "$usbdev" "$ctrl" "$driver" "$id" "${name//$'\t'/ }"
+    done | sort -u
+}
+
+remembered() { [ -f "$MEM" ] && grep -v '^#' "$MEM" | grep -v '^[[:space:]]*$'; }
+
+save_mem() {  # stdin: the lines to remember
+    local tmp
+    mkdir -p "$(dirname "$MEM")" && own "$UHOME/.config" "$(dirname "$MEM")"
+    tmp="$MEM.tmp.$$"
+    { echo "# Touchscreens vt-touch-guard watches on this Pi (port, USB device, controller, driver, id, name)."
+      echo "# Forget them: vt-touch-guard forget"
+      cat; } >"$tmp" && mv -f "$tmp" "$MEM" && own "$MEM"
+}
+
+# Learn: remember every touchscreen seen now. One seen on another port with the same id as a
+# remembered one that is gone takes its place (the cable was moved), so the old port isn't "missing".
+learn() {
+    local cur old line port id changed=0 out
+    cur=$(scan)
+    [ -n "$cur" ] || return 0
+    old=$(remembered)
+    out="$old"
+    while IFS=$'\t' read -r port _ _ _ id _; do
+        [ -n "$port" ] || continue
+        line=$(grep -P "^\Q$port\E\t" <<<"$cur" | head -n1)
+        if grep -qP "^\Q$port\E\t" <<<"$old"; then
+            # Known port: keep its details current (the USB device name can change).
+            if ! grep -qxF "$line" <<<"$old"; then
+                out=$(grep -vP "^\Q$port\E\t" <<<"$out"; echo "$line"); changed=1
+            fi
+            continue
+        fi
+        local moved
+        moved=$(while IFS=$'\t' read -r op _ _ _ oid _; do
+                    [ -n "$op" ] && [ "$oid" = "$id" ] && ! grep -qP "^\Q$op\E\t" <<<"$cur" && echo "$op"
+                done <<<"$old" | head -n1)
+        if [ -n "$moved" ]; then
+            out=$(grep -vP "^\Q$moved\E\t" <<<"$out")
+            say "The touchscreen moved from USB port $moved to $port; watching the new port."
+        else
+            say "Found a touchscreen ($(cut -f6 <<<"$line")) on USB port $port; it will be watched from now on."
+        fi
+        out=$(printf '%s\n%s\n' "$out" "$line"); changed=1
+    done <<<"$cur"
+    [ "$changed" = 1 ] && grep -v '^[[:space:]]*$' <<<"$out" | save_mem
+    return 0
+}
+
+# The remembered touchscreens that are missing now (their lines).
+missing() {
+    local cur port
+    cur=$(scan)
+    remembered | while IFS=$'\t' read -r port _; do
+        grep -qP "^\Q$port\E\t" <<<"$cur" || grep -P "^\Q$port\E\t" "$MEM"
+    done
+}
+
+# Is the Pi's own disk (any mounted disk) on this USB controller? Then it is never reset.
+disk_on_controller() {
+    local ctrl_path="$1" src dev blk
+    while read -r src _; do
+        case "$src" in /dev/*) ;; *) continue ;; esac
+        dev=$(basename "$(readlink -f "$src" 2>/dev/null || echo "$src")")
+        blk=$(readlink -f "$SYS/class/block/$dev" 2>/dev/null) || continue
+        [ -n "$blk" ] && [[ "$blk" == "$ctrl_path"/* ]] && return 0
+    done <"$PROC/mounts"
+    return 1
+}
+
+touch_back() {  # wait up to SETTLE seconds for this port's touchscreen
+    local port="$1" i
+    for ((i = 0; i < SETTLE; i += 2)); do
+        scan | grep -qP "^\Q$port\E\t" && return 0
+        [ "$SETTLE" -gt 0 ] && sleep 2
+    done
+    scan | grep -qP "^\Q$port\E\t"
+}
+
+# (a) uhubctl: that one port off and on. usbdev 3-1 is port 1 on hub 3; 3-1.4 is port 4 on hub 3-1.
+try_uhubctl() {
+    local usbdev="$1" hub p out
+    command -v "$UHUBCTL" >/dev/null 2>&1 || { echo "uhubctl isn't installed"; return 1; }
+    [ -n "$usbdev" ] || { echo "the USB port number isn't known"; return 1; }
+    if [[ "$usbdev" == *.* ]]; then hub="${usbdev%.*}"; p="${usbdev##*.}"; else hub="${usbdev%%-*}"; p="${usbdev#*-}"; fi
+    out=$("$UHUBCTL" -l "$hub" 2>&1)
+    if [ $? -ne 0 ] || ! grep -q "status for hub $hub " <<<"$out"; then
+        echo "uhubctl can't switch the power of USB hub $hub on this Pi"; return 1
+    fi
+    "$UHUBCTL" -l "$hub" -p "$p" -a cycle -d 3 >/dev/null 2>&1 || { echo "uhubctl couldn't turn port $p of hub $hub off and on"; return 1; }
+    echo "turned USB port $p of hub $hub off and on with uhubctl"
+}
+
+# (b) The USB controller off and on (unbind/bind its driver). Bind is tried 3 times: without it
+# nothing on that controller works until a restart.
+try_rebind() {
+    local ctrl="$1" driver="$2" drv i
+    drv="$SYS/bus/platform/drivers/$driver"
+    [ -n "$ctrl" ] && [ -n "$driver" ] && [ -w "$drv/unbind" ] && [ -w "$drv/bind" ] \
+        || { echo "can't restart USB controller $ctrl (no $drv/unbind)"; return 1; }
+    if [ -e "$drv/$ctrl" ]; then
+        echo "$ctrl" >"$drv/unbind" 2>/dev/null || { echo "couldn't stop USB controller $ctrl"; return 1; }
+        sleep "${VT_TG_REBIND_PAUSE:-2}"
+    fi
+    for i in 1 2 3; do
+        echo "$ctrl" >"$drv/bind" 2>/dev/null && { echo "restarted USB controller $ctrl"; return 0; }
+        [ -e "$drv/$ctrl" ] && { echo "restarted USB controller $ctrl"; return 0; }
+        sleep 2
+    done
+    echo "USB controller $ctrl did NOT start again: everything on it stays off until the Pi is restarted"
+    return 1
+}
+
+# One try at bringing a missing touchscreen back.
+reset_for() {
+    local line="$1" port usbdev ctrl driver name ctrl_path r
+    IFS=$'\t' read -r port usbdev ctrl driver _ name <<<"$line"
+    ctrl_path=$(readlink -f "$SYS/bus/platform/devices/$ctrl" 2>/dev/null)
+    if [ -n "$ctrl_path" ] && disk_on_controller "$ctrl_path"; then
+        say "Not resetting: a disk in use (the Pi's own disk or a mounted USB stick) is on the same USB controller ($ctrl) as the touchscreen. Unplug and replug the touchscreen's USB cable by hand."
+        return 1
+    fi
+    if r=$(try_uhubctl "$usbdev"); then
+        say "Try: $r."
+        if touch_back "$port"; then say "The touchscreen is back (USB port $port)."; return 0; fi
+        say "The touchscreen didn't come back from that; restarting its USB controller instead."
+    else
+        say "(Not turning just that port off and on: $r.)"
+    fi
+    if [ -z "$ctrl_path" ]; then
+        say "Can't reset: USB controller $ctrl isn't on this Pi. Unplug and replug the touchscreen's USB cable by hand."
+        return 1
+    fi
+    say "Try: restarting USB controller $ctrl (everything on it reconnects, e.g. a USB receipt printer or scanner)."
+    r=$(try_rebind "$ctrl" "$driver"); say "Result: $r."
+    if touch_back "$port"; then say "The touchscreen is back (USB port $port)."; return 0; fi
+    say "The touchscreen ($name) is still missing after the try."
+    return 1
+}
+
+# This boot's tries (in /run: a restart starts again from 0).
+state_init() {
+    mkdir -p "$RUN" && chmod 755 "$RUN"
+    if [ "$(cat "$RUN/boot_id" 2>/dev/null)" != "$(boot_id)" ]; then
+        rm -f "$RUN/tries" "$RUN/seen" "$RUN/misses" "$RUN/gave_up"
+        boot_id >"$RUN/boot_id"
+    fi
+    touch "$RUN/tries"
+}
+tries_count() { local n; n=$(grep -c . "$RUN/tries" 2>/dev/null); echo "${n:-0}"; }
+last_try() { tail -n1 "$RUN/tries" 2>/dev/null | cut -d' ' -f1; }
+
+round() {
+    local miss first n last t
+    learn
+    [ -n "$(remembered)" ] || return 0
+    miss=$(missing)
+    if [ -z "$miss" ]; then
+        [ -f "$RUN/misses" ] && rm -f "$RUN/misses"
+        touch "$RUN/seen"
+        return 0
+    fi
+    # Seen this boot and gone now (a cable pulled, a monitor swapped): only after two looks in a row.
+    # Never seen since the boot (the power-up problem): at once.
+    if [ -f "$RUN/seen" ] && [ ! -f "$RUN/misses" ]; then
+        touch "$RUN/misses"; return 0
+    fi
+    first=$(head -n1 <<<"$miss")
+    n=$(tries_count); t=$(now)
+    if [ "$n" -ge "$MAX_TRIES" ]; then
+        if [ ! -f "$RUN/gave_up" ]; then
+            touch "$RUN/gave_up"
+            say "The touchscreen is still missing after $n tries; no more tries until the Pi restarts. Unplug and replug its USB cable. If this Pi has no touch monitor any more: vt-touch-guard forget"
+        fi
+        return 0
+    fi
+    last=$(last_try)
+    if [ -n "$last" ] && [ $((t - last)) -lt "$MIN_GAP" ]; then return 0; fi
+    echo "$t $(cut -f1 <<<"$first")" >>"$RUN/tries"
+    say "The touchscreen ($(cut -f6 <<<"$first")) on USB port $(cut -f1 <<<"$first") is missing. Try $((n + 1)) of $MAX_TRIES this boot: emulating unplugging and replugging it."
+    reset_for "$first"
+    rm -f "$RUN/misses"
+}
+
+cmd_run() {
+    [ "$(id -u)" = 0 ] || [ -n "${VT_TG_SYS:-}" ] || { echo "vt-touch-guard run needs root (the service runs it): sudo vt-touch-guard install"; exit 1; }
+    state_init
+    local up; up=$(uptime_s)
+    if [ "$up" -lt "$BOOT_WAIT" ] && [ -z "${VT_TG_ONCE:-}" ]; then sleep $((BOOT_WAIT - up)); fi
+    while true; do
+        round
+        [ -n "${VT_TG_ONCE:-}" ] && break
+        sleep "$INTERVAL"
+    done
+}
+
+cmd_status() {
+    local mem cur port _u ctrl _d _i name n st
+    mem=$(remembered); cur=$(scan)
+    if [ -z "$mem" ]; then
+        echo "No touchscreen remembered on this Pi: vt-touch-guard does nothing here."
+        [ -n "$cur" ] && echo "(A touchscreen is plugged in now; it will be remembered within 30 seconds if the service runs.)"
+    else
+        echo "Touchscreens watched on this Pi:"
+        while IFS=$'\t' read -r port _u ctrl _d _i name; do
+            if grep -qP "^\Q$port\E\t" <<<"$cur"; then st="there now"; else st="MISSING now"; fi
+            echo "  $name, USB port $port (controller $ctrl): $st"
+        done <<<"$mem"
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        st=$(systemctl is-active "$UNIT_NAME" 2>/dev/null)
+        case "$st" in
+            active) echo "The service is running." ;;
+            *) if [ -f "$OFF" ]; then echo "The service is off (turned off with uninstall; sudo vt-touch-guard install turns it on)."
+               else echo "The service isn't running (${st:-not installed}): sudo vt-touch-guard install"; fi ;;
+        esac
+    fi
+    n=$(tries_count)
+    echo "Resets since this boot: $n of at most $MAX_TRIES."
+    if [ -s "$LOGFILE" ]; then
+        echo "Last messages ($LOGFILE):"
+        tail -n 8 "$LOGFILE" | sed 's/^/  /'
+    fi
+}
+
+cmd_check() {
+    local cur
+    cur=$(scan)
+    if [ -z "$cur" ]; then echo "No USB touchscreen is plugged in now."
+    else echo "USB touchscreens now:"; while IFS=$'\t' read -r p u c d i n; do echo "  $n ($i), port $p, USB device $u, controller $c ($d)"; done <<<"$cur"; fi
+}
+
+cmd_forget() {
+    if [ -f "$MEM" ]; then
+        rm -f "$MEM" || { echo "Couldn't remove $MEM (try: sudo vt-touch-guard forget)"; exit 1; }
+        say "Forgot the remembered touchscreen(s) (vt-touch-guard forget)."
+        echo "Forgotten. A touchscreen plugged in now is remembered again within 30 seconds; unplug it first if this Pi has none any more."
+    else
+        echo "Nothing to forget: no touchscreen was remembered."
+    fi
+}
+
+unit_file() { echo "$UNIT_DIR/$UNIT_NAME"; }
+
+cmd_needs_install() {  # exit 0 when vt-server should install (or update) the service
+    [ -f "$OFF" ] && return 1
+    grep -qxF "$UNIT_VERSION" "$(unit_file)" 2>/dev/null && return 1
+    return 0
+}
+
+cmd_install() {
+    [ "$(id -u)" = 0 ] || { echo "Needs root: sudo vt-touch-guard install"; exit 1; }
+    local self
+    self=$(readlink -f "$0")
+    [ "$(readlink -f /usr/local/bin/vt-touch-guard 2>/dev/null)" = "$self" ] && self=/usr/local/bin/vt-touch-guard
+    cat >"$(unit_file)" <<EOF
+$UNIT_VERSION
+[Unit]
+Description=ViewTouch touch guard: brings back a USB touchscreen missing after power-up
+After=systemd-udevd.service
+
+[Service]
+Type=simple
+Environment=VT_TG_HOME=$UHOME
+ExecStart=$self run
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    rm -f "$OFF"
+    systemctl daemon-reload && systemctl enable "$UNIT_NAME" >/dev/null 2>&1 && systemctl restart "$UNIT_NAME" \
+        || { echo "Couldn't start the touch guard service (see: systemctl status $UNIT_NAME)."; exit 1; }
+    echo "Touch guard is on: if the touchscreen doesn't show up after a power-up, the Pi replugs it by itself (vt-touch-guard status)."
+}
+
+cmd_uninstall() {
+    [ "$(id -u)" = 0 ] || { echo "Needs root: sudo vt-touch-guard uninstall"; exit 1; }
+    systemctl disable --now "$UNIT_NAME" >/dev/null 2>&1
+    rm -f "$(unit_file)"; systemctl daemon-reload 2>/dev/null
+    mkdir -p "$(dirname "$OFF")" && echo "Turned off with vt-touch-guard uninstall; vt-server won't turn it on again." >"$OFF" && own "$OFF"
+    echo "Touch guard is off and removed. To turn it on again: sudo vt-touch-guard install"
+}
+
+case "${1:-status}" in
+    run) cmd_run ;;
+    status) cmd_status ;;
+    check) cmd_check ;;
+    forget) cmd_forget ;;
+    install) cmd_install ;;
+    uninstall) cmd_uninstall ;;
+    needs-install) cmd_needs_install ;;
+    -h|--help|help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *) echo "Unknown: $1. Use: vt-touch-guard status | forget | check | sudo vt-touch-guard install | uninstall"; exit 1 ;;
+esac
