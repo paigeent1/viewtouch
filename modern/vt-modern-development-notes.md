@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 11:23 ET — Bob (Claude) — vt-install: the pi user also joins lp (USB receipt printers)
+- **What:** Step 4 of vt-install adds the user to lp as well as dialout, so ViewTouch can write to /dev/usb/lp0.
+- **Why:** HCA (2026-11-14): its Rongta on USB didn't print: 'Permission denied' on /dev/usb/lp0, pi wasn't in lp (BHDAN's was added by hand earlier).
+- **Files:** (none)
+
 ### 2026-11-13 16:12 ET — Bob (Claude) — Status: HCA on Qt 6.12; BHDAN hardware, ID scans and screens sorted
 - **What:** HCA (VT-HCA-PI) runs 7e46d6a on the official Qt 6.12.0 (vt-qt612 install 2026-11-13 16:05: all four checks OK, video too; backup ~/vt-backups/before-qt-6.12.0-2026-11-13_1605). Its run-through (screen, touch, a sale with UPC and license, printing, a report, Labels) waits for a monitor on HCA. BHDAN runs 7e46d6a on Debian's Qt 6.8: Rongta RP850 on /dev/usb/lp0 as VT-BHDAN-RECEIPT (prints, cuts, drawer), Symbol keyboard-mode scanner (UPCs and licenses work), register on HDMI-1 (large Wimaxit) with ~/.vt-pos-output HDMI-1 and the startup layout rewritten, guest touch learned, a powered USB hub, normal boot restored (old-kernel config backed up as config.txt.old-kernel-backup), SITE_NAME BH Danbury. Waiting: Android run 43507088390 (tablets + fire5 with billboard auto-start and the scan fixes), then fire5 Update app and vt-tablets; manual PDF from run 43492911274 to Dropbox Manuals by the owner.
 - **Why:** Owner paused at 16:12 (no monitor on HCA); where things stand for whoever picks up.

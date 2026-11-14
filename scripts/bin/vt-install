@@ -31,8 +31,8 @@ git pull --ff-only myfork main
 step "3. The vt-* commands, linked to the repo (git pull keeps them current)"
 for f in "$REPO"/scripts/bin/vt-*; do sudo ln -sf "$f" /usr/local/bin/; done
 
-step "4. Serial scanner access, and the beep3 command"
-sudo usermod -aG dialout "$USER"
+step "4. Serial scanner and USB receipt printer access (dialout, lp), and the beep3 command"
+sudo usermod -aG dialout,lp "$USER"
 if ! grep -q '^beep3()' "$HOME/.bashrc"; then
     cat >> "$HOME/.bashrc" <<'EOF'
 
