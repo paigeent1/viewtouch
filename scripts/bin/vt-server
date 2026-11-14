@@ -83,6 +83,21 @@ for f in "$VT_REPO"/scripts/bin/vt-*; do
     [ -e "/usr/local/bin/$(basename "$f")" ] && continue
     sudo ln -sf "$f" /usr/local/bin/ 2>/dev/null || echo "Note: couldn't link $(basename "$f") into /usr/local/bin (run it as $f)."
 done
+# The newest app for each kind of screen (tablets: arm64-v8a, Fire TVs: armeabi-v7a) from apks/ into
+# ViewTouch's own updates folder, the one Manager > Network offers to screens that are behind; older
+# ones there are removed. (HCA 2026-11-14: new apps in apks/ were never offered.)
+UPD="$HOME/.local/share/ViewTouch/ViewTouch/updates"
+if [ -d "$VT_REPO/apks" ]; then
+    mkdir -p "$UPD"
+    for abi in arm64-v8a armeabi-v7a; do
+        newest=$(ls "$VT_REPO"/apks/*-b[0-9]*-"$abi".apk 2>/dev/null | sed -E 's/.*-b([0-9]+)-.*/\1 &/' | sort -n | tail -1 | cut -d' ' -f2-)
+        [ -n "$newest" ] || continue
+        if [ ! -e "$UPD/$(basename "$newest")" ]; then
+            find "$UPD" -maxdepth 1 -name "*-$abi.apk" -delete
+            cp -f "$newest" "$UPD/" && echo "Screens will be offered $(basename "$newest") (Manager > Network)."
+        fi
+    done
+fi
 # The touch guard (vt-touch-guard): replugs a USB touchscreen that didn't show up after a power-up.
 # Installed once (and again when its service changes); not after vt-touch-guard uninstall. Already on:
 # restarted quietly, so it runs this pull's version.

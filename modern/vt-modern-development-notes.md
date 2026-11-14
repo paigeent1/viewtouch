@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 17:50 ET — Bob (Claude) — vt-server offers the newest apps from apks/ to the screens
+- **What:** vt-server copies the highest-build arm64-v8a (tablets) and armeabi-v7a (Fire TVs) app in apks/ into ViewTouch's updates folder (~/.local/share/ViewTouch/ViewTouch/updates), removing older ones of the same kind, so Manager > Network offers them.
+- **Why:** HCA 2026-11-14: new apps downloaded into apks/ were never offered (the server reads only its updates folder); the owner had to copy them by hand.
+- **Files:** (none)
+
 ### 2026-11-14 17:29 ET — Bob (Claude) — Update strip comes back when a new update is offered
 - **What:** Main.qml: the tablet's update strip (Update Now) shows again after Later whenever the store offers a different update or runs a different build, not only after a reconnection.
 - **Why:** HCA 2026-11-14: after b533 went into the updates folder and ViewTouch restarted, managers logging in on HCA 1-3 saw no update strip: Later had been tapped and the quick restart didn't count as a new connection.
