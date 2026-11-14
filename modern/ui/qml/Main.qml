@@ -498,6 +498,10 @@ ApplicationWindow {
         readonly property var info: root.controller.pos ? root.controller.pos.updateInfo : ({})
         readonly property bool manager: !!root.controller.pos && root.controller.pos.loggedIn && root.controller.pos.can("manager")
         property bool later: false
+        // A new update on the store's computer brings the strip back even after Later (HCA 2026-11-14:
+        // ViewTouch restarted too quickly for the tablets to count it as a new connection).
+        readonly property string offered: (info.update ? info.update.name ?? "" : "") + "/" + (info.storeBuild ?? "")
+        onOfferedChanged: later = false
         Connections {
             target: root.controller.pos
             function onOnlineChanged() { updateStrip.later = false }

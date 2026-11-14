@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 17:29 ET — Bob (Claude) — Update strip comes back when a new update is offered
+- **What:** Main.qml: the tablet's update strip (Update Now) shows again after Later whenever the store offers a different update or runs a different build, not only after a reconnection.
+- **Why:** HCA 2026-11-14: after b533 went into the updates folder and ViewTouch restarted, managers logging in on HCA 1-3 saw no update strip: Later had been tapped and the quick restart didn't count as a new connection.
+- **Files:** (none)
+
 ### 2026-11-14 16:46 ET — Bob (Claude) — Keys: tablet taps that roll or press slowly still count
 - **What:** WidgetKey.qml TapHandler: keys without a hold action have no long-press timer (longPressThreshold 0: a slow, firm press is still a tap); dragThreshold widened to the larger of the system's drag distance and a quarter of the key (at most 40 px), so a finger rolling a little while it presses still taps; a real drag still scrolls.
 - **Why:** Owner 2026-11-14 at HCA: all three tablets miss taps at random (HCA 2 most).
