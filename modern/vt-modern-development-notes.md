@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 11:28 ET — Bob (Claude) — Back: one touch, even when the page was remembered twice
+- **What:** app/navigator.cpp: a push to the page already showing no longer remembers it, and Back (and Sequence) skips remembered entries that are the page already showing. Test in test_navigator.cpp.
+- **Why:** Owner 2026-11-14: on BHDAN and HCA, Manager's Back always took two touches: Manager was on the Back stack twice, so the first Back went to Manager.
+- **Files:** (none)
+
 ### 2026-11-14 11:23 ET — Bob (Claude) — vt-install: the pi user also joins lp (USB receipt printers)
 - **What:** Step 4 of vt-install adds the user to lp as well as dialout, so ViewTouch can write to /dev/usb/lp0.
 - **Why:** HCA (2026-11-14): its Rongta on USB didn't print: 'Permission denied' on /dev/usb/lp0, pi wasn't in lp (BHDAN's was added by hand earlier).

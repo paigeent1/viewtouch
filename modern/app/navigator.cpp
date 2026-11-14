@@ -36,7 +36,8 @@ bool Navigator::jump(Mode mode, const QString &target)
     case Mode::Push:
         if (!layout_->page(target))
             return false;
-        push(current_);
+        if (target != current_)   // a jump to the page already showing isn't a step Back must undo
+            push(current_);
         enter(target);
         break;
     case Mode::Replace:
@@ -46,8 +47,9 @@ bool Navigator::jump(Mode mode, const QString &target)
         break;
     case Mode::Back:
     case Mode::Sequence:
-        // Skip pages deleted or renamed (in the editor) since they were pushed.
-        while (!stack_.isEmpty() && !layout_->page(stack_.last()))
+        // Skip pages deleted or renamed (in the editor) since they were pushed, and the page already
+        // showing (Back on Manager took two touches when Manager had been remembered twice).
+        while (!stack_.isEmpty() && (!layout_->page(stack_.last()) || stack_.last() == current_))
             stack_.removeLast();
         if (stack_.isEmpty())
             enter(home_);

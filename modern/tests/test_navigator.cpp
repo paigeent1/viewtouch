@@ -137,3 +137,23 @@ TEST_CASE("index prefers the current meal period when none was visited", "[nav]"
     CHECK(nav.jump(Mode::Index));
     CHECK(nav.current() == u"lunch"_s);
 }
+
+TEST_CASE("Back leaves the page showing in one step, even when it was opened from itself", "[nav]")
+{
+    // BHDAN and HCA 2026-11-14: Back on Manager took two touches.
+    const auto l = pages();
+    Navigator nav(l);
+    nav.reset(u"login"_s);
+    CHECK(nav.jump(Mode::Push, u"tables"_s));
+    CHECK(nav.jump(Mode::Push, u"tables"_s));   // a button on Tables that jumps to Tables
+    CHECK(nav.depth() == 1);
+    CHECK(nav.jump(Mode::Back));
+    CHECK(nav.current() == u"login"_s);
+
+    // And when it got remembered some other way (a page, a replace back onto it): skipped.
+    CHECK(nav.jump(Mode::Push, u"lunch"_s));      // login remembered
+    CHECK(nav.jump(Mode::Push, u"settle"_s));     // lunch remembered
+    CHECK(nav.jump(Mode::Replace, u"lunch"_s));   // now on lunch, lunch on top of the stack
+    CHECK(nav.jump(Mode::Back));
+    CHECK(nav.current() == u"login"_s);
+}
