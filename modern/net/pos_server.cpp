@@ -838,6 +838,21 @@ void PosServer::pair(Connection *c, const QJsonObject &m)
     // replaced tablet keeps that terminal's printer and drawer settings).
     auto &list = shared_->settings.terminals;
     auto it = std::ranges::find_if(list, [&](const core::TerminalConfig &t) { return t.name == name.toStdString(); });
+    // ...but not a tablet that's connected right now under that name: two tablets given the same
+    // name (the model's, "TB305FU") bumped each other back to pairing (HCA, 2026-11-14).
+    if (it != list.end() && !asStandby) {
+        const QString taken = QString::fromStdString(it->id);
+        const bool inUse = std::ranges::any_of(connections_, [&](const auto &other) {
+            return other.get() != c && other->session && other->terminalId == taken;
+        });
+        if (inUse) {
+            c->channel->send({{u"t"_s, u"error"_s},
+                              {u"text"_s, tr("\"%1\" is a terminal that's connected right now: give this one another "
+                                             "name (or remove \"%1\" in Manager -> Terminals to replace it).").arg(name)}});
+            c->socket->disconnectFromHost();
+            return;
+        }
+    }
     if (it == list.end()) {
         list.push_back({});
         it = list.end() - 1;

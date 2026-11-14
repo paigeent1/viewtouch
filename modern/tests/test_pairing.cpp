@@ -9,6 +9,8 @@
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
 
+#include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -246,4 +248,31 @@ TEST_CASE("Discovery: servers answer who they are; a terminal finds a moved serv
     REQUIRE_FALSE(moved.isEmpty());
     CHECK(moved.last()[0].value<net::Credentials>().port == store.server.port());
     CHECK(remote.credentials().port == store.server.port());
+}
+
+TEST_CASE("Pairing under the name of a terminal that's connected right now is refused", "[pairing]")
+{
+    // HCA 2026-11-14: two tablets joined with the same suggested name bumped each other back to pairing.
+    Store store;
+    const auto [ok, creds, error] = store.pair(store.startPairing(), u"HCA 1"_s);
+    REQUIRE(ok);
+    {
+        net::RemoteSession first(u"HCA 1"_s);
+        first.setCredentials(creds);
+        first.connectTo(creds.host, creds.port);
+        REQUIRE(first.waitForWelcome(5000));
+
+        const auto [taken, c2, takenError] = store.pair(store.startPairing(), u"HCA 1"_s);
+        CHECK_FALSE(taken);
+        CHECK(takenError.contains(u"connected right now"_s));
+        CHECK(store.shared.settings.pairedTerminal(creds.terminalId.toStdString()));   // the first keeps its place
+    }
+    // A tablet that's gone (not connected) can still be replaced under its name.
+    QElapsedTimer t;
+    t.start();
+    while (t.elapsed() < 500)
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    const auto [replaced, c3, replacedError] = store.pair(store.startPairing(), u"HCA 1"_s);
+    CHECK(replaced);
+    CHECK(c3.terminalName == u"HCA 1"_s);
 }

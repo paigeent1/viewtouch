@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-14 12:51 ET — Bob (Claude) — Pairing refuses the name of a terminal that's connected right now
+- **What:** net/pos_server.cpp pair(): a device paired under a terminal's name still takes its place (a replaced tablet keeps its settings), unless that terminal is connected right now: then it's refused with 'is a terminal that's connected right now: give this one another name (or remove it in Manager -> Terminals to replace it)'. Test in test_pairing.cpp.
+- **Why:** HCA 2026-11-14: re-pairing Bar 1-3 as HCA 1-3 from the Join screen, each tablet joined bumped the other back to the Join screen: they were given the same name (the model's suggested 'TB305FU' or a repeated HCA n).
+- **Files:** (none)
+
 ### 2026-11-14 11:48 ET — Bob (Claude) — Back test: a jump to the page showing returns false
 - **What:** test_navigator.cpp: the new Back test no longer expects true from a push to the page already showing (jump reports no change).
 - **Why:** Checks run 43615808167: that one CHECK failed; the rest of the test passed.
