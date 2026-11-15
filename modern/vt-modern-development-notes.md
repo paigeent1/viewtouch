@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 18:07 ET — Bob (Claude) — DIRECTV: BOX .72 is now BAR 3
+- **What:** The DIRECTV receiver chooser and the .72 tuning page say BAR 3 (192.168.6.72) instead of BOX .72; the tuning page's doubled address is gone; manual updated. The box key stays box72, so HCA's tvs.json and the buttons keep working.
+- **Why:** Owner at HCA 2026-11-15: the .72 box drives Bar 3. HCA's receivers were found and named (vt-directv scan --save, then bar1=.74, bar2=.71, box72=.72, front=.70, vip=.73).
+- **Files:** `modern/seed/pages/directv.json, modern/seed/pages/directv-tune-box72.json, modern/docs/manual/manual.html`
+
 ### 2026-11-15 16:35 ET — Helper (Claude) for Bob — Manual: loss alerts, Loss Watch, the profit coach, Find My Printers
 - **What:** Ported upstream 31f6b05 and ac2ead3's text for these three features into modern/docs/manual/manual.html, without screenshots: a What's new from ViewTouch 0.21 list, Dashboard alerts and profit coach (chapter 2), Find My Printers under Printers (chapter 11), the Loss Watch report and a Profit Coach row (chapter 12). Fitted to the fork: Store Settings section name, Cancel Sale alerts, retail costs, the USB and label printers left alone. Left out: Your Tables and the keyboard's Next key (not ported).
 - **Why:** Owner/Bob: the manual must cover the ported features.

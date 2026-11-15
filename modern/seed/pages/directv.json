@@ -103,7 +103,7 @@
     {
       "id": "b-72",
       "kind": "button",
-      "label": "\ud83d\udcfa BOX .72\n(192.168.6.72)",
+      "label": "\ud83d\udcfa BAR 3\n(192.168.6.72)",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
