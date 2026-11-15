@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 11:18 ET — Bob (Claude) — Labels screen: long label names wrap and fit
+- **What:** The label keys on Retail Labels (Choose a label) wrap long names and shrink the text to fit instead of cutting it off.
+- **Why:** BHDAN 1 photo: 'RECEIVING LABEL - BHGAYLORDSVILLE' and 'CIGAR STICK LABEL UPC_DESC' ran off the key. These keys are built in, not editor buttons, so there is no editor setting for it.
+- **Files:** `modern/ui/qml/WidgetRetailLabels.qml`
+
 ### 2026-11-15 11:15 ET — Bob (Claude) — Tablets update themselves (silent install, idle only)
 - **What:** Device-owner tablets fetch the store's update by themselves (getUpdate fast+auto; the server allows it for paired devices without a manager) and install it silently through PackageInstaller once nobody is signed in, then reopen (MY_PACKAGE_REPLACED). Other screens are unchanged. Doc: modern/docs/TABLET_AUTO_UPDATE.md. Test: test_updates 'Updates by themselves'.
 - **Why:** Owner wants patches deployed with little user action; adb tcpip 5555 is lost on every tablet restart (HCA 1-3), so pushing from the Pi kept needing USB.

@@ -288,6 +288,20 @@ Item {
                             font.pixelSize: 17
                             highlighted: w.chosen === modelData.name
                             text: modelData.name + "\n" + modelData.size
+                            // Long names wrap, and shrink to fit rather than run off the key
+                            // (BHDAN 1, 2026-11-15: "RECEIVING LABEL - BHGAYLORDSVILLE" was cut off).
+                            contentItem: Text {
+                                text: parent.text
+                                font.pixelSize: parent.font.pixelSize
+                                font.bold: parent.font.bold
+                                color: parent.palette.buttonText
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                fontSizeMode: Text.Fit
+                                minimumPixelSize: 11
+                                maximumLineCount: 4
+                            }
                             onClicked: w.chooseLabel(modelData.name)
                         }
                     }
