@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 10:00 ET — Helper (Claude) for Bob — Paced updates: count the encrypted queue too
+- **What:** pos_server.cpp: the old-way parts and the download stream are paced on what waits to go out including the encrypted bytes (bytesToWrite + encryptedBytesToWrite), driven by encryptedBytesWritten.
+- **Why:** A QSslSocket's bytesToWrite() is only the not-yet-encrypted part, which it hands to the encrypted queue at once: the pacing let everything through (the old-way test caught it: 32 MB queued in 0.2 s).
+- **Files:** `modern/net/pos_server.cpp`
+
 ### 2026-11-15 09:40 ET — Helper (Claude) for Bob — Update tests: fix the old-way test
 - **What:** test_updates.cpp: the hand-made client took two messages per look (waitFor asks once more at the end), and the old-way test now reads with a small buffer and a payload bigger than the computer's network buffers, so it shows the store answers before the update is through.
 - **Why:** CI run 43724053497: the old-way test failed on its own bookkeeping, not the store.

@@ -136,6 +136,13 @@ constexpr qint64 kDownloadWindow = 2 * 1024 * 1024;
 constexpr qint64 kDownloadStuckMs = 60'000;
 constexpr qint64 kTicketMs = 24 * 3600 * 1000;
 
+// What waits to go out on a connection: not yet encrypted, and encrypted but not yet sent (a QSslSocket's
+// bytesToWrite() is only the first, which it empties into the second at once).
+qint64 queued(const QSslSocket *s)
+{
+    return s->bytesToWrite() + s->encryptedBytesToWrite();
+}
+
 // Screens that ask for things (this version) get the open checks in two
 // parts (the shared part made and sent once a round); older ones the list.
 bool notFor(bool subscribes, const QString &key)
@@ -502,7 +509,8 @@ void PosServer::onNewConnection()
         connections_.push_back(std::move(c));
         connect(socket, &QTcpSocket::readyRead, this, [this, raw] { onReadyRead(raw); });
         // An update on its way goes on as the last of it leaves.
-        connect(socket, &QTcpSocket::bytesWritten, this, [this, raw] {
+        // (Encrypted bytes leaving: what's queued shrank.)
+        connect(socket, &QSslSocket::encryptedBytesWritten, this, [this, raw] {
             if (raw->paced)
                 pumpPacedUpdate(raw);
             if (raw->download) {
@@ -1081,7 +1089,7 @@ void PosServer::sendUpdate(Connection *c, bool fast)
 
 void PosServer::pumpPacedUpdate(Connection *c)
 {
-    while (c->paced && c->socket->bytesToWrite() < kPacedWindow) {
+    while (c->paced && queued(c->socket) < kPacedWindow) {
         Connection::PacedUpdate &p = *c->paced;
         const QByteArray data = p.file.read(kPacedChunk);
         if (data.isEmpty() && p.size > 0) {
@@ -1138,7 +1146,7 @@ void PosServer::startDownload(Connection *c, const QJsonObject &m)
 
 void PosServer::pumpDownload(Connection *c)
 {
-    while (c->download && c->downloadLeft > 0 && c->socket->bytesToWrite() < kDownloadWindow) {
+    while (c->download && c->downloadLeft > 0 && queued(c->socket) < kDownloadWindow) {
         const QByteArray data = c->download->read(std::min(kDownloadChunk, c->downloadLeft));
         if (data.isEmpty()) {
             c->download.reset();
