@@ -105,6 +105,19 @@ Item {
         repeat: true
         onTriggered: {
             if (!w.controller) return
+            // Typed on a keyboard with the search line not touched first (Main.qml): into the line.
+            const typed = w.controller.take("lookupType")
+            if (typed) {
+                let text = searchField.text
+                let now = false
+                for (const c of String(typed)) {
+                    if (c === "\b") text = text.slice(0, -1)
+                    else if (c === "\n") now = true
+                    else text += c
+                }
+                searchField.text = text
+                if (now) { typing.stop(); w.find(text) } else typing.restart()
+            }
             const code = w.controller.take("lookupScan")
             if (!code) return
             searchField.text = String(code)

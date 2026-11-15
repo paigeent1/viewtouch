@@ -281,6 +281,21 @@ ApplicationWindow {
                             return
                         }
                     }
+                    // Item Look Up (Retail: ALPHA LOOK UP, PRICE CHECK): what's typed on a keyboard goes into
+                    // its search line without touching the line first: letters, digits, space, Backspace, and
+                    // Enter to look it up now (BHDAN 2026-11-15). A scan still arrives whole (lookupScan).
+                    if (!burst && root.controller.pageId === "item-lookup") {
+                        const t = event.text
+                        const key = t.length === 1 && t >= " " && t !== "@" ? t
+                                  : event.key === Qt.Key_Backspace ? "\b"
+                                  : (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) ? "\n" : ""
+                        if (key !== "") {
+                            const before = root.controller.take("lookupType")
+                            root.controller.keep("lookupType", (before ? String(before) : "") + key)
+                            event.accepted = true
+                            return
+                        }
+                    }
                     if (event.key === Qt.Key_Escape && root.controller.numberKey("escape")) {
                         event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {

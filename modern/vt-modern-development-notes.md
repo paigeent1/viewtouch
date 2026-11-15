@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 12:32 ET — Bob (Claude) — Alpha Look Up takes keyboard typing
+- **What:** On the Item Look Up page (ALPHA LOOK UP / PRICE CHECK), letters, digits, space, Backspace and Enter typed on a keyboard go into the search line without touching it first; scans still arrive whole.
+- **Why:** Owner: alpha lookup in retail mode should take keyboard input.
+- **Files:** `modern/ui/qml/Main.qml, modern/ui/qml/WidgetItemLookup.qml`
+
 ### 2026-11-15 11:18 ET — Bob (Claude) — Labels screen: long label names wrap and fit
 - **What:** The label keys on Retail Labels (Choose a label) wrap long names and shrink the text to fit instead of cutting it off.
 - **Why:** BHDAN 1 photo: 'RECEIVING LABEL - BHGAYLORDSVILLE' and 'CIGAR STICK LABEL UPC_DESC' ran off the key. These keys are built in, not editor buttons, so there is no editor setting for it.
