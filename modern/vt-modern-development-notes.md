@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 10:50 ET — Bob (Claude) — vt-add-tablet waits for the tablet on USB
+- **What:** vt-add-tablet now waits up to 60 s for a USB tablet, says to tap Allow when it shows unauthorized, and prints adb devices -l if it still can't find one.
+- **Why:** At BHDAN the tablet was listed a minute earlier but missing when vt-add-tablet ran right after vt-server, so it quit straight away.
+- **Files:** `scripts/bin/vt-add-tablet`
+
 ### 2026-11-15 10:00 ET — Helper (Claude) for Bob — Paced updates: count the encrypted queue too
 - **What:** pos_server.cpp: the old-way parts and the download stream are paced on what waits to go out including the encrypted bytes (bytesToWrite + encryptedBytesToWrite), driven by encryptedBytesWritten.
 - **Why:** A QSslSocket's bytesToWrite() is only the not-yet-encrypted part, which it hands to the encrypted queue at once: the pacing let everything through (the old-way test caught it: 32 MB queued in 0.2 s).

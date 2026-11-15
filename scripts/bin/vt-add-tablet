@@ -4,8 +4,21 @@
 #   vt-add-tablet ["Bar 4"] [its Wi-Fi address]
 set -e
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-USB=$(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1; exit}')
-[ -z "$USB" ] && { echo "Plug new tablet into Pi USB port with USB Debugging ON first!"; exit 1; }
+usb_tablet() { adb devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1; exit}'; }
+USB=$(usb_tablet)
+if [ -z "$USB" ]; then
+  # A tablet that just woke, or was just replugged, takes a few seconds; one waiting on
+  # "Allow USB debugging?" shows as unauthorized until someone taps Allow.
+  echo "Looking for the tablet on USB (up to 60 s)..."
+  for i in $(seq 30); do
+    USB=$(usb_tablet); [ -n "$USB" ] && break
+    if adb devices | awk 'NR>1 && $1 !~ /:/' | grep -q unauthorized; then
+      [ "$i" = 1 ] && echo "On the tablet: tap Allow on 'Allow USB debugging?' (tick Always allow)."
+    fi
+    sleep 2
+  done
+fi
+[ -z "$USB" ] && { adb devices -l; echo "Plug new tablet into Pi USB port with USB Debugging ON first!"; exit 1; }
 COUNT=$(( $(vt_tablets | grep -c .) + 1 ))
 NAME="${1:-Bar ${COUNT}}"
 IP="${2:-$(adb -s "$USB" shell ip -f inet addr show wlan0 | awk '/inet / {split($2,a,"/"); print a[1]; exit}' | tr -d '\r')}"
