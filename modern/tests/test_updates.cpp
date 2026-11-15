@@ -18,6 +18,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSslPreSharedKeyAuthenticator>
+#include <QSignalSpy>
 #include <QSslSocket>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -361,4 +362,65 @@ TEST_CASE("Updates the old way, for older screens: a part at a time, the store s
     REQUIRE(back.encrypted());
     back.helloAndLogin(0);
     CHECK(back.next(u"updateError"_s));
+}
+
+TEST_CASE("Updates by themselves: a paired tablet fetches the store's update with nobody signed in, and waits", "[net][updates]")
+{
+    Store store(2 * 1024 * 1024 + 5);
+    const net::Credentials creds = store.pairedDevice(u"BHDAN 1"_s);
+
+    // Nobody signed in: Update Now (a person asking) still needs a manager...
+    {
+        auto screen = std::make_unique<net::RemoteSession>(creds.terminalName);
+        screen->setCredentials(creds);
+        screen->connectTo(creds.host, creds.port);
+        REQUIRE(screen->waitForWelcome(5000));
+        REQUIRE_FALSE(screen->loggedIn());
+        REQUIRE(screen->updateInfo().contains(u"update"_s));
+        screen->getUpdate();
+        REQUIRE(waitFor([&] { return screen->updateInfo().contains(u"error"_s); }));
+        CHECK(screen->updateInfo()[u"error"_s].toString().contains(u"manager"_s));
+
+        // ...but the screen fetching it by itself gets it, and doesn't open it (Main.qml installs it
+        // once nobody is signed in): no "Update saved" here, nothing said at all.
+        QSignalSpy notices(screen.get(), &app::PosSession::notice);
+        screen->autoUpdate();
+        REQUIRE(waitFor([&] { return screen->updateInfo().contains(u"ready"_s); }, 20000));
+        CHECK_FALSE(screen->updateInfo().contains(u"error"_s));
+        QFile got(screen->updateInfo()[u"ready"_s].toString());
+        REQUIRE(got.open(QIODevice::ReadOnly));
+        CHECK(sha256(got.readAll()) == sha256(store.payload));
+        for (const QList<QVariant> &n : notices)
+            CHECK_FALSE(n.value(0).toString().contains(u"Update saved"_s));
+        // Here already: asked again by itself, nothing happens; getUpdate opens it (on a computer: said).
+        screen->autoUpdate();
+        CHECK(screen->updateInfo().value(u"downloading"_s, -1).toInt() == -1);
+        screen->getUpdate();
+        CHECK(waitFor([&] {
+            for (const QList<QVariant> &n : notices)
+                if (n.value(0).toString().contains(u"Update saved"_s))
+                    return true;
+            return false;
+        }));
+        got.remove();
+    }
+
+    // By hand: only the fast way, only as itself. Not signed in, "auto" gets the ticket; without it, no.
+    Raw raw(creds, store.server.port());
+    REQUIRE(raw.encrypted());
+    const net::AppBuild me = net::appBuild();
+    raw.send({{u"t"_s, u"hello"_s}, {u"terminal"_s, u"x"_s}, {u"protocol"_s, net::ProtocolVersion},
+              {u"build"_s, me.number}, {u"version"_s, me.version}, {u"platform"_s, me.platform},
+              {u"subscribes"_s, true}, {u"updates"_s, 2}});
+    REQUIRE(raw.next(u"welcome"_s));
+    raw.send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}});
+    const auto no = raw.next(u"updateError"_s);
+    REQUIRE(no);
+    CHECK(no->value(u"text"_s).toString().contains(u"manager"_s));
+    raw.send({{u"t"_s, u"getUpdate"_s}, {u"auto"_s, true}});   // the old way: never by itself
+    CHECK(raw.next(u"updateError"_s));
+    raw.send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}, {u"auto"_s, true}});
+    const auto ticket = raw.next(u"updateTicket"_s);
+    REQUIRE(ticket);
+    CHECK(ticket->value(u"sha256"_s).toString() == sha256(store.payload));
 }

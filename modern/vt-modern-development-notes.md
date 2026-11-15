@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 11:15 ET — Bob (Claude) — Tablets update themselves (silent install, idle only)
+- **What:** Device-owner tablets fetch the store's update by themselves (getUpdate fast+auto; the server allows it for paired devices without a manager) and install it silently through PackageInstaller once nobody is signed in, then reopen (MY_PACKAGE_REPLACED). Other screens are unchanged. Doc: modern/docs/TABLET_AUTO_UPDATE.md. Test: test_updates 'Updates by themselves'.
+- **Why:** Owner wants patches deployed with little user action; adb tcpip 5555 is lost on every tablet restart (HCA 1-3), so pushing from the Pi kept needing USB.
+- **Files:** `Updater.kt, Kiosk.kt, AndroidManifest.xml, remote_session.{hh,cpp}, pos_session.hh, pos_server.{hh,cpp}, Main.qml, tests/test_updates.cpp, docs/TABLET_AUTO_UPDATE.md`
+- **Next person must know:** The first build with this goes on each tablet the old way once (Update Now or USB); after that they install their own. Update the Pi first.
+
 ### 2026-11-15 11:04 ET — Bob (Claude) — Tablets set to full brightness
 - **What:** vt-add-tablet turns auto-brightness off and sets brightness to 255 on new tablets.
 - **Why:** Owner's choice: BHDAN 1 was on auto at 52/255 and looked dim. Tablets already set up (HCA 1-3) need the adb command once.

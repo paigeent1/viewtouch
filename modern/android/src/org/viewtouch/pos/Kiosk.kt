@@ -211,12 +211,12 @@ object Kiosk {
 // The device owner (set once with adb; see Kiosk).
 class KioskAdmin : DeviceAdminReceiver()
 
-// The tablet (or a billboard TV) turned on. Some devices say so only with QUICKBOOT_POWERON (a fast
+// The tablet (or a billboard TV) turned on, or ViewTouch was just updated (open the new one). Some devices say so only with QUICKBOOT_POWERON (a fast
 // boot): that opens a billboard only, so a tablet does just what BOOT_COMPLETED does.
 class KioskBoot : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED -> Kiosk.boot(context)
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> Kiosk.boot(context)
             "android.intent.action.QUICKBOOT_POWERON", "com.htc.intent.action.QUICKBOOT_POWERON" -> Billboard.boot(context)
         }
     }

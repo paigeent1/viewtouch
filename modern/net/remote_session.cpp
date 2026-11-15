@@ -510,6 +510,7 @@ void RemoteSession::handle(const QJsonObject &m)
         storeBuild_ = m.value(u"build").toInt();
         storeVersion_ = m.value(u"version").toString();
         storeUpdate_ = m.value(u"update").toObject().toVariantMap();
+        autoRefused_ = false;
         emit updateChanged();
         welcomed_ = true;
         for (auto it = wanted_.cbegin(); it != wanted_.cend(); ++it)
@@ -556,8 +557,14 @@ void RemoteSession::handle(const QJsonObject &m)
         emit videosChanged();
     } else if (type == u"updateError") {
         updateProgress_ = -1;
-        updateError_ = m.value(u"text").toString();
-        emit notice(updateError_);
+        if (std::exchange(autoUpdate_, false)) {
+            // Asked by itself: nobody to tell. A manager's Update Now still works.
+            autoRefused_ = true;
+            qCInfo(lcRemote).noquote() << "the store won't send the update by itself:" << m.value(u"text").toString();
+        } else {
+            updateError_ = m.value(u"text").toString();
+            emit notice(updateError_);
+        }
         emit updateChanged();
     } else if (type == u"reply") {
         const Reply r = replies_.take(m.value(u"id").toInteger());
@@ -739,11 +746,14 @@ QVariantMap RemoteSession::updateInfo() const
         out.insert(u"ready"_s, updateReady_);
     if (!updateError_.isEmpty())
         out.insert(u"error"_s, updateError_);
+    if (silentInstall())
+        out.insert(u"silent"_s, true);
     return out;
 }
 
 void RemoteSession::getUpdate()
 {
+    autoUpdate_ = false;   // a manager asked (or Main.qml, to install it now): opened when it's here
     // Already here (Android asked to allow installs first): open it again.
     if (!updateReady_.isEmpty() && QFile::exists(updateReady_)) {
         openUpdate();
@@ -761,6 +771,30 @@ void RemoteSession::getUpdate()
     emit updateChanged();
     // fast: a store that can sends a ticket to download it with; an older one, the parts.
     send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}});
+}
+
+void RemoteSession::autoUpdate()
+{
+    if (download_ || updateProgress_ >= 0 || !updateReady_.isEmpty() || autoRefused_ || !welcomed_
+        || storeUpdate_.isEmpty())
+        return;
+    autoUpdate_ = true;
+    updateError_.clear();
+    updateProgress_ = 0;
+    emit updateChanged();
+    send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}, {u"auto"_s, true}});
+}
+
+bool RemoteSession::silentInstall()
+{
+#if defined(Q_OS_ANDROID)
+    static const bool silent = QJniObject::callStaticMethod<jboolean>(
+        "org/viewtouch/pos/Updater", "silent", "(Landroid/content/Context;)Z",
+        QNativeInterface::QAndroidApplication::context().object());
+    return silent;
+#else
+    return false;
+#endif
 }
 
 void RemoteSession::startDownload(const UpdateTicket &ticket)
@@ -787,12 +821,18 @@ void RemoteSession::startDownload(const UpdateTicket &ticket)
         end();
         updateReady_ = path;
         emit updateChanged();
-        openUpdate();
+        if (!autoUpdate_)
+            openUpdate();
     });
     connect(d, &UpdateDownload::failed, this, [this, end](const QString &why) {
         end();
-        updateError_ = why;
-        emit notice(why);
+        if (std::exchange(autoUpdate_, false)) {
+            autoRefused_ = true;   // tried again after the next connection
+            qCInfo(lcRemote).noquote() << "the update by itself didn't come:" << why;
+        } else {
+            updateError_ = why;
+            emit notice(why);
+        }
         emit updateChanged();
     });
     d->start();
@@ -819,7 +859,8 @@ void RemoteSession::finishUpdate(const QJsonObject &done)
         return;
     }
     updateReady_ = f.fileName();
-    openUpdate();
+    if (!autoUpdate_)
+        openUpdate();
 }
 
 void RemoteSession::openUpdate()

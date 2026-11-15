@@ -62,6 +62,7 @@ public:
     }
     QVariantMap updateInfo() const override;
     void getUpdate() override;
+    void autoUpdate() override;
     bool online() const override { return welcomed_; }
     bool loggedIn() const override { return v(u"loggedIn").toBool(); }
     QString userName() const override { return v(u"userName").toString(); }
@@ -265,11 +266,14 @@ private:
     int updateProgress_ = -1;
     QString updateReady_;
     QString updateError_;
+    bool autoUpdate_ = false;    // this one fetched by itself: not opened when it's here
+    bool autoRefused_ = false;   // the store said no (an older store: managers only): not till next time
     void finishUpdate(const QJsonObject &done);
     // A store that can (updateTicket): the update on a connection of its own, picked up where it got to.
     std::unique_ptr<UpdateDownload> download_;
     void startDownload(const UpdateTicket &ticket);
     void openUpdate();
+    static bool silentInstall();   // Android, the device owner (Updater.kt): installs asking no one
     qint64 silentMs_ = 10'000;   // a server that pings, heard from no longer than this: gone
     qint64 heard_ = 0;           // when the server last said anything
     qint64 lastWatch_ = 0;       // the watchdog's last look (a long gap: this app was asleep)

@@ -506,6 +506,33 @@ ApplicationWindow {
             target: root.controller.pos
             function onOnlineChanged() { updateStrip.later = false }
         }
+        // A tablet set up for ViewTouch (info.silent: it installs asking no one, Updater.kt): the
+        // update comes by itself, and goes in once nobody has been signed in for two looks in a row
+        // (and no guest is ordering), so no order is ever cut off. ViewTouch closes, Android puts the
+        // new one in and opens it again. Tried once per file: still here after that, it didn't take,
+        // and a manager's Install is back. (docs/TABLET_AUTO_UPDATE.md)
+        property string installTried: ""
+        readonly property bool installing: !!info.ready && installTried === info.ready
+        Timer {
+            objectName: "autoUpdate"
+            interval: 15000
+            repeat: true
+            running: Qt.platform.os === "android" && !!updateStrip.info.silent && !!updateStrip.info.behind
+                     && !!updateStrip.info.update && !!root.controller.pos && root.controller.pos.online
+            property int idle: 0
+            onTriggered: {
+                const pos = root.controller.pos
+                const i = updateStrip.info
+                idle = (!pos.loggedIn && !selfOrder.visible) ? idle + 1 : 0
+                if (!i.ready) {
+                    if (i.downloading === undefined)
+                        pos.autoUpdate()
+                } else if (idle >= 2 && updateStrip.installTried !== i.ready) {
+                    updateStrip.installTried = i.ready
+                    pos.getUpdate()   // here already: installs it
+                }
+            }
+        }
         visible: !later && (info.behind === true || info.ahead === true) && !selfOrder.visible && !root.pageCovered
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
@@ -530,6 +557,10 @@ ApplicationWindow {
                     const i = updateStrip.info
                     if (i.ahead)
                         return qsTr("This screen is newer than the store's computer (%1). Update the store's computer.").arg(i.storeText ?? "")
+                    if (updateStrip.installing)
+                        return qsTr("Putting in the update: ViewTouch starts again in a moment.")
+                    if (i.ready && i.silent)
+                        return qsTr("The update is here. It goes in by itself once nobody is signed in.")
                     if (i.ready)
                         return qsTr("The update is here: %1").arg(i.ready)
                     if (i.downloading !== undefined && i.waiting)
@@ -537,7 +568,8 @@ ApplicationWindow {
                     if (i.downloading !== undefined)
                         return qsTr("Getting the update… %1%").arg(i.downloading)
                     return qsTr("This screen runs an older ViewTouch (%1) than the store (%2).").arg(i.text ?? "").arg(i.storeText ?? "")
-                         + (i.update ? (updateStrip.manager ? "" : " " + qsTr("A manager can update it here."))
+                         + (i.update ? (i.silent ? " " + qsTr("It updates itself once nobody is signed in.")
+                                                 : updateStrip.manager ? "" : " " + qsTr("A manager can update it here."))
                                      : " " + qsTr("Put the new version on the store's computer (Manager → Network)."))
                 }
             }

@@ -15,7 +15,8 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <!-- Installing an update the store sends (Updater.kt; Android still asks). -->
+    <!-- Installing an update the store sends (Updater.kt: by itself on a tablet set up for ViewTouch,
+         else Android asks). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- A tablet only for ViewTouch starts it when it turns on (Kiosk.kt). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
@@ -91,8 +92,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                <!-- An update just put in (Updater.kt): open the new one. -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
         </receiver>
+        <!-- How an update ViewTouch put in by itself went (Updater.kt). -->
+        <receiver android:name="org.viewtouch.pos.UpdateInstalled" android:exported="false"/>
         <!-- Lets Android's installer read an update ViewTouch fetched (Updater.kt). -->
         <provider
             android:name="androidx.core.content.FileProvider"

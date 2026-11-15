@@ -288,6 +288,10 @@ public:
     // Fetch the store's update for this screen and open it (Android: the
     // installer asks to install it). Managers.
     Q_INVOKABLE virtual void getUpdate() {}
+    // A tablet set up for ViewTouch (updateInfo "silent": it installs without asking anyone): fetch
+    // the store's update by itself, no manager needed; Main.qml installs it (getUpdate) once nobody
+    // is signed in. Does nothing while one is on its way or here, or after the store said no.
+    Q_INVOKABLE virtual void autoUpdate() {}
     virtual bool loggedIn() const = 0;
     virtual QString userName() const = 0;
     virtual QString userRole() const = 0;

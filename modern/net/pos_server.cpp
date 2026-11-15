@@ -698,7 +698,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         return;
     }
     if (type == u"getUpdate") {
-        sendUpdate(c, m.value(u"fast").toBool());
+        sendUpdate(c, m.value(u"fast").toBool(), m.value(u"auto").toBool());
         return;
     }
 
@@ -1049,10 +1049,13 @@ QString PosServer::fingerprint(const QString &path)
 
 // The update for this screen. Managers only: installing it is theirs to decide. A screen that can
 // (fast) gets a ticket and downloads it on a connection of its own; an older one gets it in parts here.
-void PosServer::sendUpdate(Connection *c, bool fast)
+void PosServer::sendUpdate(Connection *c, bool fast, bool byItself)
 {
     const auto refuse = [c](const QString &why) { c->channel->send({{u"t"_s, u"updateError"_s}, {u"text"_s, why}}); };
-    if (!c->session->can(QString::fromLatin1(core::perm::Manager)))
+    // A paired device fetching the store's own update by itself (a tablet set up for ViewTouch puts it
+    // in while nobody is signed in): no manager needed. It only ever gets the update for itself.
+    const bool paired = fast && byItself && !c->terminalId.isEmpty();
+    if (!paired && !c->session->can(QString::fromLatin1(core::perm::Manager)))
         return refuse(tr("Updating a screen needs a manager."));
     const UpdateFile u = updateFor(c->platform, c->build);
     if (u.path.isEmpty())

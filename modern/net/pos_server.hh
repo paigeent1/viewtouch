@@ -135,7 +135,7 @@ private:
     qint64 silentMs_ = 15'000;
     QString updatesDir_;
     QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
-    void sendUpdate(Connection *c, bool fast);
+    void sendUpdate(Connection *c, bool fast, bool byItself = false);
     void pumpPacedUpdate(Connection *c);
     void startDownload(Connection *c, const QJsonObject &message);
     void pumpDownload(Connection *c);
