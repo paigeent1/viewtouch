@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 14:03 ET — Bob (Claude) — Queued: Altria scan data export, then cigarette cash discount
+- **What:** Owner decided: after the upstream ports (Loss Watch, Find My Printers, profit coach), build the Altria (AGDC Digital Trade Program) weekly scan data export inside ViewTouch (Scan Data report with preview; a small scheduled sFTP send on the Pi), together with the cigarette cash discount. RJR to follow once its spec arrives.
+- **Why:** Store not yet enrolled; Altria's 2026 spec received. The spec and Bob's technical summary are For Trade Use Only and live in the owner's Dropbox (POS project), never in this public repo. Credentials (Retail Control Number, sFTP login) go in a private settings file on the Pi only.
+- **Files:** `modern/vt-modern-development-notes.md`
+
 ### 2026-11-15 12:32 ET — Bob (Claude) — Alpha Look Up takes keyboard typing
 - **What:** On the Item Look Up page (ALPHA LOOK UP / PRICE CHECK), letters, digits, space, Backspace and Enter typed on a keyboard go into the search line without touching it first; scans still arrive whole.
 - **Why:** Owner: alpha lookup in retail mode should take keyboard input.
