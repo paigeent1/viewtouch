@@ -1037,6 +1037,12 @@ public:
     QVariantMap dashboard() const override;
     QVariantList lossAlerts() const override;
     QVariantList lossAlertsNow() const;
+    // The profit coach (app/pos_coach.cpp): {tips: [{id, kind, title, why,
+    // worth, worthText, item, price}], days} or {waiting} or {busy}.
+    QVariantMap coach() const override;
+    QVariantMap coachFrom(const std::vector<core::Check> &closed) const;
+    bool coachNotNow(const QString &id);
+    core::Report coachReport(const core::ReportContext &ctx) const;
     bool alertsSeen();
     static bool watchesEvent(const char *kind);
     QVariantMap checklists() const override;
@@ -1493,6 +1499,11 @@ public:
     bool stopPairing();
 
 private:
+    // The profit coach's tips, when they were worked out, and for which day.
+    void refreshCoach() const;
+    mutable QVariantMap coach_;
+    mutable std::int64_t coachAt_ = 0;
+    mutable std::int64_t coachDay_ = 0;
     // Why the last PIN was refused when it's because of guessing (wait), else `usual`.
     QString pinRefused(const QString &usual) const { return pinWait_.isEmpty() ? usual : pinWait_; }
     QString pinWait_;

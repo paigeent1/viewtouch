@@ -243,6 +243,10 @@
   "one": "Save %n change",
   "other": "Save %n changes"
  },
+ "Tips start after two weeks of sales (%n day(s) so far).": {
+  "one": "Tips start after two weeks of sales (%n day so far).",
+  "other": "Tips start after two weeks of sales (%n days so far)."
+ },
  "Too many wrong PINs: try again in %n second(s).": {
   "one": "Too many wrong PINs: try again in %n second.",
   "other": "Too many wrong PINs: try again in %n seconds."

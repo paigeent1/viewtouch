@@ -164,8 +164,16 @@ Item {
         if (open) {
             const i = allItems.find(x => x.id === open || x.name.toLowerCase() === String(open).toLowerCase())
             if (i) {
+                // From the profit coach (Change the Price…, Open It): straight to the item, in its mode.
+                if (zone.controller.take("menuBuilderFromCoach") === true) {
+                    choosingScope = false
+                    builderScope = i.isRetail ? "retail" : "hospitality"
+                }
                 categoryId = i.family
                 editItem(i)
+                // Change the Price…: the new price filled in, not saved.
+                const price = zone.controller.take("menuBuilderPrice")
+                if (price !== undefined) set("price", String(price))
             } else {
                 waitingFor = String(open)   // not here yet: opened when it is
             }

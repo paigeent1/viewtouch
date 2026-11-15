@@ -240,6 +240,9 @@ class PosSession : public QObject {
     // Today's loss alerts, newest first (managers only; PosService::lossAlertsNow):
     // [{id, at, time, kind, who, text, checkId, cents, new}].
     Q_PROPERTY(QVariantList lossAlerts READ lossAlerts NOTIFY dayChanged)
+    // The profit coach's tips from the last 4 weeks (managers; PosService::coach): {tips: [{id, kind,
+    // title, why, worth, worthText, item, price}], days} or {waiting} or {busy}.
+    Q_PROPERTY(QVariantMap coach READ coach NOTIFY sessionChanged)
     // Today's opening and closing checklists: {opening: [{task, done, by, at}], closing: [...]}.
     Q_PROPERTY(QVariantMap checklists READ checklists NOTIFY dayChanged)
     Q_PROPERTY(QVariantList days READ days NOTIFY dayChanged)
@@ -419,6 +422,7 @@ public:
     virtual QVariantMap checklists() const = 0;
     virtual QVariantMap dashboard() const = 0;
     virtual QVariantList lossAlerts() const = 0;
+    virtual QVariantMap coach() const = 0;
     virtual QVariantMap stockLeft() const = 0;
     virtual QStringList soldOut() const = 0;
     virtual QVariantList menuItems() const = 0;
@@ -629,6 +633,7 @@ public:
     Q_INVOKABLE void logWaste(const QVariantMap &waste) { invoke(QStringLiteral("logWaste"), {waste}); }
     Q_INVOKABLE void problemsSeen() { invoke(QStringLiteral("problemsSeen")); }
     Q_INVOKABLE void alertsSeen() { invoke(QStringLiteral("alertsSeen")); }
+    Q_INVOKABLE void coachNotNow(const QString &id) { invoke(QStringLiteral("coachNotNow"), {id}); }
     // Find My Printers: the printers on the store's network (printerSearch), a page on one of them saying
     // its address (to tell which is which), and one made the Receipts, Kitchen or Bar printer (kind
     // receipt | kitchen | bar; replace: yes to taking over that printer's place from another address).

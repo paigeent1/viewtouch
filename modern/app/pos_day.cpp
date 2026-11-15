@@ -1544,6 +1544,8 @@ bool PosService::saveExceptionTickets()
 Report PosService::buildReport(const QString &id) const
 {
     const ReportContext ctx = reportContext(tr("Today, since %1").arg(clockText(s_->day.openedAt)));
+    if (id == u"coach")
+        return coachReport(ctx);
     if (id == u"items")
         return itemSales(s_->closedToday, s_->menu, ctx);
     if (isEmployeeItems(id))

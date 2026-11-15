@@ -49,12 +49,18 @@ Item {
         { id: "kitchen", label: qsTr("Kitchen") },
         { id: "foodcost", label: qsTr("Food Cost") },
         { id: "engineering", label: qsTr("Menu Mix") },
+        { id: "coach", label: qsTr("Profit Coach") },
         { id: "forecast", label: qsTr("Forecast") },
         { id: "turns", label: qsTr("Turns") },
         { id: "checklists", label: qsTr("Checklists") },
         { id: "drivers", label: qsTr("Drivers") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
+    // Sent from elsewhere (the Dashboard's tips: See Who Gave Them): that report.
+    Component.onCompleted: {
+        const sent = zone && zone.controller ? zone.controller.take("reportOpen") : undefined
+        if (sent && reportIds.some(r => r.id === sent)) reportId = sent
+    }
     // Sales by Employee and Item: only items whose name, UPC or category has this text.
     property string itemFilter: ""
     readonly property bool isEmployeeItems: reportId === "employee_items"
@@ -146,6 +152,12 @@ Item {
     onForecastDayChanged: refresh()
     readonly property var report: {
         if (!pos) return ({ rows: [] })
+        // The profit coach: the last 4 weeks, whatever day or dates are picked (again when it's worked out).
+        if (reportId === "coach") {
+            const c = pos.coach
+            if (!c || pos.queryRevision < 0) return ({ rows: [] })
+            return pos.report("coach", 0)
+        }
         if (ilsaEmployees)
             return range.id === "ilsa-employees" && range.report ? range.report
                  : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })

@@ -12,7 +12,9 @@
 #include "core/tax.hh"
 
 #include <algorithm>
+#include <cstdint>
 #include <ctime>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -514,6 +516,8 @@ struct PosSettings {
     Money watchVoid = Money::fromCents(2000);
     Money watchComp = Money::fromCents(2500);
     std::int64_t alertsSeenAt = 0;   // the managers have seen the alerts up to then
+    // Profit coach tips put off (Not Now): tip id -> until (epoch ms).
+    std::map<std::string, std::int64_t> coachDismissed;
     // Phone orders: a name before Send (and an address for deliveries);
     // employees and terminals can say otherwise.
     bool requireOrderName = false;

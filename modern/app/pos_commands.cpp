@@ -94,6 +94,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"closeRetailLabelPreview"_s, [](PosService &p, const QVariantList &) { return QVariant(p.closeRetailLabelPreview()); }},
         {u"problemsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.problemsSeen()); }},
         {u"alertsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.alertsSeen()); }},
+        {u"coachNotNow"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.coachNotNow(a.value(0).toString())); }},
         {u"findPrinters"_s, [](PosService &p, const QVariantList &) { return QVariant(p.findPrinters()); }},
         {u"printWhoAmI"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printWhoAmI(a.value(0).toString())); }},
         {u"useFoundPrinter"_s, [](PosService &p, const QVariantList &a) {
