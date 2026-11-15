@@ -130,11 +130,15 @@ Item {
                             Label {
                                 objectName: "screenBuild-" + modelData.name
                                 font.pixelSize: 16
-                                color: modelData.behind || modelData.ahead ? "#f5b940" : "white"
-                                opacity: modelData.behind || modelData.ahead ? 1 : 0.6
+                                // Behind this computer's own build number, but no newer app here to give it: up to date
+                                // as far as it can be (a Pi counts its own builds apart from the tablets' app builds, so
+                                // "behind" alone said "needs an update" to a tablet on the newest app; BHDAN 2026-11-15).
+                                readonly property bool waiting: modelData.behind && modelData.hasUpdate
+                                color: waiting || modelData.ahead ? "#f5b940" : "white"
+                                opacity: waiting || modelData.ahead ? 1 : 0.6
                                 text: !modelData.build ? qsTr("older version")
                                     : modelData.behind ? (modelData.hasUpdate ? qsTr("build %1 · update ready").arg(modelData.build)
-                                                                              : qsTr("build %1 · needs an update").arg(modelData.build))
+                                                                              : qsTr("build %1 · newest app here").arg(modelData.build))
                                     : modelData.ahead ? qsTr("build %1 · newer than this computer").arg(modelData.build)
                                     : qsTr("build %1").arg(modelData.build)
                             }
@@ -153,9 +157,9 @@ Item {
                     font.pixelSize: 16
                     opacity: 0.8
                     text: (w.net.updates ?? []).length
-                          ? qsTr("Ready: %1. A manager on a screen that's behind gets the update there.")
+                          ? qsTr("Ready: %1. Tablets set up for ViewTouch put it in by themselves while nobody is signed in on them; on other screens a manager taps Update Now.")
                                 .arg((w.net.updates ?? []).map(u => u.name).join(", "))
-                          : qsTr("To update the tablets, copy the new app (ViewTouch-b<build>-arm64-v8a.apk) into %1 on this computer. Screens that are behind then offer it to a manager.")
+                          : qsTr("To update the tablets, copy the new app (ViewTouch-b<build>-arm64-v8a.apk) into %1 on this computer. Tablets set up for ViewTouch then put it in by themselves; other screens offer it to a manager.")
                                 .arg(w.net.updatesDir ?? "")
                 }
 
