@@ -43,7 +43,7 @@ Item {
         { id: "labor", label: qsTr("Labor") },
         { id: "timeclock", label: qsTr("Time Clock") },
         { id: "drawer", label: qsTr("Drawer") }, { id: "expenses", label: qsTr("Expenses") }, { id: "purchases", label: qsTr("Purchases") }, { id: "stock", label: qsTr("Stock") }, { id: "audit", label: qsTr("Audit") },
-        { id: "exceptions", label: qsTr("Exceptions") }, { id: "changes", label: qsTr("Changes") }, { id: "deposit", label: qsTr("Deposit") }, { id: "customers", label: qsTr("Customers") },
+        { id: "exceptions", label: qsTr("Exceptions") }, { id: "losswatch", label: qsTr("Loss Watch") }, { id: "changes", label: qsTr("Changes") }, { id: "deposit", label: qsTr("Deposit") }, { id: "customers", label: qsTr("Customers") },
         { id: "royalty", label: qsTr("Royalty") }, { id: "accounting", label: qsTr("Accounting") },
         { id: "accounts", label: qsTr("Gift Cards") },
         { id: "kitchen", label: qsTr("Kitchen") },

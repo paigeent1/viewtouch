@@ -167,6 +167,7 @@ bool PosService::noSale()
             s_->sink->saveDrawer(*d);
         emit s_->drawerChanged();
     }
+    emit s_->dayChanged();   // the managers' alerts look again
     emit notice(shut.isEmpty() ? tr("Drawer opened (No Sale #%1)").arg(number)
                               : tr("No Sale #%1 recorded, but the drawer did not open: %2").arg(number).arg(shut));
     return true;
@@ -1603,7 +1604,7 @@ Report PosService::buildReport(const QString &id) const
         return accountsReport(s_->giftCards, s_->customers, s_->day.openedAt, ctx);
     if (id.startsWith(u"gc_"))
         return giftCardsSubReport(ss(id), s_->giftCards, s_->closedToday, 0, 0, ctx, can(u"manager"_s));
-    if (id == u"audit" || id == u"exceptions") {
+    if (id == u"audit" || id == u"exceptions" || id == u"losswatch") {
         std::vector<const Check *> checks;
         for (const Check &c : s_->closedToday)
             checks.push_back(&c);
@@ -1612,6 +1613,8 @@ Report PosService::buildReport(const QString &id) const
                 checks.push_back(&c);
         for (const Check &c : s_->cancelledToday)   // Cancel Sale: not sales, but exceptions
             checks.push_back(&c);
+        if (id == u"losswatch")
+            return lossWatchReport(checks, s_->drawers, ctx);
         return id == u"audit" ? auditReport(checks, ctx) : exceptionsReport(checks, s_->drawers, ctx);
     }
     if (id == u"deposit") {
@@ -1645,7 +1648,7 @@ Report PosService::timeClockReport(const QString &id, std::int64_t from, std::in
 
 namespace {
 const QStringList kRangeReports = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s,
-                                   u"kitchen"_s, u"audit"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s, u"exceptions"_s, u"customers"_s,
+                                   u"kitchen"_s, u"audit"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s, u"exceptions"_s, u"losswatch"_s, u"customers"_s,
                                    u"royalty"_s, u"accounting"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s,
                                    u"employee_items"_s};
 // Over a range: the report's own id, without a filter ("employee_items|cohiba" -> "employee_items").
@@ -1653,7 +1656,7 @@ bool rangeCapable(const QString &id) { return kRangeReports.contains(id.section(
 } // namespace
 
 Report PosService::rangeCapableReport(const QString &id, const std::vector<Check> &closed, const ReportContext &ctx,
-                                      const std::vector<Refund> *refunds) const
+                                      const std::vector<Refund> *refunds, const std::vector<DrawerSession> *drawers) const
 {
     std::vector<const Check *> ptrs;
     for (const Check &c : closed)
@@ -1674,8 +1677,10 @@ Report PosService::rangeCapableReport(const QString &id, const std::vector<Check
         return kitchenReport(ptrs, s_->settings.kitchenLateMinutes, ctx);
     if (id == u"audit")
         return auditReport(ptrs, ctx);
-    if (id == u"exceptions")   // no-sales are kept with today's drawers only
-        return exceptionsReport(ptrs, {}, ctx);
+    if (id == u"exceptions")   // (no sales: the drawers of those days, when read)
+        return exceptionsReport(ptrs, drawers ? *drawers : std::vector<DrawerSession>{}, ctx);
+    if (id == u"losswatch")
+        return lossWatchReport(ptrs, drawers ? *drawers : std::vector<DrawerSession>{}, ctx);
     if (id == u"foodcost")
         return foodCostReport(closed, ctx);
     if (id == u"engineering")
@@ -1782,11 +1787,28 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
     // Read the checks away from the screen, then build here.
     auto history = s_->history;
     auto refundHistory = s_->refundHistory;
+    // No sales: the drawers of those days (today's in memory may not be written yet).
+    const bool needDrawers = id == u"exceptions" || id == u"losswatch";
+    auto drawerHistory = needDrawers ? s_->drawerHistory : nullptr;
+    std::vector<DrawerSession> drawersNow;
+    if (needDrawers)
+        for (const DrawerSession &d : s_->drawers)
+            if (d.openedAt >= a && d.openedAt < b)
+                drawersNow.push_back(d);
     std::vector<Check> today_ = s_->closedToday;
     std::vector<Refund> refundsToday = s_->refundsToday;
     QPointer<PosService> self(this);
-    QThreadPool::globalInstance()->start([=, today_ = std::move(today_), refundsToday = std::move(refundsToday)]() mutable {
+    QThreadPool::globalInstance()->start([=, today_ = std::move(today_), refundsToday = std::move(refundsToday),
+                                          drawersNow = std::move(drawersNow)]() mutable {
         std::vector<Check> now = history ? history(a, b) : std::vector<Check>{};
+        std::vector<DrawerSession> drawers = drawerHistory ? drawerHistory(a, b) : std::vector<DrawerSession>{};
+        for (DrawerSession &d : drawersNow) {
+            const auto it = std::ranges::find_if(drawers, [&](const DrawerSession &x) { return x.id == d.id; });
+            if (it == drawers.end())
+                drawers.push_back(std::move(d));
+            else
+                *it = std::move(d);   // (the newer, in memory)
+        }
         std::vector<Check> before = history && compare ? history(a0, b0) : std::vector<Check>{};
         // Refunds by when they were made (today's may not be written yet).
         std::vector<Refund> refundsNow = refundHistory ? refundHistory(a, b) : std::vector<Refund>{};
@@ -1802,13 +1824,14 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
         }
         const bool byDate = bool(refundHistory) || !refundsNow.empty();
         QMetaObject::invokeMethod(self, [self, request, id, label, beforeLabel, compare, now = std::move(now),
+                                         drawers = std::move(drawers),
                                          before = std::move(before), refundsNow = std::move(refundsNow),
                                          refundsBefore = std::move(refundsBefore), byDate] {
             if (!self || request != self->rangeRequest_)
                 return;   // a newer request replaced it
             const ReportContext ctx = self->reportContext(label);
             Report r = self->rangeCapableReport(rangeCapable(id) ? id : u"sales"_s, now, ctx,
-                                                byDate ? &refundsNow : nullptr);
+                                                byDate ? &refundsNow : nullptr, &drawers);
             if (!rangeCapable(id))
                 r.note(tr("That report is one day at a time (pick Day). Showing sales.").toStdString());
             if (compare) {

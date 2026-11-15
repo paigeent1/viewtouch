@@ -584,6 +584,12 @@ QVariantList PosService::adminFields(const QString &panel)
                          tr("Cancel Sale asks why with these buttons; the Exceptions report counts them. "
                             "No reasons: it doesn't ask.")),
                    tr("+ Add a reason")),
+            field(u"watch"_s, tr("Alert managers to big voids, comps and refunds"), u"bool"_s,
+                  tr("On the Dashboard, as they happen: a void of an item already sent, a big discount or comp, a payment "
+                     "taken back after the check printed, a cash check reopened, a refund, a third no-sale in an hour.")),
+            field(u"watchVoid"_s, tr("A void worth an alert, at least"), u"money"_s),
+            field(u"watchComp"_s, tr("A discount or comp worth an alert, at least"), u"money"_s,
+                  tr("Or half its check, whichever is less.")),
             asRows(field(u"openingChecklist"_s, tr("Opening checklist"), u"text"_s,
                          tr("Staff tick them off on the Checklists page.")),
                    tr("+ Add a task")),

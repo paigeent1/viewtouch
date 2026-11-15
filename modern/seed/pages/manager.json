@@ -35,7 +35,7 @@
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Dashboard",
+      "label": "Dashboard {alerts}",
       "actions": [
         {
           "type": "jump",

@@ -506,6 +506,14 @@ struct PosSettings {
     int kitchenLateMinutes = 15;
     // Orders for later go to the kitchen this long before they're due.
     int laterLeadMinutes = 20;
+    // Loss alerts (Dashboard): a void of an item already sent of at least
+    // watchVoid, a discount or comp of at least watchComp (or half its check),
+    // a payment taken back after the check printed, a cash check reopened, a
+    // refund, a third no-sale in an hour by one person. Off: none.
+    bool watch = true;
+    Money watchVoid = Money::fromCents(2000);
+    Money watchComp = Money::fromCents(2500);
+    std::int64_t alertsSeenAt = 0;   // the managers have seen the alerts up to then
     // Phone orders: a name before Send (and an address for deliveries);
     // employees and terminals can say otherwise.
     bool requireOrderName = false;

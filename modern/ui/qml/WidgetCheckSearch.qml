@@ -18,7 +18,6 @@ Item {
     // How far back: days (0: every check ever); props.days sets where it starts, and
     // props.showAll lists those checks as soon as the screen opens (Reprint Receipt: 7 days).
     property int days: zone && zone.props && zone.props.days !== undefined ? zone.props.days : 365
-    Component.onCompleted: if (pos && zone && zone.props && zone.props.showAll === true) fresh("")
     // A day chosen on the calendar ("2026-10-01"): `days` reaches back to its start.
     property string since: ""
     function daysSince(iso) {
@@ -35,6 +34,29 @@ Item {
         w.pos.searchChecks(query, days, offset)
     }
     function fresh(query) { offsets = [0]; run(query, 0) }
+    // Sent from elsewhere (a Dashboard alert): that check, found and shown.
+    property var wanted: 0
+    Component.onCompleted: {
+        const sent = zone && zone.controller ? zone.controller.take("findCheck") : undefined
+        if (sent) {
+            days = 0
+            wanted = sent.id
+            fresh(sent.query)
+        } else if (pos && zone && zone.props && zone.props.showAll === true) {
+            fresh("")
+        }
+    }
+    onFoundChanged: if (wanted && found.some(r => r.id === wanted)) showWanted.start()
+    // (After the results are in: choosing one changes them.)
+    Timer {
+        id: showWanted
+        interval: 0
+        onTriggered: {
+            const id = w.wanted
+            w.wanted = 0
+            if (id) w.pos.selectFoundCheck(id)
+        }
+    }
     function older() {
         offsets = offsets.concat([info.nextOffset])
         run(asked, info.nextOffset)

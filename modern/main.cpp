@@ -1155,6 +1155,8 @@ int runStore(const Args &cli, const Options &o)
             // A given button renamed later: once, and only if the store kept the old name.
             static const struct { const char16_t *pageId, *zoneId, *was, *renamed; } renamedZones[] = {
                 {u"hardware-config", u"vt-touch-map", u"Guest touch monitor sync (2x Tap)", u"Learn guest touchscreen (2x Tap)"},
+                // The count of new loss alerts on the Manager page's Dashboard key (upstream 0fcfc34).
+                {u"manager", u"dashboard", u"Dashboard", u"Dashboard {alerts}"},
             };
             for (const auto &[pageId, zoneId, was, renamed] : renamedZones) {
                 const QString mark = QString::fromUtf16(pageId) + u'#' + QString::fromUtf16(zoneId) + u"@label"_s;
@@ -1417,6 +1419,9 @@ int runStore(const Args &cli, const Options &o)
         };
         shared->punchHistory = [dbPath](std::int64_t from, std::int64_t to) {
             return vt::storage::punchesBetween(dbPath, from, to);
+        };
+        shared->drawerHistory = [dbPath](std::int64_t from, std::int64_t to) {
+            return vt::storage::drawersBetween(dbPath, from, to);
         };
     }
     // ILSA's sales history, beside the database (scripts/bin/vt-ilsa-history writes it): read-only.
