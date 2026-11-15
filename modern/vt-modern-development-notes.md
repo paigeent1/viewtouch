@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 11:04 ET — Bob (Claude) — Tablets set to full brightness
+- **What:** vt-add-tablet turns auto-brightness off and sets brightness to 255 on new tablets.
+- **Why:** Owner's choice: BHDAN 1 was on auto at 52/255 and looked dim. Tablets already set up (HCA 1-3) need the adb command once.
+- **Files:** `scripts/bin/vt-add-tablet`
+
 ### 2026-11-15 10:50 ET — Bob (Claude) — vt-add-tablet waits for the tablet on USB
 - **What:** vt-add-tablet now waits up to 60 s for a USB tablet, says to tap Allow when it shows unauthorized, and prints adb devices -l if it still can't find one.
 - **Why:** At BHDAN the tablet was listed a minute earlier but missing when vt-add-tablet ran right after vt-server, so it quit straight away.
