@@ -532,6 +532,8 @@ ApplicationWindow {
                         return qsTr("This screen is newer than the store's computer (%1). Update the store's computer.").arg(i.storeText ?? "")
                     if (i.ready)
                         return qsTr("The update is here: %1").arg(i.ready)
+                    if (i.downloading !== undefined && i.waiting)
+                        return qsTr("Getting the update… %1% (cut off: going on by itself in a moment)").arg(i.downloading)
                     if (i.downloading !== undefined)
                         return qsTr("Getting the update… %1%").arg(i.downloading)
                     return qsTr("This screen runs an older ViewTouch (%1) than the store (%2).").arg(i.text ?? "").arg(i.storeText ?? "")

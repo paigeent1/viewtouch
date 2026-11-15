@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include "net/build_info.hh"
 #include <QRegularExpression>
+#include <QFile>
 #include <QFileInfo>
 #include <QDir>
 #include <QCryptographicHash>
@@ -57,6 +58,21 @@ struct PosServer::Connection {
     // the billboard's pieces (forBillboard), no pages, no events, and may only fetch its pictures
     // and videos and check a manager's PIN. Never a check or a customer.
     bool billboard = false;
+    bool fastUpdates = false;   // hello: "updates": 2 (fetches its update on a connection of its own)
+    // An older screen's update, the old way: a part at a time, the next once the last has gone out.
+    struct PacedUpdate {
+        QFile file;
+        int next = 0, parts = 0;
+        qint64 size = 0;
+        int build = 0;
+        QString name, sha256;
+    };
+    std::unique_ptr<PacedUpdate> paced;
+    // A download connection (no session): the update file's bytes, streamed from the disk.
+    bool downloader = false;
+    std::unique_ptr<QFile> download;
+    qint64 downloadLeft = 0;
+    qint64 downloadMoved = 0;   // when bytes last went out
 };
 
 namespace {
@@ -107,6 +123,18 @@ bool billboardCall(const QString &method)
 // Videos are sent to billboards a part at a time, each asked for (memory stays small on both
 // sides, however long the video).
 constexpr qint64 kVideoChunk = 512 * 1024;
+
+// Updates the old way: parts this big, the next only once less than kPacedWindow waits to go out, so a
+// ping is never more than a few seconds behind, even on slow Wi-Fi (the old screens give up on a store
+// silent 10 s, and the store on a screen that hasn't answered for 15 s).
+constexpr qint64 kPacedChunk = 128 * 1024;
+constexpr qint64 kPacedWindow = 256 * 1024;
+// Downloads (their own connection): read from the disk this much at a time, at most this much waiting.
+constexpr qint64 kDownloadChunk = 256 * 1024;
+constexpr qint64 kDownloadWindow = 2 * 1024 * 1024;
+// A download that has sent nothing this long is given up (the screen tries again from where it got to).
+constexpr qint64 kDownloadStuckMs = 60'000;
+constexpr qint64 kTicketMs = 24 * 3600 * 1000;
 
 // Screens that ask for things (this version) get the open checks in two
 // parts (the shared part made and sent once a round); older ones the list.
@@ -345,14 +373,22 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
     connect(&pingTimer_, &QTimer::timeout, this, [this] {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         std::vector<Connection *> silent;
+        std::vector<Connection *> stuck;
         for (auto &c : connections_) {
             if ((c->standby && c->synced) || c->session)
                 c->channel->send({{u"t"_s, u"ping"_s}});
             if (c->session && c->answersPings && now - c->heard > silentMs_)
                 silent.push_back(c.get());
+            if (c->download && now - c->downloadMoved > kDownloadStuckMs)
+                stuck.push_back(c.get());
         }
         for (Connection *c : silent) {
             qCWarning(lcServer) << "terminal stopped answering:" << c->session->terminalName();
+            c->socket->abort();
+            drop(c);
+        }
+        for (Connection *c : stuck) {
+            qCWarning(lcServer) << "an update download stopped moving; closed (the screen picks it up again)";
             c->socket->abort();
             drop(c);
         }
@@ -465,6 +501,15 @@ void PosServer::onNewConnection()
         Connection *raw = c.get();
         connections_.push_back(std::move(c));
         connect(socket, &QTcpSocket::readyRead, this, [this, raw] { onReadyRead(raw); });
+        // An update on its way goes on as the last of it leaves.
+        connect(socket, &QTcpSocket::bytesWritten, this, [this, raw] {
+            if (raw->paced)
+                pumpPacedUpdate(raw);
+            if (raw->download) {
+                raw->downloadMoved = QDateTime::currentMSecsSinceEpoch();
+                pumpDownload(raw);
+            }
+        });
         connect(socket, &QTcpSocket::disconnected, this, [this, raw] { drop(raw); });
     }
 }
@@ -515,6 +560,12 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         return;
     }
 
+    if (c->downloader)   // a download connection: nothing more to say
+        return;
+    if (type == u"download" && !c->session) {
+        startDownload(c, m);
+        return;
+    }
     if (type == u"pong") {
         c->answersPings = true;
         return;
@@ -540,6 +591,9 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
                 }
         const QString name = QString::fromStdString(paired->name);
         c->build = m.value(u"build").toInt();
+        c->fastUpdates = m.value(u"updates").toInt() >= 2;
+        if (const QString why = m.value(u"lastDrop").toString(); !why.isEmpty())   // why it was cut off before
+            qCInfo(lcServer).noquote() << name << "is back; it had lost the store:" << why;
         c->version = m.value(u"version").toString();
         c->platform = m.value(u"platform").toString();
         c->session = std::make_unique<app::PosService>(shared_, name);
@@ -599,6 +653,15 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
             welcome.insert(u"update"_s, QJsonObject{{u"name"_s, QFileInfo(u.path).fileName()}, {u"build"_s, u.build},
                                                     {u"size"_s, QFileInfo(u.path).size()}});
         c->channel->send(welcome);
+        // An older screen whose update the old way was cut off shows "Getting the update... N%" for
+        // good, with no Update Now (HCA 2026-11-15): this clears it. Also once to every older screen
+        // with an update after this server starts (one cut off before it did is stuck the same way).
+        if (!c->fastUpdates && welcome.contains(u"update"_s)
+            && (cutUpdates_.remove(c->terminalId) || !toldOld_.contains(c->terminalId))) {
+            toldOld_.insert(c->terminalId);
+            c->channel->send({{u"t"_s, u"updateError"_s},
+                              {u"text"_s, tr("A new version is ready: a manager can tap Update Now to get it.")}});
+        }
         qCInfo(lcServer) << "terminal connected:" << name;
         emit terminalsChanged();
         return;
@@ -627,7 +690,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         return;
     }
     if (type == u"getUpdate") {
-        sendUpdate(c);
+        sendUpdate(c, m.value(u"fast").toBool());
         return;
     }
 
@@ -959,9 +1022,26 @@ PosServer::UpdateFile PosServer::updateFor(const QString &platform, int build) c
     return {};
 }
 
-// The update for this screen, in parts (like the standby's copy), the last
-// with its fingerprint. Managers only: installing it is theirs to decide.
-void PosServer::sendUpdate(Connection *c)
+QString PosServer::fingerprint(const QString &path)
+{
+    const QFileInfo info(path);
+    Fingerprint &f = fingerprints_[path];
+    const qint64 modified = info.lastModified().toMSecsSinceEpoch();
+    if (f.size == info.size() && f.modified == modified && !f.sha256.isEmpty())
+        return f.sha256;
+    QFile file(path);
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    if (!file.open(QIODevice::ReadOnly) || !hash.addData(&file)) {
+        fingerprints_.remove(path);
+        return {};
+    }
+    f = {info.size(), modified, QString::fromLatin1(hash.result().toHex())};
+    return f.sha256;
+}
+
+// The update for this screen. Managers only: installing it is theirs to decide. A screen that can
+// (fast) gets a ticket and downloads it on a connection of its own; an older one gets it in parts here.
+void PosServer::sendUpdate(Connection *c, bool fast)
 {
     const auto refuse = [c](const QString &why) { c->channel->send({{u"t"_s, u"updateError"_s}, {u"text"_s, why}}); };
     if (!c->session->can(QString::fromLatin1(core::perm::Manager)))
@@ -969,22 +1049,109 @@ void PosServer::sendUpdate(Connection *c)
     const UpdateFile u = updateFor(c->platform, c->build);
     if (u.path.isEmpty())
         return refuse(tr("The store has no newer version for this screen."));
-    QFile f(u.path);
-    if (!f.open(QIODevice::ReadOnly))
-        return refuse(tr("Can't read %1: %2").arg(QFileInfo(u.path).fileName(), f.errorString()));
-    const QByteArray data = f.readAll();
-    const QString hash = QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
-    constexpr qsizetype chunk = 1 << 20;
-    const int parts = std::max(1, int((data.size() + chunk - 1) / chunk));
-    for (int i = 0; i < parts; ++i) {
-        QJsonObject part{{u"t"_s, u"updatePart"_s}, {u"i"_s, i}, {u"n"_s, parts},
-                         {u"data"_s, QString::fromLatin1(data.mid(i * chunk, chunk).toBase64())}};
-        if (i == parts - 1)
-            part.insert(u"done"_s, QJsonObject{{u"name"_s, QFileInfo(u.path).fileName()}, {u"build"_s, u.build},
-                                               {u"size"_s, qint64(data.size())}, {u"sha256"_s, hash}});
-        c->channel->send(part);
+    const QString name = QFileInfo(u.path).fileName();
+    const QString sha256 = fingerprint(u.path);
+    const qint64 size = QFileInfo(u.path).size();
+    if (sha256.isEmpty())
+        return refuse(tr("Can't read %1.").arg(name));
+    if (fast && !c->terminalId.isEmpty()) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        for (auto it = tickets_.begin(); it != tickets_.end();)
+            it = it->expires < now ? tickets_.erase(it) : std::next(it);
+        const QString token = QString::fromLatin1(newDeviceKey().toHex());
+        tickets_.insert(token, {c->terminalId, u.path, sha256, size, now + kTicketMs});
+        c->channel->send({{u"t"_s, u"updateTicket"_s}, {u"token"_s, token}, {u"name"_s, name},
+                          {u"build"_s, u.build}, {u"size"_s, size}, {u"sha256"_s, sha256}});
+        qCInfo(lcServer) << "update" << name << "ready to download for" << c->session->terminalName();
+        return;
     }
-    qCInfo(lcServer) << "sent" << QFileInfo(u.path).fileName() << "to" << c->session->terminalName();
+    auto p = std::make_unique<Connection::PacedUpdate>();
+    p->file.setFileName(u.path);
+    if (!p->file.open(QIODevice::ReadOnly))
+        return refuse(tr("Can't read %1: %2").arg(name, p->file.errorString()));
+    p->size = size;
+    p->parts = std::max(1, int((size + kPacedChunk - 1) / kPacedChunk));
+    p->build = u.build;
+    p->name = name;
+    p->sha256 = sha256;
+    c->paced = std::move(p);
+    qCInfo(lcServer) << "sending" << name << "to" << c->session->terminalName() << "(the old way, in parts)";
+    pumpPacedUpdate(c);
+}
+
+void PosServer::pumpPacedUpdate(Connection *c)
+{
+    while (c->paced && c->socket->bytesToWrite() < kPacedWindow) {
+        Connection::PacedUpdate &p = *c->paced;
+        const QByteArray data = p.file.read(kPacedChunk);
+        if (data.isEmpty() && p.size > 0) {
+            c->channel->send({{u"t"_s, u"updateError"_s}, {u"text"_s, tr("Can't read %1.").arg(p.name)}});
+            c->paced.reset();
+            return;
+        }
+        QJsonObject part{{u"t"_s, u"updatePart"_s}, {u"i"_s, p.next}, {u"n"_s, p.parts},
+                         {u"data"_s, QString::fromLatin1(data.toBase64())}};
+        const bool last = ++p.next >= p.parts;
+        if (last)
+            part.insert(u"done"_s, QJsonObject{{u"name"_s, p.name}, {u"build"_s, p.build},
+                                               {u"size"_s, p.size}, {u"sha256"_s, p.sha256}});
+        c->channel->send(part);
+        if (last) {
+            qCInfo(lcServer) << "sent" << p.name << "to" << (c->session ? c->session->terminalName() : QString());
+            c->paced.reset();
+        }
+    }
+}
+
+// A download connection: the device's own ticket, then the file from where it got to.
+void PosServer::startDownload(Connection *c, const QJsonObject &m)
+{
+    c->downloader = true;
+    const auto fail = [c](const QString &why) {
+        c->channel->send({{u"t"_s, u"downloadError"_s}, {u"text"_s, why}});
+        c->socket->disconnectFromHost();
+    };
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const auto it = tickets_.constFind(m.value(u"token").toString());
+    if (c->terminalId.isEmpty() || it == tickets_.cend() || it->terminalId != c->terminalId || it->expires < now)
+        return fail(tr("This download has run out. A manager can tap Update Now again."));
+    auto file = std::make_unique<QFile>(it->path);
+    if (!file->open(QIODevice::ReadOnly))
+        return fail(tr("Can't read %1: %2").arg(QFileInfo(it->path).fileName(), file->errorString()));
+    if (file->size() != it->size || fingerprint(it->path) != it->sha256)
+        return fail(tr("The update on the store's computer has changed. A manager can tap Update Now again."));
+    qint64 from = m.value(u"from").toInteger();
+    if (from < 0 || from > it->size)
+        from = 0;
+    if (!file->seek(from))
+        return fail(tr("Can't read %1.").arg(QFileInfo(it->path).fileName()));
+    ++downloadsStarted_;
+    if (from > 0)
+        ++downloadsResumed_;
+    c->channel->send({{u"t"_s, u"downloadStart"_s}, {u"size"_s, it->size}, {u"from"_s, from}, {u"sha256"_s, it->sha256}});
+    c->download = std::move(file);
+    c->downloadLeft = it->size - from;
+    c->downloadMoved = now;
+    qCInfo(lcServer).noquote() << "downloading" << QFileInfo(it->path).fileName() << "from byte" << from;
+    pumpDownload(c);
+}
+
+void PosServer::pumpDownload(Connection *c)
+{
+    while (c->download && c->downloadLeft > 0 && c->socket->bytesToWrite() < kDownloadWindow) {
+        const QByteArray data = c->download->read(std::min(kDownloadChunk, c->downloadLeft));
+        if (data.isEmpty()) {
+            c->download.reset();
+            c->socket->abort();
+            return;
+        }
+        c->socket->write(data);
+        c->downloadLeft -= data.size();
+    }
+    if (c->download && c->downloadLeft == 0) {
+        c->download.reset();
+        c->socket->disconnectFromHost();   // once the rest has gone out
+    }
 }
 
 void PosServer::dropRevoked()
@@ -1078,6 +1245,9 @@ void PosServer::drop(Connection *c)
         qCWarning(lcServer) << "the standby server disconnected";
         QMetaObject::invokeMethod(this, &PosServer::standbyChanged, Qt::QueuedConnection);
     }
+    if (c->paced && !c->terminalId.isEmpty())
+        cutUpdates_.insert(c->terminalId);   // told to tap Update Now again when it's back
+    c->socket->disconnect(this);
     c->socket->deleteLater();
     // Destroying the session releases the check it had open; tell the rest.
     const bool hadSession = c->session != nullptr;

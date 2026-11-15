@@ -117,7 +117,7 @@ if(Qt6_FOUND)
         net/layout_hub.hh net/layout_hub.cpp
         net/pos_server.hh net/pos_server.cpp
         net/stripe_api.hh net/stripe_api.cpp
-        net/remote_session.hh net/remote_session.cpp net/stress.hh net/stress.cpp
+        net/remote_session.hh net/remote_session.cpp net/update_download.hh net/update_download.cpp net/stress.hh net/stress.cpp
         net/standby.hh net/standby.cpp
     )
     target_link_libraries(vtm_net PUBLIC vtm_pos vtm_layout vtm_storage Qt6::Network)

@@ -503,6 +503,7 @@
  "A menu saved as CSV": "Um cardápio salvo como CSV",
  "A new ViewTouch comes from the internet: Check for a New ViewTouch, then install it (a few minutes; it's checked to be ViewTouch's own, and never an older one). The tablets' app comes with it.": "Um ViewTouch novo vem pela internet: Procurar um ViewTouch novo e depois instalar (alguns minutos; confere-se que é do ViewTouch e nunca um mais antigo). O app dos tablets vem junto.",
  "A new row": "Uma nova fileira",
+ "A new version is ready: a manager can tap Update Now to get it.": "Há uma versão nova: um gerente pode tocar Atualizar agora para baixá-la.",
  "A note for the next shift's manager": "Uma nota para o gerente do próximo turno",
  "A number": "Um número",
  "A picture for %1": "Uma imagem para %1",
@@ -865,6 +866,8 @@
  "Can't open %1.": "Não foi possível abrir %1.",
  "Can't open it: %1": "Não foi possível abrir: %1",
  "Can't reach the main server (%1).": "Não foi possível alcançar o servidor principal (%1).",
+ "Can't reach the store's computer for the update. A manager can tap Update Now again.": "Não foi possível alcançar o computador da loja para a atualização. Um gerente pode tocar Atualizar agora de novo.",
+ "Can't read %1.": "Não foi possível ler %1.",
  "Can't read %1: %2": "Não foi possível ler %1: %2",
  "Canadian dollar (cad)": "Dólar canadense (cad)",
  "Cancel": "Cancelar",
@@ -1185,6 +1188,7 @@
  "Couldn't look for a new ViewTouch": "Não foi possível procurar um ViewTouch novo",
  "Couldn't reach the standby: %1": "Não foi possível alcançar o reserva: %1",
  "Couldn't restart": "Não foi possível reiniciar",
+ "Couldn't save the update.": "Não foi possível salvar a atualização.",
  "Couldn't save the update: %1": "Não foi possível salvar a atualização: %1",
  "Couldn't save to the database (it kept trying): %1": "Não foi possível salvar no banco de dados (continuou tentando): %1",
  "Couldn't shut down": "Não foi possível desligar",
@@ -1566,6 +1570,7 @@
  "GNU General Public License, version 3: free to use, share and change; it comes with no warranty.": "Licença Pública Geral GNU, versão 3: livre para usar, compartilhar e alterar; sem nenhuma garantia.",
  "General": "Geral",
  "Getting the update… %1%": "Baixando a atualização… %1%",
+ "Getting the update… %1% (cut off: going on by itself in a moment)": "Baixando a atualização… %1% (caiu: continua sozinha em instantes)",
  "Gift Card": "Vale-presente",
  "Gift Card %1": "Vale-presente %1",
  "Gift Card reload %1": "Recarga de vale-presente %1",
@@ -3414,6 +3419,7 @@
  "The store is erased; ViewTouch starts fresh.": "A loja foi apagada; o ViewTouch começa do zero.",
  "The store logo": "O logo da loja",
  "The store needs a name.": "A loja precisa de um nome.",
+ "The store sent an update with no proper name.": "A loja enviou uma atualização sem um nome válido.",
  "The store's Stripe key isn't set (Manager -> Store Settings).": "A chave da Stripe da loja não está definida (Gerente -> Ajustes da loja).",
  "The store's Stripe key isn't set.": "A chave da Stripe da loja não está definida.",
  "The store's label printer": "A impressora de etiquetas da loja",
@@ -3433,6 +3439,8 @@
  "The update didn't arrive whole. Try again.": "A atualização não chegou inteira. Tente de novo.",
  "The update didn't finish": "A atualização não terminou",
  "The update is here: %1": "A atualização está aqui: %1",
+ "The update on the store's computer has changed. A manager can tap Update Now again.": "A atualização no computador da loja mudou. Um gerente pode tocar Atualizar agora de novo.",
+ "The update was cut off. A manager can tap Update Now to start it again.": "A atualização foi interrompida. Um gerente pode tocar Atualizar agora para recomeçar.",
  "The usual": "A de sempre",
  "The vendor needs a name.": "O fornecedor precisa de um nome.",
  "The waitlist": "A lista de espera",
@@ -3486,6 +3494,7 @@
  "This computer runs the store on its own (it doesn't serve other screens).": "Este computador roda a loja sozinho (não atende outras telas).",
  "This computer's PIN": "PIN deste computador",
  "This deletes every sale and past day, customers, gift cards, house accounts, the waitlist, the schedule, staff, the menu, inventory, settings, paired devices and your page changes. ViewTouch then restarts with the starter pages, menu, staff and settings.": "Isto apaga todas as vendas e dias anteriores, clientes, vales-presente, contas da casa, a lista de espera, a escala, a equipe, o cardápio, o estoque, os ajustes, os dispositivos pareados e suas alterações de páginas. O ViewTouch reinicia com as páginas, o cardápio, a equipe e os ajustes iniciais.",
+ "This download has run out. A manager can tap Update Now again.": "Este download expirou. Um gerente pode tocar Atualizar agora de novo.",
  "This is a phone page: phones show it, other screens the page it's a version of.": "Esta é uma página de celular: os celulares a mostram, as outras telas mostram a página da qual ela é versão.",
  "This is the table's only check.": "Esta é a única conta da mesa.",
  "This needs the ViewTouch computer setup (vtmodern-lockdown).": "Isto precisa da configuração de computador do ViewTouch (vtmodern-lockdown).",
@@ -3581,6 +3590,10 @@
  "Toggle on/off": "Liga/desliga",
  "Tomorrow": "Amanhã",
  "Tomorrow %1": "Amanhã %1",
+ "Too many wrong PINs. Try again in %n second(s).": {
+  "one": "PINs errados demais. Tente de novo em %n segundo.",
+  "other": "PINs errados demais. Tente de novo em %n segundos."
+ },
  "Too many wrong PINs: try again in %n second(s).": {
   "one": "PINs errados demais: tente de novo em %n segundo.",
   "other": "PINs errados demais: tente de novo em %n segundos."
@@ -4116,9 +4129,5 @@
  "🌮 Ready-Made Picture…": "🌮 Imagem pronta…",
  "👁 Preview": "👁 Prévia",
  "🔍 Find an item": "🔍 Encontrar um item",
- "🔍 Find an item (name or number)": "🔍 Buscar item",
- "Too many wrong PINs. Try again in %n second(s).": {
-  "one": "PINs errados demais. Tente de novo em %n segundo.",
-  "other": "PINs errados demais. Tente de novo em %n segundos."
- }
+ "🔍 Find an item (name or number)": "🔍 Buscar item"
 }

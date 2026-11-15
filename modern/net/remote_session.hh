@@ -15,6 +15,8 @@
 namespace vt::net {
 
 class LineChannel;
+class UpdateDownload;
+struct UpdateTicket;
 
 // A terminal whose POS session lives on a server. Mirrors the session state
 // the server sends, forwards operations, and reconnects on its own when the
@@ -264,6 +266,9 @@ private:
     QString updateReady_;
     QString updateError_;
     void finishUpdate(const QJsonObject &done);
+    // A store that can (updateTicket): the update on a connection of its own, picked up where it got to.
+    std::unique_ptr<UpdateDownload> download_;
+    void startDownload(const UpdateTicket &ticket);
     void openUpdate();
     qint64 silentMs_ = 10'000;   // a server that pings, heard from no longer than this: gone
     qint64 heard_ = 0;           // when the server last said anything

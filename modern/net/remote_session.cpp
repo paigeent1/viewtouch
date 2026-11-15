@@ -1,4 +1,5 @@
 #include "net/remote_session.hh"
+#include "net/update_download.hh"
 
 #include "net/build_info.hh"
 
@@ -434,7 +435,9 @@ void RemoteSession::onConnected()
                       {u"version"_s, me.version}, {u"build"_s, me.number}, {u"commit"_s, me.commit},
                       {u"platform"_s, me.platform},
                       // Big things (the closed checks) only while they're shown: see want().
-                      {u"subscribes"_s, true}};
+                      {u"subscribes"_s, true},
+                      // Updates on a connection of their own (updateTicket), not in parts on this one.
+                      {u"updates"_s, 2}};
     if (!requestedScreen_.isEmpty())
         hello.insert(u"screen"_s, requestedScreen_);
     // Why it was cut off last time, for the store's log.
@@ -470,6 +473,14 @@ void RemoteSession::onDisconnected()
         emit notice(tr("Lost the connection to the server. Reconnecting…"));
     }
     encrypted_ = false;
+    // An update coming the old way (an older store) stops here: say so, so Update Now is back
+    // (it used to show "Getting the update... N%" for good). A download on its own connection goes on.
+    if (updateProgress_ >= 0 && !download_) {
+        updateProgress_ = -1;
+        updateData_.clear();
+        updateError_ = tr("The update was cut off. A manager can tap Update Now to start it again.");
+        emit updateChanged();
+    }
     videoAt_ = -1;   // a video on its way: asked for again from where it got to, once back
     if (!rejected_)
         reconnect_.start();
@@ -511,6 +522,14 @@ void RemoteSession::handle(const QJsonObject &m)
         fetchNextVideo();   // a billboard's video that was on its way
     } else if (type == u"state") {
         applyState(m.value(u"set").toObject(), false);
+    } else if (type == u"updateTicket") {
+        UpdateTicket t;
+        t.token = m.value(u"token").toString();
+        t.name = m.value(u"name").toString();
+        t.sha256 = m.value(u"sha256").toString();
+        t.build = m.value(u"build").toInt();
+        t.size = m.value(u"size").toInteger();
+        startDownload(t);
     } else if (type == u"updatePart") {
         // The store's update for this screen, a part at a time.
         if (m.value(u"i").toInt() == 0)
@@ -714,6 +733,8 @@ QVariantMap RemoteSession::updateInfo() const
         out.insert(u"update"_s, storeUpdate_);
     if (updateProgress_ >= 0)
         out.insert(u"downloading"_s, updateProgress_);
+    if (download_ && download_->waiting())
+        out.insert(u"waiting"_s, true);   // cut off: picks up again by itself
     if (!updateReady_.isEmpty())
         out.insert(u"ready"_s, updateReady_);
     if (!updateError_.isEmpty())
@@ -728,6 +749,8 @@ void RemoteSession::getUpdate()
         openUpdate();
         return;
     }
+    if (download_)   // on its way already
+        return;
     if (!welcomed_ || storeUpdate_.isEmpty()) {
         emit notice(tr("The store has no newer version for this screen."));
         return;
@@ -736,7 +759,43 @@ void RemoteSession::getUpdate()
     updateReady_.clear();
     updateProgress_ = 0;
     emit updateChanged();
-    send({{u"t"_s, u"getUpdate"_s}});
+    // fast: a store that can sends a ticket to download it with; an older one, the parts.
+    send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}});
+}
+
+void RemoteSession::startDownload(const UpdateTicket &ticket)
+{
+    if (download_)
+        return;
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + u"/updates"_s;
+    download_ = std::make_unique<UpdateDownload>(credentials_, host_, port_, ticket, dir, this);
+    UpdateDownload *d = download_.get();
+    const auto end = [this] {
+        updateProgress_ = -1;
+        if (download_)
+            download_.release()->deleteLater();   // it's the one telling us
+    };
+    connect(d, &UpdateDownload::progress, this, [this](qint64 got, qint64 size) {
+        const int percent = size > 0 ? int(std::min<qint64>(100, got * 100 / size)) : 100;
+        if (percent != updateProgress_) {
+            updateProgress_ = percent;
+            emit updateChanged();
+        }
+    });
+    connect(d, &UpdateDownload::waitingChanged, this, &RemoteSession::updateChanged);
+    connect(d, &UpdateDownload::finished, this, [this, end](const QString &path) {
+        end();
+        updateReady_ = path;
+        emit updateChanged();
+        openUpdate();
+    });
+    connect(d, &UpdateDownload::failed, this, [this, end](const QString &why) {
+        end();
+        updateError_ = why;
+        emit notice(why);
+        emit updateChanged();
+    });
+    d->start();
 }
 
 void RemoteSession::finishUpdate(const QJsonObject &done)

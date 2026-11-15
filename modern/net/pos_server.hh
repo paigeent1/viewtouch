@@ -3,6 +3,8 @@
 #include <QDir>
 #include <QHostAddress>
 #include <QHash>
+#include <QJsonObject>
+#include <QSet>
 #include <QObject>
 #include <QSslServer>
 #include <QTimer>
@@ -46,6 +48,19 @@ public:
     QList<UpdateFile> updateFiles() const;
     // The newest for that platform, newer than `build` (none: an empty path).
     UpdateFile updateFor(const QString &platform, int build) const;
+    // How a screen gets its update (HCA 2026-11-15: a 160 MB app sent in one burst on the store's
+    // connection queued the pings behind it, so the store took the tablet for gone, cut it off and the
+    // download never came back):
+    // - a screen that knows how ("updates": 2 in its hello) asks a manager's "getUpdate" with fast:
+    //   it gets a ticket for its own device (updateTicket: token, name, build, size, sha256) and fetches
+    //   the file on a second connection to this port (the same paired-device key), a plain stream of
+    //   the file's bytes from where it got to: {t: "download", token, from} -> {t: "downloadStart",
+    //   size, from, sha256} + the bytes, or {t: "downloadError", text}. Nothing else waits behind it.
+    // - an older screen gets the parts as before, but one at a time as the last has gone out, so the
+    //   pings and everything else still get through.
+    // Downloads begun, and of those, picked up part way (for the Network screen and the tests).
+    int downloadsStarted() const { return downloadsStarted_; }
+    int downloadsResumed() const { return downloadsResumed_; }
     // Billboards (Manager -> Terminals: Billboard) play the guest screen's videos: files in this
     // folder only (~/Pictures/Guest Screen; tests: their own), sent a part at a time on request.
     void setGuestVideoDir(const QString &dir) { guestVideoDir_ = dir; }
@@ -120,7 +135,29 @@ private:
     qint64 silentMs_ = 15'000;
     QString updatesDir_;
     QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
-    void sendUpdate(Connection *c);   // a terminal that answered pings, silent this long: gone
+    void sendUpdate(Connection *c, bool fast);
+    void pumpPacedUpdate(Connection *c);
+    void startDownload(Connection *c, const QJsonObject &message);
+    void pumpDownload(Connection *c);
+    // The file's sha256 (kept until the file changes: worked out once per file, not per screen).
+    QString fingerprint(const QString &path);
+    struct Fingerprint {
+        qint64 size = -1;
+        qint64 modified = 0;
+        QString sha256;
+    };
+    QHash<QString, Fingerprint> fingerprints_;
+    // Download tickets: for one device and one file, a day long (resumed downloads use it again).
+    struct Ticket {
+        QString terminalId, path, sha256;
+        qint64 size = 0;
+        qint64 expires = 0;
+    };
+    QHash<QString, Ticket> tickets_;
+    // Older screens whose update the old way was cut off (told to tap Update Now again when back),
+    // and those told once since this server started (the strip of one cut off before stays stuck).
+    QSet<QString> cutUpdates_, toldOld_;
+    int downloadsStarted_ = 0, downloadsResumed_ = 0;
     std::function<QByteArray()> snapshot_;
 };
 

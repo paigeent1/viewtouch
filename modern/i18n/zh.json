@@ -503,6 +503,7 @@
  "A menu saved as CSV": "存为 CSV 的菜单",
  "A new ViewTouch comes from the internet: Check for a New ViewTouch, then install it (a few minutes; it's checked to be ViewTouch's own, and never an older one). The tablets' app comes with it.": "新版 ViewTouch 通过互联网获取：先“查找新版 ViewTouch”，再安装（几分钟；会验证确为 ViewTouch 官方版本，且绝不会装旧版）。平板应用会一并获取。",
  "A new row": "新起一行",
+ "A new version is ready: a manager can tap Update Now to get it.": "有新版本：经理可以点“立即更新”获取。",
  "A note for the next shift's manager": "给下一班经理的留言",
  "A number": "数字",
  "A picture for %1": "%1 的图片",
@@ -865,6 +866,8 @@
  "Can't open %1.": "无法打开 %1。",
  "Can't open it: %1": "无法打开：%1",
  "Can't reach the main server (%1).": "无法连接主服务器（%1）。",
+ "Can't reach the store's computer for the update. A manager can tap Update Now again.": "连不上店里的电脑获取更新。经理可以再点“立即更新”。",
+ "Can't read %1.": "无法读取 %1。",
  "Can't read %1: %2": "无法读取 %1：%2",
  "Canadian dollar (cad)": "加拿大元 (cad)",
  "Cancel": "取消",
@@ -1185,6 +1188,7 @@
  "Couldn't look for a new ViewTouch": "无法查找新版 ViewTouch",
  "Couldn't reach the standby: %1": "无法连接备用服务器：%1",
  "Couldn't restart": "无法重启",
+ "Couldn't save the update.": "无法保存更新。",
  "Couldn't save the update: %1": "无法保存更新：%1",
  "Couldn't save to the database (it kept trying): %1": "无法保存到数据库（一直在重试）：%1",
  "Couldn't shut down": "无法关机",
@@ -1566,6 +1570,7 @@
  "GNU General Public License, version 3: free to use, share and change; it comes with no warranty.": "GNU 通用公共许可证第 3 版：可自由使用、分享和修改；不提供任何担保。",
  "General": "常规",
  "Getting the update… %1%": "正在获取更新… %1%",
+ "Getting the update… %1% (cut off: going on by itself in a moment)": "正在获取更新… %1%（连接中断：稍后自动继续）",
  "Gift Card": "礼品卡",
  "Gift Card %1": "礼品卡 %1",
  "Gift Card reload %1": "礼品卡充值 %1",
@@ -3414,6 +3419,7 @@
  "The store is erased; ViewTouch starts fresh.": "门店已清除；ViewTouch 重新开始。",
  "The store logo": "门店标志",
  "The store needs a name.": "门店需要名称。",
+ "The store sent an update with no proper name.": "店里发来的更新没有有效的名称。",
  "The store's Stripe key isn't set (Manager -> Store Settings).": "门店的 Stripe 密钥未设置（经理 -> 门店设置）。",
  "The store's Stripe key isn't set.": "门店的 Stripe 密钥未设置。",
  "The store's label printer": "门店的标签打印机",
@@ -3433,6 +3439,8 @@
  "The update didn't arrive whole. Try again.": "更新没有完整收到。请重试。",
  "The update didn't finish": "更新没有完成",
  "The update is here: %1": "更新已到：%1",
+ "The update on the store's computer has changed. A manager can tap Update Now again.": "店里电脑上的更新已改变。经理可以再点“立即更新”。",
+ "The update was cut off. A manager can tap Update Now to start it again.": "更新中断了。经理可以点“立即更新”重新开始。",
  "The usual": "默认",
  "The vendor needs a name.": "供应商需要名称。",
  "The waitlist": "候位名单",
@@ -3486,6 +3494,7 @@
  "This computer runs the store on its own (it doesn't serve other screens).": "此电脑独立运行门店（不为其他屏幕服务）。",
  "This computer's PIN": "这台电脑的 PIN",
  "This deletes every sale and past day, customers, gift cards, house accounts, the waitlist, the schedule, staff, the menu, inventory, settings, paired devices and your page changes. ViewTouch then restarts with the starter pages, menu, staff and settings.": "这会删除所有销售和以往营业日、顾客、礼品卡、签单账户、候位名单、排班、员工、菜单、库存、设置、已配对设备以及您对页面的修改。之后 ViewTouch 将以初始页面、菜单、员工和设置重新启动。",
+ "This download has run out. A manager can tap Update Now again.": "此下载已过期。经理可以再点“立即更新”。",
  "This is a phone page: phones show it, other screens the page it's a version of.": "这是手机页面：手机显示它，其他屏幕显示它所对应的页面。",
  "This is the table's only check.": "这是这张桌子唯一的账单。",
  "This needs the ViewTouch computer setup (vtmodern-lockdown).": "这需要 ViewTouch 电脑设置 (vtmodern-lockdown)。",
@@ -3581,6 +3590,10 @@
  "Toggle on/off": "开/关切换",
  "Tomorrow": "明天",
  "Tomorrow %1": "明天 %1",
+ "Too many wrong PINs. Try again in %n second(s).": {
+  "one": "错误 PIN 次数过多。请在 %n 秒后重试。",
+  "other": "错误 PIN 次数过多。请在 %n 秒后重试。"
+ },
  "Too many wrong PINs: try again in %n second(s).": {
   "one": "错误 PIN 次数过多：请 %n 秒后再试。",
   "other": "错误 PIN 次数过多：请 %n 秒后再试。"
@@ -4116,9 +4129,5 @@
  "🌮 Ready-Made Picture…": "🌮 现成图片…",
  "👁 Preview": "👁 预览",
  "🔍 Find an item": "🔍 查找菜品",
- "🔍 Find an item (name or number)": "🔍 查找菜品（名称或编号）",
- "Too many wrong PINs. Try again in %n second(s).": {
-  "one": "错误 PIN 次数过多。请在 %n 秒后重试。",
-  "other": "错误 PIN 次数过多。请在 %n 秒后重试。"
- }
+ "🔍 Find an item (name or number)": "🔍 查找菜品（名称或编号）"
 }

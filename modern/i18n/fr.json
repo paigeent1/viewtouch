@@ -503,6 +503,7 @@
  "A menu saved as CSV": "Un menu enregistré en CSV",
  "A new ViewTouch comes from the internet: Check for a New ViewTouch, then install it (a few minutes; it's checked to be ViewTouch's own, and never an older one). The tablets' app comes with it.": "Un nouveau ViewTouch arrive par internet : Chercher un nouveau ViewTouch, puis l'installer (quelques minutes ; on vérifie qu'il vient bien de ViewTouch, jamais une version plus ancienne). L'app des tablettes vient avec.",
  "A new row": "Une nouvelle rangée",
+ "A new version is ready: a manager can tap Update Now to get it.": "Une nouvelle version est prête : un gérant peut toucher Mettre à jour pour l'obtenir.",
  "A note for the next shift's manager": "Une note pour le gérant de l'équipe suivante",
  "A number": "Un nombre",
  "A picture for %1": "Une image pour %1",
@@ -865,6 +866,8 @@
  "Can't open %1.": "Impossible d'ouvrir %1.",
  "Can't open it: %1": "Impossible de l'ouvrir : %1",
  "Can't reach the main server (%1).": "Impossible de joindre le serveur principal (%1).",
+ "Can't reach the store's computer for the update. A manager can tap Update Now again.": "Impossible de joindre l'ordinateur du magasin pour la mise à jour. Un gérant peut toucher Mettre à jour à nouveau.",
+ "Can't read %1.": "Impossible de lire %1.",
  "Can't read %1: %2": "Impossible de lire %1 : %2",
  "Canadian dollar (cad)": "Dollar canadien (cad)",
  "Cancel": "Annuler",
@@ -1185,6 +1188,7 @@
  "Couldn't look for a new ViewTouch": "Impossible de chercher un nouveau ViewTouch",
  "Couldn't reach the standby: %1": "Impossible de joindre le secours : %1",
  "Couldn't restart": "Impossible de redémarrer",
+ "Couldn't save the update.": "Impossible d'enregistrer la mise à jour.",
  "Couldn't save the update: %1": "Impossible d'enregistrer la mise à jour : %1",
  "Couldn't save to the database (it kept trying): %1": "Impossible d'enregistrer dans la base de données (nouvelles tentatives) : %1",
  "Couldn't shut down": "Impossible d'éteindre",
@@ -1566,6 +1570,7 @@
  "GNU General Public License, version 3: free to use, share and change; it comes with no warranty.": "Licence publique générale GNU, version 3 : libre à utiliser, partager et modifier ; sans aucune garantie.",
  "General": "Général",
  "Getting the update… %1%": "Téléchargement de la mise à jour… %1%",
+ "Getting the update… %1% (cut off: going on by itself in a moment)": "Téléchargement de la mise à jour… %1% (coupé : reprend tout seul dans un instant)",
  "Gift Card": "Carte cadeau",
  "Gift Card %1": "Carte cadeau %1",
  "Gift Card reload %1": "Recharge carte cadeau %1",
@@ -3414,6 +3419,7 @@
  "The store is erased; ViewTouch starts fresh.": "Le magasin est effacé ; ViewTouch repart de zéro.",
  "The store logo": "Le logo de l'établissement",
  "The store needs a name.": "L'établissement a besoin d'un nom.",
+ "The store sent an update with no proper name.": "Le magasin a envoyé une mise à jour sans nom valable.",
  "The store's Stripe key isn't set (Manager -> Store Settings).": "La clé Stripe de l'établissement n'est pas définie (Gérant -> Réglages de l'établissement).",
  "The store's Stripe key isn't set.": "La clé Stripe de l'établissement n'est pas définie.",
  "The store's label printer": "L'imprimante d'étiquettes de l'établissement",
@@ -3433,6 +3439,8 @@
  "The update didn't arrive whole. Try again.": "La mise à jour n'est pas arrivée entière. Réessayez.",
  "The update didn't finish": "La mise à jour n'a pas abouti",
  "The update is here: %1": "La mise à jour est là : %1",
+ "The update on the store's computer has changed. A manager can tap Update Now again.": "La mise à jour sur l'ordinateur du magasin a changé. Un gérant peut toucher Mettre à jour à nouveau.",
+ "The update was cut off. A manager can tap Update Now to start it again.": "La mise à jour a été coupée. Un gérant peut toucher Mettre à jour pour la relancer.",
  "The usual": "L'habituelle",
  "The vendor needs a name.": "Le fournisseur a besoin d'un nom.",
  "The waitlist": "La liste d'attente",
@@ -3486,6 +3494,7 @@
  "This computer runs the store on its own (it doesn't serve other screens).": "Cet ordinateur fait tourner l'établissement seul (il ne sert pas d'autres écrans).",
  "This computer's PIN": "PIN de cet ordinateur",
  "This deletes every sale and past day, customers, gift cards, house accounts, the waitlist, the schedule, staff, the menu, inventory, settings, paired devices and your page changes. ViewTouch then restarts with the starter pages, menu, staff and settings.": "Cela supprime toutes les ventes et journées passées, les clients, cartes cadeaux, comptes clients, la liste d'attente, le planning, l'équipe, le menu, l'inventaire, les réglages, les appareils associés et vos modifications de pages. ViewTouch redémarre ensuite avec les pages, le menu, l'équipe et les réglages de départ.",
+ "This download has run out. A manager can tap Update Now again.": "Ce téléchargement a expiré. Un gérant peut toucher Mettre à jour à nouveau.",
  "This is a phone page: phones show it, other screens the page it's a version of.": "C'est une page téléphone : les téléphones l'affichent, les autres écrans la page dont elle est une version.",
  "This is the table's only check.": "C'est la seule addition de la table.",
  "This needs the ViewTouch computer setup (vtmodern-lockdown).": "Il faut la configuration d'ordinateur ViewTouch (vtmodern-lockdown).",
@@ -3581,6 +3590,10 @@
  "Toggle on/off": "Bascule activé/désactivé",
  "Tomorrow": "Demain",
  "Tomorrow %1": "Demain %1",
+ "Too many wrong PINs. Try again in %n second(s).": {
+  "one": "Trop de PIN erronés. Réessayez dans %n seconde.",
+  "other": "Trop de PIN erronés. Réessayez dans %n secondes."
+ },
  "Too many wrong PINs: try again in %n second(s).": {
   "one": "Trop de codes erronés : réessayez dans %n seconde.",
   "other": "Trop de codes erronés : réessayez dans %n secondes."
@@ -4116,9 +4129,5 @@
  "🌮 Ready-Made Picture…": "🌮 Image toute prête…",
  "👁 Preview": "👁 Aperçu",
  "🔍 Find an item": "🔍 Trouver un article",
- "🔍 Find an item (name or number)": "🔍 Trouver un article",
- "Too many wrong PINs. Try again in %n second(s).": {
-  "one": "Trop de PIN erronés. Réessayez dans %n seconde.",
-  "other": "Trop de PIN erronés. Réessayez dans %n secondes."
- }
+ "🔍 Find an item (name or number)": "🔍 Trouver un article"
 }
