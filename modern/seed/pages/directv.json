@@ -12,7 +12,7 @@
     {
       "id": "title",
       "kind": "label",
-      "label": "\ud83d\udcfa DIRECTV \u2014 Select Receiver",
+      "label": "\ud83d\udcfa TVs \u2014 Select Receiver or TV",
       "shape": "rect",
       "behavior": "none",
       "rect": {
@@ -175,6 +175,58 @@
           "mode": "push",
           "page": "directv-tune-all",
           "target": "directv-tune-all"
+        }
+      ]
+    },
+    {
+      "id": "b-samsung",
+      "kind": "button",
+      "label": "\ud83d\udcfa SAMSUNG TV\n(192.168.6.200)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 100,
+        "y": 670,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#0f766e"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "tv-samsung",
+          "target": "tv-samsung"
+        }
+      ]
+    },
+    {
+      "id": "b-roku",
+      "kind": "button",
+      "label": "\ud83d\udcfa ROKU TV",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 690,
+        "y": 670,
+        "w": 540,
+        "h": 220
+      },
+      "style": {
+        "normal": {
+          "fill": "#7c3aed"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "tv-roku",
+          "target": "tv-roku"
         }
       ]
     },

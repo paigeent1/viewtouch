@@ -7,6 +7,8 @@
   vt-directv scan [--save]                find DIRECTV receivers and smart TVs on
                                           this Pi's own network (SSDP, then a sweep)
   vt-directv list                         the TVs this script knows
+  vt-directv pair <tv>                    a Samsung TV: allow ViewTouch on it once (the TV
+                                          asks; press Allow with its remote within 30 s)
 
 The TV list is ~/.config/viewtouch/tvs.json (not in the repo, not in the
 database), one per site. Start it with `vt-directv scan --save`, which
@@ -18,16 +20,24 @@ pages are ordinary pages in seed/pages, edited in the layout editor.
 
 DIRECTV receivers need "External Device Access" allowed (Menu > Settings >
 Whole-Home > External Device). Roku TVs are worked over ECP (port 8060).
-Samsung, LG webOS, Sony Bravia and Android/Google TVs are found and listed;
-working them needs a one-time pairing on the TV (not done here yet).
+Samsung TVs (2016 and newer, Tizen) are worked over their own network remote (port 8002)
+after a one-time `vt-directv pair <tv>` (the TV asks to allow it; its token is kept in
+tvs.json). TV on wakes it over the network (Wake-on-LAN: the TV's Settings > General >
+Network > Expert Settings > Power On with Mobile ON). LG webOS, Sony Bravia and
+Android/Google TVs are found and listed; working them isn't done yet.
 """
+import base64
 import concurrent.futures
+import html
 import ipaddress
 import json
 import os
 import pathlib
 import re
 import socket
+import ssl
+import struct
+import subprocess
 import subprocess
 import sys
 import urllib.error
@@ -47,6 +57,16 @@ ROKU_KEYS = {
     "chanup": "ChannelUp", "chandown": "ChannelDown", "poweron": "PowerOn", "poweroff": "PowerOff",
     "select": "Select", "exit": "Back", "info": "Info", "guide": "Home", "prev": "InstantReplay",
     "volup": "VolumeUp", "voldown": "VolumeDown", "mute": "VolumeMute",
+    "up": "Up", "down": "Down", "left": "Left", "right": "Right", "home": "Home", "back": "Back",
+    "input": "InputHDMI1",
+}
+# Our key names -> a Samsung TV's remote keys.
+SAMSUNG_KEYS = {
+    "chanup": "KEY_CHUP", "chandown": "KEY_CHDOWN", "prev": "KEY_PRECH", "guide": "KEY_GUIDE",
+    "exit": "KEY_EXIT", "info": "KEY_INFO", "select": "KEY_ENTER", "poweroff": "KEY_POWER",
+    "volup": "KEY_VOLUP", "voldown": "KEY_VOLDOWN", "mute": "KEY_MUTE", "up": "KEY_UP",
+    "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT", "home": "KEY_HOME",
+    "back": "KEY_RETURN", "input": "KEY_SOURCE",
 }
 FREQ_FILE = pathlib.Path(os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/directv_freq.json"))
 
@@ -101,13 +121,147 @@ def roku(ip, op, val):
         return f"not reachable ({e.__class__.__name__})"
 
 
+# --- Samsung (Tizen) TVs: their network remote, a websocket on port 8002 ---------------------
+
+def _ws_open(ip, token, timeout=4.0):
+    """A websocket to the TV's remote; returns (socket, first message as a dict)."""
+    name = base64.b64encode(b"ViewTouch").decode()
+    path = f"/api/v2/channels/samsung.remote.control?name={name}" + (f"&token={token}" if token else "")
+    raw = socket.create_connection((ip, 8002), timeout=timeout)
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE   # the TV's own certificate (self-signed)
+    s = ctx.wrap_socket(raw, server_hostname=ip)
+    key = base64.b64encode(os.urandom(16)).decode()
+    s.sendall((f"GET {path} HTTP/1.1\r\nHost: {ip}:8002\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+               f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+    head = b""
+    while b"\r\n\r\n" not in head:
+        chunk = s.recv(1024)
+        if not chunk:
+            raise ConnectionError("closed")
+        head += chunk
+    if b" 101 " not in head.split(b"\r\n", 1)[0]:
+        raise ConnectionError("refused")
+    rest = head.split(b"\r\n\r\n", 1)[1]
+    return s, json.loads(_ws_read(s, rest) or "{}")
+
+
+def _ws_read(s, buf=b""):
+    def need(n):
+        nonlocal buf
+        while len(buf) < n:
+            chunk = s.recv(4096)
+            if not chunk:
+                raise ConnectionError("closed")
+            buf += chunk
+    need(2)
+    n = buf[1] & 0x7F
+    off = 2
+    if n == 126:
+        need(4); n = struct.unpack(">H", buf[2:4])[0]; off = 4
+    elif n == 127:
+        need(10); n = struct.unpack(">Q", buf[2:10])[0]; off = 10
+    need(off + n)
+    return buf[off:off + n].decode("utf-8", errors="ignore")
+
+
+def _ws_send(s, text):
+    data = text.encode()
+    mask = os.urandom(4)
+    head = bytes([0x81])
+    if len(data) < 126:
+        head += bytes([0x80 | len(data)])
+    elif len(data) < 65536:
+        head += bytes([0x80 | 126]) + struct.pack(">H", len(data))
+    else:
+        head += bytes([0x80 | 127]) + struct.pack(">Q", len(data))
+    s.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+
+
+def _wake(mac):
+    m = bytes.fromhex(mac.replace(":", "").replace("-", ""))
+    packet = b"\xff" * 6 + m * 16
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as u:
+        u.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        for port in (9, 7):
+            u.sendto(packet, ("255.255.255.255", port))
+
+
+def _mac_of(ip):
+    try:
+        out = subprocess.run(["ip", "neigh", "show", ip], capture_output=True, text=True, timeout=3).stdout
+        m = re.search(r"lladdr ([0-9a-f:]{17})", out)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+def samsung(tv, op, val):
+    ip = tv["ip"]
+    if op == "key" and val == "poweron":
+        if not tv.get("mac"):
+            return "can't wake it (pair it while it's on: vt-directv pair)"
+        _wake(tv["mac"])
+        return "waking it"
+    if not tv.get("token"):
+        return "not paired yet (vt-directv pair, with the TV on)"
+    keys = ([f"KEY_{d}" for d in str(val)] + ["KEY_ENTER"]) if op == "tune" else [SAMSUNG_KEYS.get(val, val)]
+    try:
+        s, hello = _ws_open(ip, tv["token"])
+        if hello.get("event") != "ms.channel.connect":
+            s.close()
+            return "not allowed (pair it again: vt-directv pair)"
+        for k in keys:
+            _ws_send(s, json.dumps({"method": "ms.remote.control", "params": {
+                "Cmd": "Click", "DataOfCmd": k, "Option": "false", "TypeOfRemote": "SendRemoteKey"}}))
+        s.close()
+    except Exception as e:
+        return "off or not reachable" if op == "key" and val == "poweroff" else f"not reachable ({e.__class__.__name__})"
+    return f"-> channel {val}" if op == "tune" else f"{val} sent"
+
+
+def pair(key):
+    tvs = load_tvs()
+    if key not in tvs:
+        print(f"No TV called {key} (vt-directv list)")
+        return 2
+    tv = tvs[key]
+    if tv.get("kind") != "samsung":
+        print(f"{tv.get('name', key)} is a {tv.get('kind', 'directv')}: nothing to pair.")
+        return 0
+    print(f"On {tv.get('name', key)}: press Allow when it asks about ViewTouch (30 seconds)...")
+    try:
+        s, hello = _ws_open(tv["ip"], tv.get("token", ""), timeout=35.0)
+        s.close()
+    except Exception as e:
+        print(f"Couldn't reach it ({e.__class__.__name__}). Is it on, at {tv['ip']}?")
+        return 1
+    token = hello.get("data", {}).get("token", "")
+    if hello.get("event") != "ms.channel.connect":
+        print("The TV said no (Deny, or too late). Try again; to undo a Deny: the TV's Settings > General >"
+              " External Device Manager > Device Connection Manager > Device List.")
+        return 1
+    if token:
+        tv["token"] = token
+    mac = _mac_of(tv["ip"])
+    if mac:
+        tv["mac"] = mac
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG.write_text(json.dumps(tvs, indent=2) + "\n")
+    print(f"Paired {tv.get('name', key)}" + (f" (wake address {mac})" if mac else "") + ".")
+    return 0
+
+
 def work(tv, op, val):
     kind = tv.get("kind", "directv")
     if kind == "directv":
         return directv(tv["ip"], op, val)
     if kind == "roku":
         return roku(tv["ip"], op, val)
-    return f"{kind} TVs need pairing first (not done yet)"
+    if kind == "samsung":
+        return samsung(tv, op, val)
+    return f"{kind} TVs can't be worked from here yet"
 
 
 def count_channel(val):
@@ -182,7 +336,7 @@ def ssdp(timeout=3.0):
             except Exception:
                 pass
         if kind:
-            out[ip] = {"kind": kind, "name": name, "how": "ssdp"}
+            out[ip] = {"kind": kind, "name": html.unescape(name), "how": "ssdp"}
     return out
 
 
@@ -252,7 +406,8 @@ def scan(save, subnets):
         f = found[ip]
         known = by_ip.get(ip)
         label = tvs[known]["name"] if known else (f["name"] or "(new)")
-        works = "works now" if f["kind"] in ("directv", "roku") else "needs pairing"
+        works = ("works now" if f["kind"] in ("directv", "roku")
+                 else "pair it: vt-directv pair <name>" if f["kind"] == "samsung" else "can't work it yet")
         print(f"  {ip:15}  {f['kind']:9}  {label:24}  {works}  [{f['how']}]")
         if save and not known:
             key = re.sub(r"[^a-z0-9]+", "-", (f["name"] or f"{f['kind']}-{ip.split('.')[-1]}").lower()).strip("-")
@@ -280,6 +435,8 @@ def main(argv):
         for key, tv in load_tvs().items():
             print(f"  {key:10}  {tv.get('kind', 'directv'):9}  {tv.get('ip', ''):15}  {tv.get('name', '')}")
         return 0
+    if argv[0] == "pair":
+        return pair(argv[1]) if len(argv) > 1 else (print("vt-directv pair <tv>  (vt-directv list)") or 2)
     if argv[0] == "scan":
         save = "--save" in argv
         nets = local_subnets()

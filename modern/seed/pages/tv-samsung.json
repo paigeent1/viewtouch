@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 1,
+  "id": "tv-samsung",
+  "name": "TV: Samsung",
+  "kind": "custom",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "zones": [
+    {
+      "id": "t",
+      "kind": "label",
+      "label": "📺 SAMSUNG TV (192.168.6.200)",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 24,
+        "y": 16,
+        "w": 1872,
+        "h": 64
+      }
+    },
+    {
+      "id": "note",
+      "kind": "label",
+      "label": "First time only: on HCA, vt-directv pair samsung (press Allow on the TV). TV on needs Power On with Mobile ON in the TV's network settings.",
+      "shape": "rect",
+      "behavior": "none",
+      "rect": {
+        "x": 24,
+        "y": 84,
+        "w": 1872,
+        "h": 48
+      }
+    },
+    {
+      "id": "rk-poweron",
+      "kind": "button",
+      "label": "TV on",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 150,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "poweron"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-poweroff",
+      "kind": "button",
+      "label": "TV off",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 300,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#9b2c2c"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "poweroff"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-volup",
+      "kind": "button",
+      "label": "VOL +",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 450,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "volup"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-voldown",
+      "kind": "button",
+      "label": "VOL −",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 600,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "voldown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-mute",
+      "kind": "button",
+      "label": "MUTE",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 750,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "mute"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-chanup",
+      "kind": "button",
+      "label": "CH ▲",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 150,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "chanup"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-chandown",
+      "kind": "button",
+      "label": "CH ▼",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 300,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#1e3a8a"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "chandown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-input",
+      "kind": "button",
+      "label": "INPUT",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 450,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#6b46c1"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "input"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-home",
+      "kind": "button",
+      "label": "HOME",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 600,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "home"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-back",
+      "kind": "button",
+      "label": "BACK",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 750,
+        "w": 430,
+        "h": 130
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "back"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-up",
+      "kind": "button",
+      "label": "▲",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1180,
+        "y": 164,
+        "w": 200,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "up"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-left",
+      "kind": "button",
+      "label": "◀",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 964,
+        "y": 380,
+        "w": 200,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "left"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-select",
+      "kind": "button",
+      "label": "OK",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1180,
+        "y": 380,
+        "w": 200,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "select"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-right",
+      "kind": "button",
+      "label": "▶",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1396,
+        "y": 380,
+        "w": 200,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "right"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-down",
+      "kind": "button",
+      "label": "▼",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1180,
+        "y": 596,
+        "w": 200,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "down"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-guide",
+      "kind": "button",
+      "label": "GUIDE",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 964,
+        "y": 816,
+        "w": 430,
+        "h": 90
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "guide"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rk-info",
+      "kind": "button",
+      "label": "INFO",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1424,
+        "y": 816,
+        "w": 430,
+        "h": 90
+      },
+      "style": {
+        "normal": {
+          "fill": "#475569"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directv",
+          "args": {
+            "box": "samsung",
+            "op": "key",
+            "val": "info"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bk-b",
+      "kind": "button",
+      "label": "‹ Select TV",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 24,
+        "y": 924,
+        "w": 430,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "directv",
+          "target": "directv"
+        }
+      ]
+    },
+    {
+      "id": "bk-t",
+      "kind": "button",
+      "label": "‹ Tables",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 484,
+        "y": 924,
+        "w": 430,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#334155"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "tables",
+          "target": "tables"
+        }
+      ]
+    }
+  ]
+}

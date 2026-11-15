@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 18:22 ET — Bob (Claude) — TV control: Samsung TVs (paired) and a Roku page; buttons on the DIRECTV chooser
+- **What:** vt-directv works Samsung Tizen TVs over their network remote (wss port 8002) after a one-time 'vt-directv pair <tv>' (token and wake MAC kept in tvs.json; TV on = Wake-on-LAN), adds arrow/home/back/input/volume keys for Roku and Samsung, and unescapes names found by scan. New pages tv-samsung and tv-roku (power, volume, mute, channel, input, home, back, arrows/OK, guide, info); the DIRECTV chooser gets SAMSUNG TV and ROKU TV buttons and is titled 'TVs'.
+- **Why:** Owner at HCA: add buttons for the bar's Samsung 55 (192.168.6.200) and a Roku TV. The Roku wasn't found by the scan (its network control is probably off).
+- **Files:** `scripts/bin/vt-directv, modern/seed/pages/directv.json, modern/seed/pages/tv-samsung.json, modern/seed/pages/tv-roku.json`
+- **Next person must know:** HCA: name the TVs samsung and roku in ~/.config/viewtouch/tvs.json; pair the Samsung once.
+
 ### 2026-11-15 18:07 ET — Bob (Claude) — DIRECTV: BOX .72 is now BAR 3
 - **What:** The DIRECTV receiver chooser and the .72 tuning page say BAR 3 (192.168.6.72) instead of BOX .72; the tuning page's doubled address is gone; manual updated. The box key stays box72, so HCA's tvs.json and the buttons keep working.
 - **Why:** Owner at HCA 2026-11-15: the .72 box drives Bar 3. HCA's receivers were found and named (vt-directv scan --save, then bar1=.74, bar2=.71, box72=.72, front=.70, vip=.73).
