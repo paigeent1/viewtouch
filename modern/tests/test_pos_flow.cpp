@@ -8166,8 +8166,8 @@ TEST_CASE("Manager -> Printers: Find My Printers, Print Its Address, and what it
     QTest::qWait(150);
     s.shot("admin-find-printers");
     // Neither the silent one nor the label printer gets buttons.
-    CHECK_FALSE(by(u"foundPrinterTest-127.0.0.2"_s) && by(u"foundPrinterTest-127.0.0.2"_s)->isVisible());
-    CHECK_FALSE(by(u"foundPrinterTest-127.0.0.4"_s) && by(u"foundPrinterTest-127.0.0.4"_s)->isVisible());
+    CHECK_FALSE((by(u"foundPrinterTest-127.0.0.2"_s) && by(u"foundPrinterTest-127.0.0.2"_s)->isVisible()));
+    CHECK_FALSE((by(u"foundPrinterTest-127.0.0.4"_s) && by(u"foundPrinterTest-127.0.0.4"_s)->isVisible()));
     CHECK_FALSE(by(u"foundPrinterUse-kitchen-127.0.0.4"_s));
 
     // Its address on paper, then it's the kitchen's.

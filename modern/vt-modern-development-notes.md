@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 16:35 ET — Helper (Claude) for Bob — Find My Printers test: builds (Catch2 && in parentheses)
+- **What:** Wrapped two CHECK_FALSE(a && b) in parentheses in the Find My Printers UI test.
+- **Why:** CI run 43763626448 failed to build: Catch2 doesn't decompose && inside an assertion.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-15 16:25 ET — Helper (Claude) for Bob — Upstream 30e6949: Find My Printers in Manager -> Printers
 - **What:** Hand port of upstream 30e6949. New print/printer_finder (port 9100 on every address of this computer's private /24s, at once, then the ESC/POS status DLE EOT 1) and PrinterFinder.qml; Manager -> Printers gets a Find My Printers... button under + Add that opens it in a popup: each found printer can print a page with its address, then be made the Receipts, Kitchen or Bar printer (PosService::findPrinters, printWhoAmI, useFoundPrinter; printerSearch state, on the Pi only via PosShared hooks). Fork safety changes: network printers the store has set as label printers (format zpl/tspl, the Zebras) are only connected to and sent nothing, and get no buttons; anything that doesn't answer like a receipt printer gets no buttons (add it by hand); a Receipts/Kitchen/Bar printer that isn't on the network (the Rongta on USB /dev/usb/lp0, CUPS, file) is never changed; taking the place of one at another address asks first (replace). Left out: upstream's setup-guide printer step and its menu-step wording (the fork's setup guide has no printer step; both stores are set up). Translations es/fr/pt/zh from upstream plus the fork's new phrases. Test adapted from the setup guide to Manager -> Printers, with the USB, Zebra and replace cases.
 - **Why:** Owner/Bob: port upstream's Find My Printers without disturbing the stores' existing printers (Rongta on USB, Zebra label printers on the network).
