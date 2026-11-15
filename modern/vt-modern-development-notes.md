@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 18:26 ET — Bob (Claude) — vt-reset-page: put a page back to the starter version
+- **What:** New script vt-reset-page <page...>: takes the store's own copy of a starter page (and its phone/tablet versions) out of viewtouch.db and clears its starter marks, so the next start adds the current starter page; backs up the DB first; refuses pages that don't come with ViewTouch.
+- **Why:** HCA's DIRECTV page had been edited at some point, so the update (BAR 3, SAMSUNG TV and ROKU TV buttons) didn't reach it: ViewTouch keeps a store's edited pages.
+- **Files:** `scripts/bin/vt-reset-page`
+
 ### 2026-11-15 18:22 ET — Bob (Claude) — TV control: Samsung TVs (paired) and a Roku page; buttons on the DIRECTV chooser
 - **What:** vt-directv works Samsung Tizen TVs over their network remote (wss port 8002) after a one-time 'vt-directv pair <tv>' (token and wake MAC kept in tvs.json; TV on = Wake-on-LAN), adds arrow/home/back/input/volume keys for Roku and Samsung, and unescapes names found by scan. New pages tv-samsung and tv-roku (power, volume, mute, channel, input, home, back, arrows/OK, guide, info); the DIRECTV chooser gets SAMSUNG TV and ROKU TV buttons and is titled 'TVs'.
 - **Why:** Owner at HCA: add buttons for the bar's Samsung 55 (192.168.6.200) and a Roku TV. The Roku wasn't found by the scan (its network control is probably off).

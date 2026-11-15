@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Put pages back to the version that comes with ViewTouch (the starter page), throwing away
+the changes made to them in the editor on this computer. Use it when a page was edited here, so
+updates no longer change it (ViewTouch keeps a store's own edits), and you want the new one.
+
+  vt-reset-page directv                 the DIRECTV / TVs chooser
+  vt-reset-page directv tv-samsung      several at once
+  vt-reset-page --list                  the pages this store has
+
+The page and its phone/tablet versions are taken out of this store's pages; the next start of
+ViewTouch (vt-server does that) adds the starter version back. Pages that don't come with
+ViewTouch (made here from scratch) are refused: they'd be gone for good.
+A copy of the database is made first (viewtouch.db.before-reset-<time>).
+"""
+import json
+import os
+import shutil
+import sqlite3
+import sys
+import time
+
+DB = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+SEED = os.path.join(REPO, "modern", "seed", "pages")
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    if not os.path.exists(DB):
+        print(f"No ViewTouch database at {DB}")
+        return 1
+    con = sqlite3.connect(DB)
+    rows = {pid: json.loads(js) for pid, js in con.execute("SELECT id, json FROM layout_pages")}
+    if argv[0] == "--list":
+        for pid in sorted(rows):
+            print(f"  {pid:32}  {rows[pid].get('name', '')}")
+        return 0
+    starter = {f[:-5] for f in os.listdir(SEED) if f.endswith(".json")} if os.path.isdir(SEED) else set()
+    gone = []
+    for pid in argv:
+        if pid not in starter:
+            print(f"{pid}: not a page that comes with ViewTouch; left alone.")
+            continue
+        ids = [pid] + [v for v, p in rows.items() if p.get("variantOf") == pid]
+        gone += [i for i in ids if i in rows]
+        if pid not in rows:
+            print(f"{pid}: this store doesn't have it now; it's added at the next start.")
+            gone.append(pid)   # still clear its "seen"/"installed" marks below
+    if not gone:
+        return 1
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    shutil.copy2(DB, f"{DB}.before-reset-{stamp}")
+    with con:
+        for i in gone:
+            con.execute("DELETE FROM layout_pages WHERE id = ?", (i,))
+        row = con.execute("SELECT value FROM meta WHERE key = 'starter_pages'").fetchone()
+        if row:
+            state = json.loads(row[0])
+            state["seen"] = [s for s in state.get("seen", []) if s not in gone]
+            inst = state.get("installed", {})
+            for i in gone:
+                inst.pop(i, None)
+            state["installed"] = inst
+            con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('starter_pages', ?)",
+                        (json.dumps(state, separators=(",", ":")),))
+    print("Reset: " + ", ".join(dict.fromkeys(gone)) + f". (A copy from before: viewtouch.db.before-reset-{stamp})")
+    print("Now restart ViewTouch to get the starter version: vt-server")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
