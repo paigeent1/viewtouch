@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 09:40 ET — Helper (Claude) for Bob — Update tests: fix the old-way test
+- **What:** test_updates.cpp: the hand-made client took two messages per look (waitFor asks once more at the end), and the old-way test now reads with a small buffer and a payload bigger than the computer's network buffers, so it shows the store answers before the update is through.
+- **Why:** CI run 43724053497: the old-way test failed on its own bookkeeping, not the store.
+- **Files:** `modern/tests/test_updates.cpp`
+
 ### 2026-11-15 09:22 ET — Helper (Claude) for Bob — Tablet updates: their own resumable download; the old way paced
 - **What:** Screens of this build ask for their update with fast:true and get a one-device ticket (24 h); they download the file on a second TLS connection to the store's port with the same paired-device key ({t:download, token, from} -> downloadStart + the raw bytes, streamed from disk, Range-like resume from any byte), into cache/updates/<name>.part, retrying by themselves with backoff (2 s .. 30 s) and picking up a .part after an app restart; sha256 checked before it goes to Updater.kt. Older screens (b525/b533) still get updatePart messages, but 128 KiB at a time and only once the last has mostly gone out (<256 KiB queued), so pings and answers get through. An older screen whose old-way update was cut off (or any older screen with an update, once per server start) is sent updateError on its next hello, which clears its stuck 'Getting the update... N%' and brings Update Now back. New screens clear a stuck old-way progress themselves on disconnect. The server logs a returning screen's lastDrop. Strip says when a download is waiting to go on.
 - **Why:** HCA 2026-11-14/15: tablets stalled for good at 38-48% of the 160 MB APK. Cause in the code: sendUpdate read the whole file and queued all ~160 parts (~215 MB base64) on the store connection at once, so the store's pings sat behind the burst; the tablet could not answer them, the store's 15 s 'stopped answering' check (or the tablet's 10 s silent-server watchdog) cut the session part way, the queued rest was thrown away, nothing resumed, and the old client kept showing N% with Update Now hidden.

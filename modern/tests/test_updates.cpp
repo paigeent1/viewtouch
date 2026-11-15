@@ -147,6 +147,8 @@ struct Raw {
     {
         std::optional<QJsonObject> found;
         waitFor([&] {
+            if (found)   // (waitFor asks once more at the end)
+                return true;
             pump();
             for (qsizetype i = 0; i < inbox.size(); ++i)
                 if (inbox[i].value(u"t"_s).toString() == type) {
@@ -302,11 +304,13 @@ TEST_CASE("Updates the fast way: only the device the ticket is for, and only pai
 
 TEST_CASE("Updates the old way, for older screens: a part at a time, the store still heard meanwhile", "[net][updates]")
 {
-    Store store(8 * 1024 * 1024 + 77);
+    // More than this computer's own network buffers hold (a few MB), so what the store keeps queued shows.
+    Store store(32 * 1024 * 1024 + 77);
     const net::Credentials a = store.pairedDevice(u"Old Tablet"_s);
     QString cutId;
     {
         Raw old(a, store.server.port());
+        old.socket.setReadBufferSize(256 * 1024);   // read as it's used, as a tablet on Wi-Fi does
         REQUIRE(old.encrypted());
         old.helloAndLogin(0);
         // Told once (a strip stuck at "Getting the update... N%" from before gets its Update Now back).
@@ -317,7 +321,7 @@ TEST_CASE("Updates the old way, for older screens: a part at a time, the store s
         REQUIRE(first);
         CHECK(first->value(u"i"_s).toInt() == 0);
         const int parts = first->value(u"n"_s).toInt();
-        CHECK(parts >= 64);   // small parts: a ping or an answer is never far behind
+        CHECK(parts >= 256);   // small parts: a ping or an answer is never far behind
         // Asked something now, it answers before the update is through.
         old.send({{u"t"_s, u"call"_s}, {u"id"_s, 99}, {u"m"_s, u"pinKey"_s}, {u"a"_s, QJsonArray{u"5"_s}}});
         QByteArray data = QByteArray::fromBase64(first->value(u"data"_s).toString().toLatin1());
