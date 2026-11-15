@@ -173,6 +173,11 @@ class PosSession : public QObject {
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
     Q_PROPERTY(QVariantMap checkSearch READ checkSearch NOTIFY sessionChanged)
+    // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
+    // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
+    // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
+    // {name, where, network}} (what each is now).
+    Q_PROPERTY(QVariantMap printerSearch READ printerSearch NOTIFY sessionChanged)
     // Find on the order screens (findItems): {query, count, limit, rev, items: [{id, name, price, available, byWeight,
     //  unit, number, upc, family, allergens}]} (the best 50 or as many as asked, best first; every word typed in the
     //  name, or a number / UPC).
@@ -406,6 +411,7 @@ public:
     virtual QVariantMap retailLabels() const = 0;
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap itemSearch() const = 0;
+    virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
     virtual QVariantList tablets() const = 0;
     virtual QVariantList printerAlerts() const = 0;
@@ -623,6 +629,15 @@ public:
     Q_INVOKABLE void logWaste(const QVariantMap &waste) { invoke(QStringLiteral("logWaste"), {waste}); }
     Q_INVOKABLE void problemsSeen() { invoke(QStringLiteral("problemsSeen")); }
     Q_INVOKABLE void alertsSeen() { invoke(QStringLiteral("alertsSeen")); }
+    // Find My Printers: the printers on the store's network (printerSearch), a page on one of them saying
+    // its address (to tell which is which), and one made the Receipts, Kitchen or Bar printer (kind
+    // receipt | kitchen | bar; replace: yes to taking over that printer's place from another address).
+    Q_INVOKABLE void findPrinters() { invoke(QStringLiteral("findPrinters")); }
+    Q_INVOKABLE void printWhoAmI(const QString &host) { invoke(QStringLiteral("printWhoAmI"), {host}); }
+    Q_INVOKABLE void useFoundPrinter(const QString &kind, const QString &host, bool replace = false)
+    {
+        invoke(QStringLiteral("useFoundPrinter"), {kind, host, replace});
+    }
     // {ingredient | name, hours, count, note}.
     Q_INVOKABLE void printPrepLabels(const QVariantMap &labels) { invoke(QStringLiteral("printPrepLabels"), {labels}); }
     Q_INVOKABLE void findRetailLabels(const QString &query) { invoke(QStringLiteral("findRetailLabels"), {query}); }

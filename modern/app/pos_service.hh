@@ -484,6 +484,11 @@ public:
     // The store's computers and printers, for Manager -> Network (set by
     // the app): {role, term, terminals, standby, printers}.
     std::function<QVariantMap()> network;
+    // Find My Printers (set by the app: print/printer_finder.hh), on any thread: the printers on the
+    // store's network [{host, port, answered}] (noProbe: addresses only connected to, sent nothing: the
+    // label printers); and a page on one saying its address ("" when it went, else why not).
+    std::function<QVariantList(const QStringList &noProbe)> searchPrinters;
+    std::function<QString(const QString &host, int port, const QString &title, const QString &line)> printWhoAmI;
     // Find a Tablet (pos_find.cpp). The paired screens connected now, kept by the store's server
     // (PosServer): terminal id -> how many connections it has open, since when, and when it was
     // last heard (ms). Only in memory: "last seen" starts over when ViewTouch restarts.
@@ -608,6 +613,10 @@ public:
     // (from the ID check; Store Settings: a manager's, if dobReprintNeedsManager).
     bool reprintCheck(qint64 id, bool gift = false, bool withDob = false);
     QVariantMap checkSearch() const override;
+    QVariantMap printerSearch() const override;
+    bool findPrinters();
+    bool printWhoAmI(const QString &host);
+    bool useFoundPrinter(const QString &kind, const QString &host, bool replace);
     QVariantMap receiving() const override;
     QVariantMap stockCounting() const override;
     // A stock count: each item counted becomes what's on hand, and the count
@@ -1522,6 +1531,7 @@ private:
     core::Report timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
                                  const std::vector<core::TimePunch> &punches, bool paper) const;
     QVariantMap checkSearch_;
+    QVariantMap printerSearch_;   // Find My Printers: {busy} | {done, found}
     std::vector<core::Check> searchHits_;
     qint64 selectedHit_ = 0;
     int searchRequest_ = 0;

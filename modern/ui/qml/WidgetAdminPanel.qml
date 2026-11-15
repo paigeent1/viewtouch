@@ -520,6 +520,15 @@ Item {
                     text: w.boards ? qsTr("+ Add billboard") : qsTr("+ Add")
                     onClicked: w.boards ? w.startAdding() : w.choose(-1)
                 }
+                // Printers: the ones on the network, without typing addresses (upstream 30e6949).
+                Button {
+                    Layout.minimumHeight: w.narrow ? 36 : 0
+                    visible: w.panel === "printers"
+                    Layout.fillWidth: true
+                    objectName: "adminFindPrinters"
+                    text: qsTr("Find My Printers…")
+                    onClicked: printerFinder.open()
+                }
             }
 
             Rectangle {
@@ -1018,6 +1027,42 @@ Item {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Find My Printers: the printers on this network, each to print its address and say what it's for.
+    Popup {
+        id: printerFinder
+        objectName: "adminPrinterFinder"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(900, (parent ? parent.width : 900) - 24)
+        height: Math.min(640, (parent ? parent.height : 640) - 24)
+        padding: 16
+        contentItem: ColumnLayout {
+            spacing: 10
+            Label { textFormat: Text.PlainText; text: qsTr("Printers on this network"); font.pixelSize: 20; font.bold: true }
+            ScrollView {
+                id: finderScroll
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                PrinterFinder {
+                    width: finderScroll.availableWidth
+                    pos: w.pos
+                    small: w.narrow
+                }
+            }
+            Button {
+                Layout.alignment: Qt.AlignRight
+                Layout.preferredWidth: 140
+                implicitHeight: 52
+                text: qsTr("Close")
+                onClicked: printerFinder.close()
             }
         }
     }

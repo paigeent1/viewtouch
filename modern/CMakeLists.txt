@@ -85,6 +85,7 @@ if(Qt6_FOUND)
         print/day_summary.hh print/day_summary.cpp
         print/raster.hh print/raster.cpp
         print/printer_monitor.hh print/printer_monitor.cpp
+        print/printer_finder.hh print/printer_finder.cpp
     )
     target_link_libraries(vtm_print PUBLIC vtm_pos Qt6::Network Qt6::Gui)
 
@@ -241,6 +242,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetChecklist.qml
             ui/qml/PagePreview.qml
             ui/qml/SetupGuide.qml
+            ui/qml/PrinterFinder.qml
             ui/qml/LayoutGallery.qml
             ui/qml/CustomerDisplay.qml
             ui/qml/CustomerDisplayWindow.qml

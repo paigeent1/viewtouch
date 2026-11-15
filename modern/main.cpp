@@ -18,6 +18,7 @@
 #include "net/remote_session.hh"
 #include "net/stress.hh"
 #include "print/printer_monitor.hh"
+#include "print/printer_finder.hh"
 #include "print/spooler.hh"
 #include "print/ticket_printer.hh"
 #include "storage/async_writer.hh"
@@ -1435,6 +1436,7 @@ int runStore(const Args &cli, const Options &o)
         qInfo().noquote() << "Billboards: their addresses taken from" << shared->billboardsFile;
         shared->saveSettings();
     }
+    vt::print::installFinder(*shared);   // Find My Printers (Manager -> Printers)
 
     // Printing: a worker thread delivers tickets; "file" printers write under
     // <app data>/printouts so tickets are visible without hardware.

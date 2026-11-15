@@ -94,6 +94,10 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"closeRetailLabelPreview"_s, [](PosService &p, const QVariantList &) { return QVariant(p.closeRetailLabelPreview()); }},
         {u"problemsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.problemsSeen()); }},
         {u"alertsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.alertsSeen()); }},
+        {u"findPrinters"_s, [](PosService &p, const QVariantList &) { return QVariant(p.findPrinters()); }},
+        {u"printWhoAmI"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printWhoAmI(a.value(0).toString())); }},
+        {u"useFoundPrinter"_s, [](PosService &p, const QVariantList &a) {
+             return QVariant(p.useFoundPrinter(a.value(0).toString(), a.value(1).toString(), a.value(2).toBool())); }},
         {u"logWaste"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.logWaste(a.value(0).toMap())); }},
         {u"saveStockCount"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveStockCount(a.value(0).toMap())); }},
         {u"setExpenseCategory"_s, [](PosService &p, const QVariantList &a) { p.setExpenseCategory(a.value(0).toString()); return QVariant(true); }},

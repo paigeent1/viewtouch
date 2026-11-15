@@ -7,6 +7,9 @@
 #include "layout_fixture.hh"
 #include "layoutcontroller.hh"
 #include "print/raster.hh"
+#include "print/printer_finder.hh"
+#include <QTcpServer>
+#include <QTcpSocket>
 #include "editorcontroller.hh"
 #include <QBuffer>
 #include <QColor>
@@ -8097,6 +8100,124 @@ TEST_CASE("UI: loss alerts: Manager's count, the Dashboard's bar, and the check 
     CHECK(s.c.pageId() == u"find-check"_s);
     CHECK(s.pos.checkSearch().value(u"selected"_s).toMap().value(u"id"_s).toLongLong() == checkId);
     s.shot("dashboard-alert-check");
+}
+
+TEST_CASE("Manager -> Printers: Find My Printers, Print Its Address, and what it's for", "[flow][ui][findprinters]")
+{
+    // On port P: a receipt printer (says its status), something that doesn't answer, and the store's Zebra
+    // label printer (must never be sent a byte); and an address with nothing there.
+    QTcpServer printer, silent, zebra;
+    REQUIRE(printer.listen(QHostAddress(u"127.0.0.1"_s)));
+    const int port = printer.serverPort();
+    REQUIRE(silent.listen(QHostAddress(u"127.0.0.2"_s), quint16(port)));
+    REQUIRE(zebra.listen(QHostAddress(u"127.0.0.4"_s), quint16(port)));
+    QByteArray printed, toZebra;
+    QObject::connect(&printer, &QTcpServer::newConnection, [&] {
+        while (QTcpSocket *c = printer.nextPendingConnection())
+            QObject::connect(c, &QTcpSocket::readyRead, c, [&, c] {
+                const QByteArray got = c->readAll();
+                if (got.startsWith(QByteArray("\x10\x04", 2)))
+                    c->write(QByteArray("\x12", 1));   // online, nothing wrong
+                else
+                    printed += got;
+            });
+    });
+    QObject::connect(&silent, &QTcpServer::newConnection, [&] { silent.nextPendingConnection(); });
+    QObject::connect(&zebra, &QTcpServer::newConnection, [&] {
+        while (QTcpSocket *c = zebra.nextPendingConnection())
+            QObject::connect(c, &QTcpSocket::readyRead, c, [&, c] { toZebra += c->readAll(); });
+    });
+    vt::print::setSearchForTests({QHostAddress(u"127.0.0.1"_s), QHostAddress(u"127.0.0.2"_s), QHostAddress(u"127.0.0.3"_s),
+                                  QHostAddress(u"127.0.0.4"_s)}, port);
+
+    Screen s;
+    // The store's printers: receipts on USB (a Rongta), the bar's at another address, the Zebra for labels.
+    auto &printers = s.pos.shared()->settings.printers;
+    printers.clear();
+    core::PrinterConfig usb;
+    usb.id = "receipt"; usb.name = "Receipts"; usb.type = "file"; usb.path = "/dev/usb/lp0"; usb.format = "escpos"; usb.receipts = true;
+    core::PrinterConfig bar;
+    bar.id = "bar"; bar.name = "Bar"; bar.type = "network"; bar.host = "10.1.1.1"; bar.port = 9100;
+    core::PrinterConfig labels;
+    labels.id = "shelf"; labels.name = "Shelf Labels"; labels.type = "network"; labels.host = "127.0.0.4"; labels.port = port; labels.format = "zpl";
+    printers = {usb, bar, labels};
+    vt::print::installFinder(*s.pos.shared());
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"admin-printers"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    const auto by = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    REQUIRE(by(u"adminFindPrinters"_s));
+    s.tapItem(by(u"adminFindPrinters"_s));
+    QTest::qWait(150);
+    REQUIRE(by(u"findPrinters"_s));
+    s.tapItem(by(u"findPrinters"_s));
+    for (int i = 0; i < 100 && !s.pos.printerSearch().value(u"done"_s).toBool(); ++i)
+        QTest::qWait(50);
+    const QVariantList found = s.pos.printerSearch().value(u"found"_s).toList();
+    REQUIRE(found.size() == 3);
+    CHECK(found[0].toMap().value(u"host"_s) == u"127.0.0.1"_s);
+    CHECK(found[0].toMap().value(u"answered"_s).toBool());
+    CHECK(found[1].toMap().value(u"host"_s) == u"127.0.0.2"_s);
+    CHECK_FALSE(found[1].toMap().value(u"answered"_s).toBool());
+    CHECK(found[2].toMap().value(u"host"_s) == u"127.0.0.4"_s);
+    CHECK(found[2].toMap().value(u"label"_s).toBool());
+    CHECK(found[2].toMap().value(u"printer"_s).toString() == u"Shelf Labels"_s);
+    QTest::qWait(150);
+    s.shot("admin-find-printers");
+    // Neither the silent one nor the label printer gets buttons.
+    CHECK_FALSE(by(u"foundPrinterTest-127.0.0.2"_s) && by(u"foundPrinterTest-127.0.0.2"_s)->isVisible());
+    CHECK_FALSE(by(u"foundPrinterTest-127.0.0.4"_s) && by(u"foundPrinterTest-127.0.0.4"_s)->isVisible());
+    CHECK_FALSE(by(u"foundPrinterUse-kitchen-127.0.0.4"_s));
+
+    // Its address on paper, then it's the kitchen's.
+    REQUIRE(by(u"foundPrinterTest-127.0.0.1"_s));
+    s.tapItem(by(u"foundPrinterTest-127.0.0.1"_s));
+    const QByteArray cut("\x1d\x56\x42\x00", 4);
+    for (int i = 0; i < 100 && !printed.endsWith(cut); ++i)
+        QTest::qWait(30);
+    CHECK(printed.contains("This printer is 127.0.0.1"));
+    CHECK(printed.contains(QByteArray("\x1d\x21\x11", 3)));   // big
+    CHECK(printed.endsWith(cut));                                 // and cut, whole
+    s.tapItem(by(u"foundPrinterUse-kitchen-127.0.0.1"_s));
+    QTest::qWait(150);
+    const auto find = [&](const char *id) {
+        return std::ranges::find_if(s.pos.shared()->settings.printers, [id](const core::PrinterConfig &p) { return p.id == id; });
+    };
+    REQUIRE(find("kitchen") != printers.end());
+    CHECK(find("kitchen")->type == "network");
+    CHECK(find("kitchen")->host == "127.0.0.1");
+    CHECK(find("kitchen")->port == port);
+    CHECK(s.pos.printerSearch().value(u"found"_s).toList()[0].toMap().value(u"printer"_s).toString() == u"Kitchen"_s);
+
+    // The receipt printer on USB is left as it is.
+    s.tapItem(by(u"foundPrinterUse-receipt-127.0.0.1"_s));
+    QTest::qWait(100);
+    CHECK_FALSE(s.pos.useFoundPrinter(u"receipt"_s, u"127.0.0.1"_s, true));
+    CHECK(find("receipt")->type == "file");
+    CHECK(find("receipt")->path == "/dev/usb/lp0");
+
+    // The bar's printer at another address: asked first.
+    CHECK_FALSE(s.pos.useFoundPrinter(u"bar"_s, u"127.0.0.1"_s, false));
+    CHECK(find("bar")->host == "10.1.1.1");
+    s.tapItem(by(u"foundPrinterUse-bar-127.0.0.1"_s));
+    QTest::qWait(150);
+    CHECK(find("bar")->host == "10.1.1.1");
+    REQUIRE(by(u"foundPrinterReplaceOk"_s));
+    s.shot("admin-find-printers-replace");
+    s.tapItem(by(u"foundPrinterReplaceOk"_s));
+    QTest::qWait(150);
+    CHECK(find("bar")->host == "127.0.0.1");
+    CHECK(find("bar")->port == port);
+
+    // Only a printer that was found and answered gets a page; the label printer never a byte.
+    CHECK_FALSE(s.pos.printWhoAmI(u"10.9.9.9"_s));
+    CHECK_FALSE(s.pos.printWhoAmI(u"127.0.0.4"_s));
+    CHECK_FALSE(s.pos.useFoundPrinter(u"kitchen"_s, u"127.0.0.4"_s, true));
+    QTest::qWait(200);
+    CHECK(toZebra.isEmpty());
+    CHECK(find("shelf")->host == "127.0.0.4");
+    vt::print::setSearchForTests({}, 0);
 }
 
 TEST_CASE("UI: manager pages one after another: each opens as it should", "[flow][ui][settings]")
