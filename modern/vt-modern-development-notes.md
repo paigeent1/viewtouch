@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-15 18:39 ET — Bob (Claude) — Upstream review 2026-11-15: nothing new
+- **What:** New modern/docs/UPSTREAM_REVIEW.md (tracker: last reviewed upstream commit fac7dc56, 2026-11-14) and modern/docs/upstream-reviews/2026-11-15.md (two-line review: no upstream commits after Version 0.21).
+- **Why:** Twice-monthly scheduled upstream review; upstream main has nothing after fac7dc5.
+- **Files:** `modern/docs/UPSTREAM_REVIEW.md`, `modern/docs/upstream-reviews/2026-11-15.md`
+- **Next person must know:** Next review starts after fac7dc56.
+
 ### 2026-11-15 18:26 ET — Bob (Claude) — vt-reset-page: put a page back to the starter version
 - **What:** New script vt-reset-page <page...>: takes the store's own copy of a starter page (and its phone/tablet versions) out of viewtouch.db and clears its starter marks, so the next start adds the current starter page; backs up the DB first; refuses pages that don't come with ViewTouch.
 - **Why:** HCA's DIRECTV page had been edited at some point, so the update (BAR 3, SAMSUNG TV and ROKU TV buttons) didn't reach it: ViewTouch keeps a store's edited pages.
