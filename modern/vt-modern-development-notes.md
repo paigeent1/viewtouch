@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 11:57 ET — Bob (Claude) — Altria scan data: BHDAN site info received; Help Desk questions still open
+- **What:** The Altria rep gave BHDAN's Retail Control Number and its name/address/ZIP+4 as on file (kept out of this public repo; to be entered in BHDAN's own Scan Data settings). OPEN QUESTIONS for the Scan Data Help Desk (844-230-3454), not yet answered: (1) the sFTP upload login; (2) the summary line's 4th value when the store's own POS makes the file: store name or the software's name; (3) the file's text encoding and line endings; (4) how to send and get approval of the first test week; (5) whether voided lines are left out (assumed yes).
+- **Why:** Owner 2026-11-16: keep these as open questions until the Help Desk answers them.
+- **Files:** `modern/vt-modern-development-notes.md`
+
 ### 2026-11-16 11:52 ET — Bob (Claude) — Altria scan data: new locations must set up and test their own Altria site info
 - **What:** Owner's rule for every new location (Gaylordsville / BHG or any other): before it sells Altria products on ViewTouch, its Altria scan data site info must be determined with Altria and tested: its own Retail Control Number (or the chain's Management Account Number and a Store Number), the store name/address/ZIP+4 exactly as Altria has them on file, the file's account name, and its own sFTP set-up; then a test week sent and approved by the Scan Data Help Desk before it counts. Also: Altria may make the owner a chain again (several stores under one Management Account). If that happens, recheck every store's settings: field 1 becomes the 5-digit Management Account Number, each store needs its Store Number (field 6), and whether stores send separate files or one combined file must be confirmed with Altria.
 - **Why:** Owner 2026-11-16, while the Altria scan data export is being built (helper/altria-scan-data): BHDAN is set up first as an independent; other stores and a possible chain set-up must not reuse BHDAN's settings.
