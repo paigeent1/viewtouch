@@ -160,7 +160,9 @@ Code: `modern/core/scan_data.{hh,cpp}` (plain C++: the file, its checks, the fil
 - **Returns**: a line with a negative quantity is sent with negative quantity (18) and negative final
   price (31). Money refunded after a check closed isn't by item, so the file shows that sale as rung, with a
   warning.
-- **Final price (31)**: the line's total less its share of every discount, **before sales tax**.
+- **Final price (31)**: the line's total less its share of every discount, **before sales tax**. In a
+  store whose prices include tax (Store Settings → Taxes), the tax is backed out of each line's final
+  price and discounts at its class's rate (a cent may differ from the check's own tax split).
 - **Per-pack buydowns** (the Menu Builder's *Buydown*): already in the shelf price, so they show only as
   that lower price. Multi-unit indicator *N*, no discount fields.
 - **Discounts**, sorted by who pays, by their names in Store Settings (a manual discount's name, or a

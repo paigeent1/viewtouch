@@ -796,6 +796,15 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
         std::string phone = digitsOf(settings.phone);
         if (phone.size() == 11 && phone[0] == '1')
             phone = phone.substr(1);
+        // Prices that include tax (Store Settings > Taxes): the final price and the discounts are sent
+        // without it, as the file wants (each line's own, backed out at its class's rate).
+        const TaxRates &checkRates = c->closedRates ? *c->closedRates : rates;
+        const bool takeout = c->type == CheckType::Takeout;
+        const auto exTax = [&](const OrderLine &l, Money m) {
+            if (!checkRates.pricesIncludeTax || l.taxClass == TaxClass::None)
+                return m;
+            return m.withoutTaxPpm(checkRates.ratePpmFor(l.taxClass, takeout));
+        };
         const bool inStore = !c->kiosk && (c->type == CheckType::Quick || c->type == CheckType::DineIn
                                            || c->type == CheckType::Tab);
         for (const Work &w : work) {
@@ -813,7 +822,8 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
                                     + perUnit(w.store) + joined(w.storeNames, 99, true) + "|" + perUnit(w.coupon)
                                     + joined(w.couponNames, 99, true) + "|" + perUnit(w.other)
                                     + joined(w.otherNames, 99, true) + "|" + perUnit(w.multi) + "|" + dealKey;
-            Money fsp = w.extended - w.store - w.coupon - w.other - w.multi;
+            const Money fsp = exTax(l, w.extended - w.store - w.coupon - w.other - w.multi);
+            const Money storeOff = exTax(l, w.store), couponOff = exTax(l, w.coupon), otherOff = exTax(l, w.other);
             const auto found = std::ranges::find(keys, key);
             if (found != keys.end()) {
                 Record &r = out[std::size_t(found - keys.begin())];
@@ -831,9 +841,9 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
                     }
                     field = Money::fromCents(now + m.cents()).toString();
                 };
-                addMoney(r.f[23], w.store);
-                addMoney(r.f[25], w.coupon);
-                addMoney(r.f[27], w.other);
+                addMoney(r.f[23], storeOff);
+                addMoney(r.f[25], couponOff);
+                addMoney(r.f[27], otherOff);
                 continue;
             }
             Record r;
@@ -867,7 +877,7 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
                 Money dealTotal;
                 int units = 0;
                 for (std::size_t d : w.deals) {
-                    dealTotal += deals[d].total;
+                    dealTotal += exTax(l, deals[d].total);
                     units += deals[d].consumerUnits;
                 }
                 f[19] = "Y";
@@ -884,9 +894,9 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
                 f[19] = "N";
             }
             if (!w.returned) {
-                if (w.store.cents() > 0) { f[22] = joined(w.storeNames, 20, utf8); f[23] = w.store.toString(); }
-                if (w.coupon.cents() > 0) { f[24] = joined(w.couponNames, 50, utf8); f[25] = w.coupon.toString(); }
-                if (w.other.cents() > 0) { f[26] = joined(w.otherNames, 20, utf8); f[27] = w.other.toString(); }
+                if (w.store.cents() > 0) { f[22] = joined(w.storeNames, 20, utf8); f[23] = storeOff.toString(); }
+                if (w.coupon.cents() > 0) { f[24] = joined(w.couponNames, 50, utf8); f[25] = couponOff.toString(); }
+                if (w.other.cents() > 0) { f[26] = joined(w.otherNames, 20, utf8); f[27] = otherOff.toString(); }
             }
             f[30] = fsp.toString();
             f[31] = phone.size() == 10 ? phone : std::string();

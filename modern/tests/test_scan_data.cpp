@@ -472,3 +472,29 @@ TEST_CASE("Scan data: an Altria UPC without its maker is an error", "[scandata]"
     CHECK(r.hasErrors());
     CHECK(r.records.empty());
 }
+
+TEST_CASE("Scan data: prices that include tax are sent without it", "[scandata]")
+{
+    const auto m = menu();
+    Check c = sale(1015, kWed);
+    c.addItem(find(m, "gold"));
+    const std::int64_t line = c.addItem(find(m, "lcmint")).id;
+    Payment p;
+    p.id = c.nextPaymentId++;
+    p.kind = TenderKind::Discount;
+    p.tenderName = "Manager";
+    p.amount = usd(100);
+    p.lineId = line;
+    c.payments.push_back(p);
+    TaxRates included;
+    included.merchandisePpm = 63500;   // 6.35%
+    included.pricesIncludeTax = true;
+    const Result r = build({c}, m, {}, included, store(), week());
+    REQUIRE(r.records.size() == 2);
+    CHECK(r.records[0].f[30] == "5.63");   // 5.99 / 1.0635
+    CHECK(r.records[1].f[23] == "0.94");   // 1.00 / 1.0635
+    CHECK(r.records[1].f[30] == "3.76");   // 4.00 / 1.0635
+    TaxRates added;
+    added.merchandisePpm = 63500;
+    CHECK(build({c}, m, {}, added, store(), week()).records[0].f[30] == "5.99");
+}

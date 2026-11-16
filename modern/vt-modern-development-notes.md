@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:05 ET — Scan Data helper (Claude helper) — Scan data: final prices without tax where prices include tax
+- **What:** core/scan_data: when the check's rates have pricesIncludeTax (Helper A's new Store Settings > Taxes switch), each record's final price (31) and discount amounts (22, 24, 26, 28) are sent without tax, backed out per line at its class's rate (Money::withoutTaxPpm). Test added; SCAN_DATA.md says so.
+- **Why:** Field 31 must be before sales tax; rebased onto main with prices-include-tax.
+- **Files:** `modern/core/scan_data.cpp`, `modern/docs/SCAN_DATA.md`, `modern/tests/test_scan_data.cpp`
+
 ### 2026-11-16 12:09 ET — Scan Data helper (Claude helper) — Scan data: helper names that don't clash with PosService::lines()
 - **What:** Renamed pos_scan_data.cpp's file-local helpers (scanStrings, scanLines, scanJoin).
 - **Why:** PosService has a member lines(): inside its member functions the free helper of that name was hidden.
