@@ -547,24 +547,44 @@ bool PosService::receiveDelivery(const QVariantMap &r)
             return fail(tr("There is no ingredient '%1' (see Manager → Inventory).").arg(l.value(u"ingredient"_s).toString()));
         if (qty < 0)
             return fail(tr("Amounts received can't be negative: %1.").arg(qs(g->name)));
-        const double cost = l.contains(u"cost"_s) ? l.value(u"cost"_s).toDouble() : double(g->cost.cents()) / 100.0;
+        // The invoice's cost (typed; none typed or empty: the system cost). Never the system cost's new value.
+        const QString typed = l.value(u"cost"_s).toString().trimmed();
+        const double cost = l.contains(u"cost"_s) && !typed.isEmpty() ? l.value(u"cost"_s).toDouble()
+                                                                        : double(g->cost.cents()) / 100.0;
         if (cost < 0)
             return fail(tr("Costs can't be negative: %1.").arg(qs(g->name)));
-        d.lines.push_back({g->id, g->name, g->unit, qty, Money::fromCents(std::llround(cost * 100))});
+        Delivery::Line line{g->id, g->name, g->unit, qty, Money::fromCents(std::llround(cost * 100))};
+        line.systemCost = g->cost;
+        line.systemCostKnown = true;
+        d.lines.push_back(line);
     }
     if (d.lines.empty())
         return fail(tr("Type how much came of each item."));
-    // Over the food cost target before (to say which went over with these prices).
+    // Price watch: which items the invoice's prices would put over the food cost target. Only a
+    // warning: the system cost stays as it is (the item editor or the price book changes it).
     QSet<QString> overBefore;
     for (const QVariant &v : overFoodCost())
         overBefore.insert(v.toMap()[u"name"_s].toString());
-    // On the shelf now, at the latest cost.
+    QStringList nowOver;
+    {
+        std::vector<std::pair<Ingredient *, Money>> kept;
+        for (const Delivery::Line &l : d.lines)
+            if (Ingredient *g = s_->ingredient(l.ingredientId); g && l.unitCost.cents() > 0 && l.unitCost != g->cost) {
+                kept.emplace_back(g, g->cost);
+                g->cost = l.unitCost;
+            }
+        if (!kept.empty())
+            for (const QVariant &v : overFoodCost())
+                if (!overBefore.contains(v.toMap()[u"name"_s].toString()))
+                    nowOver << v.toMap()[u"name"_s].toString();
+        for (auto it = kept.rbegin(); it != kept.rend(); ++it)
+            it->first->cost = it->second;
+    }
+    // On the shelf now; the system cost as it was.
     for (const Delivery::Line &l : d.lines) {
         const auto g = std::ranges::find_if(s_->ingredients, [&](const Ingredient &x) { return x.id == l.ingredientId; });
         g->onHand += l.qty;
         g->received += l.qty;
-        if (l.unitCost.cents() > 0)
-            g->cost = l.unitCost;
         if (s_->sink)
             s_->sink->saveIngredient(*g, int(g - s_->ingredients.begin()));
     }
@@ -575,13 +595,11 @@ bool PosService::receiveDelivery(const QVariantMap &r)
     if (s_->sink)
         s_->sink->saveDelivery(d);
     refreshSoldOut();   // what was out is back
-    QStringList nowOver;
-    for (const QVariant &v : overFoodCost())
-        if (!overBefore.contains(v.toMap()[u"name"_s].toString()))
-            nowOver << v.toMap()[u"name"_s].toString();
     if (!nowOver.isEmpty())
-        emit notice(tr("At these prices, over %1% food cost now: %2. Reports -> Food Cost suggests prices.")
+        emit notice(tr("At these invoice prices, over %1% food cost: %2. The system cost is unchanged: see Cost differences.")
                         .arg(s_->settings.targetFoodCostPercent).arg(nowOver.join(u", "_s)));
+    if (const int diffs = int(std::ranges::count_if(d.lines, [](const Delivery::Line &l) { return l.costDifference().cents() != 0; })))
+        emit notice(tr("%n invoice cost(s) differ from the system cost: see Cost differences.", "", diffs));
     ++s_->adminRevision;
     emit s_->adminChanged();
     emit notice(d.vendorName.empty()
@@ -608,7 +626,29 @@ QVariantMap PosService::receiving() const
                                   {u"vendor"_s, qs(it->vendorName)}, {u"invoice"_s, qs(it->invoice)},
                                   {u"items"_s, int(it->lines.size())}, {u"total"_s, format(it->total())},
                                   {u"by"_s, qs(it->by)}});
-    return {{u"vendors"_s, vendors}, {u"ingredients"_s, ingredients}, {u"recent"_s, recent}};
+    return {{u"vendors"_s, vendors}, {u"ingredients"_s, ingredients}, {u"recent"_s, recent},
+            {u"costDifferences"_s, costDifferences()}};
+}
+
+QVariantList PosService::costDifferences() const
+{
+    // Newest first: each line received at an invoice cost other than the item's system cost then.
+    QVariantList out;
+    if (!can(u"manager"_s))
+        return out;
+    for (auto it = s_->deliveries.rbegin(); it != s_->deliveries.rend() && out.size() < 200; ++it)
+        for (const Delivery::Line &l : it->lines) {
+            const Money diff = l.costDifference();
+            if (diff.cents() == 0)
+                continue;
+            out.append(QVariantMap{{u"when"_s, i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(it->at), u"ddd M/d h:mm AP"_s)},
+                                   {u"at"_s, qint64(it->at)}, {u"vendor"_s, qs(it->vendorName)}, {u"invoice"_s, qs(it->invoice)},
+                                   {u"item"_s, qs(l.name)}, {u"systemCost"_s, format(l.systemCost)},
+                                   {u"invoiceCost"_s, format(l.unitCost)},
+                                   {u"difference"_s, (diff.cents() > 0 ? u"+"_s : QString()) + format(diff)},
+                                   {u"differenceCents"_s, qint64(diff.cents())}});
+        }
+    return out;
 }
 
 // --- stock counts ------------------------------------------------------------------------
@@ -1662,6 +1702,38 @@ Report PosService::stockCountReport(const ReportContext &ctx) const
     stockExtras(r, ctx);
     r.note("Should be: last count + deliveries - sales (by recipe) - waste logged + changes by hand.");
     r.note("Less than that: unlogged waste, big portions, theft, or a recipe that's off.");
+    return r;
+}
+
+Report PosService::costDifferencesReport(const ReportContext &ctx) const
+{
+    Report r;
+    r.id = "costdiffs";
+    r.title = "Cost differences";
+    r.subtitle = ctx.period;
+    r.columns = {"Item", "System cost", "Invoice cost", "Difference"};
+    bool any = false;
+    for (auto it = s_->deliveries.rbegin(); it != s_->deliveries.rend(); ++it) {
+        if (it->at < s_->day.openedAt)
+            continue;
+        bool header = false;
+        for (const Delivery::Line &l : it->lines) {
+            const Money diff = l.costDifference();
+            if (diff.cents() == 0)
+                continue;
+            if (!header) {
+                r.section((it->vendorName.empty() ? std::string("Delivery") : it->vendorName) + ", " + ctx.clock(it->at)
+                          + (it->invoice.empty() ? std::string() : ", #" + it->invoice));
+                header = true;
+            }
+            r.line({l.name, ctx.money(l.systemCost), ctx.money(l.unitCost), (diff.cents() > 0 ? "+" : "") + ctx.money(diff)});
+            any = true;
+        }
+    }
+    if (!any)
+        r.note("No invoice costs differed from the system cost today.");
+    r.note("Receiving never changes the system cost. Change it in the item editor (Manager -> Inventory), "
+           "or let the price book sync do it.");
     return r;
 }
 

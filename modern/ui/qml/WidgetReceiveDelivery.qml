@@ -3,8 +3,10 @@ import QtQuick.Controls.Fusion
 import QtQuick.Layouts
 
 // Receiving a delivery: pick the vendor, type how much came of each item
-// (and its cost if it changed), Receive. Stock goes up, costs are updated,
-// and the delivery is kept for the Purchases report.
+// (and the invoice's cost if it isn't the usual), Receive. Stock goes up and
+// the delivery is kept for the Purchases report. Receiving never changes an
+// item's system cost: an invoice cost that differs goes on Cost differences
+// for review (the system cost comes from the item editor or the price book).
 Item {
     id: w
     property ZoneItem zone
@@ -14,6 +16,8 @@ Item {
     property var qty: ({})    // ingredient id -> quantity typed
     property var cost: ({})   // ingredient id -> cost typed
     property int typed: 0     // bumps when either changes (for the total)
+    property bool showDiffs: false   // the Cost differences review, over the screen
+    readonly property var diffs: info.costDifferences ?? []
     readonly property var shown: (info.ingredients ?? []).filter(i => vendor === "" || i.vendor === vendor)
     readonly property int recentCount: (info.recent ?? []).length
     onRecentCountChanged: clear()   // received: start over
@@ -101,7 +105,7 @@ Item {
                     Label { text: qsTr("Item"); opacity: 0.6; Layout.fillWidth: true }
                     Label { visible: !w.narrow; text: qsTr("On hand"); opacity: 0.6; Layout.preferredWidth: 110 }
                     Label { text: qsTr("Received"); opacity: 0.6; Layout.preferredWidth: 110 }
-                    Label { text: qsTr("Cost each"); opacity: 0.6; Layout.preferredWidth: 110 }
+                    Label { text: qsTr("Invoice cost"); opacity: 0.6; Layout.preferredWidth: 110 }
                     Label { text: qsTr("Total"); opacity: 0.6; Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight }
                 }
                 ListView {
@@ -163,6 +167,15 @@ Item {
                         }
                     }
                 }
+                Label {   // what the cost typed here is (and isn't)
+                    objectName: "invoiceCostNote"
+                    Layout.fillWidth: true
+                    text: qsTr("Invoice cost: what this invoice charges, for review. It never changes the system cost; "
+                               + "a difference goes on Cost differences.")
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    font.pixelSize: 12
+                }
                 Label {
                     visible: w.shown.length === 0
                     text: (w.info.ingredients ?? []).length === 0 ? qsTr("Add ingredients in Manager → Inventory first.")
@@ -176,6 +189,13 @@ Item {
                     Layout.fillHeight: false
                     spacing: 10
                     Label { text: qsTr("Total %1").arg("$" + w.total.toFixed(2)); font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
+                    Button {
+                        objectName: "costDifferences"
+                        text: w.diffs.length ? qsTr("Cost differences (%1)").arg(w.diffs.length) : qsTr("Cost differences")
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        onClicked: w.showDiffs = true
+                    }
                     Button {
                         text: qsTr("Clear")
                         implicitHeight: 52
@@ -237,6 +257,84 @@ Item {
                     text: qsTr("Nothing received yet.")
                     opacity: 0.6
                 }
+            }
+        }
+    }
+
+    // Cost differences: lines received at an invoice cost other than the system cost, newest first.
+    Rectangle {
+        objectName: "costDifferencesView"
+        anchors.fill: parent
+        visible: w.showDiffs
+        color: "#14181e"
+        MouseArea { anchors.fill: parent }   // nothing under it is touched
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 8
+            RowLayout {
+                Layout.fillWidth: true
+                Label { text: qsTr("Cost differences"); font.bold: true; font.pixelSize: 20; Layout.fillWidth: true }
+                Button {
+                    objectName: "closeCostDifferences"
+                    text: qsTr("Close")
+                    implicitHeight: 48
+                    font.pixelSize: 16
+                    onClicked: w.showDiffs = false
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Invoice costs that differ from the system cost. Receiving never changes the system cost: "
+                           + "change it in the item editor, or let the price book sync do it.")
+                wrapMode: Text.WordWrap
+                opacity: 0.6
+            }
+            RowLayout {   // headings
+                Layout.fillWidth: true
+                visible: !w.narrow
+                Label { text: qsTr("Date"); opacity: 0.6; Layout.preferredWidth: 130 }
+                Label { text: qsTr("Vendor"); opacity: 0.6; Layout.preferredWidth: 150 }
+                Label { text: qsTr("Item"); opacity: 0.6; Layout.fillWidth: true }
+                Label { text: qsTr("System cost"); opacity: 0.6; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                Label { text: qsTr("Invoice cost"); opacity: 0.6; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                Label { text: qsTr("Difference"); opacity: 0.6; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+            }
+            ListView {
+                id: diffList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 4
+                model: w.showDiffs ? w.diffs : []
+                ScrollBar.vertical: TouchScrollBar { id: diffBar; needed: diffList.contentHeight > diffList.height + 1 }
+                delegate: RowLayout {
+                    id: diff
+                    required property var modelData
+                    width: ListView.view.width - diffBar.room
+                    Label { visible: !w.narrow; text: diff.modelData.when; Layout.preferredWidth: 130; elide: Text.ElideRight }
+                    Label { visible: !w.narrow; text: diff.modelData.vendor || "-"; Layout.preferredWidth: 150; elide: Text.ElideRight }
+                    Label {
+                        Layout.fillWidth: true
+                        text: w.narrow ? diff.modelData.item + "  ·  " + (diff.modelData.vendor || "-") + "  ·  " + diff.modelData.when
+                                       : diff.modelData.item
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
+                    Label { text: diff.modelData.systemCost; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                    Label { text: diff.modelData.invoiceCost; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                    Label {
+                        text: diff.modelData.difference
+                        color: diff.modelData.differenceCents > 0 ? "#f5b940" : "#7ee2a8"
+                        Layout.preferredWidth: 100
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+            }
+            Label {
+                visible: w.diffs.length === 0
+                text: qsTr("No differences: every invoice cost matched the system cost.")
+                opacity: 0.6
             }
         }
     }

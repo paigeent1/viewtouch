@@ -596,7 +596,8 @@ public:
     // touching the chosen one again clears it.
     void setExpenseCategory(const QString &category);
     // A delivery from a vendor (managers): {vendor, invoice, lines: [{ingredient,
-    // qty, cost}]}. Adds to stock and sets each ingredient's cost per unit.
+    // qty, cost}]}. Adds to stock. `cost` is the invoice's: kept on the line beside the system cost
+    // (costDifferences), never made the system cost.
     bool receiveDelivery(const QVariantMap &delivery);
     // Find checks, open or closed, from the last `days`: "#123", "17.62",
     // or text (table, customer, phone, server, item, gift card). Results
@@ -617,7 +618,10 @@ public:
     bool findPrinters();
     bool printWhoAmI(const QString &host);
     bool useFoundPrinter(const QString &kind, const QString &host, bool replace);
-    QVariantMap receiving() const override;
+    QVariantMap receiving() const override;   // also costDifferences (below)
+    // Lines received at an invoice cost other than the system cost (newest first, at most 200): when,
+    // vendor, invoice, item, systemCost, invoiceCost, difference. Receiving never changes the system cost.
+    QVariantList costDifferences() const;
     QVariantMap stockCounting() const override;
     // A stock count: each item counted becomes what's on hand, and the count
     // (against what should be there) is kept for the Stock Count report.
@@ -1442,6 +1446,8 @@ public:
     QVariantList overFoodCost() const;
     // Deliveries received today: by vendor, then each one.
     core::Report purchasesReport(const core::ReportContext &ctx) const;
+    // Today's deliveries' lines at an invoice cost other than the system cost (Reports: costdiffs).
+    core::Report costDifferencesReport(const core::ReportContext &ctx) const;
 
     // --- the schedule (pos_schedule.cpp) ----------------------------------------
     // {employeeId, start, end (ms or "yyyy-MM-dd HH:mm"; an end before the

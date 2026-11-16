@@ -2001,9 +2001,13 @@ Ingredient ingredientFromJson(const QJsonObject &o)
 QJsonObject toJson(const Delivery &d)
 {
     QJsonArray lines;
-    for (const Delivery::Line &l : d.lines)
-        lines.append(QJsonObject{{u"ingredientId"_s, qs(l.ingredientId)}, {u"name"_s, qs(l.name)}, {u"unit"_s, qs(l.unit)},
-                                 {u"qty"_s, l.qty}, {u"unitCost"_s, qint64(l.unitCost.cents())}});
+    for (const Delivery::Line &l : d.lines) {
+        QJsonObject o{{u"ingredientId"_s, qs(l.ingredientId)}, {u"name"_s, qs(l.name)}, {u"unit"_s, qs(l.unit)},
+                      {u"qty"_s, l.qty}, {u"unitCost"_s, qint64(l.unitCost.cents())}};
+        if (l.systemCostKnown)   // the system cost when it came (the invoice's is unitCost)
+            o.insert(u"systemCost"_s, qint64(l.systemCost.cents()));
+        lines.append(o);
+    }
     return {{u"id"_s, qint64(d.id)}, {u"at"_s, qint64(d.at)}, {u"vendorId"_s, qs(d.vendorId)},
             {u"vendorName"_s, qs(d.vendorName)}, {u"invoice"_s, qs(d.invoice)}, {u"by"_s, qs(d.by)},
             {u"lines"_s, lines}};
@@ -2023,6 +2027,10 @@ Delivery deliveryFromJson(const QJsonObject &o)
         d.lines.push_back({ss(l.value(u"ingredientId").toString()), ss(l.value(u"name").toString()),
                            ss(l.value(u"unit").toString()), l.value(u"qty").toDouble(),
                            money(l.value(u"unitCost"))});
+        if (l.contains(u"systemCost"_s)) {
+            d.lines.back().systemCost = money(l.value(u"systemCost"));
+            d.lines.back().systemCostKnown = true;
+        }
     }
     return d;
 }

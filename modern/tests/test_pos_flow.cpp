@@ -3767,8 +3767,19 @@ TEST_CASE("UI: receiving a delivery by touch", "[flow][ui][vendors]")
     s.tapItem(find(u"receiveDelivery"_s));
     QTest::qWait(80);
     CHECK(s.pos.shared()->ingredient("bun")->onHand == before + 24);
-    CHECK(s.pos.shared()->ingredient("bun")->cost.cents() == 42);
+    // The 0.42 typed is the invoice's: the system cost stays (0.35), the difference is up for review.
+    CHECK(s.pos.shared()->ingredient("bun")->cost.cents() == 35);
     CHECK(find(u"qty-bun"_s)->property("text").toString().isEmpty());   // ready for the next one
+    REQUIRE(find(u"invoiceCostNote"_s));
+    CHECK(find(u"invoiceCostNote"_s)->property("text").toString().contains(u"never changes the system cost"_s));
+    REQUIRE(find(u"costDifferences"_s));
+    CHECK(find(u"costDifferences"_s)->property("text").toString() == u"Cost differences (1)"_s);
+    s.tapItem(find(u"costDifferences"_s));
+    QTest::qWait(60);
+    CHECK(find(u"costDifferencesView"_s)->property("visible").toBool());
+    s.tapItem(find(u"closeCostDifferences"_s));
+    QTest::qWait(60);
+    CHECK_FALSE(find(u"costDifferencesView"_s)->property("visible").toBool());
 }
 
 TEST_CASE("UI: counting stock by touch, and the Stock Count report", "[flow][ui][stockCount]")

@@ -58,7 +58,9 @@ struct Vendor {
 };
 
 // A delivery received (Manager -> Inventory -> Receive a Delivery): what came,
-// at what cost. Receiving adds it to stock and updates each ingredient's cost.
+// at what cost. Receiving adds it to stock; it never changes an item's system cost (that comes only
+// from the item editor or the price book / ILSA sync). A cost typed while receiving is the invoice's,
+// kept on the line beside the system cost then, for the Cost differences review.
 struct Delivery {
     std::int64_t id = 0;
     std::int64_t at = 0;
@@ -71,8 +73,12 @@ struct Delivery {
         std::string name;
         std::string unit;
         double qty = 0;
-        Money unitCost;
+        Money unitCost;          // the invoice's cost each (as typed; none typed: the system cost)
+        Money systemCost;        // the item's system cost when it came (systemCostKnown: older lines didn't keep it)
+        bool systemCostKnown = false;
         Money total() const { return Money::fromCents(std::llround(double(unitCost.cents()) * qty)); }
+        // Invoice cost less system cost (each); 0 when the same or not known.
+        Money costDifference() const { return systemCostKnown ? unitCost - systemCost : Money(); }
         bool operator==(const Line &) const = default;
     };
     std::vector<Line> lines;

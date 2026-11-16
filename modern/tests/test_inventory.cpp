@@ -364,7 +364,7 @@ TEST_CASE("Vendors, and which vendor each ingredient comes from", "[inventory][v
     CHECK(pos.adminRecords(u"vendors"_s).size() == 3);
 }
 
-TEST_CASE("Receiving a delivery: stock up, costs updated, kept for Purchases", "[inventory][vendors]")
+TEST_CASE("Receiving a delivery: stock up, system cost unchanged, invoice cost kept for review and Purchases", "[inventory][vendors]")
 {
     PosService pos(test::seedPosData(), nullptr);
     REQUIRE(pos.loginWithPin(u"1111"_s));                            // servers can't
@@ -387,7 +387,9 @@ TEST_CASE("Receiving a delivery: stock up, costs updated, kept for Purchases", "
                                       QVariantMap{{u"ingredient"_s, u"bread"_s}, {u"qty"_s, 20}}}}}));   // its usual cost
     CHECK(onHand(pos, "bun") == 48);
     CHECK(onHand(pos, "bread") == bread + 20);
-    CHECK(pos.shared()->ingredient("bun")->cost.cents() == 40);       // the new cost
+    // Receiving never changes the system cost (2026-11-16, the owner's rule): the 0.40 typed is the
+    // invoice's, kept on the delivery beside the system cost (0.35) for the Cost differences review.
+    CHECK(pos.shared()->ingredient("bun")->cost.cents() == 35);
     CHECK(pos.shared()->ingredient("bread")->cost.cents() == 12);
     CHECK(pos.shared()->menu[0].available);                          // burgers are back
     REQUIRE(pos.shared()->deliveries.size() == 1);
@@ -395,8 +397,31 @@ TEST_CASE("Receiving a delivery: stock up, costs updated, kept for Purchases", "
     CHECK(d.vendorName == "City Bakery");
     CHECK(d.invoice == "A-1001");
     CHECK(d.by == "Morgan (Manager)");
-    CHECK(d.total().cents() == 48 * 40 + 20 * 12);                   // $21.60
+    CHECK(d.total().cents() == 48 * 40 + 20 * 12);                   // $21.60 on the invoice
+    CHECK(d.lines[0].unitCost.cents() == 40);
+    CHECK(d.lines[0].systemCost.cents() == 35);
+    CHECK(d.lines[0].costDifference().cents() == 5);
+    CHECK(d.lines[1].costDifference().cents() == 0);                 // none typed: the system cost
     CHECK(app::deliveryFromJson(app::toJson(d)) == d);
+
+    // Cost differences: vendor, item, system cost, invoice cost, difference, date.
+    const QVariantList diffs = pos.costDifferences();
+    REQUIRE(diffs.size() == 1);
+    const QVariantMap diff = diffs[0].toMap();
+    CHECK(diff[u"vendor"_s] == u"City Bakery"_s);
+    CHECK(diff[u"item"_s] == u"Burger Buns"_s);
+    CHECK(diff[u"systemCost"_s] == u"$0.35"_s);
+    CHECK(diff[u"invoiceCost"_s] == u"$0.40"_s);
+    CHECK(diff[u"difference"_s] == u"+$0.05"_s);
+    CHECK_FALSE(diff[u"when"_s].toString().isEmpty());
+    CHECK(pos.receiving()[u"costDifferences"_s].toList().size() == 1);   // the Receive screen's list (tablets too)
+    CHECK(cellsOf(pos.report(u"costdiffs"_s), u"Burger Buns"_s).value(3) == u"+$0.05"_s);
+    // A delivery saved before system costs were kept: no difference made up.
+    core::Delivery old = d;
+    old.lines[0].systemCostKnown = false;
+    const core::Delivery back = app::deliveryFromJson(app::toJson(old));
+    CHECK_FALSE(back.lines[0].systemCostKnown);
+    CHECK(back.lines[0].costDifference().cents() == 0);
 
     // What the Receive screen shows.
     const QVariantMap info = pos.receiving();
@@ -789,7 +814,7 @@ TEST_CASE("Prep labels: what, made and use by, on the label printer", "[labels]"
     CHECK_FALSE(pos.adminSave(u"printers"_s, int(printers.size()) - 1, pr));
 }
 
-TEST_CASE("Price watch: a delivery at higher prices names the items over the food cost target, with a price", "[inventory][pricewatch]")
+TEST_CASE("Price watch: a delivery at higher invoice prices names the items they'd put over the food cost target", "[inventory][pricewatch]")
 {
     PosService pos(test::seedPosData(), nullptr);
     REQUIRE(pos.loginWithPin(u"1234"_s));
@@ -797,9 +822,29 @@ TEST_CASE("Price watch: a delivery at higher prices names the items over the foo
     const QVariantList before = pos.overFoodCost();
     QStringList said;
     QObject::connect(&pos, &app::PosSession::notice, [&](const QString &n) { said << n; });
-    // Patties at $9.00 each: every burger goes over 30%.
+    // Patties invoiced at $9.00 each: every burger would go over 30%. Receiving warns, and leaves the
+    // system cost alone (the owner's rule, 2026-11-16).
     REQUIRE(pos.receiveDelivery({{u"vendor"_s, u"valley-foods"_s},
                                  {u"lines"_s, QVariantList{QVariantMap{{u"ingredient"_s, u"patty"_s}, {u"qty"_s, 10}, {u"cost"_s, 9.0}}}}}));
+    CHECK(pos.shared()->ingredient("patty")->cost.cents() == 160);
+    CHECK(pos.overFoodCost().size() == before.size());
+    bool named = false;
+    for (const QString &n : said)
+        named = named || (n.contains(u"over 30%"_s) && n.contains(u"Classic Burger"_s));
+    CHECK(named);
+    // The manager agrees and sets the system cost in the item editor: now it's over, with a price.
+    QVariantMap patty;
+    int pattyAt = -1;
+    const QVariantList stock = pos.adminRecords(u"inventory"_s);
+    for (int i = 0; i < stock.size(); ++i)
+        if (stock[i].toMap()[u"id"_s] == u"patty"_s) {
+            patty = stock[i].toMap();
+            pattyAt = i;
+        }
+    REQUIRE(pattyAt >= 0);
+    patty[u"cost"_s] = 9.0;
+    REQUIRE(pos.adminSave(u"inventory"_s, pattyAt, patty));
+    REQUIRE(pos.shared()->ingredient("patty")->cost.cents() == 900);
     const QVariantList over = pos.overFoodCost();
     QVariantMap burger;
     for (const QVariant &v : over)
@@ -813,10 +858,6 @@ TEST_CASE("Price watch: a delivery at higher prices names the items over the foo
     const double suggested = burger[u"suggested"_s].toString().remove(u'$').toDouble() * 100;
     CHECK(cost / suggested <= 0.30 + 1e-9);
     CHECK(cost / (suggested - 25) > 0.30);
-    bool named = false;
-    for (const QString &n : said)
-        named = named || (n.contains(u"over 30%"_s) && n.contains(u"Classic Burger"_s));
-    CHECK(named);
     // And Reports -> Food Cost lists it.
     bool listed = false;
     QString in;
