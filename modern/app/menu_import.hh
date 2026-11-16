@@ -34,6 +34,8 @@ struct ImportedItem {
     QString length;            // a cigar's length: "6 1/8", "6.125"
     QString ringGauge;         // "52"
     QString ringGauge2;        // a diadema's second gauge: "60"
+    QString abv;               // a drink's alcohol by volume, percent: "5", "40" ("ABV %"); empty: none
+    QString pourOz;            // its pour in ounces: "1.25", "12" ("Pour oz"); empty: none
 };
 
 struct MenuImport {
@@ -44,7 +46,8 @@ struct MenuImport {
 
 // Columns by their header (Name / Item, Price, Category / Section / Type,
 // Description, Ingredients / On it, Photo, UPC, More UPCs, Cost, Item #, Tax, Maker,
-// Product group, Sub group, Prints to; English or Spanish), else name, price,
+// Product group, Sub group, Prints to, ABV / ABV % / Alcohol %, Pour oz / Pour / Serving oz; English or
+// Spanish), else name, price,
 // category in that order. "Cost" is the store's cost, never the price.
 // Prices: "$3.50", "3,50", "3.50".
 MenuImport readMenuCsv(const QString &text);

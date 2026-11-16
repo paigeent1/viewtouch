@@ -132,6 +132,36 @@ struct MenuItem {
     bool operator==(const MenuItem &) const = default;
 };
 
+// A drink's strength and pour, kept with the item's other settings in its recipe (as "__abv__" and
+// "__pour_oz__", like "__cost__": no stock is taken for them). 0: not given.
+inline constexpr const char *kAbvTag = "__abv__";
+inline constexpr const char *kPourOzTag = "__pour_oz__";
+inline double recipeValue(const MenuItem &m, const std::string &tag)
+{
+    for (const RecipeLine &rl : m.recipe)
+        if (rl.ingredientId == tag)
+            return rl.quantity;
+    return 0;
+}
+// Sets (value > 0) or clears it.
+inline void setRecipeValue(MenuItem &m, const std::string &tag, double value)
+{
+    std::erase_if(m.recipe, [&](const RecipeLine &rl) { return rl.ingredientId == tag; });
+    if (value > 0)
+        m.recipe.push_back({tag, value});
+}
+// Alcohol by volume, in percent (5 = 5%).
+inline double abvOf(const MenuItem &m) { return recipeValue(m, kAbvTag); }
+// One serving's size in US fluid ounces (12 for a bottle of beer, 1.25 for a shot).
+inline double pourOzOf(const MenuItem &m) { return recipeValue(m, kPourOzTag); }
+// US standard drinks (0.6 oz of pure alcohol each): pour_oz x abv / 100 / 0.6. 12 oz at 5% = 1.0,
+// 1.25 oz at 40% = 0.83, 5 oz at 14% = 1.17. 0 when either is missing.
+inline constexpr double standardDrinks(double pourOz, double abv)
+{
+    return pourOz > 0 && abv > 0 ? pourOz * abv / 100.0 / 0.6 : 0.0;
+}
+inline double standardDrinksOf(const MenuItem &m) { return standardDrinks(pourOzOf(m), abvOf(m)); }
+
 // One choice in a modifier group: "Medium Rare", "Onion Rings +1.50".
 struct ModifierOption {
     std::string name;

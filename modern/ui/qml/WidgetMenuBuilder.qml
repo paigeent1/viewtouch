@@ -236,6 +236,7 @@ Item {
                      kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
                      allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode,
                      length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
+                     abv: i.abv ?? "", pourOz: i.pourOz ?? "",
                      buttonColor: i.buttonColor, prepMinutes: i.prepMinutes ? String(i.prepMinutes) : "",
                      takeoutPrice: i.takeoutPrice, periodPrices: Object.assign({}, i.periodPrices),
                      taxClass: i.taxClass, printer: i.printer, station: i.station,
@@ -244,7 +245,7 @@ Item {
                      available: true, kioskHide: false, description: "", favorite: false, allergens: [],
                      noDiscount: category ? category.noDiscount === true : false,
                      kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode,
-                     length: "", ringGauge: "", ringGauge2: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
+                     length: "", ringGauge: "", ringGauge2: "", abv: "", pourOz: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
                      section: "", breakBefore: "",
                      // what its category's items start with
                      taxClass: w.retailMode ? "merchandise" : (category ? (category.taxClass || "food") : "food"),
@@ -1608,6 +1609,41 @@ Item {
                                         onTextEdited: w.set("ringGauge2", text)
                                         ToolTip.visible: hovered
                                         ToolTip.text: qsTr("A second ring gauge, for a shape that changes along its length (a diadema: 52/60). Usually empty.")
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
+                                // A drink: its ABV and pour, and the US standard drinks in one (0.6 oz of alcohol each).
+                                Label { text: qsTr("Drink"); visible: w.draft.isRetail !== true }
+                                RowLayout {
+                                    visible: w.draft.isRetail !== true
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    readonly property real stdDrinks: {
+                                        const a = parseFloat(w.draft.abv ?? ""), p = parseFloat(w.draft.pourOz ?? "")
+                                        return a > 0 && p > 0 ? p * a / 100 / 0.6 : 0
+                                    }
+                                    Label { text: qsTr("ABV %") }
+                                    TextField {
+                                        objectName: "builderAbv"
+                                        Layout.preferredWidth: 80
+                                        text: w.draft.abv ?? ""
+                                        placeholderText: "5"
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        onTextEdited: w.set("abv", text)
+                                    }
+                                    Label { text: qsTr("Pour oz") }
+                                    TextField {
+                                        objectName: "builderPourOz"
+                                        Layout.preferredWidth: 80
+                                        text: w.draft.pourOz ?? ""
+                                        placeholderText: "1.25"
+                                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                        onTextEdited: w.set("pourOz", text)
+                                    }
+                                    Label {
+                                        objectName: "builderStdDrinks"
+                                        opacity: 0.7
+                                        text: parent.stdDrinks > 0 ? qsTr("= %1 standard drinks").arg(parent.stdDrinks.toFixed(2)) : ""
                                     }
                                     Item { Layout.fillWidth: true }
                                 }

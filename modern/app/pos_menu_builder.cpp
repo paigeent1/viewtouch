@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdint>
 #include <ranges>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -769,6 +770,21 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         for (const QString &c : codes)
             item.barcodes.push_back(ss(c));
     }
+    // A drink's ABV (%) and pour (oz), kept in its recipe as __abv__ / __pour_oz__ (no stock taken).
+    for (const auto &[key, tag, top] : {std::tuple{u"abv"_s, kAbvTag, 100.0}, {u"pourOz"_s, kPourOzTag, 1000.0}})
+        if (card.contains(key)) {
+            QString t = card.value(key).toString().trimmed();
+            t.remove(u'%');
+            if (t.endsWith(u"oz"_s, Qt::CaseInsensitive))
+                t.chop(2);
+            t = t.trimmed();
+            bool ok = t.isEmpty();
+            const double v = t.isEmpty() ? 0.0 : t.toDouble(&ok);
+            if (!ok || !std::isfinite(v) || v < 0 || v > top)
+                return fail(key == u"abv"_s ? tr("Type the ABV as a percent, like 5 or 40, or leave it empty.")
+                                            : tr("Type the pour in ounces, like 1.25 or 12, or leave it empty."));
+            setRecipeValue(item, tag, v);
+        }
     // Retail POS Cost & Parent/Child (Box/Carton <-> Pack/Single) relationship stored in item.recipe
     if (card.contains(u"isEvent"_s)) {
         std::erase_if(item.recipe, [](const RecipeLine &rl) { return rl.ingredientId == "__event__"; });
@@ -1304,7 +1320,7 @@ QVariantMap sheetExtras(const QVariantMap &r)
         card.insert(u"subGroup"_s, g);
     if (r.contains(u"printer"_s))
         card.insert(u"printer"_s, r.value(u"printer"_s).toString().trimmed().toLower());
-    for (const QString &k : {u"length"_s, u"ringGauge"_s, u"ringGauge2"_s})
+    for (const QString &k : {u"length"_s, u"ringGauge"_s, u"ringGauge2"_s, u"abv"_s, u"pourOz"_s})
         if (const QString v = r.value(k).toString().trimmed(); !v.isEmpty())
             card.insert(k, v);
     return card;
@@ -1376,6 +1392,11 @@ int PosService::importMenuRows(const QVariantList &rows, const QString &category
                 if (const QString v = r.value(from).toString().trimmed(); !v.isEmpty() && now.empty())
                     card.insert(to, v);
             }
+            // A drink's ABV and pour it doesn't have yet.
+            if (const QString v = r.value(u"abv"_s).toString().trimmed(); !v.isEmpty() && abvOf(*existing) <= 0)
+                card.insert(u"abv"_s, v);
+            if (const QString v = r.value(u"pourOz"_s).toString().trimmed(); !v.isEmpty() && pourOzOf(*existing) <= 0)
+                card.insert(u"pourOz"_s, v);
             if (card.size() == 2) {
                 skipped << name;
                 continue;

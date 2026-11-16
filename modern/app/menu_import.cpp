@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QRegularExpression>
 #include <cmath>
+#include <tuple>
 
 using namespace Qt::StringLiterals;
 
@@ -76,6 +77,9 @@ QString what(const QString &header)
         {u"onIt"_s, {u"ingredients"_s, u"on it"_s, u"toppings"_s, u"whats on it"_s, u"comes with"_s, u"ingredientes"_s}},
         {u"photo"_s, {u"photo"_s, u"photos"_s, u"picture"_s, u"image"_s, u"photo file"_s, u"picture file"_s, u"image file"_s,
                       u"foto"_s, u"imagen"_s, u"fotografia"_s}},
+        // A drink: "ABV %", "Alcohol %" (the % is dropped above) and "Pour oz", "Serving oz".
+        {u"abv"_s, {u"abv"_s, u"alcohol"_s, u"abv percent"_s, u"alcohol percent"_s, u"alcohol by volume"_s}},
+        {u"pourOz"_s, {u"pour oz"_s, u"pour"_s, u"serving oz"_s, u"pour ounces"_s, u"pour size"_s}},
         {u"barcode"_s, {u"barcode"_s, u"barcodes"_s, u"upc"_s, u"ean"_s, u"gtin"_s, u"codigo de barras"_s}},
     };
     for (const auto &[key, words] : names)
@@ -128,7 +132,8 @@ MenuImport readMenuCsv(const QString &text)
     }
     for (const QString &key : {u"name"_s, u"price"_s, u"category"_s, u"description"_s, u"onIt"_s, u"photo"_s, u"barcode"_s,
                                u"moreBarcodes"_s, u"cost"_s, u"number"_s, u"tax"_s, u"maker"_s, u"productGroup"_s,
-                               u"subGroup"_s, u"printer"_s, u"length"_s, u"ringGauge"_s, u"ringGauge2"_s})
+                               u"subGroup"_s, u"printer"_s, u"length"_s, u"ringGauge"_s, u"ringGauge2"_s,
+                               u"abv"_s, u"pourOz"_s})
         if (at.contains(key))
             out.columns << key;
     const auto cell = [&](const QStringList &r, const QString &key) {
@@ -157,6 +162,30 @@ MenuImport readMenuCsv(const QString &text)
         item.length = cell(row, u"length"_s);
         item.ringGauge = cell(row, u"ringGauge"_s);
         item.ringGauge2 = cell(row, u"ringGauge2"_s);
+        // A drink's ABV and pour: numbers ("40%", "1.25 oz" are fine); anything else is a problem.
+        bool bad = false;
+        for (const auto &[key, field, top] : {std::tuple{u"abv"_s, &ImportedItem::abv, 100.0},
+                                              {u"pourOz"_s, &ImportedItem::pourOz, 1000.0}}) {
+            QString c = cell(row, key);
+            c.remove(u'%');
+            if (c.endsWith(u"oz"_s, Qt::CaseInsensitive))
+                c.chop(2);
+            c = c.trimmed();
+            if (c.isEmpty())
+                continue;
+            bool ok = false;
+            const double v = c.toDouble(&ok);
+            if (!ok || !std::isfinite(v) || v < 0 || v > top) {
+                out.problems << (key == u"abv"_s
+                                     ? QCoreApplication::translate("MenuImport", "Row %1: the ABV of %2 isn't a percent").arg(item.row).arg(item.name)
+                                     : QCoreApplication::translate("MenuImport", "Row %1: the pour of %2 isn't ounces").arg(item.row).arg(item.name));
+                bad = true;
+                break;
+            }
+            item.*field = v > 0 ? QString::number(v, 'g', 6) : QString();
+        }
+        if (bad)
+            continue;
         if (const QString c = cell(row, u"cost"_s); !c.isEmpty()) {
             double v = 0;
             if (!price(c, &v)) {

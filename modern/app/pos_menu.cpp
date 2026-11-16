@@ -732,6 +732,10 @@ QVariantList PosService::menuItemsNow() const
                                {u"length"_s, cigarLengthText(m.length)},
                                {u"ringGauge"_s, m.ringGauge > 0 ? QString::number(m.ringGauge) : QString()},
                                {u"ringGauge2"_s, m.ringGauge2 > 0 ? QString::number(m.ringGauge2) : QString()},
+                               // A drink: ABV (%), pour (oz) and the standard drinks in it ("" when not given).
+                               {u"abv"_s, abvOf(m) > 0 ? QString::number(abvOf(m), 'g', 6) : QString()},
+                               {u"pourOz"_s, pourOzOf(m) > 0 ? QString::number(pourOzOf(m), 'g', 6) : QString()},
+                               {u"stdDrinks"_s, standardDrinksOf(m) > 0 ? QString::number(standardDrinksOf(m), 'f', 2) : QString()},
                                {u"isEvent"_s, [&m] {
                                    for (const RecipeLine &rl : m.recipe) {
                                        if (rl.ingredientId == "__event__")
