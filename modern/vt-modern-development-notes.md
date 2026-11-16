@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 12:09 ET — Scan Data helper (Claude helper) — Scan data: helper names that don't clash with PosService::lines()
+- **What:** Renamed pos_scan_data.cpp's file-local helpers (scanStrings, scanLines, scanJoin).
+- **Why:** PosService has a member lines(): inside its member functions the free helper of that name was hidden.
+- **Files:** `modern/app/pos_scan_data.cpp`
+
 ### 2026-11-16 12:08 ET — Scan Data helper (Claude helper) — SCAN_DATA.md: set-up, weekly routine, new location / chain checklist, open questions
 - **What:** New modern/docs/SCAN_DATA.md (plain English): what it does, set-up (rep: Retail Control Number; Help Desk: sFTP login and test week approval), weekly routine, sending again and the cap, a New location / chain checklist (each store its own Altria site info and approved test week; chain: 5-digit Management Account Number, Store Number, separate vs combined files), the five open Help Desk questions, and every data-mapping decision. Manual: Scan Data row in the Reports table.
 - **Why:** Owner and the next developer; owner rules 2026-11-16 (new locations, open questions).

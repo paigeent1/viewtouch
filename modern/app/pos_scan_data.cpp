@@ -31,7 +31,7 @@ namespace sd = core::scandata;
 
 namespace {
 
-QJsonArray strings(const std::vector<std::string> &v)
+QJsonArray scanStrings(const std::vector<std::string> &v)
 {
     QJsonArray a;
     for (const std::string &s : v)
@@ -39,7 +39,7 @@ QJsonArray strings(const std::vector<std::string> &v)
     return a;
 }
 
-std::vector<std::string> strings(const QJsonValue &v)
+std::vector<std::string> scanStrings(const QJsonValue &v)
 {
     std::vector<std::string> out;
     for (const QJsonValue &x : v.toArray())
@@ -49,7 +49,7 @@ std::vector<std::string> strings(const QJsonValue &v)
 }
 
 // "Marl Coup\nBOGO" -> its lines; and back.
-std::vector<std::string> lines(const QString &text)
+std::vector<std::string> scanLines(const QString &text)
 {
     std::vector<std::string> out;
     for (const QString &l : text.split(u'\n'))
@@ -58,7 +58,7 @@ std::vector<std::string> lines(const QString &text)
     return out;
 }
 
-QString joinLines(const std::vector<std::string> &v)
+QString scanJoin(const std::vector<std::string> &v)
 {
     QStringList l;
     for (const std::string &s : v)
@@ -91,9 +91,9 @@ QJsonObject PosService::scanDataJson(const sd::Settings &s)
             {u"accountName"_s, qs(s.accountName)}, {u"storeName"_s, qs(s.storeName)}, {u"street"_s, qs(s.street)},
             {u"city"_s, qs(s.city)}, {u"state"_s, qs(s.state)}, {u"zip4"_s, qs(s.zip4)}, {u"phone"_s, qs(s.phone)},
             {u"contact"_s, qs(s.contact)}, {u"email"_s, qs(s.email)}, {u"provider"_s, qs(s.provider)},
-            {u"optional"_s, strings(s.optional)}, {u"encoding"_s, qs(s.encoding)}, {u"lineEnding"_s, qs(s.lineEnding)},
-            {u"couponNames"_s, strings(s.couponNames)}, {u"multiNames"_s, strings(s.multiNames)},
-            {u"otherMfrNames"_s, strings(s.otherMfrNames)}, {u"fillRules"_s, qs(s.fillRules)}};
+            {u"optional"_s, scanStrings(s.optional)}, {u"encoding"_s, qs(s.encoding)}, {u"lineEnding"_s, qs(s.lineEnding)},
+            {u"couponNames"_s, scanStrings(s.couponNames)}, {u"multiNames"_s, scanStrings(s.multiNames)},
+            {u"otherMfrNames"_s, scanStrings(s.otherMfrNames)}, {u"fillRules"_s, qs(s.fillRules)}};
 }
 
 sd::Settings PosService::scanDataFromJson(const QJsonObject &o)
@@ -119,10 +119,10 @@ sd::Settings PosService::scanDataFromJson(const QJsonObject &o)
     text(u"encoding", s.encoding);
     text(u"lineEnding", s.lineEnding);
     s.fillRules = ss(o.value(u"fillRules").toString());
-    s.optional = strings(o.value(u"optional"));
-    s.couponNames = strings(o.value(u"couponNames"));
-    s.multiNames = strings(o.value(u"multiNames"));
-    s.otherMfrNames = strings(o.value(u"otherMfrNames"));
+    s.optional = scanStrings(o.value(u"optional"));
+    s.couponNames = scanStrings(o.value(u"couponNames"));
+    s.multiNames = scanStrings(o.value(u"multiNames"));
+    s.otherMfrNames = scanStrings(o.value(u"otherMfrNames"));
     if (s.mode != "chain")
         s.mode = "independent";
     if (s.encoding != "utf8")
@@ -227,8 +227,8 @@ QVariantMap PosService::scanDataValues() const
                   {u"scanState"_s, qs(s.state)}, {u"scanZip4"_s, qs(s.zip4)}, {u"scanPhone"_s, qs(s.phone)},
                   {u"scanContact"_s, qs(s.contact)}, {u"scanEmail"_s, qs(s.email)}, {u"scanProvider"_s, qs(s.provider)},
                   {u"scanEncoding"_s, qs(s.encoding)}, {u"scanLineEnding"_s, qs(s.lineEnding)},
-                  {u"scanCoupons"_s, joinLines(s.couponNames)}, {u"scanMultiDeals"_s, joinLines(s.multiNames)},
-                  {u"scanOtherMfr"_s, joinLines(s.otherMfrNames)},
+                  {u"scanCoupons"_s, scanJoin(s.couponNames)}, {u"scanMultiDeals"_s, scanJoin(s.multiNames)},
+                  {u"scanOtherMfr"_s, scanJoin(s.otherMfrNames)},
                   {u"scanFillRules"_s, s.fillRules.empty() ? qs(sd::defaultRulesText()).trimmed() : qs(s.fillRules)}};
     for (const auto &[type, key] : kOptional)
         v.insert(QLatin1StringView(key), std::ranges::find(s.optional, std::string(type)) != s.optional.end());
@@ -259,11 +259,11 @@ void PosService::saveScanDataRecord(const QVariantMap &record)
     text(u"scanLineEnding"_s, s.lineEnding);
     s.state = ss(qs(s.state).toUpper());
     if (record.contains(u"scanCoupons"_s))
-        s.couponNames = lines(record.value(u"scanCoupons"_s).toString());
+        s.couponNames = scanLines(record.value(u"scanCoupons"_s).toString());
     if (record.contains(u"scanMultiDeals"_s))
-        s.multiNames = lines(record.value(u"scanMultiDeals"_s).toString());
+        s.multiNames = scanLines(record.value(u"scanMultiDeals"_s).toString());
     if (record.contains(u"scanOtherMfr"_s))
-        s.otherMfrNames = lines(record.value(u"scanOtherMfr"_s).toString());
+        s.otherMfrNames = scanLines(record.value(u"scanOtherMfr"_s).toString());
     if (record.contains(u"scanFillRules"_s)) {
         const QString rules = record.value(u"scanFillRules"_s).toString().trimmed();
         s.fillRules = rules == qs(sd::defaultRulesText()).trimmed() ? std::string() : ss(rules);
