@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 2: Store Settings section (off by default)
+- **What:** PosSettings::service (core::ServicePolicy), saved as settings JSON 'responsibleService'. Manager -> Store Settings gets a 'Responsible service' section: Count standard drinks per guest (off), Caution at 4, Stop at 6 (standard drinks), Within 3 hours, Take off drinks as time passes (on), 1 drink an hour, Reasons for a manager's override (rows; empty = built-in list). Saving checks the levels (0-100, caution under stop), window 0.5-24 h and rate 0-10 before anything changes.
+- **Why:** HCA bar handoff item 3: the owner sets the caution and stop levels, the window and the hourly subtraction; every number editable.
+- **Files:** `modern/app/pos_admin_fields.cpp`, `modern/app/pos_admin_records.cpp`, `modern/app/pos_admin_save.cpp`, `modern/app/pos_admin_shared.hh`, `modern/app/pos_json.cpp`, `modern/core/settings.hh`
+- **Next person must know:** Off at both stores until a manager turns it on (HCA). The Responsible service fields show only when it's on.
+
 ### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 1: standard drinks counted per guest
 - **What:** New core/over_service.hh/.cpp (pure C++): ServicePolicy (on, caution, stop, windowHours, subtract, perHour, overrideReasons), ServiceLevel, DrinkGuest (a seat of a check, or a customer linked to the check or seat: saved customer c:<id>, subscription card s:<card>, ID scanned id:<FNV hash of DOB+last 4>), lineDrinks (quantity; a shared piece its part; voided/no ABV = 0), lineGuests (the line's seat, or evenly across OrderLine::drinkSeats), drinkRings (each guest's rings: time, drinks, who rang it, check, line; practice/discarded/merged checks skipped), drinksNow (within the window, less perHour per hour since the first drink, never below 0). OrderLine gains stdDrinks (frozen at Check::addItem from the item's __abv__/__pour_oz__ via standardDrinksOf) and drinkSeats; Check gains seatGuests (an ID scanned while a seat is chosen: key + last 4 only). pos_age.cpp: agePassed links the ID to the chosen seat. pos_json.cpp persists stdDrinks, drinkSeats and seatGuests.
 - **Why:** HCA bar handoff item 3 (Part C): over-service warnings need each guest's standard drinks with the time and employee of each ring. Counting from the check lines means voids remove a drink and transfers/splits move it with the item.

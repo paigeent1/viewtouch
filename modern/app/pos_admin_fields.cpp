@@ -590,6 +590,24 @@ QVariantList PosService::adminFields(const QString &panel)
                  })(tr("The first label printer"))),
             asRows(field(u"wasteReasons"_s, tr("Reasons for waste"), u"text"_s, tr("Log Waste asks which one.")),
                    tr("+ Add a reason")),
+            // Responsible service (pos_over_service.cpp): standard drinks per guest at ring-in.
+            field(u"serviceOn"_s, tr("Count standard drinks per guest"), u"bool"_s,
+                  tr("On: each drink's standard drinks (pour oz x ABV / 100 / 0.6, from the item card) count for its seat, "
+                     "or for the customer linked to the check or seat (a subscription card, an ID scanned). A drink that "
+                     "reaches the caution level asks the bartender to acknowledge it; the stop level needs a manager's PIN. "
+                     "The guest's screens never show it.")),
+            with(field(u"serviceCaution"_s, tr("Caution at (standard drinks)"), u"number"_s,
+                       tr("Yellow: the bartender acknowledges it with one tap. 0: no caution.")), u"min"_s, 0),
+            with(field(u"serviceStop"_s, tr("Stop at (standard drinks)"), u"number"_s,
+                       tr("Flashing red: the drink isn't rung in until a manager's PIN and a reason override it. 0: no stop.")), u"min"_s, 0),
+            with(field(u"serviceWindowHours"_s, tr("Within (hours)"), u"number"_s,
+                       tr("Drinks rung in within this many hours count.")), u"min"_s, 0.5),
+            field(u"serviceSubtract"_s, tr("Take off drinks as time passes"), u"bool"_s,
+                  tr("On: the count goes down by the number below for each hour since the guest's first drink in the window.")),
+            with(field(u"servicePerHour"_s, tr("…drinks an hour"), u"number"_s), u"min"_s, 0),
+            asRows(field(u"serviceReasons"_s, tr("Reasons for a manager's override"), u"text"_s,
+                         tr("The manager picks one, or types their own. Empty: the built-in list.")),
+                   tr("+ Add a reason")),
             field(u"askReasons"_s, tr("Ask why on voids and comps"), u"bool"_s,
                   tr("Voiding an item already sent, or a discount or comp, asks for a reason from the lists below. "
                      "The Exceptions report adds them up. Can be set per employee.")),

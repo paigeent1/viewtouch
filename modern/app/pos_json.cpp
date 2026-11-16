@@ -1191,6 +1191,10 @@ QJsonObject toJson(const PosSettings &s)
         {u"minimumAge"_s, QJsonObject{{u"alcohol"_s, s.ageAlcohol}, {u"tobacco"_s, s.ageTobacco}}},
         {u"idChecks"_s, QJsonObject{{u"tobacco"_s, s.idCheckTobacco}, {u"alcohol"_s, s.idCheckAlcohol},
                                     {u"tobaccoCategories"_s, strings(s.tobaccoCategories)}, {u"handNeedsManager"_s, s.idHandNeedsManager}}},
+        {u"responsibleService"_s, QJsonObject{
+             {u"on"_s, s.service.on}, {u"caution"_s, s.service.caution}, {u"stop"_s, s.service.stop},
+             {u"windowHours"_s, s.service.windowHours}, {u"subtract"_s, s.service.subtract},
+             {u"perHour"_s, s.service.perHour}, {u"overrideReasons"_s, strings(s.service.overrideReasons)}}},
         {u"privacy"_s, QJsonObject{{u"onReceipts"_s, s.privacyOnReceipts}, {u"short"_s, qs(s.privacyShort)},
                                    {u"full"_s, qs(s.privacyFull)}, {u"updatedAt"_s, qint64(s.privacyUpdatedAt)}}},
         {u"gratuity"_s, QJsonObject{{u"percent"_s, double(s.gratuityBp) / 100.0}, {u"minGuests"_s, s.gratuityMinGuests}}},
@@ -1627,6 +1631,18 @@ PosSettings settingsFromJson(const QJsonObject &o)
         for (const QJsonValue &v : id.value(u"tobaccoCategories").toArray())
             s.tobaccoCategories.push_back(ss(v.toString()));
         s.idHandNeedsManager = id.value(u"handNeedsManager").toBool(false);
+    }
+    {
+        // Responsible service: off, caution 4, stop 6 within 3 hours, less 1 an hour (core/over_service.hh).
+        const QJsonObject rs = o.value(u"responsibleService").toObject();
+        const ServicePolicy d;
+        s.service.on = rs.value(u"on").toBool(false);
+        s.service.caution = std::clamp(rs.value(u"caution").toDouble(d.caution), 0.0, 100.0);
+        s.service.stop = std::clamp(rs.value(u"stop").toDouble(d.stop), 0.0, 100.0);
+        s.service.windowHours = std::clamp(rs.value(u"windowHours").toDouble(d.windowHours), 0.5, 24.0);
+        s.service.subtract = rs.value(u"subtract").toBool(d.subtract);
+        s.service.perHour = std::clamp(rs.value(u"perHour").toDouble(d.perHour), 0.0, 10.0);
+        s.service.overrideReasons = strings(rs.value(u"overrideReasons").toArray());
     }
     {
         const QJsonObject privacy = o.value(u"privacy").toObject();

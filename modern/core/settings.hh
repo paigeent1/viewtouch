@@ -8,6 +8,7 @@
 
 #include "core/check.hh"
 #include "core/inventory.hh"
+#include "core/over_service.hh"
 #include "core/receipt_ref.hh"
 #include "core/tax.hh"
 
@@ -252,6 +253,9 @@ struct PosSettings {
     std::vector<std::string> tobaccoCategories;
     // A date of birth typed by hand (an ID that won't scan) needs a manager's PIN.
     bool idHandNeedsManager = false;
+    // Responsible service (Store Settings -> Responsible service): standard drinks per guest, a caution
+    // and a stop level. Off by default (core/over_service.hh).
+    ServicePolicy service;
     bool privacyOnReceipts = true;
     std::string privacyShort;
     std::string privacyFull;

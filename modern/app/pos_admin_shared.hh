@@ -147,6 +147,8 @@ inline QVariantList storeSections(const QVariantList &fields)
          {"startPage.server", "startPage.bartender", "startPage.cashier", "startPage.host", "startPage.manager"}},
         {"cash", PosService::tr("Cash"), {"cashMode", "terminalsHaveDrawer", "checkoutNeedsClosedChecks", "blindDrawerCount", "cashDenominations",
           "expenseCategories"}},
+        {"service", PosService::tr("Responsible service"),
+         {"serviceOn", "serviceCaution", "serviceStop", "serviceWindowHours", "serviceSubtract", "servicePerHour", "serviceReasons"}},
         {"reasons", PosService::tr("Voids, comps, No Sale and Cancel Sale"), {"askReasons", "voidReasons", "compReasons", "noSaleReasons", "cancelReasons", "watch", "watchVoid", "watchComp"}},
         {"hours", PosService::tr("Staff hours"),
          {"laborState", "paidBreaks", "overtimeDailyHours", "doubleTimeDailyHours", "seventhDayRule", "overtimeWeeklyHours", "mealBreakAfterHours", "giftCardCashBelow", "weekStartsOn", "scheduleRequired", "clockInEarlyMinutes", "checksPerServerHour"}},
@@ -184,6 +186,8 @@ inline QVariantList storeSections(const QVariantList &fields)
         {"clockInEarlyMinutes", "scheduleRequired"}, {"gratuityMinGuests", "gratuityPercent"},
         {"offlineCardMax", "offlineCards"}, {"offlineCardTotal", "offlineCards"},
         {"pointsPerDollar", "loyaltyEnabled"}, {"watchVoid", "watch"}, {"watchComp", "watch"}, {"rewards", "loyaltyEnabled"}, {"backupPassword", "encryptBackups"},
+        {"serviceCaution", "serviceOn"}, {"serviceStop", "serviceOn"}, {"serviceWindowHours", "serviceOn"},
+        {"serviceSubtract", "serviceOn"}, {"servicePerHour", "serviceSubtract"}, {"serviceReasons", "serviceOn"},
     };
     // Numbers: what 0 means, and a bigger step where 1 is too fine.
     struct Number {

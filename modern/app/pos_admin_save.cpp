@@ -575,6 +575,30 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             s_->settings.backupCopyDir = ss(record.value(u"backupCopyDir"_s).toString().trimmed());
         if (record.contains(u"askReasons"_s))
             s_->settings.askReasons = record.value(u"askReasons"_s).toBool();
+        {   // Responsible service: checked whole before anything of it changes.
+            ServicePolicy sp = s_->settings.service;
+            if (record.contains(u"serviceOn"_s)) sp.on = record.value(u"serviceOn"_s).toBool();
+            if (record.contains(u"serviceCaution"_s)) sp.caution = record.value(u"serviceCaution"_s).toDouble();
+            if (record.contains(u"serviceStop"_s)) sp.stop = record.value(u"serviceStop"_s).toDouble();
+            if (record.contains(u"serviceWindowHours"_s)) sp.windowHours = record.value(u"serviceWindowHours"_s).toDouble();
+            if (record.contains(u"serviceSubtract"_s)) sp.subtract = record.value(u"serviceSubtract"_s).toBool();
+            if (record.contains(u"servicePerHour"_s)) sp.perHour = record.value(u"servicePerHour"_s).toDouble();
+            if (record.contains(u"serviceReasons"_s)) {
+                sp.overrideReasons.clear();
+                for (const QString &line : record.value(u"serviceReasons"_s).toString().split(u'\n', Qt::SkipEmptyParts))
+                    if (!line.trimmed().isEmpty() && sp.overrideReasons.size() < 20)
+                        sp.overrideReasons.push_back(ss(line.trimmed().left(120)));
+            }
+            if (sp.caution < 0 || sp.caution > 100 || sp.stop < 0 || sp.stop > 100)
+                return fail(tr("Responsible service: the levels are standard drinks, 0 to 100."));
+            if (sp.caution > 0 && sp.stop > 0 && sp.caution >= sp.stop)
+                return fail(tr("Responsible service: the caution level must be under the stop level."));
+            if (sp.windowHours < 0.5 || sp.windowHours > 24)
+                return fail(tr("Responsible service: the time window is 0.5 to 24 hours."));
+            if (sp.perHour < 0 || sp.perHour > 10)
+                return fail(tr("Responsible service: take off 0 to 10 drinks an hour."));
+            s_->settings.service = sp;
+        }
         if (record.contains(u"watch"_s))
             s_->settings.watch = record.value(u"watch"_s).toBool();
         for (const auto &[key, amount] : {std::pair{u"watchVoid", &s_->settings.watchVoid}, std::pair{u"watchComp", &s_->settings.watchComp}})
