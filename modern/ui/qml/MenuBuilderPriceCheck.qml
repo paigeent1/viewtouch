@@ -97,11 +97,13 @@ Rectangle {
                     onTextEdited: check.target = text
                 }
                 Label {
+                    objectName: "priceCheckNetResult"
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     text: check.f.chargeForNet ? qsTr("before tax, charge %1").arg(check.f.chargeForNet) : qsTr("before tax, charge…")
                 }
                 UseButton {
+                    objectName: "priceCheckUseNet"
                     visible: !!check.f.chargeForNetPlain
                     onClicked: check.use(check.f.chargeForNetPlain)
                 }
@@ -131,6 +133,7 @@ Rectangle {
                     onTextEdited: check.target = text
                 }
                 Label {
+                    objectName: "priceCheckGuestResult"
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     text: !check.f.priceForGuest ? qsTr("→ price it at…")
@@ -139,6 +142,7 @@ Rectangle {
                               .arg(check.f.guestTarget).arg(check.f.priceForGuest).arg(check.f.guestGets)
                 }
                 UseButton {
+                    objectName: "priceCheckUseGuest"
                     visible: !!check.f.priceForGuestPlain
                     onClicked: check.use(check.f.priceForGuestPlain)
                 }

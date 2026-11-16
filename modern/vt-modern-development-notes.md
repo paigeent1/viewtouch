@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 14:10 ET — Price Check helper (Claude helper) — Price check: on-screen test (the item card, with tax and back)
+- **What:** UI test 'UI: Menu Builder: an item's Price check, with tax and back' (test_pos_flow.cpp, after the quick-edit test): opens Classic Burger's card, checks the included figures, To net -> Use, switching Taxes to tax-on-top, Round to $1 -> Use; object names on the panel's result labels and Use buttons.
+- **Why:** Prove the panel loads and computes on the real card; most older Menu Builder UI tests are in the known-failing 28 and wouldn't catch a broken panel.
+- **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/MenuBuilderPriceCheck.qml`
+
 ### 2026-11-16 13:51 ET — Price Check helper (Claude helper) — Menu Builder: Price check panel on the item card; es/fr/pt/zh; manual
 - **What:** ui/qml/MenuBuilderPriceCheck.qml, shown under Pricing & Margin on every item card: prices include tax (guest pays = before tax + tax, To net X charge Y, Round to 0.25/0.50/1), tax on top (price + tax = guest pays; Guest pays round Y -> price it at X), retail cash vs card (card, cash = card less Cash discount %, carton = 10 cash packs, each with tax; margins before tax), Use buttons put a suggested price in the price field. Cash discount % field saves the store setting (saveCashDiscount). Translations; manual ch. 19 'Price check' and a Taxes note.
 - **Why:** Owner's request: see what a price comes to with tax while setting prices, mainly drinks, and cigarettes cash vs card.

@@ -1459,6 +1459,74 @@ TEST_CASE("UI: a manager changes or adds an item right on the order screen", "[f
     CHECK(find(u"builderName"_s)->property("text").toString() == u"Cheeseburger"_s);
 }
 
+TEST_CASE("UI: Menu Builder: an item's Price check, with tax and back", "[flow][ui][pricecheck]")
+{
+    Screen s;
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    const auto taxes = [&](bool included) {   // CT: 7.35% meals and alcohol, 6.35% sales
+        QVariantMap tax = s.pos.adminRecords(u"taxes"_s)[0].toMap();
+        tax[u"food"_s] = 7.35;
+        tax[u"alcohol"_s] = 7.35;
+        tax[u"merchandise"_s] = 6.35;
+        tax[u"pricesIncludeTax"_s] = included;
+        REQUIRE(s.pos.adminSave(u"taxes"_s, 0, tax));
+        QTest::qWait(60);
+    };
+    taxes(true);   // a bar (HCA)
+    REQUIRE(s.pos.startCheck(core::CheckType::Takeout));
+    REQUIRE(s.c.jumpTo(u"menu-all"_s));
+    s.c.setMenuCategory(u"burgers"_s);
+    QTest::qWait(80);
+    QQuickItem *root = s.window->contentItem();
+    const auto find = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    const auto text = [&](const QString &name) {
+        QQuickItem *it = find(name);
+        return it ? it->property("text").toString() : QString();
+    };
+    // Held on the order screen, All Settings…: the Menu Builder with its card (Classic Burger, 11.50, food).
+    {
+        QQuickItem *it = find(u"menuItem-classic-burger"_s);
+        REQUIRE(it);
+        const QPoint at = it->mapToScene(QPointF(it->width() / 2, it->height() / 2)).toPoint();
+        QTest::mousePress(s.window, Qt::LeftButton, {}, at);
+        QTest::qWait(900);
+        QTest::mouseRelease(s.window, Qt::LeftButton, {}, at);
+        QTest::qWait(60);
+    }
+    REQUIRE(find(u"quickAll"_s));
+    s.tapItem(find(u"quickAll"_s));
+    QTest::qWait(150);
+    REQUIRE(s.c.pageId() == u"menu-builder"_s);
+    root = s.window->contentItem();
+    QQuickItem *panel = find(u"builderPriceCheck"_s);
+    REQUIRE(panel);
+    CHECK(text(u"priceCheckRate"_s).contains(u"7.35%"_s));
+    CHECK(text(u"priceCheckIncluded"_s) == u"Guest pays $11.50 = $10.71 before tax + $0.79 tax"_s);
+
+    // To net $10.00 before tax, charge $10.73; Use puts it in the price field.
+    panel->setProperty("target", u"10.00"_s);
+    QTest::qWait(30);
+    CHECK(text(u"priceCheckNetResult"_s) == u"before tax, charge $10.73"_s);
+    REQUIRE(find(u"priceCheckUseNet"_s));
+    QMetaObject::invokeMethod(find(u"priceCheckUseNet"_s), "clicked");
+    QTest::qWait(30);
+    CHECK(text(u"builderPrice"_s) == u"10.73"_s);
+    CHECK(text(u"priceCheckIncluded"_s) == u"Guest pays $10.73 = $10.00 before tax + $0.73 tax"_s);
+
+    // Store Settings -> Taxes: tax on top (retail, BHDAN): the panel follows.
+    taxes(false);
+    panel->setProperty("target", QString());
+    CHECK(text(u"priceCheckAdded"_s) == u"$10.73 + $0.79 tax = guest pays $11.52"_s);
+    panel->setProperty("roundCents", 100);   // Round to $1: guest pays $12.00
+    QTest::qWait(30);
+    CHECK(text(u"priceCheckGuestResult"_s) == u"$12.00 → price it at $11.18"_s);
+    QMetaObject::invokeMethod(find(u"priceCheckUseGuest"_s), "clicked");
+    QTest::qWait(30);
+    CHECK(text(u"builderPrice"_s) == u"11.18"_s);
+    // Only a calculator: nothing saved until Save.
+    CHECK(s.pos.findItem(u"classic-burger"_s)->price.cents() == 1150);
+}
+
 TEST_CASE("UI: Menu Builder: several items at once; an item dragged onto another category", "[flow][ui][menubuild][several]")
 {
     Screen s(false, 1280, 800);
