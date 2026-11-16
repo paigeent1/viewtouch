@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 5: tests and translations
+- **What:** tests/test_over_service.cpp (Catch2, [service]): counting rules (window, subtraction, levels, line parts); by seat with ring time/employee, and moved with a line to another check; by customer across checks (an ID scanned for a seat, a saved customer); window and subtraction at ring-in; a void removes the drink (unsent and sent); caution waits for one tap, with the audit file's two lines and the report; stop blocks until a manager's PIN and reason (a server PIN and no reason refused), cancel audited, + and Again counted; a bottle split across seats and back; no ABV counts 0; setting off means no warnings; settings JSON round trip and Store Settings validation. es/fr/pt/zh for the 69 new phrases (i18n.py check: no new problems).
+- **Why:** HCA bar handoff item 3: the tests the owner asked for.
+- **Files:** `modern/i18n/es.json`, `modern/i18n/fr.json`, `modern/i18n/pt.json`, `modern/i18n/zh.json`, `modern/tests/CMakeLists.txt`, `modern/tests/test_over_service.cpp`
+
 ### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 4: the audit file and Reports -> Responsible Service
 - **What:** Every warning, acknowledgment, manager override, cancel (and a kiosk stop sent to the bar, and a drink shared across seats) is appended as one JSON line to alcohol_policy_audit.jsonl in the store's data folder: at, time, terminal, employee, employeeId, check, checkId, seat, guest, guestKey, drinks (with this one), before, adding, item, level, action, manager, reason. A write error goes to Store Check. Reports gets 'Responsible Service' (id service): today since the day opened, a past day by its hours, or This Week / Last Month / Dates… read from the file; a summary by action, then each entry. Print, CSV and PDF use the existing report machinery (Reports -> PDF). tools/i18n.py reads the report's phrases from pos_over_service.cpp.
 - **Why:** HCA bar handoff item 3: every warning, acknowledgment and override goes to alcohol_policy_audit.jsonl, with a PDF audit report.
