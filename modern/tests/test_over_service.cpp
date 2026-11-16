@@ -413,11 +413,11 @@ TEST_CASE("Responsible service: the settings, saved and read back", "[service][s
     REQUIRE(rec.contains(u"serviceOn"_s));
     rec[u"serviceOn"_s] = true;
     rec[u"serviceCaution"_s] = 7.0;
-    CHECK_FALSE(pos.saveAdminRecord(u"store"_s, 0, rec));
+    CHECK_FALSE(pos.adminSave(u"store"_s, 0, rec));
     CHECK_FALSE(pos.shared()->settings.service.on);
     rec[u"serviceCaution"_s] = 3.0;
     rec[u"serviceWindowHours"_s] = 2.0;
-    REQUIRE(pos.saveAdminRecord(u"store"_s, 0, rec));
+    REQUIRE(pos.adminSave(u"store"_s, 0, rec));
     CHECK(pos.shared()->settings.service.on);
     CHECK(pos.shared()->settings.service.caution == 3.0);
     CHECK(pos.shared()->settings.service.windowHours == 2.0);

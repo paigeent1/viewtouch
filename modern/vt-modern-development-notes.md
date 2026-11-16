@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:27 ET — Helper C (Claude helper) — Responsible service test: Store Settings saved through adminSave
+- **What:** test_over_service.cpp saves the store record with PosService::adminSave (public) instead of saveAdminRecord (private).
+- **Why:** CI run 43927319323: the test didn't build.
+- **Files:** `modern/tests/test_over_service.cpp`
+
 ### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 5: tests and translations
 - **What:** tests/test_over_service.cpp (Catch2, [service]): counting rules (window, subtraction, levels, line parts); by seat with ring time/employee, and moved with a line to another check; by customer across checks (an ID scanned for a seat, a saved customer); window and subtraction at ring-in; a void removes the drink (unsent and sent); caution waits for one tap, with the audit file's two lines and the report; stop blocks until a manager's PIN and reason (a server PIN and no reason refused), cancel audited, + and Again counted; a bottle split across seats and back; no ABV counts 0; setting off means no warnings; settings JSON round trip and Store Settings validation. es/fr/pt/zh for the 69 new phrases (i18n.py check: no new problems).
 - **Why:** HCA bar handoff item 3: the tests the owner asked for.
