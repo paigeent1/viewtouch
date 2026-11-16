@@ -260,6 +260,34 @@ Item {
             Layout.fillWidth: true
             elide: Text.ElideRight
         }
+        // Responsible service: each guest's standard drinks now ("Seat 3: 4.2 drinks"), yellow at the
+        // caution level, red at the stop level. The staff's screen only (Store Settings -> Responsible service).
+        Flow {
+            objectName: "drinkCounts"
+            visible: w.controls && w.pos && w.pos.hasCheck && (w.check.drinks ?? []).length > 0
+            Layout.fillWidth: true
+            spacing: w.unit * 0.25
+            Repeater {
+                model: w.controls ? (w.check.drinks ?? []) : []
+                delegate: Rectangle {
+                    required property var modelData
+                    objectName: "drinkCount-" + modelData.seat
+                    width: countText.implicitWidth + w.unit * 0.8
+                    height: w.unit * 1.2
+                    radius: height / 2
+                    color: modelData.level === "stop" ? "#b91c1c" : modelData.level === "caution" ? "#f0b429" : "#2b3a4a"
+                    Text {
+                        id: countText
+                        anchors.centerIn: parent
+                        text: qsTr("%1: %2 drinks").arg(modelData.label).arg(modelData.drinks)
+                        color: modelData.level === "caution" ? "#1e2430" : "white"
+                        font.family: w.face
+                        font.pixelSize: w.unit * 0.6
+                        font.bold: modelData.level !== "ok"
+                    }
+                }
+            }
+        }
         // A regular: their last order again, in one touch (before anything else is on).
         WidgetKey {
             objectName: "sameAsLastTime"
@@ -564,6 +592,7 @@ Item {
                         // Keys this wide fit the line (big text on a narrow check): − 1 +, Again, Move…
                         readonly property real units: (row.modelData.sent ? 0 : 3.7) + 3
                                                       + (tableChecks.checks.length > 0 && !w.paid ? 3 : 0)
+                                                      + (shareKey.visible ? 3 : 0)
                         readonly property real key: Math.min(w.unit * 1.6, (col.width - w.unit * 2) / units)
                         WidgetKey {
                             objectName: "lineLess"
@@ -608,6 +637,16 @@ Item {
                             fontScale: 0.45
                             text: qsTr("Move…")
                             onClicked: sheet.mode = "move"
+                        }
+                        // Responsible service: a bottle or bucket's standard drinks split across seats.
+                        WidgetKey {
+                            id: shareKey
+                            objectName: "lineShareSeats"
+                            visible: (row.modelData.drinks ?? 0) > 0 && (w.check.drinks ?? []).length > 0
+                            width: qtyBar.key * 3; height: qtyBar.key
+                            fontScale: 0.45
+                            text: qsTr("Seats…")
+                            onClicked: sheet.startShare(row.modelData)
                         }
                     }
                 }
@@ -726,7 +765,23 @@ Item {
     // Choices over the panel: the table's tools, or where to move the touched line.
     Rectangle {
         id: sheet
-        property string mode: ""   // "" | "table" | "move"
+        property string mode: ""   // "" | "table" | "move" | "share"
+        // Share across seats: the line, and the seats picked.
+        property var shareLine: null
+        property var shareSeats: []
+        readonly property int seatChoices: Math.min(12, Math.max(4, w.check.guests ?? 1,
+            ...(w.pos ? w.pos.lines : []).map(l => l.seat ?? 0)))
+        function startShare(line) {
+            shareLine = line
+            shareSeats = (line.drinkSeats ?? []).length > 0 ? line.drinkSeats.slice() : (line.seat > 0 ? [line.seat] : [])
+            mode = "share"
+        }
+        function toggleSeat(s) {
+            const i = shareSeats.indexOf(s)
+            const next = shareSeats.slice()
+            if (i >= 0) next.splice(i, 1); else next.push(s)
+            shareSeats = next
+        }
         objectName: "orderSheet"
         anchors.fill: parent
         visible: mode !== "" && w.pos && w.pos.hasCheck
@@ -787,6 +842,7 @@ Item {
                     : sheet.mode === "address" ? qsTr("Where to deliver it")
                     : sheet.mode === "move" ? qsTr("Move %1 to…").arg(w.pos.lines.find(l => l.selected)?.name ?? "")
                     : sheet.mode === "fire" ? qsTr("Fire course %1").arg(w.nextCourse)
+                    : sheet.mode === "share" ? qsTr("Share %1 across seats").arg(sheet.shareLine?.name ?? "")
                     : (w.check.label ?? "")
                 color: "white"
                 font.family: w.face
@@ -881,6 +937,37 @@ Item {
                     fontScale: 0.4
                     text: qsTr("Don't fire it at %1").arg(w.check.firesAt ?? "")
                     onClicked: sheet.fireIn(-1)
+                }
+            }
+            // Share a drink's standard drinks across seats
+            Flow {
+                visible: sheet.mode === "share"
+                width: parent.width
+                spacing: w.unit * 0.3
+                Repeater {
+                    model: sheet.mode === "share" ? sheet.seatChoices : 0
+                    delegate: WidgetKey {
+                        required property int index
+                        objectName: "shareSeat-" + (index + 1)
+                        width: sheet.key * 1.6; height: sheet.key
+                        fontScale: 0.42
+                        text: qsTr("Seat %1").arg(index + 1)
+                        accent: sheet.shareSeats.indexOf(index + 1) >= 0
+                        onClicked: sheet.toggleSeat(index + 1)
+                    }
+                }
+                WidgetKey {
+                    objectName: "shareSeatsDone"
+                    width: parent.width; height: sheet.key
+                    fontScale: 0.42
+                    baseColor: "#1f8a4c"
+                    text: sheet.shareSeats.length > 1 ? qsTr("Share across %1 seats").arg(sheet.shareSeats.length)
+                                                      : qsTr("Its own seat only")
+                    onClicked: {
+                        const id = sheet.shareLine ? sheet.shareLine.id : 0
+                        const seats = sheet.shareSeats.slice()
+                        sheet.run(() => w.pos.shareDrink(id, seats))
+                    }
                 }
             }
             // Move the touched line

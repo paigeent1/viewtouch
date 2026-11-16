@@ -394,6 +394,10 @@ public:
     // ILSA's sales history file (ilsa-history.db beside the database; set by main): read-only, for
     // the ILSA History reports and Receipt Lookup (pos_legacy.cpp). Empty: none.
     QString legacyDb;
+    // Responsible service: alcohol_policy_audit.jsonl in the store's data folder (set by main). Empty
+    // (tests, a new folder): the entries are kept in memory only (serviceAuditMemory).
+    QString serviceAuditFile;
+    std::vector<QJsonObject> serviceAuditMemory;
 
     // The terminal's open drawer / its most recent one today.
     core::DrawerSession *openDrawerFor(const std::string &terminal);
@@ -739,6 +743,27 @@ public:
     QVariantMap pricing() const override;
     bool saveCashDiscount(double percent);
     int requiredAge(const core::MenuItem &item) const;
+
+    // --- Responsible service (pos_over_service.cpp) ---------------------------------------------
+    // Standard drinks for each guest (a seat, or the customer linked to it or to the check), against the
+    // store's caution and stop levels (Store Settings -> Responsible service). A drink that brings a
+    // guest to a level waits: {level: caution | stop, guest, drinks, before, adding, item, check,
+    // windowHours, caution, stop, reasons}; {} when none. Staff screens only (never the guest's).
+    QVariantMap serviceAsk() const override { return serviceAsk_; }
+    // Caution: the bartender has seen it (one tap); the drink goes in.
+    bool acknowledgeService();
+    // Stop: a manager's PIN and a reason (picked or typed); the drink goes in.
+    bool overrideService(const QString &pin, const QString &reason);
+    // Not rung in after all (caution or stop).
+    bool cancelService();
+    // A bottle or a bucket shared across seats: its standard drinks split evenly between them
+    // (its own seat only: an empty list or one seat).
+    bool shareDrink(qint64 lineId, const QVariantList &seats);
+    // The guests on the open check and their counts now: [{key, label, drinks ("4.2"), value, level}].
+    QVariantList drinkCounts() const;
+    // The audit file's entries in [from, to) (epoch ms), oldest first; and the Responsible Service report.
+    std::vector<QJsonObject> serviceAuditEntries(std::int64_t from, std::int64_t to) const;
+    core::Report serviceReport(std::int64_t from, std::int64_t to, const QString &label) const;
     void setQualifier(const QString &qualifier);   // same one again clears it
     void selectLine(qint64 lineId) override;
     void selectPayment(qint64 paymentId) override;
@@ -1691,6 +1716,25 @@ private:
     struct PendingScan { QString itemId, code; bool retail = false; };
     PendingScan pendingScan_;   // for the next addItem
     QVariantMap ageAsk_;              // an item waiting for the buyer's ID (pos_age.cpp)
+    // Responsible service (pos_over_service.cpp): the drinks waiting, and how to ring them in again.
+    struct PendingDrink {
+        core::DrinkGuest guest;
+        double drinks = 0;
+    };
+    QVariantMap serviceAsk_;
+    std::vector<PendingDrink> serviceDrinks_;   // what the ask was for (guests, drinks)
+    QString serviceMethod_;
+    QVariantList serviceArgs_;
+    bool servicePassed_ = false;                // the drink acknowledged / overridden: once
+    std::map<std::string, std::vector<core::DrinkRing>> serviceRings() const;
+    QString guestLabel(const core::DrinkGuest &g) const;
+    // Before drinks go on: true to go ahead; false when it waits for the bartender or a manager
+    // (serviceAsk_), or was refused. `method` / `args`: how to ring them in again (else the operation
+    // running through invoke).
+    bool serviceGate(const core::Check *c, const std::vector<PendingDrink> &adds, const QString &what,
+                     const QString &method, const QVariantList &args);
+    void serviceAudit(const QString &action, const QString &manager = {}, const QString &reason = {});
+    bool serviceProceed();
     PendingScan ageAskScan_;          // the scan that rang it in, kept for when the ID passes
     bool askForAge(const core::MenuItem &item, int age, const PendingScan &scan);
     bool agePassed(int age, const char *how, const std::string &idNumber, bool expired = false, const core::IdDate &birth = {});

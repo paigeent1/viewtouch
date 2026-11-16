@@ -1355,6 +1355,8 @@ int runStore(const Args &cli, const Options &o)
     vt::app::PosService pos(std::move(*posData), sink.get());
     vt::app::PosShared *shared = pos.shared();
     shared->imageCacheDir = QDir(dataDirOf(cli, o)).filePath(u"cache/store-images"_s);
+    // Responsible service: every warning, acknowledgment, override and cancel (pos_over_service.cpp).
+    shared->serviceAuditFile = QDir(dataDirOf(cli, o)).filePath(u"alcohol_policy_audit.jsonl"_s);
     // Running: a marker left behind means ViewTouch didn't close normally last
     // time (a crash, the power went off): kept for Store Check.
     // (Removed whichever way this returns; only a crash leaves it.)

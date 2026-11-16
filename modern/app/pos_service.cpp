@@ -1476,6 +1476,15 @@ bool PosService::addItem(const QString &idOrName)
         if (ticketsLeft(*item) < 1)
             return fail(tr("%1 is sold out (%2 tickets).").arg(qs(item->name)).arg(item->ticketCapacity));
     }
+    // Responsible service: a drink that brings its guest to the caution or stop level waits
+    // (pos_over_service.cpp). Not choices, nor an item still to be weighed.
+    if (!item->isModifier && !(item->byWeight && entry_.isEmpty()))
+        if (const double d = standardDrinksOf(*item); d > 0) {
+            const Check *open = current();
+            const DrinkGuest g = open ? drinkGuest(*open, seat_) : DrinkGuest{"new", "seat", {}, seat_, 0};
+            if (!serviceGate(open, {{g, d}}, qs(item->name), u"addItem"_s, {qs(item->id)}))
+                return false;
+        }
 
     // A scanned code rings in this item: its line keeps that code (an alternate UPC included).
     const auto scan = std::exchange(pendingScan_, {});
@@ -1852,6 +1861,13 @@ bool PosService::setLineQuantity(qint64 lineId, int quantity)
         if (const MenuItem *m = findItem(qs(l->itemId)); m && m->ticketCapacity > 0
             && ticketsLeft(*m) < quantity - l->quantity)
             return fail(tr("%1 is sold out (%2 tickets).").arg(qs(m->name)).arg(m->ticketCapacity));
+    if (quantity > l->quantity && l->stdDrinks > 0) {   // responsible service: more of a drink
+        std::vector<PendingDrink> adds;
+        for (const auto &[g, d] : lineGuests(*c, *l))
+            adds.push_back({g, d / l->quantity * (quantity - l->quantity)});
+        if (!serviceGate(c, adds, qs(l->displayName()), u"setLineQuantity"_s, {qint64(l->id), quantity}))
+            return false;
+    }
     if (quantity < l->quantity)
         rememberChange(*c, *l, false, tr("%1: %2 instead of %3").arg(qs(l->displayName())).arg(quantity).arg(l->quantity));
     l->quantity = quantity;
@@ -1894,6 +1910,17 @@ bool PosService::anotherRound()
         round.push_back(*l);
     if (round.empty())
         return fail(tr("No drinks have been sent on this check yet."));
+    {   // responsible service: each guest's drinks in the round
+        std::vector<PendingDrink> adds;
+        for (OrderLine l : round) {
+            l.unshare();
+            l.voided = false;
+            for (const auto &[g, d] : lineGuests(*c, l))
+                adds.push_back({g, d});
+        }
+        if (!serviceGate(c, adds, tr("Another round"), u"anotherRound"_s, {}))
+            return false;
+    }
     QStringList skipped;
     int added = 0;
     for (OrderLine copy : round) {
@@ -1981,9 +2008,16 @@ bool PosService::repeatLine(qint64 lineId)
     if (m->ticketCapacity > 0 && ticketsLeft(*m) < 1)
         return fail(tr("%1 is sold out (%2 tickets).").arg(qs(m->name)).arg(m->ticketCapacity));
     OrderLine copy = *l;
-    copy.id = c->nextLineId++;
     copy.quantity = 1;
     copy.unshare();
+    if (copy.stdDrinks > 0) {   // responsible service: one more of a drink
+        std::vector<PendingDrink> adds;
+        for (const auto &[g, d] : lineGuests(*c, copy))
+            adds.push_back({g, d});
+        if (!serviceGate(c, adds, qs(copy.displayName()), u"repeatLine"_s, {qint64(l->id)}))
+            return false;
+    }
+    copy.id = c->nextLineId++;
     copy.sent = copy.voided = copy.made = copy.served = false;
     copy.sentAt = copy.madeAt = copy.servedAt = 0;
     stampNewLine(copy);   // a new sale: rung by whoever is here now, at today's cost
@@ -2555,6 +2589,8 @@ QVariantMap PosService::checkInfo() const
                  t += tr("  ·  ID expired");
              return t;
          }()},
+        // Responsible service: each guest's standard drinks now (staff screens only; pos_over_service.cpp).
+        {u"drinks"_s, drinkCounts()},
     };
 }
 
@@ -2586,6 +2622,9 @@ QVariantList PosService::lines() const
                  const MenuItem *m = findItem(qs(l.itemId));
                  return m && !m->modifierGroups.empty(); }()},
             {u"needsChoice"_s, !l.sent && !missingChoice({l}).isEmpty()},
+            // Responsible service: its standard drinks, and the seats it's shared across.
+            {u"drinks"_s, lineDrinks(l)},
+            {u"drinkSeats"_s, [&l] { QVariantList s; for (const int x : l.drinkSeats) s << x; return s; }()},
         });
     }
     return out;

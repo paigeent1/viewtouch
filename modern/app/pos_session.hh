@@ -102,6 +102,8 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap customerPrompt READ customerPrompt NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap customerDuplicate READ customerDuplicate NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap ageAsk READ ageAsk NOTIFY checkChanged)
+    // Responsible service: a drink waiting for the bartender (caution) or a manager (stop); staff screens only.
+    Q_PROPERTY(QVariantMap serviceAsk READ serviceAsk NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap idChecks READ idChecks NOTIFY adminChanged)
     // Menu Builder -> Price check: the store's tax rates (ppm), prices include tax, the cash discount.
     Q_PROPERTY(QVariantMap pricing READ pricing NOTIFY adminChanged)
@@ -360,6 +362,7 @@ public:
     virtual QVariantMap waitlistInfo() const = 0;
     virtual QVariantMap customerPrompt() const = 0;
     virtual QVariantMap customerDuplicate() const = 0;
+    virtual QVariantMap serviceAsk() const = 0;   // {level, guest, drinks, item, reasons...}; {} when none
     virtual QVariantMap ageAsk() const = 0;     // an item waiting for the buyer's ID: {item, name, age, handNeedsManager}
     // {food, alcohol, merchandise, room (ppm), included, cashDiscountPercent}: Store Settings -> Taxes.
     virtual QVariantMap pricing() const = 0;
@@ -770,6 +773,11 @@ public:
     Q_INVOKABLE void verifyAgeScan(const QString &raw) { invoke(QStringLiteral("verifyAgeScan"), {raw}); }
     Q_INVOKABLE void verifyAgeHand(const QString &mmddyyyy) { invoke(QStringLiteral("verifyAgeHand"), {mmddyyyy}); }
     Q_INVOKABLE void cancelAgeCheck() { invoke(QStringLiteral("cancelAgeCheck")); }
+    // Responsible service (the server decides; pos_over_service.cpp).
+    Q_INVOKABLE void acknowledgeService() { invoke(QStringLiteral("acknowledgeService")); }
+    Q_INVOKABLE void overrideService(const QString &pin, const QString &reason) { invoke(QStringLiteral("overrideService"), {pin, reason}); }
+    Q_INVOKABLE void cancelService() { invoke(QStringLiteral("cancelService")); }
+    Q_INVOKABLE void shareDrink(qint64 lineId, const QVariantList &seats) { invoke(QStringLiteral("shareDrink"), {lineId, seats}); }
     Q_INVOKABLE void saveIdChecks(const QVariantMap &values) { invoke(QStringLiteral("saveIdChecks"), {values}); }
     // Menu Builder -> Price check: the store's cash discount % (Store Settings -> Taxes). Managers.
     Q_INVOKABLE void saveCashDiscount(double percent) { invoke(QStringLiteral("saveCashDiscount"), {percent}); }
