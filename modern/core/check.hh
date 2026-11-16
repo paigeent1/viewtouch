@@ -242,8 +242,13 @@ TenderKind tenderKindFromString(const std::string &s);
 struct Totals {
     Money items;         // all non-voided lines
     Money discounts;     // positive amount taken off
-    Money subtotal;      // items - discounts
-    Money tax;
+    Money subtotal;      // items - discounts; prices including tax: that less the tax in it (pre-tax)
+    Money tax;           // added on top, or (pricesIncludeTax) the tax inside the prices
+    bool taxIncluded = false;   // worked out with TaxRates::pricesIncludeTax
+    // Sales without tax (what reports count): items and discounts with the tax in them taken out.
+    // itemsExTax - discountsExTax == subtotal always. Tax added on top: the same as items, discounts.
+    Money itemsExTax;
+    Money discountsExTax;
     std::map<TaxClass, Money> taxByClass;
     Money gratuity;      // service charge on the subtotal (owed to the server)
     Money total;         // subtotal + tax + gratuity
@@ -405,6 +410,12 @@ struct Check {
     bool removePayment(std::int64_t paymentId);
 
     Totals totals(const TaxRates &rates) const;
+    // A line's sales without tax (sales by item, category, GP): its total, less the tax in it when
+    // prices include tax. A class's lines together come to exactly that class's part of
+    // Totals::itemsExTax (each line takes the rounding of the running total up to it).
+    Money lineSales(const OrderLine &line, const TaxRates &rates) const;
+    // The tax rates this check is worked out with: those it closed with, else `now`.
+    const TaxRates &ratesFor(const TaxRates &now) const { return closedRates ? *closedRates : now; }
     // What a payment actually left with the store, tip included: cash less
     // the change given back (from the last cash payment first).
     Money kept(const Payment &p, const TaxRates &rates) const;

@@ -70,7 +70,7 @@ QVariantMap PosService::coachFrom(const std::vector<Check> &closed) const
         if (c.training || c.closedAt < from)
             continue;
         const Totals tot = c.totals(st.tax);
-        discounts += tot.discounts;
+        discounts += tot.discountsExTax;
         for (const Payment &p : c.payments)
             if (p.kind == TenderKind::Discount)
                 if (const auto it = tot.discountBy.find(p.id); it != tot.discountBy.end())
@@ -78,10 +78,11 @@ QVariantMap PosService::coachFrom(const std::vector<Check> &closed) const
         for (const OrderLine &l : c.lines) {
             if (l.voided || l.isComment() || l.isGiftCard() || l.isFee())
                 continue;
-            items += l.total();   // (what was sold: no gift cards, no fees)
+            const Money sales = c.lineSales(l, st.tax);   // without tax
+            items += sales;   // (what was sold: no gift cards, no fees)
             Row &r = rows[l.itemId];
             r.sold += l.counted();
-            r.sales += l.total();
+            r.sales += sales;
             r.cost += lineCost(l);
         }
     }

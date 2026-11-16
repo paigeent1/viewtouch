@@ -60,6 +60,13 @@ public:
     // three-decimal rates (Quebec QST) are exact.
     constexpr Money ppm(std::int64_t partsPerMillion) const { return scaled(partsPerMillion, 1000000); }
 
+    // A price with tax at `partsPerMillion` in it, less that tax: this / (1 + rate), rounded half
+    // away from zero ($10.00 at 7.35% -> 9.32).
+    constexpr Money withoutTaxPpm(std::int64_t partsPerMillion) const
+    {
+        return partsPerMillion > 0 ? scaled(1000000, 1000000 + partsPerMillion) : *this;
+    }
+
     // "12.34", "-0.05"
     std::string toString() const
     {

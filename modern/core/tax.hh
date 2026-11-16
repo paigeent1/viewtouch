@@ -30,6 +30,11 @@ struct TaxRates {
     // Where pennies are gone: a check paid in cash is rounded to the
     // nearest 5 (or 10) cents. 0: no rounding. Cards are never rounded.
     int cashRoundingCents = 0;
+    // Prices include tax (a bar: $5 is what the guest pays). Off: tax is added on top (retail).
+    // On: each tax class's tax is backed out of that class's part of the check total (after
+    // discounts and comps), never line by line: subtotal = round(part / (1 + rate)),
+    // tax = part - subtotal, so the guest pays exactly the menu prices.
+    bool pricesIncludeTax = false;
 
     constexpr std::int64_t ratePpm(TaxClass c) const
     {
@@ -41,6 +46,14 @@ struct TaxRates {
         case TaxClass::None: break;
         }
         return 0;
+    }
+
+    // Takeout food untaxed (taxTakeoutFood off): no tax on it, added or included.
+    constexpr std::int64_t ratePpmFor(TaxClass c, bool takeout) const
+    {
+        if (c == TaxClass::Food && takeout && !taxTakeoutFood)
+            return 0;
+        return ratePpm(c);
     }
 
     bool operator==(const TaxRates &) const = default;

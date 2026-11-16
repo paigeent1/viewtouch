@@ -2647,12 +2647,21 @@ QVariantMap PosService::totals() const
         case TaxClass::Room: name = tr("Room tax"); break;
         case TaxClass::None: name = tr("Tax"); break;
         }
+        // Prices include tax: the rate it was backed out at ("Alcohol tax 7.35%").
+        if (t.taxIncluded) {
+            const std::int64_t ppm = c->ratesFor(s_->settings.tax).ratePpm(cls);
+            QString rate = QString::number(double(ppm) / 10000.0, 'f', 4);
+            while (rate.contains(u'.') && (rate.endsWith(u'0') || rate.endsWith(u'.')))
+                rate.chop(1);
+            name += u' ' + rate + u'%';
+        }
         taxLines.append(QVariantMap{{u"name"_s, name}, {u"amount"_s, format(amount)}});
     }
     return {
         {u"items"_s, format(t.items)}, {u"discounts"_s, format(-t.discounts)},
         {u"hasDiscount"_s, t.discounts.cents() > 0},
         {u"subtotal"_s, format(t.subtotal)}, {u"tax"_s, format(t.tax)}, {u"taxLines"_s, taxLines},
+        {u"taxIncluded"_s, t.taxIncluded},
         {u"total"_s, format(t.total)}, {u"paid"_s, format(t.paid)},
         {u"balance"_s, format(t.balance.cents() > 0 ? t.balance : Money())},
         {u"balanceCents"_s, qint64(t.balance.cents())},

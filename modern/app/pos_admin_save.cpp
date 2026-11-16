@@ -242,6 +242,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         s_->settings.tax.merchandisePpm = ppmFromPercent(rates[2]);
         s_->settings.tax.roomPpm = ppmFromPercent(rates[3]);
         s_->settings.tax.taxTakeoutFood = record.value(u"taxTakeoutFood"_s).toBool();
+        if (record.contains(u"pricesIncludeTax"_s))
+            s_->settings.tax.pricesIncludeTax = record.value(u"pricesIncludeTax"_s).toBool();
         if (record.contains(u"cashRounding"_s)) {
             const int step = record.value(u"cashRounding"_s).toInt();
             if (step != 0 && step != 5 && step != 10)

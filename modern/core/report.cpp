@@ -102,8 +102,8 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx, 
 
     for (const Check &c : closed) {
         const Totals t = c.totals(rates);
-        items += t.items;
-        discounts += t.discounts;
+        items += t.itemsExTax;   // sales never include tax (prices including tax: taken out)
+        discounts += t.discountsExTax;
         net += t.subtotal;
         tax += t.tax;
         total += t.total;
@@ -128,7 +128,7 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx, 
             if (l.voided) {
                 OrderLine live = l;
                 live.voided = false;
-                voidValue += live.total();
+                voidValue += c.lineSales(live, rates);
                 ++voidCount;
             }
         }
@@ -213,7 +213,7 @@ Report itemSales(const std::vector<Check> &closed, const std::vector<MenuItem> &
             const auto it = familyOf.find(l.itemId);
             Tally &t = families[it == familyOf.end() ? "other" : it->second][l.name];
             t.qty += l.counted();
-            t.sales += l.total();
+            t.sales += c.lineSales(l, ctx.settings.tax);
         }
     }
 
@@ -328,8 +328,9 @@ Report categorySales(const std::vector<Check> &closed, const std::vector<MenuIte
             const auto it = familyOf.find(l.itemId);
             Tally &t = families[it == familyOf.end() ? "other" : it->second];
             t.qty += l.counted();
-            t.sales += l.total();
-            total += l.total();
+            const Money sales = c.lineSales(l, ctx.settings.tax);
+            t.sales += sales;
+            total += sales;
             qty += l.counted();
         }
     }
@@ -489,10 +490,11 @@ Report employeeItemSales(const std::vector<Check> &closed, const std::vector<Men
             if (p.name.empty() || l.addedById == key)   // their name as they rang it
                 p.name = name;
             Tally &t = p.items[l.name];
+            const Money sales = c.lineSales(l, ctx.settings.tax);
             t.qty += l.counted();
-            t.sales += l.total();
+            t.sales += sales;
             p.qty += l.counted();
-            p.sales += l.total();
+            p.sales += sales;
         }
         if (counted && (!mine.others.empty() || (!cashier.empty() && cashier != c.serverName)))
             shared.push_back(std::move(mine));
@@ -559,7 +561,7 @@ Report driverReport(const std::vector<Check> &closed, const ReportContext &ctx)
         t.tips += totals.tips;
         for (const OrderLine &l : c.lines)
             if (l.isFee() && !l.voided)
-                t.fees += l.total();
+                t.fees += c.lineSales(l, ctx.settings.tax);
         if (c.outAt && c.deliveredAt > c.outAt) {
             t.outMs += c.deliveredAt - c.outAt;
             ++t.timed;
@@ -2012,8 +2014,8 @@ Report royaltyReport(const std::vector<Check> &closed, const ReportContext &ctx)
         if (c.training)
             continue;
         const Totals t = c.totals(ctx.settings.tax);
-        gross += t.items;
-        discounts += t.discounts;
+        gross += t.itemsExTax;
+        discounts += t.discountsExTax;
         net += t.subtotal;
         ++checks;
         for (const OrderLine &l : c.lines)   // gift cards sold aren't sales yet
@@ -2056,19 +2058,24 @@ Report accountingReport(const std::vector<Check> &closed, const std::map<std::st
             if (l.voided || l.isComment())
                 continue;
             if (l.isGiftCard()) {
-                credit["giftCardsSold"] += l.total();
+                credit["giftCardsSold"] += c.lineSales(l, ctx.settings.tax);
                 continue;
             }
             const auto f = familyOf.find(l.itemId);
-            credit["sales:" + (f == familyOf.end() || f->second.empty() ? std::string("other") : f->second)] += l.total();
+            credit["sales:" + (f == familyOf.end() || f->second.empty() ? std::string("other") : f->second)] += c.lineSales(l, ctx.settings.tax);
         }
         for (const auto &[cls, amount] : t.taxByClass)
             credit["tax:" + toString(cls)] += amount;
         credit["gratuity"] += t.gratuity;
         credit["tips"] += t.tips;
         credit["rounding"] += t.rounding;
-        debit["discounts"] += t.discounts - t.staffMeals;
-        debit["staffMeals"] += t.staffMeals;
+        // Prices including tax: discounts without the tax in them (staff meals their share of that),
+        // so the books balance with sales and tax kept apart. Tax added on top: as taken off.
+        const Money staffEx = t.discounts.cents() > 0
+                                  ? t.staffMeals.scaled(t.discountsExTax.cents(), t.discounts.cents())
+                                  : Money();
+        debit["discounts"] += t.discountsExTax - staffEx;
+        debit["staffMeals"] += staffEx;
         bool cashBooked = false;
         for (const Payment &p : c.payments) {
             tenderNames[p.tenderId] = p.tenderName;

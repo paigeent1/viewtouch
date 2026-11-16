@@ -53,6 +53,20 @@ std::string taxName(TaxClass c, const TicketContext &ctx)
     return ctx.tr("Tax");
 }
 
+// Prices include tax: the class's name with the rate it was backed out at ("Alcohol tax 7.35%").
+std::string taxLabel(TaxClass c, const Check &check, const Totals &t, const TicketContext &ctx)
+{
+    std::string name = taxName(c, ctx);
+    if (!t.taxIncluded)
+        return name;
+    const std::int64_t ppm = check.ratesFor(ctx.settings.tax).ratePpm(c);
+    const std::string rate = std::to_string(ppm / 10000);
+    std::string frac = std::to_string(10000 + ppm % 10000).substr(1);   // 73500 -> "3500" -> "35"
+    while (!frac.empty() && frac.back() == '0')
+        frac.pop_back();
+    return name + " " + rate + (frac.empty() ? "" : "." + frac) + "%";
+}
+
 std::string typeName(CheckType t, const TicketContext &ctx)
 {
     switch (t) {
@@ -188,7 +202,9 @@ Document receipt(const Check &check, const TicketContext &ctx)
         }
     }
     d.rule();
-    d.columns(ctx.tr("Subtotal"), ctx.money(t.items));
+    // Prices include tax: the items as rung, the discounts, then the subtotal without tax, the tax
+    // in it and the total (what the guest pays: the prices less the discounts).
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items));
     for (const Payment &p : check.payments) {
         if (p.kind == TenderKind::Discount) {
             const auto off = t.discountBy.find(p.id);
@@ -196,8 +212,12 @@ Document receipt(const Check &check, const TicketContext &ctx)
                 d.columns(p.tenderName, ctx.money(-off->second));
         }
     }
+    if (t.taxIncluded)
+        d.columns(ctx.tr("Subtotal"), ctx.money(t.subtotal));
     for (const auto &[cls, amount] : t.taxByClass)
-        d.columns(taxName(cls, ctx), ctx.money(amount));
+        d.columns(taxLabel(cls, check, t, ctx), ctx.money(amount));
+    if (t.taxIncluded)
+        d.text("  " + ctx.tr("Prices include tax."));
     if (t.gratuity.cents() != 0) {
         d.columns(ctx.tr("Gratuity %1%", {std::to_string(check.gratuityBp / 100)}), ctx.money(t.gratuity));
         // What it is and who gets it (service charge laws).
@@ -357,9 +377,14 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
         }
     }
     d.rule();
-    d.columns(ctx.tr("Subtotal"), ctx.money(t.items));
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items));
+    if (t.taxIncluded) {
+        if (t.discounts.cents() > 0)
+            d.columns(ctx.tr("Discounts & promotions"), ctx.money(-t.discounts));
+        d.columns(ctx.tr("Subtotal"), ctx.money(t.subtotal));
+    }
     for (const auto &[cls, amount] : t.taxByClass)
-        d.columns(taxName(cls, ctx), ctx.money(amount));
+        d.columns(taxLabel(cls, check, t, ctx), ctx.money(amount));
     d.columns(upper(ctx.tr("Total")), ctx.money(t.total), true, true);
     d.blank();
     if (t.balance.cents() > 0)

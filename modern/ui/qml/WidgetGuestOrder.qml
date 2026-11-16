@@ -174,7 +174,7 @@ Item {
             Text { id: l; Layout.fillWidth: true; color: w.soft; font.family: w.face; font.pixelSize: w.unit * parent.size; elide: Text.ElideRight }
             Text { id: v; color: parent.valueInk; font.family: w.face; font.pixelSize: w.unit * parent.size }
         }
-        Line { label: qsTr("Subtotal"); value: w.totals.items ?? "" }
+        Line { label: (w.totals.taxIncluded ?? false) ? qsTr("Items") : qsTr("Subtotal"); value: w.totals.items ?? "" }
         Line {
             label: qsTr("Discounts & promotions")
             value: w.totals.discounts ?? ""
@@ -182,6 +182,8 @@ Item {
             valueInk: "#7ee2a8"
         }
         // Each tax on its own (food and beverage, merchandise...), as the Order summary panel shows them.
+        // Prices include tax: the subtotal without tax, then the tax in it.
+        Line { label: qsTr("Subtotal"); value: w.totals.subtotal ?? ""; visible: w.totals.taxIncluded ?? false }
         Line { label: qsTr("Tax"); value: w.totals.tax ?? ""; visible: (w.totals.taxLines ?? []).length === 0 }
         Repeater {
             model: w.totals.taxLines ?? []

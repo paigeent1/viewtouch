@@ -345,7 +345,7 @@ Report PosService::foodCostReport(const std::vector<Check> &closed, const Report
             Row &row = rows[l.itemId];
             row.name = l.name;
             row.sold += l.counted();
-            row.sales += l.total();
+            row.sales += c.lineSales(l, s_->settings.tax);   // GP: sales without tax
             row.cost += costOf(l, row);
         }
     }
@@ -438,7 +438,7 @@ Report PosService::menuEngineeringReport(const std::vector<Check> &closed, const
             row.cost += lineCost(l, &source);
             row.costed = row.costed || source != 0;
             row.sold += l.counted();
-            row.sales += l.total();
+            row.sales += c.lineSales(l, s_->settings.tax);   // GP: sales without tax
         }
     }
     std::map<std::string, std::string> names;

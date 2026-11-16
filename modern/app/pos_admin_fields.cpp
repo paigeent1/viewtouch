@@ -292,6 +292,9 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"merchandise"_s, tr("Merchandise tax %"), u"percent"_s),
             field(u"room"_s, tr("Room tax %"), u"percent"_s),
             field(u"taxTakeoutFood"_s, tr("Tax takeout food"), u"bool"_s),
+            field(u"pricesIncludeTax"_s, tr("Prices include tax"), u"bool"_s,
+                  tr("On (a bar): menu prices are what the guest pays, and the tax is taken out of the check "
+                     "total. Off (retail): tax is added on top. Reports never count tax as sales.")),
             with(field(u"cashRounding"_s, tr("Cash rounding"), u"enum"_s,
                        tr("Where pennies are gone: checks paid in cash are rounded to the nearest 5 or 10 cents. Cards are exact.")),
                  u"options"_s, options({{"0", "None (to the cent)"}, {"5", "Nearest 5 cents"}, {"10", "Nearest 10 cents"}})),

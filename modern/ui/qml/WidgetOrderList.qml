@@ -684,10 +684,16 @@ Item {
                 font.bold: strong
             }
 
+            // Prices include tax (a bar): items and discounts as rung, then the subtotal without tax,
+            // the tax in it and the total the guest pays.
+            Cell { text: qsTr("Items"); visible: (w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false); Layout.fillWidth: true }
+            Cell { text: w.totals.items ?? ""; visible: (w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false) }
+            Cell { text: qsTr("Discount"); visible: (w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false); Layout.fillWidth: true }
+            Cell { text: w.totals.discounts ?? ""; visible: (w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false) }
             Cell { text: qsTr("Subtotal"); Layout.fillWidth: true }
             Cell { text: w.totals.subtotal ?? "" }
-            Cell { text: qsTr("Discount"); visible: w.totals.hasDiscount ?? false; Layout.fillWidth: true }
-            Cell { text: w.totals.discounts ?? ""; visible: w.totals.hasDiscount ?? false }
+            Cell { text: qsTr("Discount"); visible: !(w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false); Layout.fillWidth: true }
+            Cell { text: w.totals.discounts ?? ""; visible: !(w.totals.taxIncluded ?? false) && (w.totals.hasDiscount ?? false) }
             // One tax line, or (the Order summary) each tax on its own: food, alcohol, merchandise...
             Cell { text: qsTr("Tax"); visible: !w.taxByClass; Layout.fillWidth: true }
             Cell { text: w.totals.tax ?? ""; visible: !w.taxByClass }

@@ -226,10 +226,11 @@ Report employeeSales(const std::vector<EmployeeItemRow> &ilsa, const std::vector
                 }
                 Tally &t = p.items[l.name];
                 t.qty += double(l.counted());
-                t.sales += l.total();
+                const Money sales = c.lineSales(l, ctx.settings.tax);   // without tax
+                t.sales += sales;
                 p.qty += double(l.counted());
-                p.sales += l.total();
-                p.fromVt += l.total();
+                p.sales += sales;
+                p.fromVt += sales;
             }
         }
     }
@@ -300,8 +301,8 @@ ZTotals fromChecks(const std::vector<Check> &closed, const TaxRates &rates)
             continue;
         const Totals t = c.totals(rates);
         ++z.receipts;
-        z.merchandise += t.items;
-        z.promotions -= t.discounts;
+        z.merchandise += t.itemsExTax;   // sales without tax (prices including tax: taken out)
+        z.promotions -= t.discountsExTax;
         z.tax += t.tax;
         z.receiptTotals += t.total;
         change += t.change;
@@ -317,17 +318,17 @@ ZTotals fromChecks(const std::vector<Check> &closed, const TaxRates &rates)
             if (l.voided) {
                 OrderLine live = l;
                 live.voided = false;
-                z.voided += live.total();
+                z.voided += c.lineSales(live, rates);
                 ++z.voidLines;
             } else if (!l.itemId.empty() && !l.isGiftCard()) {
                 z.units += l.quantity;
                 ++z.itemLines;
                 // Cost at the time of sale (kept on each line since 2026-11-07); none: a no-cost line.
-                if (const std::optional<Money> c = l.costAtSale()) {
-                    z.cost += *c;
+                if (const std::optional<Money> cost = l.costAtSale()) {
+                    z.cost += *cost;
                     z.costKnown = true;
                 } else {
-                    z.noCostSales += l.total();
+                    z.noCostSales += c.lineSales(l, rates);
                 }
             }
         }

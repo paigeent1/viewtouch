@@ -239,7 +239,8 @@ QJsonObject toJson(const Check &c)
              return QJsonValue(QJsonObject{{u"food"_s, qint64(r.foodPpm)}, {u"alcohol"_s, qint64(r.alcoholPpm)},
                                            {u"merchandise"_s, qint64(r.merchandisePpm)}, {u"room"_s, qint64(r.roomPpm)},
                                            {u"takeoutFood"_s, r.taxTakeoutFood},
-                                           {u"cashRounding"_s, r.cashRoundingCents}});
+                                           {u"cashRounding"_s, r.cashRoundingCents},
+                                           {u"included"_s, r.pricesIncludeTax}});
          }()},
     };
 }
@@ -348,6 +349,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         rates.roomPpm = fraction(r.value(u"room"), 1'000'000);
         rates.taxTakeoutFood = r.value(u"takeoutFood").toBool(true);
         rates.cashRoundingCents = std::clamp(r.value(u"cashRounding").toInt(0), 0, 100);
+        rates.pricesIncludeTax = r.value(u"included").toBool(false);
         c.closedRates = rates;
     }
     c.firedCourse = std::max(1, o.value(u"firedCourse").toInt(1));
@@ -1141,7 +1143,8 @@ QJsonObject toJson(const PosSettings &s)
         {u"tax"_s, QJsonObject{
              {u"food"_s, percentFromPpm(s.tax.foodPpm)}, {u"alcohol"_s, percentFromPpm(s.tax.alcoholPpm)},
              {u"merchandise"_s, percentFromPpm(s.tax.merchandisePpm)}, {u"room"_s, percentFromPpm(s.tax.roomPpm)},
-             {u"taxTakeoutFood"_s, s.tax.taxTakeoutFood}, {u"cashRounding"_s, s.tax.cashRoundingCents}}},
+             {u"taxTakeoutFood"_s, s.tax.taxTakeoutFood}, {u"cashRounding"_s, s.tax.cashRoundingCents},
+             {u"pricesIncludeTax"_s, s.tax.pricesIncludeTax}}},
         {u"tenders"_s, tenders}, {u"tendersV2"_s, true},
         {u"printers"_s, printers},
         {u"receiptHeader"_s, qs(s.receiptHeader)}, {u"receiptLogo"_s, s.receiptLogo},
@@ -1416,6 +1419,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.tax.roomPpm = ppmFromPercent(tax.value(u"room").toDouble());
     s.tax.taxTakeoutFood = tax.value(u"taxTakeoutFood").toBool(true);
     s.tax.cashRoundingCents = tax.value(u"cashRounding").toInt(0);
+    s.tax.pricesIncludeTax = tax.value(u"pricesIncludeTax").toBool(false);
     for (const QJsonValue &v : o.value(u"printers").toArray())
         s.printers.push_back(printerFromJson(v.toObject()));
     s.receiptHeader = ss(o.value(u"receiptHeader").toString());

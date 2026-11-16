@@ -60,6 +60,8 @@ Item {
 
             Line { name: qsTr("Items"); value: w.totals.items ?? "" }
             Line { name: qsTr("Discount"); value: w.totals.discounts ?? ""; visible: w.totals.hasDiscount ?? false }
+            // Prices include tax: the subtotal without tax, then the tax in it.
+            Line { name: qsTr("Subtotal"); value: w.totals.subtotal ?? ""; visible: w.totals.taxIncluded ?? false }
             Repeater {
                 model: w.totals.taxLines ?? []
                 delegate: Line {

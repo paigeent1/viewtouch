@@ -617,17 +617,34 @@ Totals Check::totals(const TaxRates &now) const
     if (any)
         discountShare[largest] += shared - allocated;
 
+    // Prices include tax: each class's tax is backed out of its own part of the total (its lines
+    // less its share of the discounts), never line by line, so the cents add up to what the guest
+    // pays: 2 x $5 at 7.35% is $10.00 = 9.32 + 0.68.
+    t.taxIncluded = rates.pricesIncludeTax;
+    t.itemsExTax = t.items;
+    const bool takeout = type == CheckType::Takeout;
     for (const auto &[cls, amount] : byClass) {
-        if (cls == TaxClass::Food && type == CheckType::Takeout && !rates.taxTakeoutFood)
+        const std::int64_t ppm = rates.ratePpmFor(cls, takeout);
+        if (ppm == 0)
             continue;
         const Money net = amount - discountShare[cls];
-        const Money tax = net.cents() > 0 ? net.ppm(rates.ratePpm(cls)) : Money();
+        Money tax;
+        if (rates.pricesIncludeTax) {
+            if (net.cents() > 0)
+                tax = net - net.withoutTaxPpm(ppm);
+            t.itemsExTax -= amount - amount.withoutTaxPpm(ppm);
+        } else if (net.cents() > 0) {
+            tax = net.ppm(ppm);
+        }
         if (tax.cents() != 0)
             t.taxByClass[cls] = tax;
         t.tax += tax;
     }
+    if (rates.pricesIncludeTax)
+        t.subtotal = t.items - t.discounts - t.tax;
+    t.discountsExTax = t.itemsExTax - t.subtotal;
 
-    // Gratuity: on the (discounted) subtotal, not taxed, added after tax.
+    // Gratuity: on the (discounted, pre-tax) subtotal, not taxed, added after tax.
     t.gratuity = t.subtotal.percent(gratuityBp);
     t.total = t.subtotal + t.tax + t.gratuity;
     for (const Payment &p : payments) {
@@ -648,6 +665,27 @@ Totals Check::totals(const TaxRates &now) const
     t.balance = t.total + t.rounding - t.paid;
     t.change = t.balance.cents() < 0 ? -t.balance : Money();
     return t;
+}
+
+Money Check::lineSales(const OrderLine &line, const TaxRates &now) const
+{
+    const Money own = line.total();
+    const TaxRates &rates = ratesFor(now);
+    if (!rates.pricesIncludeTax)
+        return own;
+    const std::int64_t ppm = rates.ratePpmFor(line.taxClass, type == CheckType::Takeout);
+    if (line.taxClass == TaxClass::None || ppm == 0)
+        return own;
+    // The running total of its class up to it, before and after: each line takes its step of the
+    // rounded running total, so the class's lines add up to exactly its sales without tax.
+    Money before;
+    for (const OrderLine &l : lines) {
+        if (&l == &line || l.id == line.id)
+            break;
+        if (l.taxClass == line.taxClass)
+            before += l.total();
+    }
+    return (before + own).withoutTaxPpm(ppm) - before.withoutTaxPpm(ppm);
 }
 
 const std::vector<StateRules> &stateRules()

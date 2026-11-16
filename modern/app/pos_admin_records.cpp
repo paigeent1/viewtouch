@@ -101,7 +101,8 @@ QVariantList PosService::adminRecords(const QString &panel)
         const TaxRates &t = s_->settings.tax;
         add({{u"food"_s, percentFromPpm(t.foodPpm)}, {u"alcohol"_s, percentFromPpm(t.alcoholPpm)},
              {u"merchandise"_s, percentFromPpm(t.merchandisePpm)}, {u"room"_s, percentFromPpm(t.roomPpm)},
-             {u"taxTakeoutFood"_s, t.taxTakeoutFood}, {u"cashRounding"_s, QString::number(t.cashRoundingCents)}},
+             {u"taxTakeoutFood"_s, t.taxTakeoutFood}, {u"cashRounding"_s, QString::number(t.cashRoundingCents)},
+             {u"pricesIncludeTax"_s, t.pricesIncludeTax}},
             tr("Tax rates"), QString());
     } else if (panel == u"store") {
         // The tip pool, one job a line ("busser 50"), in the jobs' usual order.
