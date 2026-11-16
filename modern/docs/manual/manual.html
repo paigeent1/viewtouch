@@ -1062,6 +1062,7 @@
 <td><img src="shots/m37-printers.png" width="180" height="101"><br><small>Printers</small></td>
 </tr></table>
 <ul>
+<li><b>Taxes</b> also has <b>Cash discount % (cigarettes; for the Price check)</b>: the cash price of a pack, shown in the Menu Builder's Price check (chapter 19). It doesn't change how checks are priced or paid.</li>
 <li><b>Taxes</b> also sets <b>Cash rounding</b> where pennies are gone: a check paid in cash is rounded to the nearest 5 (or 10) cents and shows a <i>Cash rounding</i> line; cards stay exact.</li>
 <li><b>Payment types</b>: a discount can be a <b>Staff meal</b> (the demo has <i>Staff Meal</i>, 50%). Ring your meal, touch Staff Meal on the payment screen, and it records who ate; the Sales report counts staff meals.</li>
 <li><b>Printers</b>: network (TCP 9100, ESC/POS), CUPS, or a text file for testing; label printers too (Format: ZPL or TSPL, and the label size). After saving a printer, touch <b>Test Print</b>: it prints your logo, text in each size, a sample item and total, and a row of digits that should exactly fill one line (if it wraps or falls short, change <b>Characters per line</b>), then cuts the paper. With a drawer wired to the printer, <b>Test Print + Open Drawer</b> also opens it. A message says when the printer took the page, or why it didn't.
@@ -1734,6 +1735,15 @@
 <li><b>Alpha (A–Z) vs. UPC Numeric Sort:</b> Toggle the item browser between alphabetical sorting and numeric UPC/PLU sorting, and filter by <b>All</b>, <b>Retail Only</b>, or <b>F&amp;B Only</b>.</li>
 <li><b>Parent box to child single cost:</b> Link a child item (a single cigar or a pack) to its parent box or carton UPC and give how many are in it. Whenever the box's cost changes, ViewTouch works out the single's cost, Profit ($), Gross Margin % and Markup % again.</li>
 <li><b>Prices and costs follow the ILSA price book</b> by themselves (chapter 27, ILSA price book sync).</li>
+</ul>
+
+<h2>Price check: a price with tax, cash and card</h2>
+<p>On an item's card in the Menu Builder (hospitality and retail items alike), <b>Price check</b> sits under the price fields. It works out what the price comes to with the tax of the item's tax class (<b>Store Settings → Taxes</b>), as you type. It is only a calculator: checks are priced and paid as always. Touch <b>Use</b> beside a suggested price to put it in the price field (then Save as usual).</p>
+<ul>
+<li><b>Prices include tax</b> (a bar, like HCA): the price is what the guest pays. It shows what's in it: <i>Guest pays $5.00 = $4.66 before tax + $0.34 tax</i> (7.35%). That's one item on its own; a check backs the tax out of its whole total, so several items together can differ by a cent. <b>To net</b> $4.66 <b>before tax, charge</b> $5.00. <b>Round to</b> $0.25, $0.50 or $1 shows the guest price rounded and what it leaves before tax.</li>
+<li><b>Tax added on top</b> (retail, like BHDAN): <i>$12.99 + $0.82 tax = guest pays $13.81</i> (6.35%). To make the guest pay a round amount, type it under <b>Guest pays</b> (or pick <b>Round to</b>): <i>$14.00 → price it at $13.16</i>.</li>
+<li><b>Cash and card</b> (retail items, cigarettes): with a <b>Cash discount %</b>, the price on the card is the card price, and the panel lists the card pack, the cash pack (card price less the %, to the cent; $13.50 at 4% is $12.96) and the <b>carton</b>, 10 cash packs, the same in cash or by card, each with its tax. With a unit cost, it shows the margin before tax at the card and the cash price. The % is the store's one setting: changed here it is saved for every screen, and it is also in <b>Store Settings → Taxes</b> as <i>Cash discount % (cigarettes; for the Price check)</i>. 0 (the start) hides the cash rows.</li>
+<li>It works the same on the tablets.</li>
 </ul>
 
 <h2>Primary UPC and Alt UPCs</h2>

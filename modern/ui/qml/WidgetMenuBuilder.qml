@@ -1508,6 +1508,10 @@ Item {
                                     }
                                 }
 
+                                // Price check: the price with tax, and back; cash vs card (MenuBuilderPriceCheck.qml).
+                                Label { text: qsTr("Price check"); font.bold: true; Layout.alignment: Qt.AlignTop }
+                                MenuBuilderPriceCheck { menu: w }
+
                                 // Parent / Subunit Packaging Breakout
                                 Label { text: qsTr("Parent / Child Packaging"); font.bold: true }
                                 Rectangle {

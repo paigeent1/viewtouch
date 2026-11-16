@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:51 ET — Price Check helper (Claude helper) — Menu Builder: Price check panel on the item card; es/fr/pt/zh; manual
+- **What:** ui/qml/MenuBuilderPriceCheck.qml, shown under Pricing & Margin on every item card: prices include tax (guest pays = before tax + tax, To net X charge Y, Round to 0.25/0.50/1), tax on top (price + tax = guest pays; Guest pays round Y -> price it at X), retail cash vs card (card, cash = card less Cash discount %, carton = 10 cash packs, each with tax; margins before tax), Use buttons put a suggested price in the price field. Cash discount % field saves the store setting (saveCashDiscount). Translations; manual ch. 19 'Price check' and a Taxes note.
+- **Why:** Owner's request: see what a price comes to with tax while setting prices, mainly drinks, and cigarettes cash vs card.
+- **Files:** `modern/CMakeLists.txt`, `modern/docs/manual/manual.html`, `modern/i18n/es.json`, `modern/i18n/fr.json`, `modern/i18n/pt.json`, `modern/i18n/zh.json`, `modern/ui/qml/MenuBuilderPriceCheck.qml`, `modern/ui/qml/WidgetMenuBuilder.qml`
+- **Next person must know:** Panel is self-contained (own QML file, 3 lines in WidgetMenuBuilder.qml). 'Price check' here is the Menu Builder calculator, not the retail screen's PRICE CHECK scan mode.
+
 ### 2026-11-16 13:48 ET — Price Check helper (Claude helper) — Price check: cash discount setting, rates on every screen (tablets too)
 - **What:** Store Settings > Taxes: 'Cash discount % (cigarettes; for the Price check)' (settings.cashDiscountBp, JSON tax.cashDiscountPercent, default 0). PosSession: pricing property {food, alcohol, merchandise, room ppm, included, cashDiscountPercent} sent to RemoteSession (Admin group); priceFigures() works the Price check out in whole cents on any screen (core/price_check.hh); saveCashDiscount (managers). New app/pos_price_check.cpp; tests/test_price_check_app.cpp (incl. a tablet).
 - **Why:** The Menu Builder's Price check needs the item's tax rate, prices-include-tax and the cash % on the Pi and on tablets; the cash % is one store setting so it's the same everywhere (the coming Cigarette Cash Discount uses it too).
