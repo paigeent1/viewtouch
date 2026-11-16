@@ -314,6 +314,12 @@ struct PosSettings {
     // Food cost to stay under (percent of the price): a delivery at higher
     // prices says which items went over, and Food Cost suggests a price.
     int targetFoodCostPercent = 30;
+    // The bar's draft lines with a keg on them (or that had one: DraftLine), the kegs taken off since (the
+    // newest last, at most 300), and the foam / waste allowed on a keg before its loss is flagged (percent).
+    std::vector<DraftLine> draftLines;
+    std::vector<KegRecord> kegs;
+    std::int64_t lastKegId = 0;
+    int kegAllowancePercent = 7;
     // Store Check: problems up to this id have been seen by a manager.
     std::int64_t problemsSeen = 0;
     // Prep labels print here (a printer id; each screen can say otherwise).

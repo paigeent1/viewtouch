@@ -431,6 +431,18 @@ public:
     // save of the settings saves them too.
     void savePrepTimes();
     std::int64_t prepSavedAt = 0;
+    // Draft pours (each keg's ounces rung up): saved quietly, at most once a minute, and a minute after the
+    // last one at the latest (pos_bar.cpp). Changing a keg saves at once.
+    void saveDraftPours();
+    std::int64_t draftSavedAt = 0;
+    bool draftSaveQueued = false;
+    // Link pours to bottles: what the last linking changed, to undo it (items' recipes before, goods it added).
+    struct PourLinkUndo {
+        std::vector<std::pair<std::string, std::vector<core::RecipeLine>>> recipes;
+        std::vector<std::string> goodsAdded;
+        int links = 0;
+    };
+    std::optional<PourLinkUndo> pourLinkUndo;
     // Open a pairing (replacing any open one) and return its code.
     QString startPairing(bool standby = false);
 
@@ -1454,6 +1466,51 @@ public:
     core::Report purchasesReport(const core::ReportContext &ctx) const;
     // Today's deliveries' lines at an invoice cost other than the system cost (Reports: costdiffs).
     core::Report costDifferencesReport(const core::ReportContext &ctx) const;
+
+    // --- the bar: bottles, bottled beer, draft lines and kegs (pos_bar.cpp) ------------------
+    // Managers: {goods: [{id, name, kind, category, unit, packOz, perCase, size, onHand, onHandBottles, lastCount,
+    // lastCountWhen, cost}], categories, kegs: [{id, name, beer, size, onHand, cost}], beers (draft beers on the
+    // menu), allowance, links: {rows: [{item, good, amount, status}], toLink, newGoods, same, skipped}, undo}.
+    QVariantMap barInventory() const override;
+    // Anyone working (Change keg): {lines: [{id, tower, kegId, keg, beer, kegOz, poured, left, percentLeft,
+    // since, by}], kegs: [{id, name, onHand}]}.
+    QVariantMap draftLines() const override;
+    // Link pours to bottles (managers): every drink item ("Tito's 1.25oz", "Kaiken Malbec Glass", a 375ml split,
+    // bottled beer) to its bottle good, by name without the size; the goods made when missing. Draft pours
+    // ("Guinness 16oz") pour from the keg on their beer's line. Undoable (undoLinkPours).
+    bool linkPours();
+    bool undoLinkPours();
+    // The plan linkPours() follows (its preview).
+    struct PourLink {
+        int item = -1;              // index in the menu
+        std::string goodKey;        // the good it pours from ("" for draft)
+        std::string goodName;
+        std::string goodId;         // an existing good; empty: made
+        std::string kind;           // bottle | beer | draft
+        double packOz = 0;
+        double amount = 0;          // oz (bottle, draft) or bottles (beer) per pour
+        std::string status;         // link | same | skip
+        std::string note;
+    };
+    std::vector<PourLink> pourLinkPlan() const;
+    // A shelf count in bottles and tenths (3.4), kegs, or bottles of beer: {lines: [{ingredient, count}]};
+    // kept in ounces as a stock count (the opening count of the next).
+    bool saveBarCount(const QVariantMap &count);
+    // Change keg: {line, keg (a keg good's id; empty: none), kicked (the old one is empty) or left (oz in it)}.
+    bool changeKeg(const QVariantMap &change);
+    // A keg good: {beer, size (half | quarter | sixth), cost (per keg)}.
+    bool addKeg(const QVariantMap &keg);
+    // The foam / waste allowed on a keg (percent, 0-50).
+    bool setKegAllowance(int percent);
+    // Draft pours (takeStock): `oz` of `beer` from the keg on its line (sign -1: a void).
+    void pourDraft(const std::string &beer, double oz);
+    // Bottle variance: each bottle good's opening count + received - poured - closing count, over the counts
+    // made from `from` to `to` (ms); kegs: each keg taken off then, and those on now.
+    core::Report barVarianceReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx) const;
+    core::Report kegReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx) const;
+    // A drink's pricing aid: its cost per oz (its bottle's, its keg's) and 5x that for its pour, tax
+    // included: {costPerOz, target} as text; empty when not known.
+    QVariantMap drinkPricing(const core::MenuItem &m) const;
 
     // --- the schedule (pos_schedule.cpp) ----------------------------------------
     // {employeeId, start, end (ms or "yyyy-MM-dd HH:mm"; an end before the

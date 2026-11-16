@@ -114,6 +114,10 @@ QJsonArray widgetSettings(const QString &kind)
                         u"The screen's Station button can pick another."_s));
         out.append(hint(field(u"props.lockStation"_s, u"Keep this station"_s, u"bool"_s, g),
                         u"For panels side by side: the screen's Station button doesn't change this one."_s));
+    } else if (kind == u"barInventory") {
+        out.append(hint(with(field(u"props.tab"_s, u"Opens on"_s, u"enum"_s, g), u"options"_s,
+                             options({{"", "Shelf count"}, {"draft", "Draft lines"}, {"link", "Link pours to bottles"}})),
+                        u"Draft lines alone: a Change keg page for the bar (anyone working)."_s));
     } else if (kind == u"menuCategories") {
         out.append(hint(field(u"props.period"_s, u"Meal period"_s, u"string"_s, g),
                         u"Its categories (breakfast, lunch...: Menu Builder). Empty: what's on now."_s));
@@ -247,7 +251,7 @@ QStringList widgetKinds()
             u"guestOrder"_s, u"guestMessages"_s, u"guestMedia"_s, u"guestHeader"_s, u"loginPad"_s, u"guestCount"_s, u"checkList"_s,
             u"paymentPanel"_s, u"numPad"_s, u"keyboard"_s, u"splitCheck"_s, u"drawerPanel"_s,
             u"reportView"_s, u"endOfDay"_s, u"logoutPanel"_s, u"clock"_s, u"statusBar"_s,
-            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s};
+            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"barInventory"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s};
 }
 
 QStringList allKinds()

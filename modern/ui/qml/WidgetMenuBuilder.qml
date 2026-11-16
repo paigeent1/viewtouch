@@ -1649,6 +1649,20 @@ Item {
                                     }
                                     Item { Layout.fillWidth: true }
                                 }
+                                // Pricing aid: the pour's cost (its bottle's or keg's cost per oz) x 5, tax included.
+                                Item { visible: builderTarget.visible; implicitWidth: 1; implicitHeight: 1 }
+                                Label {
+                                    id: builderTarget
+                                    objectName: "builderFiveX"
+                                    readonly property var p: w.savedItem && w.savedItem.pricing ? w.savedItem.pricing : ({})
+                                    visible: w.draft.isRetail !== true && p.target !== undefined
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.8
+                                    text: !visible ? "" : qsTr("5× target, tax included: %1 (pour cost %2%3, tax %4%)")
+                                              .arg(p.target).arg(p.pourCost)
+                                              .arg(p.costPerOz ? qsTr(", %1 an oz").arg(p.costPerOz) : "").arg(p.taxPercent)
+                                }
                                 // Tobacco scan data (Altria's weekly file): who makes it, what it is, how it's sold.
                                 // Store Settings > Tobacco scan data fills these in bulk (Fill in makers); this is one item's own.
                                 Label { text: qsTr("Scan data"); visible: w.draft.isRetail === true }

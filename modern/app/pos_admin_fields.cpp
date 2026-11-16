@@ -180,6 +180,18 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"par"_s, tr("Keep on hand (par)"), u"number"_s,
                   tr("Below this, the Stock report's order list asks for enough to get back up to it. 0: not ordered by par.")),
             field(u"cost"_s, tr("Cost per unit"), u"money"_s, tr("For the Food Cost report.")),
+            // The bar (Manager -> Bar & Kegs makes these from the drink items).
+            with(field(u"kind"_s, tr("Bar"), u"enum"_s,
+                       tr("A bottle of liquor or wine (kept in oz), bottled beer (in bottles), or a keg. Empty: a kitchen ingredient.")),
+                 u"options"_s, options({{"", "(not the bar)"}, {"bottle", "Bottle (liquor, wine)"}, {"beer", "Bottled beer"}, {"keg", "Keg"}})),
+            field(u"packOz"_s, tr("Bottle or keg size (oz)"), u"number"_s,
+                  tr("750ml = 25.4, 1L = 33.8, 1.75L = 59.2, 375ml = 12.7, 187ml = 6.3. Kegs: 1/2 = 1984, 1/4 = 992, 1/6 = 661.")),
+            with(with(field(u"perCase"_s, tr("Bottles per case"), u"int"_s, tr("Receive a Delivery takes cases too.")),
+                      u"min"_s, 0), u"max"_s, 1000),
+            field(u"category"_s, tr("Shelf count group"), u"string"_s, tr("Vodka, Red Wine, Bottled Beer…")),
+            field(u"packCost"_s, tr("Cost per bottle"), u"money"_s,
+                  tr("A bottle's system cost: its cost per oz comes from it. Receiving never changes it.")),
+            field(u"beer"_s, tr("Keg: its beer"), u"string"_s, tr("The draft items \"<beer> 12oz\" and \"<beer> 16oz\" pour from it.")),
         };
     }
     if (panel == u"employees") {

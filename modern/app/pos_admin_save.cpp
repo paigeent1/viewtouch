@@ -149,6 +149,13 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             g.unit = "each";
         if (g.lowAt < 0)
             return fail(tr("Low at can't be negative."));
+        if (g.kind == "bottle") {   // kept in oz: its cost per oz from the cost per bottle
+            g.unit = "oz";
+            if (g.packOz <= 0)
+                return fail(tr("Type the bottle's size in oz (750ml = 25.4)."));
+            if (g.packCost.cents() > 0)
+                g.cost = g.packCost.scaled(1000, milli(g.packOz));
+        }
         if (index >= 0) {
             // Since its last count: kept; a different amount on hand is a change by hand.
             const Ingredient &was = s_->ingredients[index];
@@ -768,6 +775,11 @@ bool PosService::saveMenuRecord(int index, const QVariantMap &record)
             qty = 1;
         if (qty <= 0)
             return fail(tr("Recipe amounts must be more than zero: \"%1\".").arg(text));
+        // The item's own settings kept in its recipe (__cost__, __abv__, a draft pour's __draft__:<beer>): as they are.
+        if (what.startsWith(u"__"_s)) {
+            recipe.append(QVariantMap{{u"ingredient"_s, what}, {u"qty"_s, qty}});
+            continue;
+        }
         const Ingredient *g = s_->ingredient(ss(what));
         if (!g) {
             for (const Ingredient &i : s_->ingredients)

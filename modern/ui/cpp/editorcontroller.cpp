@@ -299,6 +299,7 @@ QString EditorController::kindName(const QString &kind) const
         {u"network"_s, QT_TR_NOOP("Network")},
         {u"receiveDelivery"_s, QT_TR_NOOP("Receive a delivery")},
         {u"stockCount"_s, QT_TR_NOOP("Count stock")},
+        {u"barInventory"_s, QT_TR_NOOP("Bar: bottles and kegs")},
         {u"wasteLog"_s, QT_TR_NOOP("Log waste")},
         {u"storeCheck"_s, QT_TR_NOOP("Store check")},
         {u"prepLabels"_s, QT_TR_NOOP("Prep labels")},

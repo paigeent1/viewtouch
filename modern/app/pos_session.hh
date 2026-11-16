@@ -162,6 +162,10 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap stockCounting READ stockCounting NOTIFY adminChanged)
     // Log Waste: {items, ingredients, reasons, today}.
     Q_PROPERTY(QVariantMap wasteLog READ wasteLog NOTIFY adminChanged)
+    // The bar (managers): bottle goods for the shelf count, keg goods, Link pours to bottles' preview.
+    Q_PROPERTY(QVariantMap barInventory READ barInventory NOTIFY adminChanged)
+    // The draft lines and the keg on each (Change keg; anyone working). Follows the pours.
+    Q_PROPERTY(QVariantMap draftLines READ draftLines NOTIFY dayChanged)
     // Ready to open, and what went wrong lately (managers).
     Q_PROPERTY(QVariantMap storeCheck READ storeCheck NOTIFY dayChanged)
     // Prep labels: {ingredients, printer}.
@@ -409,6 +413,8 @@ public:
     virtual QVariantMap receiving() const = 0;
     virtual QVariantMap stockCounting() const = 0;
     virtual QVariantMap wasteLog() const = 0;
+    virtual QVariantMap barInventory() const = 0;
+    virtual QVariantMap draftLines() const = 0;
     virtual QVariantMap storeCheck() const = 0;
     virtual QVariantMap prepLabels() const = 0;
     virtual QVariantMap retailLabels() const = 0;
@@ -631,6 +637,14 @@ public:
     Q_INVOKABLE void saveStockCount(const QVariantMap &count) { invoke(QStringLiteral("saveStockCount"), {count}); }
     // {item | ingredient, qty, reason}: thrown away.
     Q_INVOKABLE void logWaste(const QVariantMap &waste) { invoke(QStringLiteral("logWaste"), {waste}); }
+    // The bar: Link pours to bottles (and undo it), a shelf count in bottles ({lines: [{ingredient, count}]}),
+    // Change keg ({line, keg, kicked, left}), a keg good ({beer, size, cost}), the keg allowance (%).
+    Q_INVOKABLE void linkPours() { invoke(QStringLiteral("linkPours")); }
+    Q_INVOKABLE void undoLinkPours() { invoke(QStringLiteral("undoLinkPours")); }
+    Q_INVOKABLE void saveBarCount(const QVariantMap &count) { invoke(QStringLiteral("saveBarCount"), {count}); }
+    Q_INVOKABLE void changeKeg(const QVariantMap &change) { invoke(QStringLiteral("changeKeg"), {change}); }
+    Q_INVOKABLE void addKeg(const QVariantMap &keg) { invoke(QStringLiteral("addKeg"), {keg}); }
+    Q_INVOKABLE void setKegAllowance(int percent) { invoke(QStringLiteral("setKegAllowance"), {percent}); }
     Q_INVOKABLE void problemsSeen() { invoke(QStringLiteral("problemsSeen")); }
     Q_INVOKABLE void alertsSeen() { invoke(QStringLiteral("alertsSeen")); }
     Q_INVOKABLE void coachNotNow(const QString &id) { invoke(QStringLiteral("coachNotNow"), {id}); }

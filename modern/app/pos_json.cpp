@@ -1400,6 +1400,7 @@ QJsonObject toJson(const PosSettings &s)
          }()},
         {u"tipPercents"_s, [&] { QJsonArray a; for (int p : s.tipPercents) a.append(p); return a; }()}, {u"tableReadyText"_s, qs(s.tableReadyText)},
         {u"textWebhook"_s, qs(s.textWebhook)},
+        {u"bar"_s, barSettingsToJson(s)},
     };
 }
 
@@ -1812,6 +1813,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         tender.staffMeal = t.value(u"staffMeal").toBool();
         s.tenders.push_back(tender);
     }
+    barSettingsFromJson(o.value(u"bar").toObject(), s);
     // Settings from before gift cards and house accounts (once; afterwards
     // the managers' choices stand): the starter "gift" tender was a plain
     // card tender, and there was no house account tender.
@@ -1971,6 +1973,16 @@ QJsonObject toJson(const Ingredient &i)
         o.insert(u"par"_s, i.par);
     if (i.shelfLifeHours > 0)
         o.insert(u"shelfLifeHours"_s, i.shelfLifeHours);
+    if (!i.kind.empty()) {   // the bar: a bottle, bottled beer or a keg
+        o.insert(u"kind"_s, qs(i.kind));
+        o.insert(u"packOz"_s, i.packOz);
+        o.insert(u"perCase"_s, i.perCase);
+        o.insert(u"category"_s, qs(i.category));
+        if (!i.beer.empty())
+            o.insert(u"beer"_s, qs(i.beer));
+        if (i.packCost.cents() != 0)
+            o.insert(u"packCost"_s, decimalFromCents(i.packCost.cents()));
+    }
     if (i.countedAt || i.start || i.received || i.sold || i.wasted || i.adjusted)
         o.insert(u"sinceCount"_s, QJsonObject{{u"at"_s, qint64(i.countedAt)}, {u"start"_s, i.start},
                                               {u"received"_s, i.received}, {u"sold"_s, i.sold},
@@ -1992,6 +2004,14 @@ Ingredient ingredientFromJson(const QJsonObject &o)
     i.vendor = ss(o.value(u"vendor").toString());
     i.par = std::max(0.0, o.value(u"par").toDouble());
     i.shelfLifeHours = std::clamp(o.value(u"shelfLifeHours").toInt(), 0, 24 * 365);
+    i.kind = ss(o.value(u"kind").toString());
+    if (i.kind != "bottle" && i.kind != "beer" && i.kind != "keg")
+        i.kind.clear();
+    i.packOz = std::clamp(o.value(u"packOz").toDouble(), 0.0, 100000.0);
+    i.perCase = std::clamp(o.value(u"perCase").toInt(), 0, 1000);
+    i.category = ss(o.value(u"category").toString().trimmed());
+    i.beer = ss(o.value(u"beer").toString().trimmed());
+    i.packCost = Money::fromCents(std::max<std::int64_t>(0, centsFromDecimal(o.value(u"packCost").toDouble())));
     if (o.contains(u"sinceCount")) {
         const QJsonObject c = o.value(u"sinceCount").toObject();
         i.countedAt = i64(c.value(u"at"));
@@ -2014,6 +2034,13 @@ QJsonObject toJson(const Delivery &d)
                       {u"qty"_s, l.qty}, {u"unitCost"_s, qint64(l.unitCost.cents())}};
         if (l.systemCostKnown)   // the system cost when it came (the invoice's is unitCost)
             o.insert(u"systemCost"_s, qint64(l.systemCost.cents()));
+        if (l.packs != 0) {      // by the bottle
+            o.insert(u"packs"_s, l.packs);
+            o.insert(u"packCost"_s, qint64(l.packCost.cents()));
+            o.insert(u"packSystemCost"_s, qint64(l.packSystemCost.cents()));
+        }
+        if (!l.reason.empty())
+            o.insert(u"reason"_s, qs(l.reason));
         lines.append(o);
     }
     return {{u"id"_s, qint64(d.id)}, {u"at"_s, qint64(d.at)}, {u"vendorId"_s, qs(d.vendorId)},
@@ -2039,6 +2066,10 @@ Delivery deliveryFromJson(const QJsonObject &o)
             d.lines.back().systemCost = money(l.value(u"systemCost"));
             d.lines.back().systemCostKnown = true;
         }
+        d.lines.back().packs = l.value(u"packs").toDouble();
+        d.lines.back().packCost = money(l.value(u"packCost"));
+        d.lines.back().packSystemCost = money(l.value(u"packSystemCost"));
+        d.lines.back().reason = ss(l.value(u"reason").toString());
     }
     return d;
 }
@@ -2049,6 +2080,67 @@ std::vector<Ingredient> ingredientsFromJson(const QJsonArray &a)
     for (const QJsonValue &v : a)
         out.push_back(ingredientFromJson(v.toObject()));
     return out;
+}
+
+// The bar's draft lines and kegs (PosSettings "bar").
+QJsonObject barSettingsToJson(const PosSettings &s)
+{
+    QJsonArray lines;
+    for (const DraftLine &l : s.draftLines)
+        lines.append(QJsonObject{{u"id"_s, qs(l.id)}, {u"kegId"_s, qs(l.kegId)}, {u"kegName"_s, qs(l.kegName)},
+                                 {u"beer"_s, qs(l.beer)}, {u"kegOz"_s, l.kegOz}, {u"kegCost"_s, qint64(l.kegCost.cents())},
+                                 {u"tappedAt"_s, qint64(l.tappedAt)}, {u"tappedBy"_s, qs(l.tappedBy)}, {u"poured"_s, l.poured}});
+    QJsonArray kegs;
+    for (const KegRecord &k : s.kegs)
+        kegs.append(QJsonObject{{u"id"_s, qint64(k.id)}, {u"line"_s, qs(k.line)}, {u"kegId"_s, qs(k.kegId)},
+                                {u"kegName"_s, qs(k.kegName)}, {u"beer"_s, qs(k.beer)}, {u"kegOz"_s, k.kegOz},
+                                {u"kegCost"_s, qint64(k.kegCost.cents())}, {u"tappedAt"_s, qint64(k.tappedAt)},
+                                {u"tappedBy"_s, qs(k.tappedBy)}, {u"offAt"_s, qint64(k.offAt)}, {u"offBy"_s, qs(k.offBy)},
+                                {u"poured"_s, k.poured}, {u"left"_s, k.left}, {u"kicked"_s, k.kicked}});
+    return {{u"lines"_s, lines}, {u"kegs"_s, kegs}, {u"lastKegId"_s, qint64(s.lastKegId)},
+            {u"allowance"_s, s.kegAllowancePercent}};
+}
+
+void barSettingsFromJson(const QJsonObject &o, PosSettings &s)
+{
+    s.draftLines.clear();
+    for (const QJsonValue &v : o.value(u"lines").toArray()) {
+        const QJsonObject l = v.toObject();
+        DraftLine d;
+        d.id = ss(l.value(u"id").toString());
+        d.kegId = ss(l.value(u"kegId").toString());
+        d.kegName = ss(l.value(u"kegName").toString());
+        d.beer = ss(l.value(u"beer").toString());
+        d.kegOz = std::max(0.0, l.value(u"kegOz").toDouble());
+        d.kegCost = money(l.value(u"kegCost"));
+        d.tappedAt = i64(l.value(u"tappedAt"));
+        d.tappedBy = ss(l.value(u"tappedBy").toString());
+        d.poured = l.value(u"poured").toDouble();
+        if (std::ranges::find(draftLineIds(), d.id) != draftLineIds().end())
+            s.draftLines.push_back(d);
+    }
+    s.kegs.clear();
+    for (const QJsonValue &v : o.value(u"kegs").toArray()) {
+        const QJsonObject k = v.toObject();
+        KegRecord r;
+        r.id = i64(k.value(u"id"));
+        r.line = ss(k.value(u"line").toString());
+        r.kegId = ss(k.value(u"kegId").toString());
+        r.kegName = ss(k.value(u"kegName").toString());
+        r.beer = ss(k.value(u"beer").toString());
+        r.kegOz = std::max(0.0, k.value(u"kegOz").toDouble());
+        r.kegCost = money(k.value(u"kegCost"));
+        r.tappedAt = i64(k.value(u"tappedAt"));
+        r.tappedBy = ss(k.value(u"tappedBy").toString());
+        r.offAt = i64(k.value(u"offAt"));
+        r.offBy = ss(k.value(u"offBy").toString());
+        r.poured = k.value(u"poured").toDouble();
+        r.left = std::max(0.0, k.value(u"left").toDouble());
+        r.kicked = k.value(u"kicked").toBool();
+        s.kegs.push_back(r);
+    }
+    s.lastKegId = i64(o.value(u"lastKegId"));
+    s.kegAllowancePercent = std::clamp(o.value(u"allowance").toInt(7), 0, 50);
 }
 
 // --- schedule ----------------------------------------------------------------------------

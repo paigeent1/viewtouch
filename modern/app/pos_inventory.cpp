@@ -90,6 +90,10 @@ void PosService::takeStock(const std::vector<OrderLine> &lines, int sign)
     }
     if (total.empty())
         return;
+    // Draft pours: out of the keg on their beer's line (pos_bar.cpp).
+    for (const auto &[id, q] : total)
+        if (id.starts_with("__draft__:") && q != 0)
+            pourDraft(id.substr(10), q * sign);
     QStringList nowLow;
     for (int i = 0; i < int(s_->ingredients.size()); ++i) {
         Ingredient &g = s_->ingredients[i];
@@ -120,7 +124,7 @@ QVariantMap PosService::stockLeftNow() const
         double left = -1;
         for (const RecipeLine &r : m.recipe) {
             const Ingredient *g = s_->ingredient(r.ingredientId);
-            if (!g || r.quantity <= 0)
+            if (!g || r.quantity <= 0 || g->bar())   // the bar's bottles: counted, never "5 left"
                 continue;
             low = low || g->low();
             const double n = std::floor((g->onHand + 1e-9) / r.quantity);
@@ -144,7 +148,9 @@ void PosService::refreshSoldOut()
         bool shortOf = false;
         for (const RecipeLine &r : m.recipe) {
             const Ingredient *g = s_->ingredient(r.ingredientId);
-            if (g && r.quantity > 0 && g->onHand + 1e-9 < r.quantity)
+            // The bar's bottles and kegs never sell a drink out by themselves (the count is a guess until
+            // the shelf count; the bartender 86's it).
+            if (g && !g->bar() && r.quantity > 0 && g->onHand + 1e-9 < r.quantity)
                 shortOf = true;
         }
         if (shortOf && m.available) {
@@ -514,7 +520,7 @@ QVariantList PosService::lowStock() const
 {
     QVariantList out;
     for (const Ingredient &g : s_->ingredients) {
-        if (g.low())
+        if (g.low() && !(g.bar() && g.countedAt == 0))   // bar goods: once counted
             out.append(QVariantMap{{u"name"_s, qs(g.name)}, {u"onHand"_s, amountText(g.onHand)},
                                    {u"unit"_s, qs(g.unit)}, {u"out"_s, g.onHand <= 0}});
     }
@@ -539,23 +545,44 @@ bool PosService::receiveDelivery(const QVariantMap &r)
     d.invoice = ss(r.value(u"invoice"_s).toString().trimmed());
     for (const QVariant &v : r.value(u"lines"_s).toList()) {
         const QVariantMap l = v.toMap();
-        const double qty = l.value(u"qty"_s).toDouble();
+        const auto g = std::ranges::find_if(s_->ingredients, [&](const Ingredient &x) { return qs(x.id) == l.value(u"ingredient"_s).toString(); });
+        // The bar: bottles (and cases x bottles per case) of a good kept in ounces; bottled beer and kegs by
+        // the bottle or keg (and case).
+        const bool byPack = l.contains(u"bottles"_s) || l.contains(u"cases"_s);
+        const double packs = l.value(u"bottles"_s).toDouble()
+                             + l.value(u"cases"_s).toDouble() * (g != s_->ingredients.end() ? g->perCase : 0);
+        const bool bottle = g != s_->ingredients.end() && g->kind == "bottle" && g->packOz > 0;
+        const double qty = byPack ? (bottle ? packs * g->packOz : packs) : l.value(u"qty"_s).toDouble();
         if (qty == 0)
             continue;
-        const auto g = std::ranges::find_if(s_->ingredients, [&](const Ingredient &x) { return qs(x.id) == l.value(u"ingredient"_s).toString(); });
         if (g == s_->ingredients.end())
             return fail(tr("There is no ingredient '%1' (see Manager → Inventory).").arg(l.value(u"ingredient"_s).toString()));
-        if (qty < 0)
+        if (l.value(u"cases"_s).toDouble() != 0 && g->perCase <= 0)
+            return fail(tr("%1 has no bottles per case set (Manager → Inventory).").arg(qs(g->name)));
+        // Damaged or swapped goods: plus/minus lines (a minus only with its reason).
+        const QString reason = l.value(u"reason"_s).toString().trimmed().toLower();
+        if (!reason.isEmpty() && reason != u"damaged" && reason != u"swap")
+            return fail(tr("A line's reason is Damaged or Swap."));
+        if (qty < 0 && reason.isEmpty())
             return fail(tr("Amounts received can't be negative: %1.").arg(qs(g->name)));
         // The invoice's cost (typed; none typed or empty: the system cost). Never the system cost's new value.
+        // By the bottle for a bottle good.
+        const Money systemEach = bottle ? g->packCost : g->cost;
         const QString typed = l.value(u"cost"_s).toString().trimmed();
         const double cost = l.contains(u"cost"_s) && !typed.isEmpty() ? l.value(u"cost"_s).toDouble()
-                                                                        : double(g->cost.cents()) / 100.0;
+                                                                        : double(systemEach.cents()) / 100.0;
         if (cost < 0)
             return fail(tr("Costs can't be negative: %1.").arg(qs(g->name)));
-        Delivery::Line line{g->id, g->name, g->unit, qty, Money::fromCents(std::llround(cost * 100))};
+        const Money each = Money::fromCents(std::llround(cost * 100));
+        Delivery::Line line{g->id, g->name, g->unit, qty, bottle ? each.scaled(1000, milli(g->packOz)) : each};
         line.systemCost = g->cost;
         line.systemCostKnown = true;
+        if (bottle) {
+            line.packs = qty / g->packOz;
+            line.packCost = each;
+            line.packSystemCost = g->packCost;
+        }
+        line.reason = ss(reason);
         d.lines.push_back(line);
     }
     if (d.lines.empty())
@@ -616,10 +643,16 @@ QVariantMap PosService::receiving() const
     for (const Vendor &v : s_->settings.vendors)
         vendors.append(QVariantMap{{u"id"_s, qs(v.id)}, {u"name"_s, qs(v.name)}});
     QVariantList ingredients;
-    for (const Ingredient &g : s_->ingredients)
-        ingredients.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"name"_s, qs(g.name)}, {u"unit"_s, qs(g.unit)},
-                                       {u"onHand"_s, g.onHand}, {u"cost"_s, double(g.cost.cents()) / 100.0},
-                                       {u"vendor"_s, qs(g.vendor)}, {u"low"_s, g.low()}});
+    for (const Ingredient &g : s_->ingredients) {
+        // A bottle good is received by the bottle (or case): its on hand and cost by the bottle too.
+        const bool bottle = g.kind == "bottle" && g.packOz > 0;
+        ingredients.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"name"_s, qs(g.name)},
+                                       {u"unit"_s, bottle ? tr("bottles") : g.kind == "keg" ? tr("kegs") : qs(g.unit)},
+                                       {u"onHand"_s, bottle ? std::round(g.onHand / g.packOz * 10) / 10 : g.onHand},
+                                       {u"cost"_s, double((bottle ? g.packCost : g.cost).cents()) / 100.0},
+                                       {u"vendor"_s, qs(g.vendor)}, {u"low"_s, g.low()}, {u"kind"_s, qs(g.kind)},
+                                       {u"perCase"_s, g.perCase}});
+    }
     QVariantList recent;
     for (auto it = s_->deliveries.rbegin(); it != s_->deliveries.rend() && recent.size() < 15; ++it)
         recent.append(QVariantMap{{u"when"_s, i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(it->at), u"ddd M/d h:mm AP"_s)},
@@ -1767,7 +1800,10 @@ Report PosService::purchasesReport(const ReportContext &ctx) const
         for (const Delivery::Line &l : d->lines) {
             char qty[32];
             std::snprintf(qty, sizeof qty, "%g %s", l.qty, l.unit.c_str());
-            r.line({l.name, qty, ctx.money(l.unitCost) + " each", ctx.money(l.total())});
+            if (l.packs != 0)   // by the bottle
+                std::snprintf(qty, sizeof qty, "%g bottles", std::round(l.packs * 100) / 100);
+            r.line({l.name + (l.reason.empty() ? std::string() : " (" + l.reason + ")"), qty,
+                    ctx.money(l.packs != 0 ? l.packCost : l.unitCost) + " each", ctx.money(l.total())});
         }
         r.total({"Total", "", d->invoice.empty() ? "" : "#" + d->invoice, ctx.money(d->total())});
     }

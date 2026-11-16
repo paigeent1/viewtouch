@@ -38,6 +38,9 @@ QJsonObject toJson(const core::Check &check);
 QJsonObject toJson(const core::Refund &refund);
 core::Refund refundFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::Change &change);
+// The bar's draft lines and kegs, kept in the settings ("bar").
+QJsonObject barSettingsToJson(const core::PosSettings &s);
+void barSettingsFromJson(const QJsonObject &o, core::PosSettings &s);
 QJsonObject toJson(const core::StockCount &count);
 core::StockCount stockCountFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::Waste &waste);

@@ -787,6 +787,26 @@
           "name": "openLabelUtility"
         }
       ]
+    },
+    {
+      "id": "bar-inventory",
+      "kind": "button",
+      "rect": {
+        "x": 160,
+        "y": 660,
+        "w": 300,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Bar & Kegs\u2026",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "bar-inventory"
+        }
+      ]
     }
   ]
 }

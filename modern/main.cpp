@@ -1101,6 +1101,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
+                {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
                 // Retail Mode back to the Retail screen, from the order screens (above the check), the
                 // floor plan and Open checks (owner 2026-11-09: no way back from there).
                 {u"order-template", u"retail-mode-btn"},

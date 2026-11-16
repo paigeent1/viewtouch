@@ -191,6 +191,8 @@ public:
     QVariantMap receiving() const override { return v(u"receiving").toMap(); }
     QVariantMap stockCounting() const override { return v(u"stockCounting").toMap(); }
     QVariantMap wasteLog() const override { return v(u"wasteLog").toMap(); }
+    QVariantMap barInventory() const override { return v(u"barInventory").toMap(); }
+    QVariantMap draftLines() const override { return v(u"draftLines").toMap(); }
     QVariantMap storeCheck() const override { return v(u"storeCheck").toMap(); }
     QVariantMap prepLabels() const override { return v(u"prepLabels").toMap(); }
     QVariantMap retailLabels() const override { return v(u"retailLabels").toMap(); }

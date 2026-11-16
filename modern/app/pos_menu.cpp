@@ -737,6 +737,8 @@ QVariantList PosService::menuItemsNow() const
                                {u"abv"_s, abvOf(m) > 0 ? QString::number(abvOf(m), 'g', 6) : QString()},
                                {u"pourOz"_s, pourOzOf(m) > 0 ? QString::number(pourOzOf(m), 'g', 6) : QString()},
                                {u"stdDrinks"_s, standardDrinksOf(m) > 0 ? QString::number(standardDrinksOf(m), 'f', 2) : QString()},
+                               // Its pricing aid: cost per oz, the pour's cost, 5x it with tax (pos_bar.cpp).
+                               {u"pricing"_s, pourOzOf(m) > 0 || abvOf(m) > 0 ? drinkPricing(m) : QVariantMap()},
                                {u"scanMaker"_s, qs(m.scanMaker)}, {u"scanCategory"_s, qs(m.scanCategory)},
                                {u"scanUom"_s, qs(m.scanUom)}, {u"scanUnits"_s, m.scanUnits > 0 ? QString::number(m.scanUnits) : QString()},
                                {u"scanSoldAs"_s, [&] {

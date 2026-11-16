@@ -15,6 +15,9 @@ Item {
     property string vendor: ""
     property var qty: ({})    // ingredient id -> quantity typed
     property var cost: ({})   // ingredient id -> cost typed
+    property var cases: ({})  // ingredient id -> cases typed (the bar: bottles per case)
+    // Damaged or swapped goods: plus/minus lines [{ingredient, qty, reason: "damaged" | "swap"}].
+    property var extras: []
     property int typed: 0     // bumps when either changes (for the total)
     property bool showDiffs: false   // the Cost differences review, over the screen
     readonly property var diffs: info.costDifferences ?? []
@@ -25,6 +28,8 @@ Item {
     function clear() {
         qty = ({})
         cost = ({})
+        cases = ({})
+        extras = []
         invoice.text = ""
         ++typed
     }
@@ -32,23 +37,47 @@ Item {
         const c = cost[item.id]
         return c !== undefined && c !== "" ? Number(c) : item.cost
     }
+    // How many came: typed, plus cases x bottles per case (the bar).
+    function count(item) {
+        return Number(qty[item.id] ?? 0) + Number(cases[item.id] ?? 0) * (item.perCase ?? 0)
+    }
+    function itemById(id) { return (info.ingredients ?? []).find(i => i.id === id) }
     readonly property real total: {
         if (typed < 0) return 0   // compared, not just read: so it refreshes
         let t = 0
         for (const item of info.ingredients ?? [])
-            if (Number(qty[item.id] ?? 0) > 0)
-                t += Number(qty[item.id]) * unitCost(item)
+            if (count(item) > 0)
+                t += count(item) * unitCost(item)
+        for (const x of extras) {
+            const item = itemById(x.ingredient)
+            if (item) t += Number(x.qty || 0) * unitCost(item)
+        }
         return t
+    }
+    readonly property bool anything: typed >= 0 && ((info.ingredients ?? []).some(i => count(i) > 0)
+                                                    || extras.some(x => x.ingredient && Number(x.qty || 0) !== 0))
+    function line(item, n, reason) {
+        const l = { ingredient: item.id, cost: unitCost(item) }
+        if (item.kind) l.bottles = n   // the bar: bottles (kegs), kept in ounces for bottles
+        else l.qty = n
+        if (reason) l.reason = reason
+        return l
     }
     function receive() {
         const lines = []
         for (const item of info.ingredients ?? []) {
-            const q = Number(qty[item.id] ?? 0)
-            if (q > 0)
-                lines.push({ ingredient: item.id, qty: q, cost: unitCost(item) })
+            const n = count(item)
+            if (n > 0)
+                lines.push(line(item, n, ""))
+        }
+        for (const x of extras) {
+            const item = itemById(x.ingredient)
+            if (item && Number(x.qty || 0) !== 0)
+                lines.push(line(item, Number(x.qty), x.reason))
         }
         pos.receiveDelivery({ vendor: vendor, invoice: invoice.text, lines: lines })
     }
+    readonly property bool anyCases: (info.ingredients ?? []).some(i => (i.perCase ?? 0) > 0)
 
     // Upright (a phone): the delivery only (no "On hand", no recent deliveries).
     readonly property bool narrow: zone ? zone.narrow : false
@@ -112,6 +141,7 @@ Item {
                     Layout.fillHeight: false
                     Label { text: qsTr("Item"); opacity: 0.6; Layout.fillWidth: true }
                     Label { visible: !w.narrow; text: qsTr("On hand"); opacity: 0.6; Layout.preferredWidth: 110 }
+                    Label { visible: w.anyCases; text: qsTr("Cases"); opacity: 0.6; Layout.preferredWidth: 80 }
                     Label { text: qsTr("Received"); opacity: 0.6; Layout.preferredWidth: 110 }
                     Label { text: qsTr("Invoice cost"); opacity: 0.6; Layout.preferredWidth: 110 }
                     Label { text: qsTr("Total"); opacity: 0.6; Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight }
@@ -147,6 +177,19 @@ Item {
                             text: Number(row.modelData.onHand).toLocaleString(Qt.locale(), "f", 1).replace(/\.0$/, "") + " " + row.modelData.unit
                             opacity: 0.8
                         }
+                        TextField {   // cases (the bar), when it has bottles per case
+                            objectName: "cases-" + row.modelData.id
+                            visible: w.anyCases
+                            enabled: (row.modelData.perCase ?? 0) > 0
+                            opacity: enabled ? 1 : 0.3
+                            Layout.preferredWidth: 80
+                            implicitHeight: 44
+                            font.pixelSize: 16
+                            inputMethodHints: Qt.ImhDigitsOnly
+                            text: w.typed >= 0 ? (w.cases[row.modelData.id] ?? "") : ""
+                            placeholderText: enabled ? qsTr("× %1").arg(row.modelData.perCase) : ""
+                            onTextEdited: { w.cases[row.modelData.id] = text; ++w.typed }
+                        }
                         TextField {
                             objectName: "qty-" + row.modelData.id
                             Layout.preferredWidth: 110
@@ -170,10 +213,63 @@ Item {
                         Label {
                             Layout.preferredWidth: 90
                             horizontalAlignment: Text.AlignRight
-                            text: { if (w.typed < 0) return ""; const q = Number(w.qty[row.modelData.id] ?? 0)
+                            text: { if (w.typed < 0) return ""; const q = w.count(row.modelData)
                                     return q > 0 ? "$" + (q * w.unitCost(row.modelData)).toFixed(2) : "" }
                         }
                     }
+                }
+                // Damaged or swapped: plus/minus lines (less for what came broken or went back, more for
+                // what came instead).
+                Repeater {
+                    model: w.extras   // not w.typed: typing must not make the rows again
+                    delegate: RowLayout {
+                        id: extra
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        spacing: 6
+                        ComboBox {
+                            objectName: "extraItem-" + extra.index
+                            Layout.fillWidth: true
+                            implicitHeight: 44
+                            model: (w.info.ingredients ?? []).map(i => i.name)
+                            currentIndex: (w.info.ingredients ?? []).findIndex(i => i.id === extra.modelData.ingredient)
+                            onActivated: i => { w.extras[extra.index].ingredient = w.info.ingredients[i].id; ++w.typed }
+                        }
+                        TextField {
+                            objectName: "extraQty-" + extra.index
+                            Layout.preferredWidth: 90
+                            implicitHeight: 44
+                            text: extra.modelData.qty ?? ""
+                            placeholderText: qsTr("-1 or +1")
+                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                            onTextEdited: { w.extras[extra.index].qty = text; ++w.typed }
+                        }
+                        Repeater {
+                            model: [{ id: "damaged", text: qsTr("Damaged") }, { id: "swap", text: qsTr("Swap") }]
+                            delegate: Button {
+                                required property var modelData
+                                text: modelData.text
+                                checkable: true
+                                checked: extra.modelData.reason === modelData.id
+                                highlighted: checked
+                                implicitHeight: 44
+                                onClicked: { w.extras[extra.index].reason = modelData.id; ++w.typed }
+                            }
+                        }
+                        Button {
+                            text: "✕"
+                            implicitHeight: 44
+                            onClicked: { w.extras.splice(extra.index, 1); w.extras = w.extras.slice(); ++w.typed }
+                        }
+                    }
+                }
+                Button {
+                    objectName: "addDamagedLine"
+                    text: qsTr("+ Damaged or swapped")
+                    implicitHeight: 40
+                    enabled: (w.info.ingredients ?? []).length > 0
+                    onClicked: { w.extras = w.extras.concat([{ ingredient: w.shown.length ? w.shown[0].id : w.info.ingredients[0].id, qty: "", reason: "damaged" }]); ++w.typed }
                 }
                 Label {   // what the cost typed here is (and isn't)
                     objectName: "invoiceCostNote"
@@ -207,7 +303,7 @@ Item {
                         objectName: "receiveDelivery"
                         text: qsTr("Receive Delivery")
                         highlighted: true
-                        enabled: w.total > 0 || Object.keys(w.qty).some(k => Number(w.qty[k]) > 0)
+                        enabled: w.anything
                         implicitHeight: 52
                         implicitWidth: 220
                         font.pixelSize: 17

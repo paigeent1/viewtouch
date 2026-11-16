@@ -53,7 +53,7 @@ QVariantMap toVariant(const Report &r)
 const QStringList kReportIds = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s, u"tips"_s,
                                 u"labor"_s, u"drawer"_s, u"expenses"_s, u"purchases"_s, u"audit"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s, u"kitchen"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s,
                                 u"exceptions"_s, u"deposit"_s, u"customers"_s,
-                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s, u"costdiffs"_s};
+                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s, u"costdiffs"_s, u"barvariance"_s, u"kegs"_s};
 
 // "employee_items|cohiba": the Sales by Employee and Item report, only items matching "cohiba".
 bool isEmployeeItems(const QString &id) { return id == u"employee_items" || id.startsWith(u"employee_items|"); }
@@ -1579,6 +1579,25 @@ Report PosService::buildReport(const QString &id) const
         return purchasesReport(ctx);
     if (id == u"costdiffs")
         return costDifferencesReport(ctx);
+    if (id == u"kegs")
+        return kegReport(s_->day.openedAt, now() + 1, ctx);
+    if (id == u"barvariance") {
+        // Today's bar counts; none today: the latest one.
+        std::int64_t from = s_->day.openedAt;
+        const auto barCount = [&](const StockCount &c) {
+            return std::ranges::any_of(c.lines, [&](const StockCount::Line &l) {
+                const Ingredient *g = s_->ingredient(l.ingredientId);
+                return g && g->bar() && g->kind != "keg";
+            });
+        };
+        if (std::ranges::none_of(s_->stockCounts, [&](const StockCount &c) { return c.at >= from && barCount(c); }))
+            for (auto it = s_->stockCounts.rbegin(); it != s_->stockCounts.rend(); ++it)
+                if (barCount(*it)) {
+                    from = it->at;
+                    break;
+                }
+        return barVarianceReport(from, now() + 1, ctx);
+    }
     if (id == u"tips")
         return tipsReport(allTipShares(), ctx);
     if (id == u"hourly")
@@ -1758,6 +1777,16 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
                     {u"from"_s, from.toString(u"yyyy-MM-dd"_s)}, {u"to"_s, to.toString(u"yyyy-MM-dd"_s)}};
     emit sessionChanged();
 
+    // The bar's bottle and keg variance: from the counts and kegs kept here.
+    if (id == u"barvariance" || id == u"kegs") {
+        const ReportContext ctx = reportContext(label);
+        QVariantMap out = rangeReport_;
+        out.insert(u"loading"_s, false);
+        out.insert(u"report"_s, toVariant(id == u"kegs" ? kegReport(a, b, ctx) : barVarianceReport(a, b, ctx)));
+        rangeReport_ = out;
+        emit sessionChanged();
+        return true;
+    }
     // Time Clock: the punches clocked in on these days - those in memory (today's, the last week's,
     // Time Punches' month, as a manager may just have fixed them), then the rest from the store.
     if (isTimeClock(id)) {
