@@ -79,6 +79,14 @@ struct MenuItem {
     double length = 0;
     int ringGauge = 0;
     int ringGauge2 = 0;
+    // Tobacco scan data (core/scan_data.hh): who makes it for the weekly scan data file ("pmusa", "usstc",
+    // "jmc", "helix", "njoy", "other"; empty: not set), its product type ("cig", "mst", "cigar", "onp",
+    // "vapor", "ryo", "pipe", "other", "cbd", "none"), and how it is sold ("pack", "carton", "roll", "can",
+    // "each", "box"; empty: from its pack/carton link) with how many consumer units that is (0: the usual).
+    std::string scanMaker;
+    std::string scanCategory;
+    std::string scanUom;
+    int scanUnits = 0;
     // How long it should take the kitchen (minutes); 0: what it usually
     // takes (learned, PosSettings::prepSeconds).
     int prepMinutes = 0;

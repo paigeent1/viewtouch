@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 11:59 ET — Scan Data helper (Claude helper) — Altria scan data: core builder and tests
+- **What:** New core/scan_data (no Qt): builds the weekly AGDC scan data file (summary line + 45-field pipe records) from a week's closed checks; merges identical lines; returns negative in 18/31; final price before tax; per-pack buydowns only in the price; discounts sorted by who pays (multi-unit deal names -> 20-22 with the deal total on each line and cents allocated inside each line's price; coupons 25/26; other manufacturer 27/28; everything else store-funded 23/24); age check -> Scanned ID / Manual Entry (never a date or ID data); CBD never; Altria makers always, other makers per product type; settings checks refuse unset or sample values; UPC normalising (11/13/14 digits, UPC-E); fill rules by UPC prefix or department. MenuItem gets scanMaker, scanCategory, scanUom, scanUnits. Catch2 tests in tests/test_scan_data.cpp (core-only build too).
+- **Why:** Owner: Altria Digital Trade Program weekly scan data export (task from Bob, 2026-11-16).
+- **Files:** `modern/CMakeLists.txt`, `modern/core/menu.hh`, `modern/core/scan_data.cpp`, `modern/core/scan_data.hh`, `modern/tests/CMakeLists.txt`, `modern/tests/test_scan_data.cpp`
+- **Next person must know:** UI, settings, Menu Builder fields, the report and vt-scan-data come in the next commits on helper/altria-scan-data.
+
 ### 2026-11-16 12:30 ET — Helper A (Claude helper) — Receive Delivery: Cost differences button beside the invoice number
 - **What:** WidgetReceiveDelivery.qml: the Cost differences button moved from the crowded bottom row (Total, Clear, Receive Delivery) to the Invoice # row, where it always fits. test_pos_flow 'UI: receiving a delivery by touch' REQUIREs the view before reading it (a hidden item isn't found) and takes a screenshot of it.
 - **Why:** CI run 43915988045: the tap missed the button in the bottom row, the view stayed hidden, and the test read a null item (segfault).

@@ -1,4 +1,4 @@
-set(VTM_TEST_SOURCES test_money.cpp test_check.cpp)
+set(VTM_TEST_SOURCES test_money.cpp test_check.cpp test_scan_data.cpp)
 if(TARGET vtm_layout)
     list(APPEND VTM_TEST_SOURCES
         main.cpp   # QCoreApplication for Qt plugins

@@ -23,6 +23,7 @@ add_library(vtm_core STATIC
     core/day.hh core/report.hh core/customer.hh core/waitlist.hh core/inventory.hh core/receipt_ref.hh
     core/core.cpp core/report.cpp
     core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
+    core/scan_data.hh core/scan_data.cpp         # tobacco scan data for Altria (weekly file)
 )
 target_include_directories(vtm_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
