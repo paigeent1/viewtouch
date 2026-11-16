@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 12:08 ET — Scan Data helper (Claude helper) — SCAN_DATA.md: set-up, weekly routine, new location / chain checklist, open questions
+- **What:** New modern/docs/SCAN_DATA.md (plain English): what it does, set-up (rep: Retail Control Number; Help Desk: sFTP login and test week approval), weekly routine, sending again and the cap, a New location / chain checklist (each store its own Altria site info and approved test week; chain: 5-digit Management Account Number, Store Number, separate vs combined files), the five open Help Desk questions, and every data-mapping decision. Manual: Scan Data row in the Reports table.
+- **Why:** Owner and the next developer; owner rules 2026-11-16 (new locations, open questions).
+- **Files:** `modern/docs/SCAN_DATA.md`, `modern/docs/manual/manual.html`
+
 ### 2026-11-16 12:08 ET — Scan Data helper (Claude helper) — vt-scan-data: send a saved week by sFTP, once per week
 - **What:** New scripts/bin/vt-scan-data: 'send [WEEK] [--again] [--dry-run]' uploads ~/ViewTouch/scan-data/<name><Saturday> (curl sftp, else sftp with a key, else sshpass), login from ~/.config/viewtouch/scan-data.conf (must be mode 600; the password goes to curl on stdin), logs every upload to sent.log (time, week, file, size, sha256, sent/failed, first/again), refuses a week already sent unless --again and warns about Altria's 2x-weeks cap; 'status' lists saved and sent weeks. No schedule. vt-copy-store: notes that the scan data files stay each Pi's own and drops any scanData key.
 - **Why:** Owner: Altria scan data sending by hand until the Help Desk approves a test week.
