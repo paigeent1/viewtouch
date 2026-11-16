@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 12:12 ET — Helper A (Claude helper) — Prices include tax test: a fixed discount set as one
+- **What:** test_tax_included.cpp: the $2-off and $1-off discounts set Payment::amount after addPayment (addPayment keeps no amount for a discount tender), so the comp/discount case tests a real fixed discount.
+- **Why:** CI run 43913022202: the case failed because the discount came to nothing.
+- **Files:** `modern/tests/test_tax_included.cpp`
+
 ### 2026-11-16 12:00 ET — Helper A (Claude helper) — Receiving never changes system cost; Cost differences review
 - **What:** PosService::receiveDelivery no longer sets the ingredient's cost from the received line. The cost typed on Receive Delivery is the invoice cost: kept on the Delivery line (unitCost) beside the system cost then (systemCost, systemCostKnown; JSON 'systemCost'). Delivery::Line::costDifference(). New PosService::costDifferences() (in receiving(), so tablets get it): vendor, invoice, item, system cost, invoice cost, difference, date, newest first; a 'Cost differences (n)' button on WidgetReceiveDelivery.qml opens it over the screen; the screen's cost column is now 'Invoice cost' with a note that it never changes the system cost. Report 'costdiffs' (today's, kept at End of Day). The price-watch notice now says which items the invoice prices would put over the food cost target, without changing the cost. README and manual updated. Tests changed: test_inventory 'Receiving a delivery' (bun stays 0.35; difference listed), 'Price watch' (warns on receiving; the cost then set in the inventory editor), test_pos_flow 'UI: receiving a delivery by touch' (bun stays 0.35; Cost differences opens and closes).
 - **Why:** The owner's retail rule, now for the bar too (HCA handoff item 4): system cost comes only from the item editor or the ILSA/price-book sync; invoice costs that differ are reviewed, not applied.

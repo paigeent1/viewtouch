@@ -83,7 +83,7 @@ TEST_CASE("Prices include tax: a comp or discount comes off the total before the
 
     // $2 off the check instead: 8.00 is what's paid, the tax is in that.
     REQUIRE(c.removePayment(comp.id));
-    c.addPayment({"two", "$2 off", TenderKind::Discount, 0}, usd(200));
+    c.addPayment({"two", "$2 off", TenderKind::Discount, 0}, {}).amount = usd(200);   // a fixed amount off
     t = c.totals(ct());
     CHECK(t.total == usd(800));
     CHECK(t.subtotal == usd(745));   // 8.00 / 1.0735 = 7.4522...
@@ -122,7 +122,7 @@ TEST_CASE("Prices include tax: each tax class backs out its own part; untaxed li
         if (i % 2)
             m.addPayment({"d", "10%", TenderKind::Discount, 1000}, {});
         if (i % 3 == 0)
-            m.addPayment({"f", "$1", TenderKind::Discount, 0}, usd(100));
+            m.addPayment({"f", "$1", TenderKind::Discount, 0}, {}).amount = usd(100);
         const Totals mt = m.totals(r);
         INFO("case " << i);
         CHECK(mt.total == mt.items - mt.discounts);
