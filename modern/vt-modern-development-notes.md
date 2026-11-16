@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 09:13 ET — Bob (Claude) — DIRECTV pages: TV on/off renamed BOX on/off
+- **What:** The DIRECTV tuning pages' power keys say BOX on / BOX off: they wake or sleep the receiver, not the TV.
+- **Why:** HCA 2026-11-15: the bar's Sceptre TVs don't follow the DIRECTV box over HDMI-CEC (no device seen), so 'TV off' only put the box in standby. Owner chose to skip TV power control; TVs go off by their own remote.
+- **Files:** `modern/seed/pages/directv-tune-*.json`
+
 ### 2026-11-15 18:39 ET — Bob (Claude) — Upstream review 2026-11-15: nothing new
 - **What:** New modern/docs/UPSTREAM_REVIEW.md (tracker: last reviewed upstream commit fac7dc56, 2026-11-14) and modern/docs/upstream-reviews/2026-11-15.md (two-line review: no upstream commits after Version 0.21).
 - **Why:** Twice-monthly scheduled upstream review; upstream main has nothing after fac7dc5.

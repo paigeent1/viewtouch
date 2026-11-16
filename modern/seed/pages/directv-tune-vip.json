@@ -1053,7 +1053,7 @@
     {
       "id": "rk-poweron",
       "kind": "button",
-      "label": "TV on",
+      "label": "BOX on",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -1082,7 +1082,7 @@
     {
       "id": "rk-poweroff",
       "kind": "button",
-      "label": "TV off",
+      "label": "BOX off",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
