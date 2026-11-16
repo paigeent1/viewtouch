@@ -59,6 +59,7 @@ struct PosServer::Connection {
     // and videos and check a manager's PIN. Never a check or a customer.
     bool billboard = false;
     bool fastUpdates = false;   // hello: "updates": 2 (fetches its update on a connection of its own)
+    QString updateState;        // what its self-update is doing, as it last said (updateState)
     // An older screen's update, the old way: a part at a time, the next once the last has gone out.
     struct PacedUpdate {
         QFile file;
@@ -701,6 +702,10 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         sendUpdate(c, m.value(u"fast").toBool(), m.value(u"auto").toBool());
         return;
     }
+    if (type == u"updateState") {
+        c->updateState = m.value(u"state").toString().left(160);
+        return;
+    }
 
     if (type == u"call") {
         const qint64 id = m.value(u"id").toInteger();
@@ -977,7 +982,8 @@ QVariantList PosServer::connections() const
                                {u"build"_s, c->build}, {u"version"_s, c->version}, {u"platform"_s, c->platform},
                                {u"behind"_s, !c->standby && mine > 0 && c->build < mine},
                                {u"ahead"_s, !c->standby && mine > 0 && c->build > mine},
-                               {u"hasUpdate"_s, !c->standby && !updateFor(c->platform, c->build).path.isEmpty()}});
+                               {u"hasUpdate"_s, !c->standby && !updateFor(c->platform, c->build).path.isEmpty()},
+                               {u"updateState"_s, c->updateState}});
     }
     return out;
 }

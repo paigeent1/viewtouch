@@ -311,6 +311,8 @@ public:
     // the store's update by itself, no manager needed; Main.qml installs it (getUpdate) once nobody
     // is signed in. Does nothing while one is on its way or here, or after the store said no.
     Q_INVOKABLE virtual void autoUpdate() {}
+    // A remote screen tells the store what its self-update is doing (Manager > Network shows it).
+    Q_INVOKABLE virtual void reportUpdateState(const QString &state) { Q_UNUSED(state) }
     virtual bool loggedIn() const = 0;
     virtual QString userName() const = 0;
     virtual QString userRole() const = 0;

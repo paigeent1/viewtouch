@@ -526,6 +526,13 @@ TEST_CASE("Updates: a screen behind the store is told, and a manager there gets 
     CHECK(screens[0].toMap()[u"build"_s] == me.number);
     CHECK(screens[0].toMap()[u"platform"_s] == me.platform);
     CHECK(screens[0].toMap()[u"hasUpdate"_s].toBool());
+    // What its self-update is doing, as the screen says it, shows on the store's list (Network).
+    CHECK(screens[0].toMap()[u"updateState"_s].toString().isEmpty());
+    h.remote->reportUpdateState(u"update here; waiting for nobody signed in"_s);
+    REQUIRE(waitFor([&] {
+        return store.server.connections().value(0).toMap()[u"updateState"_s].toString()
+            == u"update here; waiting for nobody signed in"_s;
+    }));
 
     // A server can't fetch it; a manager can.
     h.pin("1111");

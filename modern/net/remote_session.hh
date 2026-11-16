@@ -63,6 +63,7 @@ public:
     QVariantMap updateInfo() const override;
     void getUpdate() override;
     void autoUpdate() override;
+    void reportUpdateState(const QString &state) override;
     bool online() const override { return welcomed_; }
     bool loggedIn() const override { return v(u"loggedIn").toBool(); }
     QString userName() const override { return v(u"userName").toString(); }
@@ -274,7 +275,9 @@ private:
     QString updateReady_;
     QString updateError_;
     bool autoUpdate_ = false;    // this one fetched by itself: not opened when it's here
-    bool autoRefused_ = false;   // the store said no (an older store: managers only): not till next time
+    bool autoRefused_ = false;
+    QString autoWhy_;               // why the store said no / the download failed (updateInfo "autoWhy")
+    QString reportedUpdateState_;   // last self-update state told to the store (reportUpdateState)   // the store said no (an older store: managers only): not till next time
     void finishUpdate(const QJsonObject &done);
     // A store that can (updateTicket): the update on a connection of its own, picked up where it got to.
     std::unique_ptr<UpdateDownload> download_;

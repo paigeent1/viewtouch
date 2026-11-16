@@ -109,11 +109,29 @@ Item {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true
-                        implicitHeight: 54
+                        implicitHeight: modelData.updateState ? 82 : 54
                         radius: 8
                         color: "#232933"
+                        // What its self-update is doing, as the screen last said (Main.qml autoUpdate).
+                        Label {
+                            objectName: "screenUpdateState-" + modelData.name
+                            visible: !!modelData.updateState
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.leftMargin: 44
+                            anchors.rightMargin: 14
+                            anchors.bottomMargin: 8
+                            font.pixelSize: 14
+                            opacity: 0.75
+                            elide: Text.ElideRight
+                            text: qsTr("Self-update: %1").arg(modelData.updateState ?? "")
+                        }
                         RowLayout {
-                            anchors.fill: parent
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: 54
                             anchors.leftMargin: 14
                             anchors.rightMargin: 14
                             spacing: 14

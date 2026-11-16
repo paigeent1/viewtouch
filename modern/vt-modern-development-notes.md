@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 15:59 ET — Bob (Claude) — Network shows what each tablet's self-update is doing
+- **What:** Android screens report their self-update state every 15 s when it changes (updateState message): up to date / asking / getting N% / waiting for nobody signed in (names who is) / installing / tried but still old / can't get it by itself: <the store's reason> / updates only by a manager. The server keeps it per connection and Manager > Network shows 'Self-update: …' under each screen. RemoteSession keeps the refusal or download failure reason (updateInfo autoWhy). Test in test_net.
+- **Why:** HCA 1-3 sat on 545 all day with nobody signed in and never updated themselves (device owner confirmed, no install attempt in the log); their app log on these tablets doesn't show ViewTouch's messages, so the reason must be visible from the store. b582 was installed on them over Wi-Fi meanwhile.
+- **Files:** `modern/net/remote_session.{hh,cpp}, modern/app/pos_session.hh, modern/net/pos_server.{hh,cpp}, modern/ui/qml/Main.qml, modern/ui/qml/WidgetNetwork.qml, modern/tests/test_net.cpp`
+
 ### 2026-11-16 13:27 ET — Helper C (Claude helper) — Responsible service test: Store Settings saved through adminSave
 - **What:** test_over_service.cpp saves the store record with PosService::adminSave (public) instead of saveAdminRecord (private).
 - **Why:** CI run 43927319323: the test didn't build.

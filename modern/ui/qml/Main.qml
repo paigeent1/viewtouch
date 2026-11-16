@@ -532,20 +532,40 @@ ApplicationWindow {
             objectName: "autoUpdate"
             interval: 15000
             repeat: true
-            running: Qt.platform.os === "android" && !!updateStrip.info.silent && !!updateStrip.info.behind
-                     && !!updateStrip.info.update && !!root.controller.pos && root.controller.pos.online
+            // Runs on every Android screen so it can say what it's doing (Manager > Network shows it);
+            // it only fetches and installs where it may (info.silent) and there is one (info.update).
+            running: Qt.platform.os === "android" && !!root.controller.pos && root.controller.pos.online
+            triggeredOnStart: true
             property int idle: 0
             onTriggered: {
                 const pos = root.controller.pos
                 const i = updateStrip.info
                 idle = (!pos.loggedIn && !selfOrder.visible) ? idle + 1 : 0
-                if (!i.ready) {
+                let state = ""
+                if (!i.silent)
+                    state = qsTr("updates only by a manager (not set up to install by itself)")
+                else if (!i.behind || !i.update)
+                    state = qsTr("up to date")
+                else if (i.autoWhy)
+                    state = qsTr("can't get the update by itself: %1").arg(i.autoWhy)
+                else if (!i.ready) {
                     if (i.downloading === undefined)
                         pos.autoUpdate()
-                } else if (idle >= 2 && updateStrip.installTried !== i.ready) {
+                    state = i.downloading !== undefined ? qsTr("getting the update, %1%").arg(i.downloading)
+                                                        : qsTr("asking for the update")
+                } else if (updateStrip.installTried === i.ready)
+                    state = qsTr("tried to install %1; still running the old one").arg(i.ready.split("/").pop())
+                else if (idle >= 2) {
                     updateStrip.installTried = i.ready
+                    state = qsTr("installing the update")
+                    pos.reportUpdateState(state)
                     pos.getUpdate()   // here already: installs it
-                }
+                    return
+                } else
+                    state = pos.loggedIn ? qsTr("update here; waiting for nobody signed in (%1 is)").arg(pos.userName || qsTr("someone"))
+                                         : selfOrder.visible ? qsTr("update here; waiting (guest ordering)")
+                                                             : qsTr("update here; installing in a moment")
+                pos.reportUpdateState(state)
             }
         }
         visible: !later && (info.behind === true || info.ahead === true) && !selfOrder.visible && !root.pageCovered

@@ -511,6 +511,8 @@ void RemoteSession::handle(const QJsonObject &m)
         storeVersion_ = m.value(u"version").toString();
         storeUpdate_ = m.value(u"update").toObject().toVariantMap();
         autoRefused_ = false;
+        autoWhy_.clear();
+        reportedUpdateState_.clear();   // a new connection: tell the store again
         emit updateChanged();
         welcomed_ = true;
         for (auto it = wanted_.cbegin(); it != wanted_.cend(); ++it)
@@ -560,7 +562,8 @@ void RemoteSession::handle(const QJsonObject &m)
         if (std::exchange(autoUpdate_, false)) {
             // Asked by itself: nobody to tell. A manager's Update Now still works.
             autoRefused_ = true;
-            qCInfo(lcRemote).noquote() << "the store won't send the update by itself:" << m.value(u"text").toString();
+            autoWhy_ = m.value(u"text").toString();
+            qCInfo(lcRemote).noquote() << "the store won't send the update by itself:" << autoWhy_;
         } else {
             updateError_ = m.value(u"text").toString();
             emit notice(updateError_);
@@ -748,6 +751,8 @@ QVariantMap RemoteSession::updateInfo() const
         out.insert(u"error"_s, updateError_);
     if (silentInstall())
         out.insert(u"silent"_s, true);
+    if (!autoWhy_.isEmpty())
+        out.insert(u"autoWhy"_s, autoWhy_);
     return out;
 }
 
@@ -771,6 +776,16 @@ void RemoteSession::getUpdate()
     emit updateChanged();
     // fast: a store that can sends a ticket to download it with; an older one, the parts.
     send({{u"t"_s, u"getUpdate"_s}, {u"fast"_s, true}});
+}
+
+void RemoteSession::reportUpdateState(const QString &state)
+{
+    // What this screen's self-update is doing, for the store's Network page (only when it changes).
+    const QString s = state.left(160);
+    if (!welcomed_ || s == reportedUpdateState_)
+        return;
+    reportedUpdateState_ = s;
+    send({{u"t"_s, u"updateState"_s}, {u"state"_s, s}});
 }
 
 void RemoteSession::autoUpdate()
@@ -828,6 +843,7 @@ void RemoteSession::startDownload(const UpdateTicket &ticket)
         end();
         if (std::exchange(autoUpdate_, false)) {
             autoRefused_ = true;   // tried again after the next connection
+            autoWhy_ = why;
             qCInfo(lcRemote).noquote() << "the update by itself didn't come:" << why;
         } else {
             updateError_ = why;
