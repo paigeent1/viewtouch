@@ -1436,6 +1436,11 @@ int runStore(const Args &cli, const Options &o)
         qInfo().noquote() << "Billboards: their addresses taken from" << shared->billboardsFile;
         shared->saveSettings();
     }
+    // Tobacco scan data (Altria): this store's own settings, in a file on this computer only (never in the
+    // database: a copied store or the standby doesn't get them).
+    shared->scanDataFile = QDir(qEnvironmentVariable("VT_CONF_DIR", QDir::homePath() + u"/.config/viewtouch"_s))
+                               .filePath(u"scan-data-site.json"_s);
+    vt::app::PosService::loadScanDataSettings(*shared);
     vt::print::installFinder(*shared);   // Find My Printers (Manager -> Printers)
 
     // Printing: a worker thread delivers tickets; "file" printers write under

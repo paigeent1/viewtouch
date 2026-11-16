@@ -301,7 +301,7 @@ QVariantList PosService::adminFields(const QString &panel)
         };
     }
     if (panel == u"store") {
-        return storeSections({
+        return storeSections(scanDataFields() + QVariantList{
             field(u"storeName"_s, tr("Store name"), u"string"_s),
             field(u"storeAddress"_s, tr("Store address"), u"text"_s,
                   tr("Street, then city, state and ZIP: one per line. On the Time Clock report.")),

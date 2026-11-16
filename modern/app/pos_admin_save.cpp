@@ -689,6 +689,7 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
                 s_->settings.backupSalt = salt.toBase64().toStdString();
             }
         }
+        saveScanDataRecord(record);   // to this computer's own file, not the database (pos_scan_data.cpp)
         settingsChanged();
         if (s_->printer)
             s_->printer->savePrivacyNotice(s_->settings);   // Desktop/Privacy Notice.txt, kept current

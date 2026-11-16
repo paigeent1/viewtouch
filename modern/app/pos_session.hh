@@ -783,6 +783,10 @@ public:
     {
         invoke(QStringLiteral("requestRangeReport"), {id, period, from, to, compare});
     }
+    // Tobacco scan data (PosService::requestScanData...): answers in rangeReport.
+    Q_INVOKABLE void requestScanData(const QString &weekEnding = {}) { invoke(QStringLiteral("requestScanData"), {weekEnding}); }
+    Q_INVOKABLE void saveScanData(bool anyway = false) { invoke(QStringLiteral("saveScanData"), {anyway}); }
+    Q_INVOKABLE void fillScanMakers(bool overwrite = false) { invoke(QStringLiteral("fillScanMakers"), {overwrite}); }
     Q_INVOKABLE void addShift(const QVariantMap &shift) { invoke(QStringLiteral("addShift"), {shift}); }
     Q_INVOKABLE void removeShift(qint64 id) { invoke(QStringLiteral("removeShift"), {id}); }
     Q_INVOKABLE void clockInEmployee(const QString &employeeId) { invoke(QStringLiteral("clockInEmployee"), {employeeId}); }

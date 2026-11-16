@@ -76,6 +76,8 @@ struct Settings {
     std::vector<std::string> couponNames;
     std::vector<std::string> multiNames;
     std::vector<std::string> otherMfrNames;
+    // Fill in makers: the rules (parseRules); empty: defaultRulesText().
+    std::string fillRules;
 
     bool operator==(const Settings &) const = default;
 };

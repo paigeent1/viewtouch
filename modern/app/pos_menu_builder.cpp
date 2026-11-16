@@ -704,6 +704,29 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         item.taxClass = taxClassFromString(ss(card.value(u"taxClass"_s).toString()));
     if (card.contains(u"manufacturer"_s))
         item.manufacturer = ss(card.value(u"manufacturer"_s).toString().trimmed());
+    // Tobacco scan data (core/scan_data.hh): maker, product type, how it's sold and its consumer units.
+    const auto scanCode = [&](const QString &key, const std::vector<std::string> &known, std::string &into) {
+        if (!card.contains(key))
+            return true;
+        const std::string v = ss(card.value(key).toString().trimmed().toLower());
+        if (!v.empty() && std::ranges::find(known, v) == known.end())
+            return false;
+        into = v;
+        return true;
+    };
+    static const std::vector<std::string> scanUoms{"pack", "carton", "roll", "can", "each", "box"};
+    if (!scanCode(u"scanMaker"_s, core::scandata::makers(), item.scanMaker)
+        || !scanCode(u"scanCategory"_s, core::scandata::categories(), item.scanCategory)
+        || !scanCode(u"scanUom"_s, scanUoms, item.scanUom))
+        return fail(tr("Choose the scan data maker, type and how it's sold from the lists."));
+    if (card.contains(u"scanUnits"_s)) {
+        const QString t = card.value(u"scanUnits"_s).toString().trimmed();
+        bool ok = t.isEmpty();
+        const int n = ok ? 0 : t.toInt(&ok);
+        if (!ok || n < 0 || n > 999)
+            return fail(tr("Consumer units: a whole number (10 for a carton), or leave it empty."));
+        item.scanUnits = n;
+    }
     if (card.contains(u"productGroup"_s))
         item.productGroup = ss(card.value(u"productGroup"_s).toString().trimmed());
     if (card.contains(u"subGroup"_s))
@@ -1722,6 +1745,8 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             idCheck.insert(ss(v.toMap().value(u"id"_s).toString()));
 
     QVariantList rows;
+    const std::vector<core::scandata::FillRule> scanRules = core::scandata::parseRules(
+        s_->scanData.fillRules.empty() ? core::scandata::defaultRulesText() : s_->scanData.fillRules);
     int added = 0, prices = 0, costs = 0, barcodes = 0, names = 0, departments = 0, taxes = 0, gone = 0, conflicts = 0,
         skipped = 0;
     const auto row = [&](const QString &kind, const MenuItem &m, const QString &upc, const QString &before, const QString &after) {
@@ -1801,6 +1826,8 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
         item.modifierGroups.clear();
         if (fileCost.back() > 0)   // ILSA's cost
             setCostCents(item, fileCost.back());
+        // A new item's tobacco scan data maker and type, from the store's fill rules (UPC prefix, department).
+        core::scandata::fillItem(item, scanRules, s_->settings.menuCategories);
         ids.insert(item.id);
         byId.emplace(item.id, s_->menu.size());
         for (const std::string &b : item.barcodes)

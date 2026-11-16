@@ -720,6 +720,7 @@ QVariantList PosService::menuItemsNow() const
     if (!user())
         return out;
     const std::string period = currentMealPeriod();
+    const core::scandata::ItemIndex scanIndex(s_->menu);   // how each sells for scan data (packs, cartons)
     for (const MenuItem &m : s_->menu) {
         out.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"family"_s, qs(m.family)},
                                {u"price"_s, format(m.priceDuring(period))}, {u"modifier"_s, m.isModifier},
@@ -736,6 +737,12 @@ QVariantList PosService::menuItemsNow() const
                                {u"abv"_s, abvOf(m) > 0 ? QString::number(abvOf(m), 'g', 6) : QString()},
                                {u"pourOz"_s, pourOzOf(m) > 0 ? QString::number(pourOzOf(m), 'g', 6) : QString()},
                                {u"stdDrinks"_s, standardDrinksOf(m) > 0 ? QString::number(standardDrinksOf(m), 'f', 2) : QString()},
+                               {u"scanMaker"_s, qs(m.scanMaker)}, {u"scanCategory"_s, qs(m.scanCategory)},
+                               {u"scanUom"_s, qs(m.scanUom)}, {u"scanUnits"_s, m.scanUnits > 0 ? QString::number(m.scanUnits) : QString()},
+                               {u"scanSoldAs"_s, [&] {
+                                   const core::scandata::ItemInfo i = scanIndex.info(m);
+                                   return u"%1 x%2"_s.arg(qs(i.uom)).arg(i.units);
+                               }()},
                                {u"isEvent"_s, [&m] {
                                    for (const RecipeLine &rl : m.recipe) {
                                        if (rl.ingredientId == "__event__")

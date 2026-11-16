@@ -285,6 +285,9 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"requestRangeReport"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.requestRangeReport(a.value(0).toString(), a.value(1).toString(), a.value(2).toString(),
                                                   a.value(3).toString(), a.value(4).toBool())); }},
+        {u"requestScanData"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.requestScanData(a.value(0).toString())); }},
+        {u"saveScanData"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveScanData(a.value(0).toBool())); }},
+        {u"fillScanMakers"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.fillScanMakers(a.value(0).toBool())); }},
         {u"removeShift"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.removeShift(a.value(0).toLongLong())); }},
         {u"clockInEmployee"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.clockInEmployee(a.value(0).toString())); }},

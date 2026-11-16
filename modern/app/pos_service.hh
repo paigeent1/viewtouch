@@ -12,6 +12,7 @@
 #include "core/inventory.hh"
 #include "core/menu.hh"
 #include "core/report.hh"
+#include "core/scan_data.hh"
 #include "core/settings.hh"
 #include "core/waitlist.hh"
 #include "app/pos_session.hh"
@@ -471,6 +472,11 @@ public:
     // list it keeps of the TVs it set up ($VT_CONF_DIR/billboards: "name|address" lines).
     QString billboardScript;
     QString billboardsFile;
+    // Tobacco scan data for Altria (pos_scan_data.cpp): this store's settings, kept in their own file on
+    // this computer ($VT_CONF_DIR/scan-data-site.json), never in the database, so they are never copied
+    // to another store's computer or a standby. Empty file name (tests): in memory only.
+    QString scanDataFile;
+    core::scandata::Settings scanData;
 
     // Backups (set up by main on the store server): take one now, and how
     // the last one went - {at, ok, error, copy, copyOk}.
@@ -1467,6 +1473,25 @@ public:
     // comes in rangeReport ({loading, report}) when the checks are read.
     bool requestRangeReport(const QString &id, const QString &period, const QString &from = {},
                             const QString &to = {}, bool compare = false);
+    // --- tobacco scan data for Altria (pos_scan_data.cpp) -----------------------------------------
+    // Reports > Scan Data: the week ending Saturday `weekEnding` (yyyy-MM-dd; empty: the last whole
+    // week, Eastern time) built and checked; the answer comes in rangeReport ({id: scandata, report,
+    // fileName, records, errors, warnings, settingsReady}). Save File writes it to ~/ViewTouch/scan-data
+    // (VT_SCAN_DATA_DIR): never while the store's scan data settings are unset; with errors only `anyway`.
+    bool requestScanData(const QString &weekEnding = {});
+    bool saveScanData(bool anyway = false);
+    // Fill in makers: every item's empty scan data maker and type from the rules (`overwrite`: all);
+    // how many changed (-1: refused).
+    int fillScanMakers(bool overwrite = false);
+    // Store Settings > Tobacco scan data: its fields, values, and saving them (to this computer's file).
+    QVariantList scanDataFields() const;
+    QVariantMap scanDataValues() const;
+    void saveScanDataRecord(const QVariantMap &record);
+    static QJsonObject scanDataJson(const core::scandata::Settings &s);
+    static core::scandata::Settings scanDataFromJson(const QJsonObject &o);
+    // main: the settings from PosShared::scanDataFile (false: none yet).
+    static bool loadScanDataSettings(PosShared &shared);
+    core::Report scanDataReport(const core::scandata::Result &r, const QString &label) const;
     QVariantMap rangeReport() const override { return rangeReport_; }
     // A coming day (0 today ... 6), from the same weekday in past weeks
     // (pos_forecast.cpp); the answer comes in rangeReport ({id: forecast, report}).
@@ -1540,6 +1565,12 @@ private:
     int scheduleWeek_ = 0;
     QVariantMap rangeReport_;
     int rangeRequest_ = 0;
+    // The scan data file last built (Reports > Scan Data), for Save File.
+    bool writeScanDataSettings();
+    QByteArray scanFile_;
+    QString scanFileName_;
+    bool scanFileErrors_ = true;
+    bool scanSettingsReady_ = false;
     core::Report forecast_;   // the forecast last shown (Print)
     core::Report legacyReport_;   // the ILSA History report last shown (Print)
     core::Report timeClockPaper_;   // the Time Clock report last shown over a range, for receipt paper (Print)

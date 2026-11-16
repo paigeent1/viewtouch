@@ -54,6 +54,7 @@ Item {
         { id: "turns", label: qsTr("Turns") },
         { id: "checklists", label: qsTr("Checklists") },
         { id: "drivers", label: qsTr("Drivers") },
+        { id: "scandata", label: qsTr("Scan Data") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
     // Sent from elsewhere (the Dashboard's tips: See Who Gave Them): that report.
@@ -115,6 +116,17 @@ Item {
     }
     // The forecast: a coming day (0 today ... 6), from past weeks.
     readonly property bool forecasting: reportId === "forecast"
+    // Tobacco scan data (Altria): a Sunday-Saturday week, last week first; its file is checked, then saved.
+    readonly property bool scanData: reportId === "scandata"
+    property string scanWeek: ""   // its Saturday, yyyy-MM-dd; empty: last week
+    function scanWeekStep(days) {
+        const base = w.range.id === "scandata" && w.range.weekEnding ? w.range.weekEnding : ""
+        if (base === "") return
+        const p = base.split("-")
+        const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + days)
+        w.scanWeek = Qt.formatDate(d, "yyyy-MM-dd")
+        w.refresh()
+    }
     property int forecastDay: 1
     // By Employee with the ILSA history too: ILSA cashiers tied to these employees (Reports > ILSA
     // History > Cashiers), over the same days (pos_legacy.cpp).
@@ -128,6 +140,10 @@ Item {
         }
         if (forecasting && pos) {
             pos.requestForecast(forecastDay)
+            return
+        }
+        if (scanData && pos) {
+            pos.requestScanData(scanWeek)
             return
         }
         if (period === "day" || !pos)
@@ -163,6 +179,9 @@ Item {
                  : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
         if (forecasting)
             return range.id === "forecast" && range.report ? range.report
+                 : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
+        if (scanData)
+            return range.id === "scandata" && range.report ? range.report
                  : ({ title: range.loading ? qsTr("Reading the checks…") : "", rows: [] })
         if (period === "custom" && !customInStep)
             return ({ title: "", rows: [] })
@@ -256,9 +275,72 @@ Item {
             }
         }
 
+        // Scan Data: the week, and the file (saved only when its checks pass, or Save Anyway).
+        RowLayout {
+            visible: w.scanData
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.keyH
+            Layout.fillHeight: false
+            spacing: w.unit * 0.3
+            readonly property bool here: w.range.id === "scandata" && !w.range.loading
+            WidgetKey {
+                objectName: "scanWeekBack"
+                Layout.preferredWidth: w.unit * 3
+                Layout.fillHeight: true
+                text: "◀"
+                onClicked: w.scanWeekStep(-7)
+            }
+            Text {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                text: (w.range.id === "scandata" ? (w.range.label ?? "") : "")
+                      + (parent.here ? "  ·  " + qsTr("%1 records, %2 errors, %3 warnings").arg(w.range.records ?? 0)
+                                                    .arg(w.range.errors ?? 0).arg(w.range.warnings ?? 0) : "")
+                color: w.ink
+                font.family: w.face
+                font.pixelSize: w.unit * 0.9
+                elide: Text.ElideRight
+            }
+            WidgetKey {
+                objectName: "scanWeekNext"
+                Layout.preferredWidth: w.unit * 3
+                Layout.fillHeight: true
+                text: "▶"
+                onClicked: w.scanWeekStep(7)
+            }
+            WidgetKey {
+                objectName: "scanFill"
+                Layout.preferredWidth: w.unit * 7
+                Layout.fillHeight: true
+                text: qsTr("Fill in Makers")
+                fontScale: 0.32
+                onClicked: { w.pos.fillScanMakers(false); Qt.callLater(w.refresh) }
+            }
+            WidgetKey {
+                objectName: "scanSave"
+                Layout.preferredWidth: w.unit * 6
+                Layout.fillHeight: true
+                text: qsTr("Save File")
+                fontScale: 0.34
+                baseColor: parent.here && w.range.settingsReady && (w.range.errors ?? 1) === 0 ? "#1f8a4c" : "#343c49"
+                onClicked: w.pos.saveScanData(false)
+            }
+            WidgetKey {
+                // Only past errors in the sales, never past unset store settings (the server refuses those).
+                objectName: "scanSaveAnyway"
+                visible: parent.here && w.range.settingsReady === true && (w.range.errors ?? 0) > 0
+                Layout.preferredWidth: w.unit * 7
+                Layout.fillHeight: true
+                text: qsTr("Save Anyway")
+                fontScale: 0.32
+                baseColor: "#8a2f2f"
+                onClicked: w.pos.saveScanData(true)
+            }
+        }
+
         // Which days.
         GridLayout {
-            visible: !w.forecasting
+            visible: !w.forecasting && !w.scanData
             Layout.fillWidth: true
             readonly property int keyRows: w.narrow ? Math.ceil((w.periods.length + 1) / 4) : 1
             Layout.preferredHeight: keyRows * w.keyH + (keyRows - 1) * w.unit * 0.3
@@ -403,7 +485,7 @@ Item {
             Layout.fillHeight: false
             spacing: w.unit * 0.3
             Text {
-                visible: w.period !== "day" || w.forecasting
+                visible: (w.period !== "day" || w.forecasting) && !w.scanData
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 text: w.period === "custom" && !w.forecasting && !w.ilsaEmployees && !w.customInStep
@@ -416,7 +498,7 @@ Item {
                 elide: Text.ElideRight
             }
             WidgetKey {
-                visible: w.period === "day" && !w.forecasting
+                visible: w.period === "day" && !w.forecasting && !w.scanData
                 Layout.preferredWidth: w.unit * 3
                 Layout.fillHeight: true
                 text: "◀"
@@ -424,7 +506,7 @@ Item {
                 onClicked: if (w.dayIndex < w.days.length - 1) w.dayIndex++
             }
             Text {
-                visible: w.period === "day" && !w.forecasting
+                visible: w.period === "day" && !w.forecasting && !w.scanData
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 text: w.day.label
@@ -434,7 +516,7 @@ Item {
                 elide: Text.ElideRight
             }
             WidgetKey {
-                visible: w.period === "day" && !w.forecasting
+                visible: w.period === "day" && !w.forecasting && !w.scanData
                 Layout.preferredWidth: w.unit * 3
                 Layout.fillHeight: true
                 text: "▶"
@@ -443,7 +525,7 @@ Item {
             }
             WidgetKey {
                 // Time Clock over days too: the one shown, two lines a punch on receipt paper (-1).
-                visible: w.period === "day" || w.forecasting || w.isTimeClock
+                visible: (w.period === "day" || w.forecasting || w.isTimeClock) && !w.scanData
                 Layout.preferredWidth: w.unit * 5
                 Layout.fillHeight: true
                 text: qsTr("Print")
@@ -466,7 +548,7 @@ Item {
             }
             WidgetKey {
                 // Today's sales and drawers on paper, nothing reset.
-                visible: w.period === "day" && w.dayIndex === 0
+                visible: w.period === "day" && w.dayIndex === 0 && !w.scanData
                 Layout.preferredWidth: w.unit * 6
                 Layout.fillHeight: true
                 text: qsTr("X Report")

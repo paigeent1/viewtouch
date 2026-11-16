@@ -249,6 +249,7 @@ QVariantList PosService::adminRecords(const QString &panel)
             store.insert(u"startPage."_s + QLatin1StringView(job),
                          s_->settings.startPages.contains(job) ? qs(s_->settings.startPages.at(job)) : QString());
         store.insert(aboutValues());
+        store.insert(scanDataValues());   // this computer's own (pos_scan_data.cpp)
         out.last() = store;
     } else if (panel == u"promotions") {
         for (const PosSettings::Promotion &p : s_->settings.promotions)

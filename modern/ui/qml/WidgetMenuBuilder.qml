@@ -237,6 +237,7 @@ Item {
                      allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode,
                      length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
                      abv: i.abv ?? "", pourOz: i.pourOz ?? "",
+                     scanMaker: i.scanMaker ?? "", scanCategory: i.scanCategory ?? "", scanUom: i.scanUom ?? "", scanUnits: i.scanUnits ?? "",
                      buttonColor: i.buttonColor, prepMinutes: i.prepMinutes ? String(i.prepMinutes) : "",
                      takeoutPrice: i.takeoutPrice, periodPrices: Object.assign({}, i.periodPrices),
                      taxClass: i.taxClass, printer: i.printer, station: i.station,
@@ -246,6 +247,7 @@ Item {
                      noDiscount: category ? category.noDiscount === true : false,
                      kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode,
                      length: "", ringGauge: "", ringGauge2: "", abv: "", pourOz: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
+                     scanMaker: "", scanCategory: "", scanUom: "", scanUnits: "",
                      section: "", breakBefore: "",
                      // what its category's items start with
                      taxClass: w.retailMode ? "merchandise" : (category ? (category.taxClass || "food") : "food"),
@@ -1646,6 +1648,59 @@ Item {
                                         text: parent.stdDrinks > 0 ? qsTr("= %1 standard drinks").arg(parent.stdDrinks.toFixed(2)) : ""
                                     }
                                     Item { Layout.fillWidth: true }
+                                }
+                                // Tobacco scan data (Altria's weekly file): who makes it, what it is, how it's sold.
+                                // Store Settings > Tobacco scan data fills these in bulk (Fill in makers); this is one item's own.
+                                Label { text: qsTr("Scan data"); visible: w.draft.isRetail === true }
+                                RowLayout {
+                                    visible: w.draft.isRetail === true
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    readonly property var makers: [
+                                        { id: "", name: qsTr("(not set)") }, { id: "pmusa", name: "PM USA" }, { id: "usstc", name: "USSTC" },
+                                        { id: "jmc", name: "John Middleton" }, { id: "helix", name: "Helix (on!)" }, { id: "njoy", name: "NJOY" },
+                                        { id: "other", name: qsTr("Other maker") }]
+                                    readonly property var types: [
+                                        { id: "", name: qsTr("(not set)") }, { id: "cig", name: qsTr("Cigarettes") }, { id: "mst", name: qsTr("Smokeless") },
+                                        { id: "cigar", name: qsTr("Cigars") }, { id: "onp", name: qsTr("Nicotine pouches") }, { id: "vapor", name: qsTr("Vapor") },
+                                        { id: "ryo", name: qsTr("Roll-your-own") }, { id: "pipe", name: qsTr("Pipe tobacco") }, { id: "other", name: qsTr("Other tobacco") },
+                                        { id: "cbd", name: qsTr("CBD (never sent)") }, { id: "none", name: qsTr("Not tobacco") }]
+                                    readonly property var uoms: [
+                                        { id: "", name: qsTr("Automatic") }, { id: "pack", name: qsTr("Pack") }, { id: "carton", name: qsTr("Carton") },
+                                        { id: "roll", name: qsTr("Roll") }, { id: "can", name: qsTr("Can") }, { id: "each", name: qsTr("Each") }, { id: "box", name: qsTr("Box") }]
+                                    ComboBox {
+                                        objectName: "builderScanMaker"
+                                        Layout.fillWidth: true
+                                        model: parent.makers.map(o => o.name)
+                                        currentIndex: Math.max(0, parent.makers.findIndex(o => o.id === (w.draft.scanMaker ?? "")))
+                                        onActivated: i => w.set("scanMaker", parent.makers[i].id)
+                                    }
+                                    ComboBox {
+                                        objectName: "builderScanType"
+                                        Layout.fillWidth: true
+                                        model: parent.types.map(o => o.name)
+                                        currentIndex: Math.max(0, parent.types.findIndex(o => o.id === (w.draft.scanCategory ?? "")))
+                                        onActivated: i => w.set("scanCategory", parent.types[i].id)
+                                    }
+                                    ComboBox {
+                                        objectName: "builderScanUom"
+                                        Layout.preferredWidth: 130
+                                        model: parent.uoms.map(o => o.name)
+                                        currentIndex: Math.max(0, parent.uoms.findIndex(o => o.id === (w.draft.scanUom ?? "")))
+                                        onActivated: i => w.set("scanUom", parent.uoms[i].id)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("How it's sold. Automatic: a carton or roll when packs or cans are linked to it, else a pack, can or each.")
+                                    }
+                                    TextField {
+                                        objectName: "builderScanUnits"
+                                        Layout.preferredWidth: 60
+                                        text: w.draft.scanUnits ?? ""
+                                        placeholderText: w.savedItem && w.savedItem.scanSoldAs ? w.savedItem.scanSoldAs.replace(/.* x/, "") : "1"
+                                        inputMethodHints: Qt.ImhDigitsOnly
+                                        onTextEdited: w.set("scanUnits", text)
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("Consumer units in one (a carton 10, a roll 5). Empty: automatic.")
+                                    }
                                 }
                                 // Sizes (Small, Large…): asked first when it's ordered.
                                 Label { text: qsTr("Sizes") }

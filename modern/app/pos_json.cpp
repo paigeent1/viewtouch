@@ -475,6 +475,10 @@ QJsonObject toJson(const MenuItem &m)
     if (m.length > 0) o.insert(u"length"_s, m.length);
     if (m.ringGauge > 0) o.insert(u"ringGauge"_s, m.ringGauge);
     if (m.ringGauge2 > 0) o.insert(u"ringGauge2"_s, m.ringGauge2);
+    if (!m.scanMaker.empty()) o.insert(u"scanMaker"_s, qs(m.scanMaker));   // tobacco scan data (core/scan_data.hh)
+    if (!m.scanCategory.empty()) o.insert(u"scanCategory"_s, qs(m.scanCategory));
+    if (!m.scanUom.empty()) o.insert(u"scanUom"_s, qs(m.scanUom));
+    if (m.scanUnits > 0) o.insert(u"scanUnits"_s, m.scanUnits);
     if (!m.productGroup.empty()) o.insert(u"productGroup"_s, qs(m.productGroup));
     if (!m.subGroup.empty()) o.insert(u"subGroup"_s, qs(m.subGroup));
     if (m.prepMinutes > 0) o.insert(u"prepMinutes"_s, m.prepMinutes);
@@ -561,6 +565,10 @@ MenuItem menuItemFromJson(const QJsonObject &o)
     m.length = std::clamp(o.value(u"length").toDouble(), 0.0, 99.0);
     m.ringGauge = std::clamp(o.value(u"ringGauge").toInt(), 0, 200);
     m.ringGauge2 = std::clamp(o.value(u"ringGauge2").toInt(), 0, 200);
+    m.scanMaker = ss(o.value(u"scanMaker").toString().trimmed());
+    m.scanCategory = ss(o.value(u"scanCategory").toString().trimmed());
+    m.scanUom = ss(o.value(u"scanUom").toString().trimmed());
+    m.scanUnits = std::clamp(o.value(u"scanUnits").toInt(), 0, 999);
     m.productGroup = ss(o.value(u"productGroup").toString().trimmed());
     m.subGroup = ss(o.value(u"subGroup").toString().trimmed());
     m.prepMinutes = std::clamp(o.value(u"prepMinutes").toVariant().toInt(), 0, 240);
