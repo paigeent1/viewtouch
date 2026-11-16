@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 12:08 ET — Scan Data helper (Claude helper) — vt-scan-data: send a saved week by sFTP, once per week
+- **What:** New scripts/bin/vt-scan-data: 'send [WEEK] [--again] [--dry-run]' uploads ~/ViewTouch/scan-data/<name><Saturday> (curl sftp, else sftp with a key, else sshpass), login from ~/.config/viewtouch/scan-data.conf (must be mode 600; the password goes to curl on stdin), logs every upload to sent.log (time, week, file, size, sha256, sent/failed, first/again), refuses a week already sent unless --again and warns about Altria's 2x-weeks cap; 'status' lists saved and sent weeks. No schedule. vt-copy-store: notes that the scan data files stay each Pi's own and drops any scanData key.
+- **Why:** Owner: Altria scan data sending by hand until the Help Desk approves a test week.
+- **Files:** `scripts/bin/vt-copy-store`, `scripts/bin/vt-scan-data`
+- **Next person must know:** Existing Pis need: sudo ln -sf ~/viewtouch-main/scripts/bin/vt-scan-data /usr/local/bin/
+
 ### 2026-11-16 12:08 ET — Scan Data helper (Claude helper) — Altria scan data: settings, item fields, Fill in Makers, Reports > Scan Data
 - **What:** Store Settings gets a 'Tobacco scan data (Altria)' section: independent (Retail Control Number) or chain (Management Account Number + Store Number), file account name, store name/address/ZIP+4 as Altria has them, optional phone/contact/e-mail, summary-line name, encoding and line endings (marked 'to confirm'), which other makers' product types to send, discount names the manufacturer pays for (coupons, multi-unit deals, other), fill rules. Kept per store in ~/.config/viewtouch/scan-data-site.json (PosShared::scanData), never in the database, so never copied by vt-copy-store or the standby. Menu Builder retail card: scan data maker, type, how it's sold, consumer units (MenuItem JSON). ILSA price book sync fills new items' maker/type from the rules. Reports > Scan Data: Sunday-Saturday week (Eastern), last week first, ◀ ▶; file totals, Checks before sending, lines by sale; Save File to ~/ViewTouch/scan-data (VT_SCAN_DATA_DIR), refused while the settings are unset or default (no override) and while errors remain (Save Anyway); Fill in Makers. Translations es/fr/pt/zh. Tests: tests/test_scan_data_app.cpp.
 - **Why:** Owner: Altria weekly scan data export; owner rule 2026-11-16: scan data settings per store, never copied between Pis, independent and chain modes, refuse to save while unset/default.

@@ -1,0 +1,166 @@
+#!/bin/bash
+# Sends this store's weekly tobacco scan data file to Altria's sFTP site, and keeps a log of every upload.
+#   vt-scan-data status                 the weeks saved and sent
+#   vt-scan-data send [WEEK] [--again] [--dry-run]
+#                                       upload the file saved for WEEK (its Saturday: 2026-01-10 or 20260110;
+#                                       default: last week). Once per week: --again sends it again.
+# First save the file in ViewTouch: Manager > Reports > Scan Data > Save File (~/ViewTouch/scan-data).
+# The sFTP login comes from the Scan Data Help Desk and goes in ~/.config/viewtouch/scan-data.conf (mode 600,
+# on this computer only, never in Git):
+#   SFTP_HOST=...            the host the Help Desk gives
+#   SFTP_PORT=22
+#   SFTP_USER=...
+#   SFTP_PASSWORD=...        or SFTP_KEY=/home/pi/.ssh/altria_key (a key file)
+#   SFTP_DIR=.               the folder to put the file in (default: where the login starts)
+#   SFTP_HOSTKEY_SHA256=...  optional: the server's key fingerprint, checked by curl
+# Every upload counts against Altria's cap (no more than 2 files per week of a promotion period), so a week
+# already sent is refused unless --again. Nothing is sent on a schedule: the owner sends each week by hand.
+set -u
+DIR="${VT_SCAN_DATA_DIR:-$HOME/ViewTouch/scan-data}"
+CONF="${VT_SCAN_DATA_CONF:-$HOME/.config/viewtouch/scan-data.conf}"
+LOG="$DIR/sent.log"   # sent at | week | file | bytes | sha256 | result | how
+
+usage() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
+
+# YYYYMMDD of a Saturday from "2026-01-10" / "20260110"; empty: the last whole week's.
+week_of() {
+    local w="${1//-/}"
+    if [ -z "$w" ]; then
+        local dow; dow=$(date +%w)   # 0 Sunday ... 6 Saturday
+        date -d "-$((dow + 1)) days" +%Y%m%d
+        return
+    fi
+    [[ "$w" =~ ^[0-9]{8}$ ]] || return 1
+    [ "$(date -d "$w" +%w 2>/dev/null)" = 6 ] || return 1
+    echo "$w"
+}
+
+sent_count() {   # successful uploads of week $1
+    [ -f "$LOG" ] || { echo 0; return; }
+    awk -F'\t' -v w="$1" '$2 == w && $6 == "sent" { n++ } END { print n + 0 }' "$LOG"
+}
+
+recent_uploads() {   # successful uploads in the last $1 days
+    [ -f "$LOG" ] || { echo 0; return; }
+    local since; since=$(date -d "-$1 days" '+%Y-%m-%d %H:%M:%S')
+    awk -F'\t' -v s="$since" '$1 >= s && $6 == "sent" { n++ } END { print n + 0 }' "$LOG"
+}
+
+status() {
+    echo "Scan data files in $DIR:"
+    local any=0 f
+    for f in "$DIR"/*; do
+        [ -f "$f" ] || continue
+        case "$(basename "$f")" in sent.log|*.tmp) continue ;; esac
+        any=1
+        local w; w=$(basename "$f" | grep -oE '[0-9]{8}$')
+        printf '  %-36s %8s bytes  %s\n' "$(basename "$f")" "$(stat -c %s "$f")" \
+            "$( [ -n "$w" ] && [ "$(sent_count "$w")" -gt 0 ] && echo "sent $(sent_count "$w")x" || echo "not sent")"
+    done
+    [ "$any" = 1 ] || echo "  (none yet: Manager > Reports > Scan Data > Save File)"
+    echo
+    if [ -f "$LOG" ]; then
+        echo "Uploads (newest last):"
+        awk -F'\t' '{ printf "  %s  week %s  %-30s %s%s\n", $1, $2, $3, $6, ($7 == "again" ? " (again)" : "") }' "$LOG" | tail -n 30
+        echo
+        echo "Uploads in the last 28 days: $(recent_uploads 28) (Altria's cap: 2 per week of the promotion period)."
+    else
+        echo "Nothing sent yet."
+    fi
+    [ -f "$CONF" ] && echo "Login: $CONF" || echo "No login yet: $CONF (from the Scan Data Help Desk)."
+}
+
+send() {
+    local week="" again=0 dry=0 a
+    for a in "$@"; do
+        case "$a" in
+            --again) again=1 ;;
+            --dry-run) dry=1 ;;
+            -h|--help) usage 0 ;;
+            -*) echo "Unknown option $a"; usage ;;
+            *) week="$a" ;;
+        esac
+    done
+    local w
+    w=$(week_of "$week") || { echo "WEEK must be a Saturday: 2026-01-10 or 20260110."; exit 2; }
+    if [ "$w" -ge "$(date +%Y%m%d)" ]; then
+        echo "The week ending $w isn't over yet: send it from Sunday on."; exit 2
+    fi
+    local files=() f
+    for f in "$DIR"/*"$w"; do [ -f "$f" ] && files+=("$f"); done
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No file for the week ending $w in $DIR."
+        echo "Save it first: Manager > Reports > Scan Data (that week) > Save File."; exit 1
+    fi
+    if [ ${#files[@]} -gt 1 ]; then
+        echo "More than one file for the week ending $w (the account name changed?):"; printf '  %s\n' "${files[@]}"
+        echo "Keep only the right one in $DIR."; exit 1
+    fi
+    local file="${files[0]}" name; name=$(basename "$file")
+    local count; count=$(sent_count "$w")
+    if [ "$count" -gt 0 ] && [ "$again" = 0 ]; then
+        echo "The week ending $w was already sent ($count time(s)); see: vt-scan-data status"
+        echo "Every upload counts against Altria's cap (2 files per week of the promotion period)."
+        echo "To replace it with the file saved now (it must hold ALL that week's sales), add --again."
+        exit 3
+    fi
+    [ "$count" -gt 0 ] && echo "WARNING: sending the week ending $w again (sent $count time(s) before). This counts toward Altria's cap."
+    echo "Uploads in the last 28 days: $(recent_uploads 28). Cap: 2 x the weeks in the promotion period."
+    head -n 1 "$file" | tr -d '\r' | sed 's/^/First line: /'
+
+    [ -f "$CONF" ] || { echo "No sFTP login: put it in $CONF (see vt-scan-data --help)."; exit 1; }
+    local perms; perms=$(stat -c %a "$CONF")
+    if [ "$perms" != 600 ] && [ "$perms" != 400 ]; then
+        echo "$CONF must be readable by you only: chmod 600 $CONF"; exit 1
+    fi
+    local SFTP_HOST="" SFTP_PORT=22 SFTP_USER="" SFTP_PASSWORD="" SFTP_KEY="" SFTP_DIR="." SFTP_HOSTKEY_SHA256=""
+    # shellcheck disable=SC1090
+    . "$CONF"
+    [ -n "$SFTP_HOST" ] && [ -n "$SFTP_USER" ] || { echo "$CONF needs SFTP_HOST and SFTP_USER."; exit 1; }
+    [ -n "$SFTP_PASSWORD" ] || [ -n "$SFTP_KEY" ] || { echo "$CONF needs SFTP_PASSWORD or SFTP_KEY."; exit 1; }
+
+    if [ "$dry" = 1 ]; then
+        echo "Dry run: would upload $name ($(stat -c %s "$file") bytes) to $SFTP_USER@$SFTP_HOST:$SFTP_PORT/$SFTP_DIR"
+        exit 0
+    fi
+    local remote="${SFTP_DIR%/}/"
+    [ "$remote" = "./" ] && remote=""
+    local ok=1 how
+    if command -v curl >/dev/null && curl -V 2>/dev/null | grep -qw sftp; then
+        how=curl
+        # The password goes to curl on its standard input, never on the command line (ps shows those).
+        {
+            printf 'user = "%s:%s"\n' "$SFTP_USER" "$SFTP_PASSWORD"
+            [ -n "$SFTP_KEY" ] && printf 'key = "%s"\n' "$SFTP_KEY"
+            [ -n "$SFTP_HOSTKEY_SHA256" ] && printf 'hostpubsha256 = "%s"\n' "$SFTP_HOSTKEY_SHA256"
+        } | curl -sS --fail -K - --ftp-create-dirs -T "$file" "sftp://$SFTP_HOST:$SFTP_PORT/~/$remote$name" || ok=0
+    elif [ -n "$SFTP_KEY" ]; then
+        how=sftp
+        printf 'put "%s" "%s"\n' "$file" "$remote$name" | \
+            sftp -q -b - -i "$SFTP_KEY" -P "$SFTP_PORT" -o StrictHostKeyChecking=accept-new "$SFTP_USER@$SFTP_HOST" || ok=0
+    elif command -v sshpass >/dev/null; then
+        how=sshpass
+        printf 'put "%s" "%s"\n' "$file" "$remote$name" | SSHPASS="$SFTP_PASSWORD" \
+            sshpass -e sftp -q -b - -P "$SFTP_PORT" -o StrictHostKeyChecking=accept-new "$SFTP_USER@$SFTP_HOST" || ok=0
+    else
+        echo "Can't send with a password here: install curl with sftp, or sshpass (sudo apt-get install sshpass)."
+        exit 1
+    fi
+    mkdir -p "$DIR"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$w" "$name" "$(stat -c %s "$file")" \
+        "$(sha256sum "$file" | cut -d' ' -f1)" "$( [ "$ok" = 1 ] && echo sent || echo failed)" \
+        "$( [ "$count" -gt 0 ] && echo again || echo first)" >> "$LOG"
+    if [ "$ok" = 1 ]; then
+        echo "Sent $name ($how). Check its status on the sFTP site; a rejected file is e-mailed to the technical contact."
+    else
+        echo "The upload failed ($how): nothing counted as sent. Check the login in $CONF and try again."
+        exit 1
+    fi
+}
+
+case "${1:-}" in
+    status) status ;;
+    send) shift; send "$@" ;;
+    -h|--help|help) usage 0 ;;
+    *) usage ;;
+esac

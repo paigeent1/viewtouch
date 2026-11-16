@@ -7,7 +7,8 @@
 # aside first to ~/vt-data-before-copy-<time> (nothing is deleted), then ViewTouch starts again.
 # It becomes its own store (new server identity), never the other Pi's standby.
 # Not copied: this Pi's site file (~/.config/viewtouch: printers' devices, scanner, screens, paired
-# tablets and billboards stay this Pi's own). Cleared from the copy: the other Pi's billboards, paired
+# tablets and billboards stay this Pi's own; so do its tobacco scan data settings, scan-data-site.json,
+# and its Altria sFTP login, scan-data.conf: each store sets up and tests its own with Altria). Cleared from the copy: the other Pi's billboards, paired
 # tablets/terminals (and their keys), standby link and printer/standby alerts; printers are kept.
 FROM="$1"
 [ -n "$FROM" ] || { echo "usage: vt-copy-store OTHER-PI-ADDRESS (e.g. 192.168.1.219)"; exit 2; }
@@ -52,6 +53,8 @@ for key, js in db.execute("SELECT key, json FROM settings").fetchall():
     except ValueError: continue
     if not isinstance(o, dict): continue
     changed = False
+    if "scanData" in o:   # never another store's Altria scan data settings (they live in ~/.config anyway)
+        o.pop("scanData", None); changed = True
     if "serverId" in o or "replicaKey" in o:
         o.pop("serverId", None); o.pop("replicaKey", None); o.pop("serverTerm", None); n += 1; changed = True
     if isinstance(o.get("terminals"), list):
