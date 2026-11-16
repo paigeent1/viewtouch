@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:48 ET — Price Check helper (Claude helper) — Price check: cash discount setting, rates on every screen (tablets too)
+- **What:** Store Settings > Taxes: 'Cash discount % (cigarettes; for the Price check)' (settings.cashDiscountBp, JSON tax.cashDiscountPercent, default 0). PosSession: pricing property {food, alcohol, merchandise, room ppm, included, cashDiscountPercent} sent to RemoteSession (Admin group); priceFigures() works the Price check out in whole cents on any screen (core/price_check.hh); saveCashDiscount (managers). New app/pos_price_check.cpp; tests/test_price_check_app.cpp (incl. a tablet).
+- **Why:** The Menu Builder's Price check needs the item's tax rate, prices-include-tax and the cash % on the Pi and on tablets; the cash % is one store setting so it's the same everywhere (the coming Cigarette Cash Discount uses it too).
+- **Files:** `modern/CMakeLists.txt`, `modern/app/pos_admin_fields.cpp`, `modern/app/pos_admin_records.cpp`, `modern/app/pos_admin_save.cpp`, `modern/app/pos_commands.cpp`, `modern/app/pos_json.cpp`, `modern/app/pos_price_check.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.cpp`, `modern/app/pos_session.hh`, `modern/core/settings.hh`, `modern/net/remote_session.cpp`, `modern/net/remote_session.hh`, `modern/tests/CMakeLists.txt`, `modern/tests/test_price_check_app.cpp`
+- **Next person must know:** cashDiscountBp changes nothing at checkout yet: calculator only.
+
 ### 2026-11-16 13:45 ET — Price Check helper (Claude helper) — Price check: core math and tests (with tax, cash vs card, carton)
 - **What:** core/price_check.hh: backOut (tax in a tax-included price), addOn (tax on top), chargeToNet, priceForGuest (price for a round guest total), roundTo, cashPrice (card less cash %), cartonPrice (10 x cash pack), marginBp; all whole cents, half away from zero. tests/test_price_check.cpp (core-only, [pricecheck]).
 - **Why:** Owner wants to see a price with tax included while setting prices (drinks at HCA, cigarettes at BHDAN incl. cash vs card). Calculator only: checks are priced and tendered as before.

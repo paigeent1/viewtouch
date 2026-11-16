@@ -91,7 +91,7 @@ QVariantMap PosSession::snapshot() const
         {u"choosing"_s, choosingInfo()}, {u"weighing"_s, weighingInfo()}, {u"setup"_s, setupInfo()}, {u"soldOut"_s, soldOut()}, {u"menuItems"_s, menuItems()}, {u"orderItems"_s, orderItems()}, {u"builderItems"_s, builderItems()}, {u"builderRevision"_s, builderRevision()}, {u"menuCategories"_s, menuCategories()}, {u"choiceGroups"_s, choiceGroups()}, {u"menuTemplates"_s, menuTemplates()}, {u"menuProblems"_s, menuProblems()}, {u"menuUndoText"_s, menuUndoText()}, {u"cardAlerts"_s, cardAlerts()},
         {u"onBreakSince"_s, onBreakSince()},
         {u"customers"_s, customerResults()}, {u"customer"_s, customerInfo()}, {u"giftCard"_s, giftCardInfo()},
-        {u"waitlist"_s, waitlistInfo()}, {u"customerPrompt"_s, customerPrompt()}, {u"customerDuplicate"_s, customerDuplicate()}, {u"ageAsk"_s, ageAsk()}, {u"idChecks"_s, idChecks()},
+        {u"waitlist"_s, waitlistInfo()}, {u"customerPrompt"_s, customerPrompt()}, {u"customerDuplicate"_s, customerDuplicate()}, {u"ageAsk"_s, ageAsk()}, {u"idChecks"_s, idChecks()}, {u"pricing"_s, pricing()},
         {u"schedule"_s, scheduleInfo()}, {u"nextShift"_s, nextShift()},
         {u"rangeReport"_s, rangeReport()}, {u"expoTickets"_s, expoTickets()},
         {u"approval"_s, approvalInfo()}, {u"training"_s, training()}, {u"autoLogoutMinutes"_s, autoLogoutMinutes()}, {u"phoneLockSeconds"_s, phoneLockSeconds()},

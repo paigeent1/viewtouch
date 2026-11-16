@@ -244,6 +244,11 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             if (r < 0 || r > 100)
                 return fail(tr("Tax rates must be between 0 and 100%."));
         }
+        if (record.contains(u"cashDiscountPercent"_s)) {   // checked before anything changes
+            const double cash = number(record, u"cashDiscountPercent");
+            if (!(cash >= 0 && cash < 100))
+                return fail(tr("The cash discount must be at least 0 and under 100%."));
+        }
         s_->settings.tax.foodPpm = ppmFromPercent(rates[0]);
         s_->settings.tax.alcoholPpm = ppmFromPercent(rates[1]);
         s_->settings.tax.merchandisePpm = ppmFromPercent(rates[2]);
@@ -257,6 +262,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
                 return fail(tr("Cash rounding is to 5 or 10 cents, or none."));
             s_->settings.tax.cashRoundingCents = step;
         }
+        if (record.contains(u"cashDiscountPercent"_s))
+            s_->settings.cashDiscountBp = std::llround(number(record, u"cashDiscountPercent") * 100.0);
         settingsChanged();
         ok = true;
     } else if (panel == u"store") {

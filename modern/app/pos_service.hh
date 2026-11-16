@@ -734,6 +734,10 @@ public:
     // Site Setup > ID checks: {tobacco, alcohol, ageTobacco, ageAlcohol, tobaccoCategories, handNeedsManager}.
     QVariantMap idChecks() const override;
     bool saveIdChecks(const QVariantMap &values);
+    // Menu Builder -> Price check (pos_menu_builder.cpp): the tax rates and the cash discount; its
+    // cash discount % saved from there (managers).
+    QVariantMap pricing() const override;
+    bool saveCashDiscount(double percent);
     int requiredAge(const core::MenuItem &item) const;
     void setQualifier(const QString &qualifier);   // same one again clears it
     void selectLine(qint64 lineId) override;

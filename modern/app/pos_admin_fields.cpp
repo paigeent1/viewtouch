@@ -310,6 +310,10 @@ QVariantList PosService::adminFields(const QString &panel)
             with(field(u"cashRounding"_s, tr("Cash rounding"), u"enum"_s,
                        tr("Where pennies are gone: checks paid in cash are rounded to the nearest 5 or 10 cents. Cards are exact.")),
                  u"options"_s, options({{"0", "None (to the cent)"}, {"5", "Nearest 5 cents"}, {"10", "Nearest 10 cents"}})),
+            field(u"cashDiscountPercent"_s, tr("Cash discount % (cigarettes; for the Price check)"), u"percent"_s,
+                  tr("The cash price of a cigarette pack: the card price less this. Shown in the Menu Builder's "
+                     "Price check (cash and card, with tax, and the carton at 10 cash packs). It doesn't change "
+                     "how checks are priced or paid. 0: off.")),
         };
     }
     if (panel == u"store") {

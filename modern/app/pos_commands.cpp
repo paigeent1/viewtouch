@@ -276,6 +276,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"verifyAgeHand"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.verifyAgeHand(a.value(0).toString())); }},
         {u"cancelAgeCheck"_s, [](PosService &p, const QVariantList &) { p.cancelAgeCheck(); return QVariant(true); }},
         {u"saveIdChecks"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveIdChecks(a.value(0).toMap())); }},
+        {u"saveCashDiscount"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveCashDiscount(a.value(0).toDouble())); }},
         {u"printPrivacyNotice"_s, [](PosService &p, const QVariantList &) { return QVariant(p.printPrivacyNotice()); }},
         {u"customerEmail"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerEmail(a.value(0).toString(), a.value(1).toBool())); }},
         {u"sendReceipt"_s, [](PosService &p, const QVariantList &a) {

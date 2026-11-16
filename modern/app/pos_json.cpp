@@ -1152,7 +1152,8 @@ QJsonObject toJson(const PosSettings &s)
              {u"food"_s, percentFromPpm(s.tax.foodPpm)}, {u"alcohol"_s, percentFromPpm(s.tax.alcoholPpm)},
              {u"merchandise"_s, percentFromPpm(s.tax.merchandisePpm)}, {u"room"_s, percentFromPpm(s.tax.roomPpm)},
              {u"taxTakeoutFood"_s, s.tax.taxTakeoutFood}, {u"cashRounding"_s, s.tax.cashRoundingCents},
-             {u"pricesIncludeTax"_s, s.tax.pricesIncludeTax}}},
+             {u"pricesIncludeTax"_s, s.tax.pricesIncludeTax},
+             {u"cashDiscountPercent"_s, double(s.cashDiscountBp) / 100.0}}},
         {u"tenders"_s, tenders}, {u"tendersV2"_s, true},
         {u"printers"_s, printers},
         {u"receiptHeader"_s, qs(s.receiptHeader)}, {u"receiptLogo"_s, s.receiptLogo},
@@ -1429,6 +1430,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.tax.taxTakeoutFood = tax.value(u"taxTakeoutFood").toBool(true);
     s.tax.cashRoundingCents = tax.value(u"cashRounding").toInt(0);
     s.tax.pricesIncludeTax = tax.value(u"pricesIncludeTax").toBool(false);
+    s.cashDiscountBp = std::clamp<std::int64_t>(std::llround(tax.value(u"cashDiscountPercent").toDouble() * 100.0), 0, 9999);
     for (const QJsonValue &v : o.value(u"printers").toArray())
         s.printers.push_back(printerFromJson(v.toObject()));
     s.receiptHeader = ss(o.value(u"receiptHeader").toString());

@@ -204,6 +204,10 @@ struct PosSettings {
     };
     std::vector<PriceChange> priceChanges;
     TaxRates tax;
+    // Cash discount % (Store Settings -> Taxes), in basis points (400 = 4%): the cash price on cigarette
+    // packs is the card price less this. For now only the Menu Builder's Price check uses it (to see
+    // the cash price while pricing); checks are priced and tendered as before. 0: none (rows hidden).
+    std::int64_t cashDiscountBp = 0;
     std::vector<Tender> tenders;
     std::vector<PrinterConfig> printers;
     std::string receiptHeader;   // lines under the store name

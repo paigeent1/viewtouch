@@ -103,6 +103,8 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap customerDuplicate READ customerDuplicate NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap ageAsk READ ageAsk NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap idChecks READ idChecks NOTIFY adminChanged)
+    // Menu Builder -> Price check: the store's tax rates (ppm), prices include tax, the cash discount.
+    Q_PROPERTY(QVariantMap pricing READ pricing NOTIFY adminChanged)
     // The week's schedule ({title, days, totals, staff}) and your next shift.
     Q_PROPERTY(QVariantMap schedule READ scheduleInfo NOTIFY sessionChanged)
     Q_PROPERTY(QString nextShift READ nextShift NOTIFY sessionChanged)
@@ -359,6 +361,8 @@ public:
     virtual QVariantMap customerPrompt() const = 0;
     virtual QVariantMap customerDuplicate() const = 0;
     virtual QVariantMap ageAsk() const = 0;     // an item waiting for the buyer's ID: {item, name, age, handNeedsManager}
+    // {food, alcohol, merchandise, room (ppm), included, cashDiscountPercent}: Store Settings -> Taxes.
+    virtual QVariantMap pricing() const = 0;
     virtual QVariantMap idChecks() const = 0;   // the store's ID check settings (Site Setup)   // {name, phone, email, matches: [{id, name, phone, email, why}]}
     virtual QVariantMap scheduleInfo() const = 0;
     virtual QString nextShift() const = 0;
@@ -767,6 +771,16 @@ public:
     Q_INVOKABLE void verifyAgeHand(const QString &mmddyyyy) { invoke(QStringLiteral("verifyAgeHand"), {mmddyyyy}); }
     Q_INVOKABLE void cancelAgeCheck() { invoke(QStringLiteral("cancelAgeCheck")); }
     Q_INVOKABLE void saveIdChecks(const QVariantMap &values) { invoke(QStringLiteral("saveIdChecks"), {values}); }
+    // Menu Builder -> Price check: the store's cash discount % (Store Settings -> Taxes). Managers.
+    Q_INVOKABLE void saveCashDiscount(double percent) { invoke(QStringLiteral("saveCashDiscount"), {percent}); }
+    // Menu Builder -> Price check: what `price` comes to with the tax of `taxClass` (pricing()), and
+    // back: the price for a round guest total (tax on top), or for `target` before tax (prices
+    // include tax); `roundCents` 25/50/100 rounds. Retail with a cash discount (`cashPercent`, empty:
+    // the store's): card and cash prices with tax, and a carton at 10 cash packs. With `cost`: the
+    // margins before tax. Worked out here, in whole cents (core/price_check.hh), on any screen.
+    Q_INVOKABLE QVariantMap priceFigures(const QString &price, const QString &taxClass, const QString &cost,
+                                         const QString &target, int roundCents, bool retail,
+                                         const QString &cashPercent = {}) const;
     Q_INVOKABLE void customerEmail(const QString &email, bool privacyAccepted = false) { invoke(QStringLiteral("customerEmail"), {email, privacyAccepted}); }
     Q_INVOKABLE void sendReceipt(const QString &how, const QString &to = {})
     {
