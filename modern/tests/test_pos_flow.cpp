@@ -3776,10 +3776,11 @@ TEST_CASE("UI: receiving a delivery by touch", "[flow][ui][vendors]")
     CHECK(find(u"costDifferences"_s)->property("text").toString() == u"Cost differences (1)"_s);
     s.tapItem(find(u"costDifferences"_s));
     QTest::qWait(60);
-    CHECK(find(u"costDifferencesView"_s)->property("visible").toBool());
+    REQUIRE(find(u"costDifferencesView"_s));   // shown (hidden items aren't found)
+    s.shot("25b-cost-differences");
     s.tapItem(find(u"closeCostDifferences"_s));
     QTest::qWait(60);
-    CHECK_FALSE(find(u"costDifferencesView"_s)->property("visible").toBool());
+    CHECK_FALSE(find(u"costDifferencesView"_s));
 }
 
 TEST_CASE("UI: counting stock by touch, and the Stock Count report", "[flow][ui][stockCount]")

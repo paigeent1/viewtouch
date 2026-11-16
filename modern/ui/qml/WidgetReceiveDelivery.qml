@@ -98,6 +98,14 @@ Item {
                         font.pixelSize: 15
                     }
                     Item { Layout.fillWidth: true }
+                    // Invoice costs that differed from the system cost, for review.
+                    Button {
+                        objectName: "costDifferences"
+                        text: w.diffs.length ? qsTr("Cost differences (%1)").arg(w.diffs.length) : qsTr("Cost differences")
+                        implicitHeight: 44
+                        font.pixelSize: 15
+                        onClicked: w.showDiffs = true
+                    }
                 }
                 RowLayout {   // headings
                     Layout.fillWidth: true
@@ -189,13 +197,6 @@ Item {
                     Layout.fillHeight: false
                     spacing: 10
                     Label { text: qsTr("Total %1").arg("$" + w.total.toFixed(2)); font.pixelSize: 20; font.bold: true; Layout.fillWidth: true }
-                    Button {
-                        objectName: "costDifferences"
-                        text: w.diffs.length ? qsTr("Cost differences (%1)").arg(w.diffs.length) : qsTr("Cost differences")
-                        implicitHeight: 52
-                        font.pixelSize: 16
-                        onClicked: w.showDiffs = true
-                    }
                     Button {
                         text: qsTr("Clear")
                         implicitHeight: 52

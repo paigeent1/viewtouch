@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 12:30 ET — Helper A (Claude helper) — Receive Delivery: Cost differences button beside the invoice number
+- **What:** WidgetReceiveDelivery.qml: the Cost differences button moved from the crowded bottom row (Total, Clear, Receive Delivery) to the Invoice # row, where it always fits. test_pos_flow 'UI: receiving a delivery by touch' REQUIREs the view before reading it (a hidden item isn't found) and takes a screenshot of it.
+- **Why:** CI run 43915988045: the tap missed the button in the bottom row, the view stayed hidden, and the test read a null item (segfault).
+- **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/WidgetReceiveDelivery.qml`
+
 ### 2026-11-16 12:12 ET — Helper A (Claude helper) — Prices include tax test: a fixed discount set as one
 - **What:** test_tax_included.cpp: the $2-off and $1-off discounts set Payment::amount after addPayment (addPayment keeps no amount for a discount tender), so the comp/discount case tests a real fixed discount.
 - **Why:** CI run 43913022202: the case failed because the discount came to nothing.
