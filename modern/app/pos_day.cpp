@@ -1546,6 +1546,8 @@ Report PosService::buildReport(const QString &id) const
     const ReportContext ctx = reportContext(tr("Today, since %1").arg(clockText(s_->day.openedAt)));
     if (id == u"coach")
         return coachReport(ctx);
+    if (id == u"service")   // Responsible Service: the audit file since the day opened (pos_over_service.cpp)
+        return serviceReport(s_->day.openedAt, now() + 1, qs(ctx.period));
     if (id == u"items")
         return itemSales(s_->closedToday, s_->menu, ctx);
     if (isEmployeeItems(id))
@@ -1817,6 +1819,16 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
         return true;
     }
 
+    // Responsible Service: the audit file's entries on these days (no checks to read).
+    if (id == u"service") {
+        QVariantMap out = rangeReport_;
+        out.insert(u"loading"_s, false);
+        out.insert(u"report"_s, toVariant(serviceReport(a, b, label)));
+        rangeReport_ = out;
+        emit sessionChanged();
+        return true;
+    }
+
     // Read the checks away from the screen, then build here.
     auto history = s_->history;
     auto refundHistory = s_->refundHistory;
@@ -1893,6 +1905,10 @@ QVariantMap PosService::report(const QString &id, qint64 dayId)
 {
     if (dayId == 0 || dayId == s_->day.id)
         return toVariant(buildReport(id));
+    if (id == u"service")   // read from the audit file for that day's hours, not saved at End of Day
+        for (const PastDay &p : s_->pastDays)
+            if (p.day.id == dayId)
+                return toVariant(serviceReport(p.day.openedAt, p.day.closedAt ? p.day.closedAt : now() + 1, dayLabel(p.day)));
     for (const PastDay &p : s_->pastDays) {
         if (p.day.id == dayId) {
             // A closed day's reports were saved at End of Day, unfiltered.
@@ -1932,6 +1948,10 @@ bool PosService::printReport(const QString &id, qint64 dayId)
         r = timeClockReport(id, startOfDay(today), startOfDay(today.addDays(1)), s_->punches, true);
     } else if (dayId == 0 || dayId == s_->day.id) {
         r = buildReport(id);
+    } else if (id == u"service") {
+        for (const PastDay &p : s_->pastDays)
+            if (p.day.id == dayId)
+                r = serviceReport(p.day.openedAt, p.day.closedAt ? p.day.closedAt : now() + 1, dayLabel(p.day));
     } else {
         for (const PastDay &p : s_->pastDays) {
             if (p.day.id == dayId)

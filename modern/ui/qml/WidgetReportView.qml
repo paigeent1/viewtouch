@@ -56,6 +56,7 @@ Item {
         { id: "checklists", label: qsTr("Checklists") },
         { id: "drivers", label: qsTr("Drivers") },
         { id: "scandata", label: qsTr("Scan Data") },
+        { id: "service", label: qsTr("Responsible Service") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
     // Sent from elsewhere (the Dashboard's tips: See Who Gave Them): that report.
