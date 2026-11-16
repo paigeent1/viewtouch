@@ -1,0 +1,107 @@
+#!/bin/bash
+# vt-update-stores: every store on the same build, in one go (owner 2026-11-16: "keep HCA and BHDAN all
+# on same build"). Run it on the Pi where `gh` is signed in (BHDAN).
+#
+#   vt-update-stores            the newest code on GitHub (main) everywhere:
+#                                 1. the tablet/billboard app built from that same code: found on GitHub,
+#                                    or built there now (about 25 minutes; it waits)
+#                                 2. both apps into apks/ here, this Pi pulled and restarted (vt-server)
+#                                 3. each other store: the apps copied over, pulled and restarted the same way
+#                                 4. what each store runs now (vt-status there)
+#   vt-update-stores --check    only step 4: what each store and its tablets run
+#   vt-update-stores --not-here steps 1-4 but this Pi isn't restarted (busy register: do it later)
+#
+# The other stores: OTHER_STORES in this Pi's site settings, Name=user@address, separated by spaces:
+#   vt-site set OTHER_STORES "HCA=pi@192.168.6.81"
+# Restarting a store's ViewTouch blanks its register for a minute or two; its tablets set up for
+# ViewTouch put the new app in by themselves once nobody is signed in on them (Fire TV billboards:
+# Store Settings > Billboards > Update app).
+# Asked for a password for each store every time? Once: ssh-copy-id pi@<address>.
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+set -o pipefail
+REPO_GH="${VT_GH_REPO:-paigeent1/viewtouch}"
+APKS="$VT_REPO/apks"
+MODE=all
+case "${1:-}" in
+    --check) MODE=check ;;
+    --not-here) MODE=nothere ;;
+    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    "") ;;
+    *) echo "vt-update-stores [--check | --not-here]"; exit 2 ;;
+esac
+STORES="${OTHER_STORES:-}"
+[ -z "$STORES" ] && echo "No other stores listed (vt-site set OTHER_STORES \"HCA=pi@192.168.6.81\"); updating this one only."
+
+each_store() {   # name target
+    for s in $STORES; do
+        [[ "$s" == *=* ]] || { echo "OTHER_STORES: '$s' isn't Name=user@address"; continue; }
+        "$@" "${s%%=*}" "${s#*=}"
+    done
+}
+show() { echo "== $1: $(ssh -o ConnectTimeout=8 "$2" 'vt-status' 2>&1 | tail -1)"; }
+
+if [ "$MODE" = check ]; then
+    echo "== here ($(hostname)): $(vt-status 2>&1 | tail -1)"
+    each_store show
+    exit 0
+fi
+
+command -v gh >/dev/null && gh auth status >/dev/null 2>&1 \
+    || { echo "GitHub (gh) isn't signed in on this Pi: run this on BHDAN."; exit 1; }
+
+# 1. The code everyone gets, and the app built from it.
+git -C "$VT_REPO" fetch -q myfork main || { echo "Couldn't reach GitHub."; exit 1; }
+SHA=$(git -C "$VT_REPO" rev-parse myfork/main)
+echo "[1/4] Newest code: ${SHA:0:8} ($(git -C "$VT_REPO" log -1 --format=%s myfork/main))"
+find_run() {   # the Android run for SHA: "id status conclusion"
+    gh run list -R "$REPO_GH" -w "Modern Android" -L 30 --json databaseId,headSha,status,conclusion \
+        -q ".[] | select(.headSha == \"$SHA\") | \"\(.databaseId) \(.status) \(.conclusion)\"" | head -1
+}
+RUN=$(find_run)
+if [ -z "$RUN" ] || [ "$(echo "$RUN" | awk '{print $3}')" = failure ]; then
+    echo "      No app built from that code yet: building it on GitHub now (about 25 minutes)..."
+    gh workflow run modern-android.yml -R "$REPO_GH" --ref main >/dev/null || { echo "Couldn't start the build."; exit 1; }
+    sleep 15
+    RUN=$(find_run)
+fi
+ID=${RUN%% *}
+[ -n "$ID" ] || { echo "Couldn't find the build on GitHub."; exit 1; }
+while [ "$(gh run view "$ID" -R "$REPO_GH" --json status -q .status)" != completed ]; do
+    echo "      waiting for the app build ($(date +%H:%M))..."; sleep 60
+done
+[ "$(gh run view "$ID" -R "$REPO_GH" --json conclusion -q .conclusion)" = success ] \
+    || { echo "The app build failed on GitHub (run $ID): nothing was changed. Tell Bob."; exit 1; }
+
+# 2. Here.
+echo "[2/4] The apps here..."
+mkdir -p "$APKS"
+for abi in arm64-v8a armeabi-v7a; do
+    gh run download "$ID" -R "$REPO_GH" -n "ViewTouch-android-$abi" -D "$APKS" 2>/dev/null \
+        || [ -n "$(ls "$APKS"/*-"$abi".apk 2>/dev/null)" ] || { echo "Couldn't download the $abi app."; exit 1; }
+done
+NEW=$(ls -t "$APKS"/*arm64-v8a.apk | head -1); NEW_ARM=$(ls -t "$APKS"/*armeabi-v7a.apk | head -1)
+echo "      $(basename "$NEW"), $(basename "$NEW_ARM")"
+git -C "$VT_REPO" pull -q --ff-only myfork main || { echo "This Pi's code couldn't be updated (local changes?)."; exit 1; }
+if [ "$MODE" = nothere ]; then
+    echo "      This Pi has the new code; not restarted (--not-here): run vt-server when it's quiet."
+else
+    vt-server || { echo "vt-server failed here."; exit 1; }
+fi
+
+# 3. The other stores.
+update_store() {   # name target
+    echo "[3/4] $1..."
+    if ! tar cf - -C "$APKS" "$(basename "$NEW")" "$(basename "$NEW_ARM")" \
+        | ssh -o ConnectTimeout=10 "$2" 'mkdir -p ~/viewtouch-main/apks && tar xf - -C ~/viewtouch-main/apks'; then
+        echo "      $1: couldn't copy the apps (is it on? ssh $2)"; return
+    fi
+    ssh -t -o ConnectTimeout=10 "$2" 'cd ~/viewtouch-main && git pull -q --ff-only myfork main && DISPLAY=:0 vt-server' \
+        || echo "      $1: the update didn't finish there; run vt-server on $1 and look at what it says."
+}
+each_store update_store
+
+# 4. What everyone runs now.
+echo "[4/4] Now:"
+echo "== here ($(hostname)): $(vt-status 2>&1 | tail -1)"
+each_store show
+echo "Tablets set up for ViewTouch update themselves in a few minutes once nobody is signed in on them."

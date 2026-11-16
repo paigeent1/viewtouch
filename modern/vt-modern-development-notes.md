@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 09:19 ET — Bob (Claude) — vt-update-stores: every store on the same build in one command
+- **What:** New vt-update-stores (run on BHDAN, where gh is signed in): finds or builds the tablet app from the newest main, downloads both APKs, pulls and restarts this Pi (unless --not-here), copies the APKs to each store in OTHER_STORES, pulls and restarts them, then shows vt-status everywhere; --check only shows what each store runs. vt-site accepts OTHER_STORES (Name=user@address, space-separated).
+- **Why:** Owner 2026-11-16: keep HCA and BHDAN all on the same build.
+- **Files:** `scripts/bin/vt-update-stores, scripts/bin/vt-site, scripts/bin/vt-site-lib`
+- **Next person must know:** BHDAN: vt-site set OTHER_STORES "HCA=pi@192.168.6.81" once; ssh-copy-id pi@192.168.6.81 to skip passwords.
+
 ### 2026-11-16 09:13 ET — Bob (Claude) — DIRECTV pages: TV on/off renamed BOX on/off
 - **What:** The DIRECTV tuning pages' power keys say BOX on / BOX off: they wake or sleep the receiver, not the TV.
 - **Why:** HCA 2026-11-15: the bar's Sceptre TVs don't follow the DIRECTV box over HDMI-CEC (no device seen), so 'TV off' only put the box in standby. Owner chose to skip TV power control; TVs go off by their own remote.

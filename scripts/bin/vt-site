@@ -14,7 +14,7 @@
 #   vt-site edit                          open the settings in nano
 # Printers, taxes, receipts and the rest are set in ViewTouch itself (Manager); TVs with vt-directv scan --save.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD STANDBY_ALLOWED QT_PREFIX"
+KEYS="SITE_NAME SERVER_ADDR SERVER_PORT SERIAL_SCANNER SERIAL_SCANNER_BAUD STANDBY_ALLOWED QT_PREFIX OTHER_STORES"
 
 write_template() {
     mkdir -p "$VT_CONF_DIR"

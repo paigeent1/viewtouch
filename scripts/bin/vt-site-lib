@@ -3,6 +3,8 @@
 #   ~/.config/viewtouch/site.conf   SITE_NAME, SERVER_ADDR, SERVER_PORT, SERIAL_SCANNER, SERIAL_SCANNER_BAUD,
 #                                   STANDBY_ALLOWED (yes/no; not set = yes), QT_PREFIX (empty = Debian's Qt;
 #                                   /opt/qt/6.12.0 = the official Qt 6.12: vt-qt612 install / off)
+#                                   OTHER_STORES: the other stores' Pis for vt-update-stores, Name=user@address
+#                                   separated by spaces ("HCA=pi@192.168.6.81")
 #     SERIAL_SCANNER: empty or all = every USB-serial port (any number of scanners); off = none; or a
 #     list of ports by commas or spaces, each @speed if wanted ("/dev/ttyUSB0, /dev/ttyUSB1@19200").
 #     vt-server / vt-start pass it to ViewTouch as VT_SERIAL_SCANNER (see modern/ui/cpp/serialscanner.hh).
