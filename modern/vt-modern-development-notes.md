@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 11:52 ET — Bob (Claude) — Altria scan data: new locations must set up and test their own Altria site info
+- **What:** Owner's rule for every new location (Gaylordsville / BHG or any other): before it sells Altria products on ViewTouch, its Altria scan data site info must be determined with Altria and tested: its own Retail Control Number (or the chain's Management Account Number and a Store Number), the store name/address/ZIP+4 exactly as Altria has them on file, the file's account name, and its own sFTP set-up; then a test week sent and approved by the Scan Data Help Desk before it counts. Also: Altria may make the owner a chain again (several stores under one Management Account). If that happens, recheck every store's settings: field 1 becomes the 5-digit Management Account Number, each store needs its Store Number (field 6), and whether stores send separate files or one combined file must be confirmed with Altria.
+- **Why:** Owner 2026-11-16, while the Altria scan data export is being built (helper/altria-scan-data): BHDAN is set up first as an independent; other stores and a possible chain set-up must not reuse BHDAN's settings.
+- **Files:** `modern/vt-modern-development-notes.md`
+- **Next person must know:** When the scan data work lands, add the same checklist to modern/docs/SCAN_DATA.md and to the new-store setup steps.
+
 ### 2026-11-16 09:19 ET — Bob (Claude) — vt-update-stores: every store on the same build in one command
 - **What:** New vt-update-stores (run on BHDAN, where gh is signed in): finds or builds the tablet app from the newest main, downloads both APKs, pulls and restarts this Pi (unless --not-here), copies the APKs to each store in OTHER_STORES, pulls and restarts them, then shows vt-status everywhere; --check only shows what each store runs. vt-site accepts OTHER_STORES (Name=user@address, space-separated).
 - **Why:** Owner 2026-11-16: keep HCA and BHDAN all on the same build.
