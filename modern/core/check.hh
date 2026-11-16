@@ -99,6 +99,10 @@ struct OrderLine {
     std::string addedById;
     std::string addedByName;
     std::int64_t addedAt = 0;
+    // Responsible service: US standard drinks in one (the item's pour oz x ABV when rung, frozen; 0: none),
+    // and the seats it is shared across (a bottle, a bucket: evenly; empty: its own seat).
+    double stdDrinks = 0;
+    std::vector<int> drinkSeats;
 
     bool isComment() const { return itemId.empty(); }
     std::string printerOf() const { return printer.empty() ? std::string("kitchen") : printer; }
@@ -333,6 +337,14 @@ struct Check {
     std::int64_t ageAt = 0;
     std::string ageId4;
     std::string ageDob;
+    // An ID scanned while a seat was chosen: that seat's guest for responsible service (core/over_service.hh).
+    // key: idGuestKey (never the ID or birth date); name: the ID's last 4.
+    struct SeatGuest {
+        std::string key;
+        std::string name;
+        bool operator==(const SeatGuest &) const = default;
+    };
+    std::map<int, SeatGuest> seatGuests;
     bool printDob = false;       // this printing only (a reprint with the date of birth): never saved
     bool ageIdExpired = false;   // the ID shown had expired: accepted (it still shows their photo and birth date), noted on the receipt
     std::map<std::string, std::string> giftCardFor;   // card number -> who a card sold on it is for (Purchased For)

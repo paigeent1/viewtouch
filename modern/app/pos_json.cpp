@@ -164,6 +164,15 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"addedByName"_s, qs(l.addedByName));
         if (l.addedAt != 0)
             lo.insert(u"addedAt"_s, qint64(l.addedAt));
+        // Responsible service: standard drinks in one, and the seats it is shared across.
+        if (l.stdDrinks > 0)
+            lo.insert(u"stdDrinks"_s, l.stdDrinks);
+        if (!l.drinkSeats.empty()) {
+            QJsonArray seats;
+            for (const int s : l.drinkSeats)
+                seats.append(s);
+            lo.insert(u"drinkSeats"_s, seats);
+        }
         lines.append(lo);
     }
     QJsonArray payments;
@@ -232,6 +241,12 @@ QJsonObject toJson(const Check &c)
          }()}, {u"driverId"_s, qs(c.driverId)}, {u"driverName"_s, qs(c.driverName)},
         {u"outAt"_s, qint64(c.outAt)}, {u"deliveredAt"_s, qint64(c.deliveredAt)}, {u"pointsEarned"_s, c.pointsEarned}, {u"training"_s, c.training},
         {u"cancelNumber"_s, c.cancelNumber},
+        {u"seatGuests"_s, [&c] {   // responsible service: an ID scanned for a seat (a key, never the ID)
+             QJsonObject o;
+             for (const auto &[seat, g] : c.seatGuests)
+                 o.insert(QString::number(seat), QJsonObject{{u"key"_s, qs(g.key)}, {u"name"_s, qs(g.name)}});
+             return o;
+         }()},
         {u"rates"_s, [&c] {
              if (!c.closedRates)
                  return QJsonValue();
@@ -299,6 +314,9 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.addedById = ss(lo.value(u"addedById").toString());
         l.addedByName = ss(lo.value(u"addedByName").toString());
         l.addedAt = i64(lo.value(u"addedAt"));
+        l.stdDrinks = std::clamp(lo.value(u"stdDrinks").toDouble(0), 0.0, 1000.0);
+        for (const QJsonValue &sv : lo.value(u"drinkSeats").toArray())
+            l.drinkSeats.push_back(std::clamp(sv.toInt(), 0, 99));
         for (const QJsonValue &mv : lo.value(u"modifiers").toArray()) {
             const QJsonObject mo = mv.toObject();
             l.modifiers.push_back({ss(mo.value(u"itemId").toString()), ss(mo.value(u"name").toString()),
@@ -399,6 +417,12 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.pointsEarned = o.value(u"pointsEarned").toInt();
     c.training = o.value(u"training").toBool();
     c.cancelNumber = o.value(u"cancelNumber").toInt();
+    const QJsonObject seatGuests = o.value(u"seatGuests").toObject();
+    for (auto it = seatGuests.begin(); it != seatGuests.end(); ++it) {
+        const QJsonObject g = it.value().toObject();
+        if (const int seat = it.key().toInt(); seat > 0 && !g.value(u"key").toString().isEmpty())
+            c.seatGuests[seat] = {ss(g.value(u"key").toString()), ss(g.value(u"name").toString())};
+    }
     for (const QJsonValue &v : o.value(u"events").toArray()) {
         const QJsonObject e = v.toObject();
         c.events.push_back({i64(e.value(u"at")), ss(e.value(u"who").toString()), ss(e.value(u"what").toString()),

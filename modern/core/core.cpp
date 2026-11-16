@@ -316,6 +316,7 @@ OrderLine &Check::addItem(const MenuItem &item, Qualifier q)
     l.noStaffDiscount = item.noStaffDiscount;
     if (item.byWeight)
         l.weightUnit = item.weightUnit;
+    l.stdDrinks = standardDrinksOf(item);   // frozen: a later ABV change never alters this ring
     lines.push_back(l);
     return lines.back();
 }

@@ -5,6 +5,7 @@
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
 #include "core/id_card.hh"
+#include "core/over_service.hh"
 
 #include <QDateTime>
 #include <QRegularExpression>
@@ -93,6 +94,10 @@ bool PosService::agePassed(int age, const char *how, const std::string &idNumber
         if (birth.valid())   // printed only on a reprint "with date of birth"
             c->ageDob = QStringLiteral("%1-%2-%3").arg(birth.year, 4, 10, QChar(u'0')).arg(birth.month, 2, 10, QChar(u'0'))
                             .arg(birth.day, 2, 10, QChar(u'0')).toStdString();
+        // Responsible service: an ID scanned with a seat chosen is that seat's guest (on any check
+        // they're on, their drinks count together). Only a key and the last 4 are kept.
+        if (seat_ > 0 && birth.valid() && !c->ageId4.empty())
+            c->seatGuests[seat_] = {idGuestKey(c->ageDob, c->ageId4), c->ageId4};
         noteEvent(*c, (std::string_view(how) == "hand" ? tr("ID checked by hand (date of birth typed): %1+").arg(age)
                                                        : tr("ID scanned: %1+").arg(age))
                           + (expired ? tr(", expired ID accepted") : QString()),

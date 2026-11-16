@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 13:17 ET — Helper C (Claude helper) — Responsible service, part 1: standard drinks counted per guest
+- **What:** New core/over_service.hh/.cpp (pure C++): ServicePolicy (on, caution, stop, windowHours, subtract, perHour, overrideReasons), ServiceLevel, DrinkGuest (a seat of a check, or a customer linked to the check or seat: saved customer c:<id>, subscription card s:<card>, ID scanned id:<FNV hash of DOB+last 4>), lineDrinks (quantity; a shared piece its part; voided/no ABV = 0), lineGuests (the line's seat, or evenly across OrderLine::drinkSeats), drinkRings (each guest's rings: time, drinks, who rang it, check, line; practice/discarded/merged checks skipped), drinksNow (within the window, less perHour per hour since the first drink, never below 0). OrderLine gains stdDrinks (frozen at Check::addItem from the item's __abv__/__pour_oz__ via standardDrinksOf) and drinkSeats; Check gains seatGuests (an ID scanned while a seat is chosen: key + last 4 only). pos_age.cpp: agePassed links the ID to the chosen seat. pos_json.cpp persists stdDrinks, drinkSeats and seatGuests.
+- **Why:** HCA bar handoff item 3 (Part C): over-service warnings need each guest's standard drinks with the time and employee of each ring. Counting from the check lines means voids remove a drink and transfers/splits move it with the item.
+- **Files:** `modern/CMakeLists.txt`, `modern/app/pos_age.cpp`, `modern/app/pos_json.cpp`, `modern/core/check.hh`, `modern/core/core.cpp`, `modern/core/over_service.cpp`, `modern/core/over_service.hh`
+- **Next person must know:** Seat 0 (no seat) and one-guest checks count against the check's linked customer; other seats count per seat unless an ID was scanned for that seat. The ID key never holds the ID number or date of birth.
+
 ### 2026-11-16 14:11 ET — Price Check helper (Claude helper) — Price check: the pricing state key back in PosSession::stateKeys (lost in the rebase)
 - **What:** Re-added u"pricing"_s to PosSession::stateKeys() after idChecks; it fell out while resolving the rebase onto bar part B.
 - **Why:** Without it the server never sends the tax rates and cash discount to tablets (RemoteSession), so the Price check there would show no tax.
