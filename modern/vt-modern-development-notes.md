@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-16 14:11 ET — Price Check helper (Claude helper) — Price check: the pricing state key back in PosSession::stateKeys (lost in the rebase)
+- **What:** Re-added u"pricing"_s to PosSession::stateKeys() after idChecks; it fell out while resolving the rebase onto bar part B.
+- **Why:** Without it the server never sends the tax rates and cash discount to tablets (RemoteSession), so the Price check there would show no tax.
+- **Files:** `modern/app/pos_session.cpp`
+
 ### 2026-11-16 14:10 ET — Price Check helper (Claude helper) — Price check: on-screen test (the item card, with tax and back)
 - **What:** UI test 'UI: Menu Builder: an item's Price check, with tax and back' (test_pos_flow.cpp, after the quick-edit test): opens Classic Burger's card, checks the included figures, To net -> Use, switching Taxes to tax-on-top, Round to $1 -> Use; object names on the panel's result labels and Use buttons.
 - **Why:** Prove the panel loads and computes on the real card; most older Menu Builder UI tests are in the known-failing 28 and wouldn't catch a broken panel.
