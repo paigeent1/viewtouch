@@ -1,0 +1,66 @@
+#!/bin/bash
+# vt-vnc: see and use this Pi's register screen from another computer (VNC), for remote help.
+#
+#   vt-vnc on       install x11vnc if needed, ask for a VNC password once, and share the register screen
+#                   (X11 display :0) on port 5900 from now on, also after a restart
+#   vt-vnc off      stop sharing (and don't start again after a restart)
+#   vt-vnc status   is it sharing, and the address to connect to
+#
+# Only the store networks may connect (192.168.x.x: this store and the others over the UniFi VPN);
+# never open port 5900 on the router to the internet. Viewer: RealVNC Viewer or TigerVNC, address
+# <this Pi>:5900, the password set here. What you click happens on the real register, so check
+# nobody is ringing a sale. The register needs X11 (vt-screen-mode); Wayland would need wayvnc.
+set -o pipefail
+PASS="$HOME/.vnc/vt-vnc.pass"
+UNIT="$HOME/.config/systemd/user/vt-vnc.service"
+say() { printf '%s\n' "$*"; }
+addr() { hostname -I 2>/dev/null | tr ' ' '\n' | grep -m1 '^192\.168\.'; }
+
+case "${1:-status}" in
+on)
+    if ! command -v x11vnc >/dev/null; then
+        say "Installing x11vnc..."
+        sudo apt-get install -y x11vnc >/dev/null || { say "Couldn't install x11vnc (sudo apt-get install x11vnc)."; exit 1; }
+    fi
+    mkdir -p "$HOME/.vnc" "$(dirname "$UNIT")"
+    if [ ! -s "$PASS" ]; then
+        say "Choose a VNC password (up to 8 characters; it's asked when connecting):"
+        x11vnc -storepasswd "$PASS" || { say "No password saved."; exit 1; }
+        chmod 600 "$PASS"
+    fi
+    cat > "$UNIT" <<EOF
+[Unit]
+Description=ViewTouch register screen over VNC (vt-vnc)
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/x11vnc -display :0 -auth guess -rfbauth $PASS -rfbport 5900 -forever -shared -noxdamage -allow 192.168. -quiet
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload && systemctl --user enable --now vt-vnc.service >/dev/null 2>&1
+    sudo loginctl enable-linger "$USER" >/dev/null 2>&1   # starts with the Pi, not only at login
+    sleep 3
+    if systemctl --user is-active vt-vnc.service >/dev/null 2>&1; then
+        say "Sharing the register screen: connect a VNC viewer to $(addr):5900 with that password."
+    else
+        say "x11vnc didn't start: journalctl --user -u vt-vnc -n 20"
+        exit 1
+    fi
+    ;;
+off)
+    systemctl --user disable --now vt-vnc.service >/dev/null 2>&1
+    say "Not sharing the screen any more."
+    ;;
+status)
+    if systemctl --user is-active vt-vnc.service >/dev/null 2>&1; then
+        say "Sharing: $(addr):5900"
+    else
+        say "Not sharing (vt-vnc on)."
+    fi
+    ;;
+*) say "vt-vnc on | off | status"; exit 2 ;;
+esac

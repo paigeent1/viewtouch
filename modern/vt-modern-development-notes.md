@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-17 11:36 ET — Bob (Claude) — vt-vnc: the register screen over VNC for remote help
+- **What:** New vt-vnc on/off/status: installs x11vnc if missing, asks once for a VNC password (~/.vnc/vt-vnc.pass, mode 600), and shares X11 display :0 on port 5900 as a systemd user service (lingering, so it comes back after a restart). Only 192.168.x.x addresses may connect (the stores and the UniFi VPN).
+- **Why:** Owner 2026-11-17: remote VNC (or similar) for HCA's main register. Raspberry Pi Connect's screen sharing needs Wayland, and the registers run X11.
+- **Files:** `scripts/bin/vt-vnc`
+
 ### 2026-11-16 15:59 ET — Bob (Claude) — Network shows what each tablet's self-update is doing
 - **What:** Android screens report their self-update state every 15 s when it changes (updateState message): up to date / asking / getting N% / waiting for nobody signed in (names who is) / installing / tried but still old / can't get it by itself: <the store's reason> / updates only by a manager. The server keeps it per connection and Manager > Network shows 'Self-update: …' under each screen. RemoteSession keeps the refusal or download failure reason (updateInfo autoWhy). Test in test_net.
 - **Why:** HCA 1-3 sat on 545 all day with nobody signed in and never updated themselves (device owner confirmed, no install attempt in the log); their app log on these tablets doesn't show ViewTouch's messages, so the reason must be visible from the store. b582 was installed on them over Wi-Fi meanwhile.
