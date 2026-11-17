@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-17 13:00 ET — Archive helper (Claude helper) — End of Day archive: small fixes
+- **What:** archiveEndOfDay: no ternary between nullopt and an optional; the Exceptions search test compares a type as text.
+- **Why:** Clean build on every compiler; clearer test.
+- **Files:** `modern/app/pos_eod_archive.cpp`, `modern/tests/test_exceptions_search.cpp`
+
 ### 2026-11-17 12:58 ET — Archive helper (Claude helper) — Docs: End of Day archive, Exceptions search, vt-eod-verify, backups
 - **What:** Manual: End of Day section (paperless summary goes to the archive), new sections 'The End of Day archive' and 'Exceptions search', the Exceptions report's Tickets text replaced, backups include eod-archive, vt-eod-verify under store computer commands. AGENTS.md section 5: the eod-archive folder must be in every backup; the long-term location is an open item.
 - **Why:** Owner 2026-11-17 requirements; the archive is only an audit trail if it is backed up and its limits are said honestly.

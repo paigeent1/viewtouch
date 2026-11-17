@@ -60,8 +60,9 @@ void PosService::archiveEndOfDay()
                                                                   s_->day.openedAt)
                                        : QByteArray();
     QString error;
-    const auto kept = pdf.isEmpty() ? std::nullopt
-                                    : eod::archiveDay(s_->archiveDb, s_->archiveDir, s_->day.id, date, pdf, now(), &error);
+    std::optional<eod::Entry> kept;
+    if (!pdf.isEmpty())
+        kept = eod::archiveDay(s_->archiveDb, s_->archiveDir, s_->day.id, date, pdf, now(), &error);
     if (kept) {
         news.insert(u"file"_s, kept->file);
         news.insert(u"kind"_s, kept->kind);

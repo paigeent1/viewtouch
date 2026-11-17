@@ -216,7 +216,7 @@ TEST_CASE("Exceptions search over days reads the database's checks, Cancel Sales
     CHECK(voided.value(u"count"_s).toInt() == 1);
     // Approved on the spot: who approved it.
     for (const QVariant &v : found.value(u"results"_s).toList())
-        if (v.toMap().value(u"type"_s) == u"void"_s)
+        if (v.toMap().value(u"type"_s).toString() == u"void"_s)
             CHECK(v.toMap().value(u"approvedBy"_s).toString() == u"Morgan (Manager)"_s);
     // Today only: none of yesterday's.
     CHECK(s.search({}).value(u"count"_s).toInt() == 0);
