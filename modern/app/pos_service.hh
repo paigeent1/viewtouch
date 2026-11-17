@@ -652,6 +652,18 @@ public:
     // (from the ID check; Store Settings: a manager's, if dobReprintNeedsManager).
     bool reprintCheck(qint64 id, bool gift = false, bool withDob = false);
     QVariantMap checkSearch() const override;
+    // --- the Exceptions search (pos_exceptions.cpp; managers) ----------------------------------
+    // From the database, never files: the days from `from` to `to` (yyyy-MM-dd; empty: today), and of
+    // those the ones matching `employee` (a name), `types` (exceptionTypes(); none: all), `minAmount`
+    // (dollars, "5" or "5.00") and `text` (a check number, with or without the store's prefix, or words of
+    // the item or the reason). Read away from the screen; the answer lands in exceptionSearch().
+    bool searchExceptions(const QVariantMap &filter);
+    bool moreExceptions();   // the next 200
+    QVariantMap exceptionSearch() const override;
+    // Everything the last search found, as a report (Print, PDF).
+    core::Report exceptionSearchReport() const;
+    QVariantMap exceptionSearchVariant();   // managers: the same, for the screen's PDF
+    bool printExceptionSearch();
     QVariantMap printerSearch() const override;
     bool findPrinters();
     bool printWhoAmI(const QString &host);
@@ -1700,6 +1712,13 @@ private:
     core::Report timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
                                  const std::vector<core::TimePunch> &punches, bool paper) const;
     QVariantMap checkSearch_;
+    QVariantMap exceptionSearch_;
+    std::vector<core::ExceptionEntry> exceptionHits_;
+    QVariantMap exceptionFilter_;
+    QString exceptionLabel_;
+    int exceptionShown_ = 0;
+    int exceptionRequest_ = 0;
+    void showExceptions();   // exceptionSearch_ from the hits and how many are shown
     QVariantMap printerSearch_;   // Find My Printers: {busy} | {done, found}
     std::vector<core::Check> searchHits_;
     qint64 selectedHit_ = 0;

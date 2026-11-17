@@ -1254,6 +1254,100 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
     return r;
 }
 
+const std::vector<std::string> &exceptionTypes()
+{
+    static const std::vector<std::string> types = {"void", "errorCorrect", "discount", "takenBack", "reopen", "cancel",
+                                                   "noSale", "refund", "ageHand", "ageRefused"};
+    return types;
+}
+
+std::string exceptionReportSection(const std::string &type)
+{
+    static const std::map<std::string, std::string> sections = {
+        {"void", "Voids (items already sent)"},
+        {"errorCorrect", "Error corrects (retail, before paying)"},
+        {"discount", "Discounts and comps"},
+        {"takenBack", "Payments and discounts taken back"},
+        {"reopen", "Reopened checks"},
+        {"cancel", "Cancelled sales"},
+        {"noSale", "Drawer opened with no sale"},
+    };
+    const auto it = sections.find(type);
+    return it == sections.end() ? std::string() : it->second;
+}
+
+std::vector<ExceptionEntry> exceptionEntries(const std::vector<const Check *> &checks, const std::vector<DrawerSession> &drawers,
+                                             const std::vector<Refund> &refunds)
+{
+    // The check event kinds, as the Exceptions report groups them.
+    static const std::map<std::string, std::string> typeOf = {
+        {"void", "void"}, {"errorCorrect", "errorCorrect"}, {"discount", "discount"}, {"unpay", "takenBack"},
+        {"undiscount", "takenBack"}, {"reopen", "reopen"}, {"cancel", "cancel"}, {"ageHand", "ageHand"},
+        {"ageRefused", "ageRefused"}};
+    const auto nobody = [](const std::string &who) { return who.empty() ? std::string("(nobody logged in)") : who; };
+    std::vector<ExceptionEntry> out;
+    for (const Check *c : checks) {
+        for (std::size_t i = 0; i < c->events.size(); ++i) {
+            const CheckEvent &e = c->events[i];
+            const auto t = typeOf.find(e.kind);
+            if (t == typeOf.end())
+                continue;
+            ExceptionEntry x;
+            x.at = e.at;
+            x.who = t->second == "ageHand" || t->second == "ageRefused" ? e.who : nobody(e.who);
+            x.type = t->second;
+            x.checkId = c->id;
+            x.checkLabel = c->label;
+            x.what = e.what;
+            x.amount = e.amount;
+            x.reason = e.reason;
+            // A manager's approval on the spot is noted just before what it allowed (within a minute).
+            for (std::size_t j = i; j-- > 0;) {
+                const CheckEvent &a = c->events[j];
+                if (a.kind != "approval") {
+                    if (typeOf.contains(a.kind))
+                        break;
+                    continue;
+                }
+                if (e.at - a.at <= 60'000) {
+                    if (!a.reason.empty())
+                        x.approvedBy = a.reason;
+                    else if (const auto k = a.what.rfind("approved by "); k != std::string::npos)
+                        x.approvedBy = a.what.substr(k + 12);
+                }
+                break;
+            }
+            out.push_back(std::move(x));
+        }
+    }
+    for (const DrawerSession &d : drawers)
+        for (const CashMovement &m : d.movements)
+            if (m.kind == CashMovement::Kind::NoSale) {
+                ExceptionEntry x;
+                x.at = m.at;
+                x.who = nobody(m.by);
+                x.type = "noSale";
+                x.what = "No Sale";
+                x.reason = m.reason;
+                x.drawer = d.name;
+                out.push_back(std::move(x));
+            }
+    for (const Refund &r : refunds) {
+        ExceptionEntry x;
+        x.at = r.at;
+        x.who = nobody(r.by);
+        x.type = "refund";
+        x.checkId = r.checkId;
+        x.checkLabel = r.checkLabel;
+        x.what = "Refund: " + r.tenderName;
+        x.amount = r.amount;
+        x.reason = r.reason;
+        out.push_back(std::move(x));
+    }
+    std::ranges::stable_sort(out, [](const ExceptionEntry &a, const ExceptionEntry &b) { return a.at > b.at; });
+    return out;
+}
+
 Report changesReport(const std::vector<Change> &changes, const ReportContext &ctx)
 {
     Report r;

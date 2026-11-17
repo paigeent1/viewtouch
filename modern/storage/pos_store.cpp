@@ -851,6 +851,31 @@ std::pair<std::vector<Check>, std::vector<core::Party>> customerTrail(const QStr
     return out;
 }
 
+std::vector<Check> cancelledChecksBetween(const QString &dbPath, std::int64_t from, std::int64_t to)
+{
+    static QAtomicInt counter;
+    const QString name = u"vt-cancelled-%1"_s.arg(counter.fetchAndAddRelaxed(1));
+    std::vector<Check> out;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(u"QSQLITE"_s, name);
+        db.setDatabaseName(dbPath);
+        db.setConnectOptions(u"QSQLITE_BUSY_TIMEOUT=5000"_s);
+        if (db.open()) {
+            QSqlQuery q(db);
+            q.prepare(u"SELECT json FROM checks WHERE status = 'discarded' AND closed_at >= ? AND closed_at < ? ORDER BY closed_at"_s);
+            q.addBindValue(qint64(from));
+            q.addBindValue(qint64(to));
+            if (q.exec())
+                while (q.next())
+                    if (auto c = app::checkFromJson(QJsonDocument::fromJson(q.value(0).toByteArray()).object()); c && c->cancelNumber > 0)
+                        out.push_back(std::move(*c));
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(name);
+    return out;
+}
+
 std::vector<Check> closedChecksBetween(const QString &dbPath, std::int64_t from, std::int64_t to, QString *error)
 {
     static QAtomicInt counter;

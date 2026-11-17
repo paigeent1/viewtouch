@@ -28,11 +28,6 @@ namespace vt::app::eod {
 
 namespace {
 
-QString say(const char *english)
-{
-    return QCoreApplication::translate("PosService", english);
-}
-
 // A connection of its own (any thread), closed when it goes.
 class Db {
 public:
@@ -324,24 +319,24 @@ Check verify(const QString &dbPath, const QString &archiveDir)
     QString error;
     const std::vector<Entry> all = entries(dbPath, &error);
     if (!error.isEmpty())
-        problem(say("The archive's records can't be read: %1").arg(error));
+        problem(QCoreApplication::translate("PosService", "The archive's records can't be read: %1").arg(error));
     std::map<std::int64_t, const Entry *> bySeq;
     QString prev = QString::fromLatin1(kGenesis);
     std::int64_t expect = 1;
     for (const Entry &e : all) {
         bySeq[e.seq] = &e;
         if (e.seq != expect)
-            problem(say("Record %1 is missing from the archive (a record was removed): the chain is broken there.").arg(expect));
+            problem(QCoreApplication::translate("PosService", "Record %1 is missing from the archive (a record was removed): the chain is broken there.").arg(expect));
         expect = e.seq + 1;
         if (e.prevHash != prev)
-            problem(say("Day %1: the archive's chain is broken here (a record before it was changed or removed).").arg(e.date));
+            problem(QCoreApplication::translate("PosService", "Day %1: the archive's chain is broken here (a record before it was changed or removed).").arg(e.date));
         if (recordHash(e) != e.recordHash)
-            problem(say("Day %1: its archive record was changed since it was written.").arg(e.date));
+            problem(QCoreApplication::translate("PosService", "Day %1: its archive record was changed since it was written.").arg(e.date));
         prev = e.recordHash;
         if (e.kind == u"moved"_s) {
             const auto of = bySeq.find(e.ofSeq);
             if (of == bySeq.end() || of->second->pdfSha != e.pdfSha)
-                problem(say("Day %1: its long-term archive record doesn't match the day's own record.").arg(e.date));
+                problem(QCoreApplication::translate("PosService", "Day %1: its long-term archive record doesn't match the day's own record.").arg(e.date));
         }
     }
     // Each day's PDF where it is now.
@@ -362,7 +357,7 @@ Check verify(const QString &dbPath, const QString &archiveDir)
                 ++c.unreachable;
             } else {
                 s.state = u"missing"_s;
-                problem(say("Day %1: the PDF is missing (%2).").arg(e.date, path));
+                problem(QCoreApplication::translate("PosService", "Day %1: the PDF is missing (%2).").arg(e.date, path));
             }
         } else {
             std::int64_t size = 0;
@@ -370,7 +365,7 @@ Check verify(const QString &dbPath, const QString &archiveDir)
             ++c.checked;
             if (sha != e.pdfSha || size != e.size) {
                 s.state = u"changed"_s;
-                problem(say("Day %1: the PDF has changed since it was archived.").arg(e.date));
+                problem(QCoreApplication::translate("PosService", "Day %1: the PDF has changed since it was archived.").arg(e.date));
             }
         }
         c.status.push_back(s);
@@ -386,7 +381,7 @@ Check verify(const QString &dbPath, const QString &archiveDir)
         }
         orphans.sort();
         if (!orphans.isEmpty())
-            problem(say("%1 is in the archive folder but has no record (its record was removed).").arg(orphans.front()));
+            problem(QCoreApplication::translate("PosService", "%1 is in the archive folder but has no record (its record was removed).").arg(orphans.front()));
     }
     return c;
 }
@@ -432,7 +427,7 @@ MoveResult moveOld(const QString &dbPath, const QString &archiveDir, const QStri
     if (due.empty())
         return r;
     if (!longTermReachable(longTermDir, archiveDir)) {
-        r.warning = say("The long-term archive folder (%1) can't be reached: the PDFs stay here for now.").arg(longTermDir);
+        r.warning = QCoreApplication::translate("PosService", "The long-term archive folder (%1) can't be reached: the PDFs stay here for now.").arg(longTermDir);
         return r;
     }
     const QString store = QDir(longTermDir).filePath(folderName(storeName));
@@ -440,12 +435,12 @@ MoveResult moveOld(const QString &dbPath, const QString &archiveDir, const QStri
         const QString local = QDir(archiveDir).filePath(e.file);
         // The file here must still be what was archived: a changed one isn't passed on as the record.
         if (sha256File(local) != e.pdfSha) {
-            r.warning = say("Day %1 was not moved to the long-term archive: its PDF here doesn't match its record.").arg(e.date);
+            r.warning = QCoreApplication::translate("PosService", "Day %1 was not moved to the long-term archive: its PDF here doesn't match its record.").arg(e.date);
             continue;
         }
         const QString yearDir = QDir(store).filePath(e.date.left(4));
         if (!QDir().mkpath(yearDir)) {
-            r.warning = say("The long-term archive folder (%1) can't be written to: the PDFs stay here for now.").arg(longTermDir);
+            r.warning = QCoreApplication::translate("PosService", "The long-term archive folder (%1) can't be written to: the PDFs stay here for now.").arg(longTermDir);
             break;
         }
         QString target = QDir(yearDir).filePath(QFileInfo(local).fileName());
@@ -456,14 +451,14 @@ MoveResult moveOld(const QString &dbPath, const QString &archiveDir, const QStri
             QFile::remove(part);
             if (!QFile::copy(local, part) || !QFile::rename(part, target)) {
                 QFile::remove(part);
-                r.warning = say("Day %1 couldn't be copied to the long-term archive: it stays here.").arg(e.date);
+                r.warning = QCoreApplication::translate("PosService", "Day %1 couldn't be copied to the long-term archive: it stays here.").arg(e.date);
                 continue;
             }
         }
         // The copy, read back, must match the chain before the file here goes.
         std::int64_t size = 0;
         if (sha256File(target, &size) != e.pdfSha) {
-            r.warning = say("Day %1: the long-term copy didn't match its record, so it stays here.").arg(e.date);
+            r.warning = QCoreApplication::translate("PosService", "Day %1: the long-term copy didn't match its record, so it stays here.").arg(e.date);
             continue;
         }
         readOnly(target);
@@ -492,7 +487,7 @@ MoveResult moveOld(const QString &dbPath, const QString &archiveDir, const QStri
             }
         }
         if (!ok) {
-            r.warning = say("Day %1 couldn't be recorded as moved: it stays here.").arg(e.date);
+            r.warning = QCoreApplication::translate("PosService", "Day %1 couldn't be recorded as moved: it stays here.").arg(e.date);
             continue;
         }
         QFile::remove(local);
@@ -519,7 +514,7 @@ QByteArray renderPage(const QString &pdfPath, int page, int dpi, QString *error)
     const QString tool = QStandardPaths::findExecutable(u"pdftoppm"_s);
     if (tool.isEmpty()) {
         if (error)
-            *error = say("The store's computer can't show PDFs yet: install poppler-utils on it (vt-install does).");
+            *error = QCoreApplication::translate("PosService", "The store's computer can't show PDFs yet: install poppler-utils on it (vt-install does).");
         return {};
     }
     QTemporaryDir tmp;
@@ -549,7 +544,7 @@ QByteArray renderPage(const QString &pdfPath, int page, int dpi, QString *error)
     Q_UNUSED(page)
     Q_UNUSED(dpi)
     if (error)
-        *error = say("The store's computer can't show PDFs yet: install poppler-utils on it (vt-install does).");
+        *error = QCoreApplication::translate("PosService", "The store's computer can't show PDFs yet: install poppler-utils on it (vt-install does).");
     return {};
 #endif
 }

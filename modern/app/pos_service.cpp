@@ -431,7 +431,7 @@ bool PosService::require(const char *permission, const QString &action, Check *n
         const std::string by = approved_->by;
         approved_.reset();
         if (Check *c = noteOn ? noteOn : current())
-            noteEvent(*c, tr("%1: approved by %2").arg(action, qs(by)), "approval");
+            noteEvent(*c, tr("%1: approved by %2").arg(action, qs(by)), "approval", {}, by);   // (who: the Exceptions search)
         emit notice(tr("Approved by %1").arg(qs(by)));
         return true;
     }

@@ -48,6 +48,56 @@
       ]
     },
     {
+      "id": "eod-archive",
+      "kind": "button",
+      "rect": {
+        "x": 464,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "End of Day archive",
+      "style": {
+        "normal": {
+          "fill": "#2f5d50"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "eod-archive"
+        }
+      ]
+    },
+    {
+      "id": "exceptions-search",
+      "kind": "button",
+      "rect": {
+        "x": 912,
+        "y": 944,
+        "w": 432,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Exceptions search",
+      "style": {
+        "normal": {
+          "fill": "#7c2d12"
+        }
+      },
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "exceptions-search"
+        }
+      ]
+    },
+    {
       "id": "back",
       "kind": "button",
       "rect": {

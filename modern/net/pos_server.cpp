@@ -101,7 +101,7 @@ bool onRequest(const QString &key)
     // Find's answer (itemSearch) too.
     // Find a Tablet's list (tablets) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"builderItems" || key == u"itemSearch"
-           || key == u"tablets";
+           || key == u"tablets" || key == u"exceptionSearch";
 }
 
 // All a billboard is ever sent (the owner: signage only, never any customer or sale): who it is,

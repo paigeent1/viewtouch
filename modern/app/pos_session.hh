@@ -181,6 +181,9 @@ class PosSession : public QObject {
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
     Q_PROPERTY(QVariantMap checkSearch READ checkSearch NOTIFY sessionChanged)
+    // Manager > Reports > Exceptions search (PosService::searchExceptions): {loading, filter, totals,
+    // results (200 at a time), shown, count, more}. Sent to a tablet only while it shows the screen.
+    Q_PROPERTY(QVariantMap exceptionSearch READ exceptionSearch NOTIFY sessionChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -434,6 +437,7 @@ public:
     virtual QVariantMap prepLabels() const = 0;
     virtual QVariantMap retailLabels() const = 0;
     virtual QVariantMap checkSearch() const = 0;
+    virtual QVariantMap exceptionSearch() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -690,6 +694,12 @@ public:
     Q_INVOKABLE void previewRetailLabel(const QVariantMap &job) { invoke(QStringLiteral("previewRetailLabel"), {job}); }
     Q_INVOKABLE void closeRetailLabelPreview() { invoke(QStringLiteral("closeRetailLabelPreview"), {}); }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }
+    // Manager > Reports > Exceptions search (answers in exceptionSearch) and the End of Day archive.
+    Q_INVOKABLE void searchExceptions(const QVariantMap &filter) { invoke(QStringLiteral("searchExceptions"), {filter}); }
+    Q_INVOKABLE void moreExceptions() { invoke(QStringLiteral("moreExceptions")); }
+    Q_INVOKABLE void printExceptionSearch() { invoke(QStringLiteral("printExceptionSearch")); }
+    Q_INVOKABLE void checkEodArchive() { invoke(QStringLiteral("checkEodArchive")); }
+    Q_INVOKABLE void printEodArchive(qint64 seq) { invoke(QStringLiteral("printEodArchive"), {seq}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }
     Q_INVOKABLE void setKitchenStation(const QString &id) { invoke(QStringLiteral("setKitchenStation"), {id}); }

@@ -72,6 +72,7 @@ if(Qt6_FOUND)
         app/legacy_history.hh app/legacy_history.cpp app/pos_legacy.cpp   # ILSA's sales history (ilsa-history.db)
         app/pos_price_check.cpp   # Menu Builder -> Price check: with tax, cash vs card (core/price_check.hh)
         app/eod_archive.hh app/eod_archive.cpp app/pos_eod_archive.cpp   # the End of Day archive (write-once PDFs, hash chain)
+        app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
     )
     target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core Qt6::Sql)   # Sql: the Labels screen reads the ILSA price book
     # Phrase files for the screens' languages (see app/i18n.hh)
@@ -196,6 +197,8 @@ if(Qt6_FOUND)
             ui/qml/WidgetReceiptLookup.qml
             ui/qml/WidgetLegacyReceipts.qml
             ui/qml/WidgetLegacyReports.qml
+            ui/qml/WidgetEodArchive.qml
+            ui/qml/WidgetExceptionSearch.qml
             ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml

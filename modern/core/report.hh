@@ -168,6 +168,26 @@ Report auditReport(const std::vector<const Check *> &checks, const ReportContext
 Report changesReport(const std::vector<Change> &changes, const ReportContext &ctx);
 Report exceptionsReport(const std::vector<const Check *> &checks, const std::vector<DrawerSession> &drawers,
                         const ReportContext &ctx);
+// One exception, for the Exceptions search (Manager > Reports): the very events the Exceptions report
+// counts (from the same checks and drawers), one by one, plus refunds and ID checks by hand or refused.
+struct ExceptionEntry {
+    std::int64_t at = 0;
+    std::string who;          // as the report names them: "(nobody logged in)" when no one was
+    std::string type;         // void | errorCorrect | discount | takenBack | reopen | cancel | noSale | refund | ageHand | ageRefused
+    std::int64_t checkId = 0; // 0: a No Sale
+    std::string checkLabel;
+    std::string what;         // "Voided Caesar ($9.75)", the item or what was done
+    Money amount;
+    std::string reason;
+    std::string approvedBy;   // a manager's approval on the spot, just before it
+    std::string drawer;       // No Sale: which drawer
+};
+std::vector<ExceptionEntry> exceptionEntries(const std::vector<const Check *> &checks, const std::vector<DrawerSession> &drawers,
+                                             const std::vector<Refund> &refunds);
+// The types in the order the screen lists them.
+const std::vector<std::string> &exceptionTypes();
+// The Exceptions report's section that counts a type ("" for one it doesn't count).
+std::string exceptionReportSection(const std::string &type);
 // Loss Watch: each person's voids of items already sent, comps and discounts,
 // payments and discounts taken back and reopened checks (each per $1,000 they
 // sold), and drawers opened with no sale (per day they worked), against the

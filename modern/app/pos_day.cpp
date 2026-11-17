@@ -1821,6 +1821,13 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
     // No sales: the drawers of those days (today's in memory may not be written yet).
     const bool needDrawers = id == u"exceptions" || id == u"losswatch";
     auto drawerHistory = needDrawers ? s_->drawerHistory : nullptr;
+    // Cancel Sales: not sales, but exceptions (as on today's report).
+    auto cancelledHistory = needDrawers ? s_->cancelledHistory : nullptr;
+    std::vector<Check> cancelledNow;
+    if (needDrawers)
+        for (const Check &c : s_->cancelledToday)
+            if (c.closedAt >= a && c.closedAt < b)
+                cancelledNow.push_back(c);
     std::vector<DrawerSession> drawersNow;
     if (needDrawers)
         for (const DrawerSession &d : s_->drawers)
@@ -1830,8 +1837,16 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
     std::vector<Refund> refundsToday = s_->refundsToday;
     QPointer<PosService> self(this);
     QThreadPool::globalInstance()->start([=, today_ = std::move(today_), refundsToday = std::move(refundsToday),
-                                          drawersNow = std::move(drawersNow)]() mutable {
+                                          drawersNow = std::move(drawersNow), cancelledNow = std::move(cancelledNow)]() mutable {
         std::vector<Check> now = history ? history(a, b) : std::vector<Check>{};
+        {
+            std::vector<Check> cancels = cancelledHistory ? cancelledHistory(a, b) : std::vector<Check>{};
+            for (Check &c : cancelledNow)
+                if (std::ranges::none_of(cancels, [&](const Check &x) { return x.id == c.id; }))
+                    cancels.push_back(std::move(c));
+            for (Check &c : cancels)
+                now.push_back(std::move(c));
+        }
         std::vector<DrawerSession> drawers = drawerHistory ? drawerHistory(a, b) : std::vector<DrawerSession>{};
         for (DrawerSession &d : drawersNow) {
             const auto it = std::ranges::find_if(drawers, [&](const DrawerSession &x) { return x.id == d.id; });

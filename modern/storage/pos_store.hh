@@ -97,6 +97,9 @@ std::vector<core::Check> findClosedChecks(const QString &dbPath, std::int64_t fr
                                           const QStringList &words, int limit, int offset, QString *error = nullptr);
 std::vector<core::Check> closedChecksBetween(const QString &dbPath, std::int64_t from, std::int64_t to,
                                              QString *error = nullptr);
+// Cancel Sale's checks (discarded, with a Cancel #) closed in [from, to): exceptions, not sales.
+// Its own connection: for a worker thread.
+std::vector<core::Check> cancelledChecksBetween(const QString &dbPath, std::int64_t from, std::int64_t to);
 // Every check and waitlist party, any day and any status, that may be a
 // customer's (their id, or their phone number's last four digits in it):
 // candidates, for the caller to match exactly.

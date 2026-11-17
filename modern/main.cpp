@@ -1100,6 +1100,8 @@ int runStore(const Args &cli, const Options &o)
                 {u"hardware-config", u"billboards"},     // Billboards (TVs with the guest-screen slides)
                 {u"admin-store", u"billboards"},         // Store Settings > Billboards…
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
+                {u"reports", u"eod-archive"},            // End of Day archive (the day's PDFs, write-once)
+                {u"reports", u"exceptions-search"},      // Exceptions search (from the database)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
                 {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
@@ -1427,6 +1429,9 @@ int runStore(const Args &cli, const Options &o)
         };
         shared->drawerHistory = [dbPath](std::int64_t from, std::int64_t to) {
             return vt::storage::drawersBetween(dbPath, from, to);
+        };
+        shared->cancelledHistory = [dbPath](std::int64_t from, std::int64_t to) {
+            return vt::storage::cancelledChecksBetween(dbPath, from, to);
         };
     }
     // The End of Day archive: each day's summary PDF beside the database, write-once, in a hash chain.

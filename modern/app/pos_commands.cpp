@@ -395,6 +395,10 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
              return QVariant(p.countDrawerPieces(a.value(0).toLongLong(), a.value(1).toList())); }},
         {u"endOfDay"_s, [](PosService &p, const QVariantList &) { return QVariant(p.endOfDay()); }},
         {u"xReport"_s, [](PosService &p, const QVariantList &) { return QVariant(p.xReport()); }},
+        {u"searchExceptions"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.searchExceptions(a.value(0).toMap())); }},
+        {u"moreExceptions"_s, [](PosService &p, const QVariantList &) { return QVariant(p.moreExceptions()); }},
+        {u"printExceptionSearch"_s, [](PosService &p, const QVariantList &) { return QVariant(p.printExceptionSearch()); }},
+        {u"exceptionSearchReport"_s, [](PosService &p, const QVariantList &) { return QVariant(p.exceptionSearchVariant()); }},
         {u"eodArchive"_s, [](PosService &p, const QVariantList &) { return QVariant(p.eodArchive()); }},
         {u"checkEodArchive"_s, [](PosService &p, const QVariantList &) { return QVariant(p.checkEodArchive()); }},
         {u"eodArchivePagePart"_s, [](PosService &p, const QVariantList &a) {

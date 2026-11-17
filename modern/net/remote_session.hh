@@ -200,6 +200,7 @@ public:
     QVariantMap prepLabels() const override { return v(u"prepLabels").toMap(); }
     QVariantMap retailLabels() const override { return v(u"retailLabels").toMap(); }
     QVariantMap checkSearch() const override { return v(u"checkSearch").toMap(); }
+    QVariantMap exceptionSearch() const override { return v(u"exceptionSearch").toMap(); }
     QVariantMap itemSearch() const override { return v(u"itemSearch").toMap(); }
     QVariantMap printerSearch() const override { return v(u"printerSearch").toMap(); }
     // Where pictures from the server are kept on this device (tests set it).
