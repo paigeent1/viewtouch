@@ -1285,7 +1285,7 @@
 <li><b>Exceptions:</b> by employee, every void of something already sent, every discount and comp, payments and discounts taken back, reopened checks, moved or merged checks, and each time the drawer opened with no sale. Then voids and comps by reason, and the biggest ones. The first report to read when the cash is short.
 <br><b>Unusual</b> sections come first: anyone who did one of these far more than everyone else on the shift (3 times or more, and at least 3 times as often as whoever else did it most), with the most anyone else did beside it. There's often a good reason (a new server, a tough table); it's a place to start, not an accusation.
 <br>It also has <i>Cancelled sales</i> (by employee and by reason), <i>No sale: why</i>, and <i>Error corrects (retail, before paying)</i>. Coupons and loyalty rewards count as system discounts (promo), not employee discounts.
-<br><b>Tickets</b> (today) saves the day's exception tickets as pictures: one for each check with a void, an error correct, an employee discount or comp, a payment or discount taken back, or a reopen. Each is headed <b>STORE COPY: EXCEPTION</b> and shows the date of birth when an ID was scanned. The No Sale slips are saved too, with one PDF of them all, in the <i>Exceptions</i> folder under <i>ViewTouch Exports</i> (and copied to <i>Reports</i> on the desktop). Nobody needs to staple a second receipt to the paperwork.</li>
+<br>Each exception ticket (the store's copy of each check with a void, an error correct, an employee discount or comp, a payment or discount taken back or a reopen, headed <b>STORE COPY: EXCEPTION</b>, with the date of birth when an ID was scanned; each Cancel Sale and No Sale slip) is a picture in the day's End of Day PDF, in the <b>End of Day archive</b>. Nothing is saved on the desktop. To find one, use <b>Exceptions search</b> (below). Nobody needs to staple a second receipt to the paperwork.</li>
 <li><b>Loss Watch:</b> each person's voids of items already sent, discounts and comps, payments taken back and reopened checks, each per $1,000 they sold, and drawer openings with no sale, per day they worked, against the whole store's. Rates, not counts: someone who works twice as much isn't flagged for it. Anyone at 2.5 times the store's usual or more is marked ⚠, and what they did is listed under: when, which check, what and why. Pick <b>Last Week</b> or <b>This Month</b> to see a pattern rather than a bad night. At the bar it's the place to watch voids, comps and refunds; at the register, cancelled sales and no-sales.</li>
 <li><b>Changes:</b> who changed what, newest first: each setting, employee, payment type or other manager-screen record saved (the field, from what to what; a PIN only as changed), menu prices and names, items added or removed, and pages edited. Kept with each day at End of Day. Price and cost changes made by the ILSA price book show as <i>ILSA sync</i> (chapter 27). The price book cleanup of November 6, 2026 shows as <i>Owner-approved cleanup</i>, area <i>Price book cleanup</i>.</li>
 <li><b>Customers:</b> who comes back. Each customer's visits, spending, average check, last visit and favorite item, best customers first, for any dates.</li>
@@ -1337,8 +1337,31 @@
 <li>It lists anything still in the way (open checks, drawers or banks not counted).</li>
 <li>Once everything is settled, <b>Close the Day</b> (touch twice) saves the day's reports and starts a new day.</li>
 <li>It also shows the last backup and a <b>Back Up Now</b> button.</li>
-<li><b>Paperless summary:</b> closing the day saves <i>EOD Summary &lt;date&gt;.pdf</i> in <i>Daily Reports</i> on the desktop (a folder for each day): Sales, Deposit, Drawer, Servers, Tips, Labor, Categories, Items, Hourly, Expenses and Exceptions (empty ones left out), then the exception ticket pictures. The pictures and their PDF are saved there too.</li>
+<li><b>Paperless summary:</b> closing the day makes one PDF of the day: Sales, Deposit, Drawer, Servers, Tips, Labor, Categories, Items, Hourly, Expenses and Exceptions (empty ones left out), then a picture of each exception ticket. It goes into the <b>End of Day archive</b> (below), not the desktop. The archive is then checked, and the result is said on the screen.</li>
 <li><b>Note for the Next Shift…</b> leaves a note for whoever comes in next (<i>Walk-in cooler is making noise; the repair is coming at 10</i>). Each manager sees new notes once, when they log in, and touches <b>Got It</b>. Notes are kept a week.</li>
+</ul>
+
+<h2>The End of Day archive</h2>
+<p><b>Manager → Reports → End of Day archive</b> (managers only; on the register and on tablets).</p>
+<ul>
+<li><b>What is kept:</b> each day's End of Day PDF, kept on the store's computer beside its database, in the <i>eod-archive</i> folder, one folder a year: <i>eod-archive/2026/2026-11-14 day 312.pdf</i>. It is made read-only, and ViewTouch never writes over it or deletes it.</li>
+<li><b>Its fingerprint:</b> each PDF's fingerprint (SHA-256) is kept in the database with the day, in a chain: each day's record includes the record before it. Changing a PDF, or changing or removing a record, breaks the chain, and the next check says where: <i>Day 2026-11-14: the PDF has changed since it was archived</i>, a PDF missing, or a record missing.</li>
+<li><b>Honestly:</b> this makes any change show; it can't make a change impossible. Someone with the computer's administrator password could still edit the files, but not without the check catching it.</li>
+<li><b>The screen:</b> the days, newest first, on the left (or <b>Go to a day…</b> on the calendar). Touch one: its PDF on the right, a page at a time (‹ ›, − + to zoom). <b>Print</b> sends it to a full-page printer when the store has one (a printer set up as <i>pdf</i>), else page by page, small, on the receipt printer. At the top: the last check (<i>All 212 archived days check out</i>, or the first problem found) and <b>Check now</b>.</li>
+<li><b>A day closed again:</b> if a day is ever archived a second time, the second PDF is kept beside the first and marked <i>re-archived</i>. The first is never replaced.</li>
+<li><b>The check runs</b> after every End of Day, when the screen first opens, and on <b>Check now</b>. From the store computer's terminal: <code>vt-eod-verify</code> (add <code>--list</code> to list every day).</li>
+<li><b>Long-term archive (a NAS, later):</b> Store Settings → Backups → <i>Long-term archive folder</i> (a full path, such as a mounted network share) and <i>Move End of Day PDFs after (days)</i> (90 to start). Empty (to start), nothing moves: the screen says no long-term location is set. When it is set, each End of Day copies the PDFs older than that many days to <i>&lt;folder&gt;/&lt;store name&gt;/&lt;year&gt;/</i>, checks the copy's fingerprint against the chain, records where it went (a new record; the day's own record stays as it was), and only then removes the copy on this computer. The list still shows those days (<i>In the long-term archive</i>) and opens them from there. When the folder can't be reached (the NAS off, or not mounted), nothing moves, the PDFs stay here, and the screen and the End of Day message say so. <b>Still to decide:</b> where the long-term archive goes (probably the NAS).</li>
+<li><b>Backups:</b> the <i>eod-archive</i> folder must be backed up with the database. ViewTouch's own backups copy it into <i>backups/eod-archive</i> and the second backup folder (new PDFs only; nothing there is replaced). Any other backup of the store computer must include it.</li>
+</ul>
+<h2>Exceptions search</h2>
+<p><b>Manager → Reports → Exceptions search</b> (managers only; on the register and on tablets). It searches the database, not files, over any days.</p>
+<ul>
+<li><b>Which days:</b> today to start; <b>Today</b>, <b>Week</b>, <b>Month</b>, <b>Year</b>, or a <b>From</b> and <b>To</b> date on the calendar (a year at most).</li>
+<li><b>Filters:</b> one employee or everyone; the kinds to show (touch to turn on; none on: all): <i>Void (item already sent)</i>, <i>Error correct</i>, <i>Comp / discount</i>, <i>Payment taken back</i>, <i>Reopened check</i>, <i>Cancel Sale</i>, <i>No Sale</i>, <i>Refund</i>, <i>Date of birth typed by hand</i> and <i>ID refused</i>; <b>At least $</b> an amount; and a box for a check number (with or without the store's check prefix: <i>HCA-1234</i>, <i>1234</i> or <i>#1234</i>), or words of the item or the reason.</li>
+<li><b>Voids:</b> an item taken off before it was sent isn't an exception and isn't kept as one; every void of an item already sent is.</li>
+<li><b>At the top:</b> the totals by kind. They are the same as the Exceptions report's for the same days.</li>
+<li><b>The list:</b> when, employee, kind, check number, item, amount, reason, and who approved it (a manager's PIN on the spot), newest first, 200 at a time (<b>More</b> for the next). Touch a row to open its check in <b>Find a Check</b>: its items, payments and whole history, and its receipt.</li>
+<li><b>Print</b> prints the list (everything found, totals first) on the receipt printer; <b>PDF</b> saves it as a PDF, like a report.</li>
 </ul>
 
 <!-- ======================================================================= -->
@@ -1516,6 +1539,7 @@
 <li><b>Every sale is saved at once</b>, so a power cut loses nothing already on the screen.</li>
 <li><b>Automatic backups:</b> when ViewTouch starts, every 24 hours and after every End of Day. The newest 30 are kept.</li>
 <li><b>A second copy</b> on a USB drive or network folder: Store Settings → <i>Also copy backups to</i>.</li>
+<li><b>The End of Day archive</b> goes with them: each backup also copies any new End of Day PDFs into <i>backups/eod-archive</i> (and the second copy's). Any other backup of the store computer must include the <i>eod-archive</i> folder beside the database.</li>
 <li><b>Damaged database:</b> if the database is damaged, ViewTouch won't use it. It names the newest good backup and the command to restore it.</li>
 <li><b>Restore</b> (ViewTouch stopped): <code>sudo vtmodern --data-dir /var/lib/viewtouch --restore &lt;backup file&gt;</code>. A restore never leaves the store without a database: what it sets aside gets a name of its own, and a move cut short is put back.</li>
 </ul>
@@ -2707,6 +2731,11 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <p>Lists the Raspberry Pi OS updates waiting, and which could change how ViewTouch runs. It never installs anything. The list also goes to Google Drive. <code>--daily</code> runs it every day at 4:50 AM; <code>--no-daily</code> stops that.</p>
 <pre>vt-pi-updates; beep3</pre>
 <div class="tip">Install updates that could touch ViewTouch only after checking them, and never during business hours.</div>
+
+<h3>vt-eod-verify: check the End of Day archive</h3>
+<p>The same check as Manager → Reports → End of Day archive (chapter 12): every archived day's record and chain, and every PDF's fingerprint where it is now (here or in the long-term folder). It only reads; it changes nothing. The first time on a Pi set up before it existed, link it once: <code>sudo ln -sf ~/viewtouch-main/scripts/bin/vt-eod-verify /usr/local/bin/</code>.</p>
+<pre>vt-eod-verify --list; beep3</pre>
+<p>It ends with <i>All is well</i>, or <i>PROBLEM:</i> and the first thing wrong (for example <i>Day 2026-11-14: the PDF has changed since it was archived</i>).</p>
 
 <h3>vt-web-reports: the reports on the website</h3>
 <p>Sends this store's reports to the reports page on the website (chapter 12, Reports on the website) every 15 minutes. Set it up once on each store's Pi, with the address and the store's own token from the website's token page:</p>

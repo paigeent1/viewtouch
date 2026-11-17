@@ -50,3 +50,11 @@ entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (
 
 ## 4. Commands for the owner to paste on the Pi
 End every block with `; beep3` (three beeps when finished).
+
+## 5. The End of Day archive (keep it, back it up)
+- Each End of Day's PDF is kept write-once in `eod-archive/` beside `viewtouch.db` (on the Pi:
+  `~/.local/share/ViewTouch/ViewTouch/eod-archive/`), recorded in the `eod_archive` table as a hash chain.
+  Never edit, move or delete those files or rows by hand: the integrity check (`vt-eod-verify`) will flag it.
+- **Backups must include the `eod-archive` folder**, not just the database. ViewTouch's own backups mirror it
+  into `backups/eod-archive` (and the second backup folder); any other backup or copy of a store must take it too.
+- Open item: the long-term archive location (Store Settings > Backups > Long-term archive folder; probably a NAS).
