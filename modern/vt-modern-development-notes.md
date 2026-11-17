@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-17 11:44 ET — Bob (Claude) — vt-vnc removed
+- **What:** Removed scripts/bin/vt-vnc (VNC sharing of the register screen).
+- **Why:** Owner 2026-11-17: delete the VNC viewer setup; he'll use something else for remote access.
+- **Files:** `scripts/bin/vt-vnc`
+
 ### 2026-11-17 11:36 ET — Bob (Claude) — vt-vnc: the register screen over VNC for remote help
 - **What:** New vt-vnc on/off/status: installs x11vnc if missing, asks once for a VNC password (~/.vnc/vt-vnc.pass, mode 600), and shares X11 display :0 on port 5900 as a systemd user service (lingering, so it comes back after a restart). Only 192.168.x.x addresses may connect (the stores and the UniFi VPN).
 - **Why:** Owner 2026-11-17: remote VNC (or similar) for HCA's main register. Raspberry Pi Connect's screen sharing needs Wayland, and the registers run X11.
