@@ -76,11 +76,13 @@ bool matches(const ExceptionEntry &e, const Filter &f)
     if (f.minCents >= 0 && e.amount.cents() < f.minCents)
         return false;
     if (!f.text.isEmpty()) {
-        const bool byNumber = f.number > 0 && e.checkId == f.number;
+        // A check number ("1234", "#1234", "HCA-1234") finds that check only (not words with the digits in them).
+        if (f.number > 0)
+            return e.checkId == f.number;
         const bool byWords = QString::fromStdString(e.what).contains(f.text, Qt::CaseInsensitive)
                              || QString::fromStdString(e.reason).contains(f.text, Qt::CaseInsensitive)
                              || QString::fromStdString(e.checkLabel).compare(f.text, Qt::CaseInsensitive) == 0;
-        if (!byNumber && !byWords)
+        if (!byWords)
             return false;
     }
     return true;

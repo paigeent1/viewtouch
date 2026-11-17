@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-17 13:17 ET — Archive helper (Claude helper) — Exceptions search: a check number finds that check only
+- **What:** A text that is a check number (1234, #1234, HCA-1234, hca1234) matches that check only, not item or reason words with those digits (Cancel #1 matched #1). Manual says so.
+- **Why:** CI: the search test found check 2's 'Cancel #1' when searching #1; a manager typing a check number wants that check.
+- **Files:** `modern/app/pos_exceptions.cpp`, `modern/docs/manual/manual.html`
+
 ### 2026-11-17 13:00 ET — Archive helper (Claude helper) — End of Day archive: small fixes
 - **What:** archiveEndOfDay: no ternary between nullopt and an optional; the Exceptions search test compares a type as text.
 - **Why:** Clean build on every compiler; clearer test.
