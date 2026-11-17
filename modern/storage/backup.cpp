@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QLoggingCategory>
@@ -303,12 +304,38 @@ void BackupScheduler::check()
         backupNow();
 }
 
+int mirrorArchive(const QString &archiveDir, const QString &dest, QString *error)
+{
+    if (archiveDir.isEmpty() || !QFileInfo(archiveDir).isDir())
+        return 0;
+    int copied = 0;
+    QDirIterator it(archiveDir, {u"*.pdf"_s}, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString from = it.next();
+        const QString to = QDir(dest).filePath(QDir(archiveDir).relativeFilePath(from));
+        if (QFileInfo::exists(to))
+            continue;   // already there: never replaced
+        const QString part = to + u".part"_s;
+        QFile::remove(part);
+        if (!QDir().mkpath(QFileInfo(to).absolutePath()) || !QFile::copy(from, part) || !QFile::rename(part, to)) {
+            QFile::remove(part);
+            if (error)
+                *error = u"Could not copy %1 to %2."_s.arg(from, to);
+            continue;
+        }
+        QFile::setPermissions(to, QFileDevice::ReadOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
+        ++copied;
+    }
+    return copied;
+}
+
 void BackupScheduler::backupNow()
 {
     if (running_)
         return;
     running_ = true;
-    pool_.start([this, db = db_, dir = dir_, copyDir = copyDir_, keep = keep_, key = sealKey_, salt = sealSalt_] {
+    pool_.start([this, db = db_, dir = dir_, copyDir = copyDir_, keep = keep_, key = sealKey_, salt = sealSalt_,
+                 archive = archiveDir_] {
         QString error;
         QString target;
         bool ok = QDir().mkpath(dir);
@@ -343,6 +370,15 @@ void BackupScheduler::backupNow()
             copyOk = copyBackup(target, copyDir, &copy);
             if (copyOk)
                 pruneBackups(copyDir, keep);
+        }
+        // The End of Day archive's PDFs go with the database that records them.
+        if (ok && !archive.isEmpty()) {
+            QString why;
+            mirrorArchive(archive, QDir(dir).filePath(u"eod-archive"_s), &why);
+            if (!copyDir.isEmpty())
+                mirrorArchive(archive, QDir(copyDir).filePath(u"eod-archive"_s), &why);
+            if (!why.isEmpty())
+                qCWarning(lcBackup).noquote() << "End of Day archive:" << why;
         }
         QMetaObject::invokeMethod(this, [this, ok, target, error, copy, copyOk] {
             running_ = false;

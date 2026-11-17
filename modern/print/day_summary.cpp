@@ -25,10 +25,10 @@ QString q(const std::string &s) { return QString::fromStdString(s); }
 
 } // namespace
 
-bool writeDaySummaryPdf(const QString &file, const QString &heading, const std::vector<core::Report> &reports,
-                        const QStringList &ticketPictures)
+bool writeDaySummaryPdf(QIODevice *out, const QString &heading, const std::vector<core::Report> &reports,
+                        const std::vector<QImage> &ticketPictures)
 {
-    QPdfWriter pdf(file);
+    QPdfWriter pdf(out);
     pdf.setPageSize(QPageSize(QPageSize::Letter));
     pdf.setResolution(150);
     pdf.setTitle(heading);
@@ -123,17 +123,16 @@ bool writeDaySummaryPdf(const QString &file, const QString &heading, const std::
     }
 
     // The exception tickets, as printed (the store's copy).
-    if (!ticketPictures.isEmpty()) {
+    if (!ticketPictures.empty()) {
         newPage();
         p.setFont(title);
         p.drawText(QRect(margin, y, width, lineH * 2), Qt::AlignLeft | Qt::AlignVCenter,
-                   u"Exception tickets (%1)"_s.arg(ticketPictures.size()));
+                   u"Exception tickets (%1)"_s.arg(qsizetype(ticketPictures.size())));
         y += lineH * 2;
         const int gap = 24, across = 3;
         const int colW = (width - gap * (across - 1)) / across;
         int x = 0, rowH = 0;
-        for (const QString &path : ticketPictures) {
-            const QImage img(path);
+        for (const QImage &img : ticketPictures) {
             if (img.isNull())
                 continue;
             int w = colW, h = int(img.height() * double(colW) / img.width());

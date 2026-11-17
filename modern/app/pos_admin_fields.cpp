@@ -560,6 +560,12 @@ QVariantList PosService::adminFields(const QString &panel)
                   tr("Texts are POSTed here as JSON {\"to\", \"message\"} (your SMS provider or a relay). Empty: no texts; the host tells the guest.")),
             field(u"backupCopyDir"_s, tr("Also copy backups to"), u"text"_s,
                   tr("A USB drive or network folder on the server, e.g. /media/usb/viewtouch. Empty = no second copy.")),
+            field(u"longTermArchiveDir"_s, tr("Long-term archive folder"), u"text"_s,
+                  tr("Where End of Day PDFs older than the days below move to: a full path such as a mounted NAS share "
+                     "(/mnt/nas/viewtouch). Empty: they stay in the store's eod-archive folder.")),
+            with(with(field(u"longTermArchiveDays"_s, tr("Move End of Day PDFs after (days)"), u"int"_s,
+                            tr("Older than this, a day's PDF is copied to the long-term folder, checked, then removed here.")),
+                      u"min"_s, 1), u"max"_s, 3650),
             field(u"royaltyPercent"_s, tr("Royalty (% of net sales)"), u"string"_s,
                   tr("A franchise's fee, e.g. 5 or 4.5. Reports -> Royalty works it out. Empty or 0: none.")),
             field(u"adFundPercent"_s, tr("Advertising fund (% of net sales)"), u"string"_s, tr("e.g. 2. Empty or 0: none.")),

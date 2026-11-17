@@ -1387,17 +1387,11 @@ bool PosService::endOfDay()
     if (s_->sink)
         s_->sink->saveDay(s_->day, reports);
     s_->pastDays.insert(s_->pastDays.begin(), PastDay{s_->day, reports});
-    if (s_->printer) {
+    if (s_->printer)
         s_->printer->printReport(s_->settings, buildReport(u"sales"_s), receiptPrinter());
-        // The day's summary PDF and the exception tickets as pictures, in the day's folder
-        // ("Daily Reports" on the Pi): nothing to staple.
-        std::vector<Report> summary;
-        for (const QString &id : {u"sales"_s, u"deposit"_s, u"drawer"_s, u"servers"_s, u"tips"_s, u"labor"_s,
-                                  u"categories"_s, u"items"_s, u"hourly"_s, u"expenses"_s, u"exceptions"_s})
-            summary.push_back(buildReport(id));
-        s_->printer->saveEndOfDay(s_->settings, summary, buildReport(u"exceptions"_s), exceptionTickets(), s_->day.id,
-                                  s_->day.openedAt);
-    }
+    // The day's summary PDF (the reports, then the exception tickets as pictures) into the End of Day
+    // archive beside the database, write-once: nothing to staple, nothing on the desktop.
+    archiveEndOfDay();
 
     s_->closedToday.clear();
     s_->kitchenDone.clear();
@@ -1526,17 +1520,9 @@ bool PosService::xReport()
 
 bool PosService::saveExceptionTickets()
 {
-    if (!require(perm::Manager, tr("Saving the exception tickets")))
-        return false;
-    if (!s_->printer)
-        return fail(tr("No printer is set up."));
-    const std::vector<PosPrinter::ExceptionTicket> tickets = exceptionTickets();
-    const QString dir = s_->printer->saveExceptionTickets(s_->settings, buildReport(u"exceptions"_s), tickets,
-                                                          s_->day.id, s_->day.openedAt);
-    if (dir.isEmpty())
-        return fail(tr("Couldn't save the exception tickets."));
-    emit notice(tr("%n exception ticket(s) saved to %1", nullptr, int(tickets.size())).arg(dir));
-    return true;
+    // Nothing is saved to the desktop any more (owner 2026-11-17).
+    return fail(tr("Exception tickets are kept in each day's End of Day archive PDF. Find them with Manager > Reports > "
+                   "Exceptions search, or End of Day archive."));
 }
 
 // --- reports ---------------------------------------------------------------------------

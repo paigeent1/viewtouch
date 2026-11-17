@@ -9,6 +9,7 @@
 #include "print/day_summary.hh"
 
 #include <algorithm>
+#include <QBuffer>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -204,9 +205,9 @@ void TicketPrinter::printPrivacyNotice(const PosSettings &settings, const std::s
 
 QString TicketPrinter::savePrivacyNotice(const PosSettings &settings)
 {
-    // Next to the Daily Reports folder (on the Pi: the Desktop).
-    const QString reports = QFileInfo(dayFolder(0, 0)).absolutePath();
-    const QString path = QDir(QFileInfo(reports).absolutePath()).filePath(u"Privacy Notice.txt"_s);
+    // On the Pi's desktop (or in the home folder without one).
+    const QString path = QDir(QDir::home().exists(u"Desktop"_s) ? QDir::home().filePath(u"Desktop"_s) : QDir::homePath())
+                             .filePath(u"Privacy Notice.txt"_s);
     const QByteArray text = QByteArray::fromStdString(privacyText(settings, true)) + '\n';
     QFile f(path);
     if (f.open(QIODevice::ReadOnly) && f.readAll() == text)
@@ -272,32 +273,15 @@ void TicketPrinter::printNoSale(const PosSettings &settings, const CashMovement 
     send(settings, *p, d, QString::fromStdString("No Sale #" + std::to_string(number)));
 }
 
-QString TicketPrinter::saveExceptionTickets(const PosSettings &settings, const Report &exceptions,
-                                           const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
-                                           std::int64_t dayOpenedAt)
+std::vector<QImage> TicketPrinter::exceptionPictures(const PosSettings &settings, const std::vector<ExceptionTicket> &tickets)
 {
-    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
-    const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
-    const QString dir = dayFolder(dayId, dayOpenedAt);
-    if (!QDir().mkpath(dir))
-        return {};
     // The store's copy: every void and error correct shows, whatever the customer's receipt hides.
     PosSettings store = settings;
     store.receiptShowVoids = true;
     const TicketContext ctx = context(store);
     const PrinterConfig *rp = receiptPrinter(settings, "");
     const int width = rp ? std::max(32, rp->width) : 42;
-    const bool jpeg = QImageWriter::supportedImageFormats().contains("jpg");
-    const char *format = jpeg ? "JPG" : "PNG";
-    const QString ext = jpeg ? u"jpg"_s : u"png"_s;
-
     std::vector<QImage> pictures;
-    const auto keep = [&](const Document &d, const QString &name) {
-        QImage img = ticketImage(d, width);
-        img.save(QDir(dir).filePath(name + u'.' + ext), format, 90);
-        pictures.push_back(std::move(img));
-    };
-    keep(reportTicket(exceptions, ctx), u"exceptions-report"_s);
     for (const ExceptionTicket &t : tickets) {
         Document d;
         if (t.check) {   // the store's copy: with the buyer's date of birth when an ID was scanned
@@ -317,92 +301,52 @@ QString TicketPrinter::saveExceptionTickets(const PosSettings &settings, const R
         d.lines.erase(std::remove_if(d.lines.begin(), d.lines.end(),
                                      [](const Document::Line &l) { return l.kind == Document::Kind::Image; }),
                       d.lines.end());
-        keep(d, QString::fromStdString(t.file));
+        pictures.push_back(ticketImage(d, width));
     }
-
-    // All of it in one PDF: the report first, then the tickets side by side, three across.
-    const QString pdfFile = QDir(dir).filePath(u"Exceptions %1.pdf"_s.arg(date));
-    {
-        QPdfWriter pdf(pdfFile);
-        pdf.setPageSize(QPageSize(QPageSize::Letter));
-        pdf.setResolution(150);
-        pdf.setTitle(u"Exceptions %1"_s.arg(date));
-        pdf.setCreator(u"ViewTouch"_s);
-        QPainter p;
-        if (p.begin(&pdf)) {
-            const int margin = 60;
-            const int pageW = pdf.width() - 2 * margin, bottom = pdf.height() - margin;
-            QFont title(u"DejaVu Sans"_s, 14);
-            title.setBold(true);
-            p.setFont(title);
-            const int titleH = QFontMetrics(title, &pdf).height() + 12;
-            p.drawText(QRect(margin, margin, pageW, titleH), Qt::AlignLeft | Qt::AlignVCenter,
-                       QString::fromStdString(settings.storeName) + u" · "_s
-                           + u"Exceptions %1 (day %2), %3 tickets"_s.arg(date).arg(dayId).arg(pictures.size() - 1));
-            const int gap = 24, across = 3;
-            const int colW = (pageW - gap * (across - 1)) / across;
-            int x = 0, y = margin + titleH, rowH = 0;
-            for (const QImage &img : pictures) {
-                const double scale = double(colW) / img.width();
-                int h = int(img.height() * scale);
-                // A ticket taller than the page: shrunk to fit.
-                const int room = bottom - (margin + titleH);
-                int w = colW;
-                if (h > room) {
-                    w = int(w * double(room) / h);
-                    h = room;
-                }
-                if (x >= across) {
-                    x = 0;
-                    y += rowH + gap;
-                    rowH = 0;
-                }
-                if (y + h > bottom) {
-                    pdf.newPage();
-                    x = 0;
-                    y = margin;
-                    rowH = 0;
-                }
-                p.drawImage(QRect(margin + x * (colW + gap), y, w, h), img);
-                rowH = std::max(rowH, h);
-                ++x;
-            }
-            p.end();
-        }
-    }
-    return dir;
+    return pictures;
 }
 
-QString TicketPrinter::dayFolder(std::int64_t dayId, std::int64_t dayOpenedAt) const
+QByteArray TicketPrinter::endOfDayPdf(const PosSettings &settings, const std::vector<Report> &summary,
+                                      const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
+                                      std::int64_t dayOpenedAt)
 {
-    QString base = exceptionsDir_;
-    if (base.isEmpty())
-        base = qEnvironmentVariable("VT_REPORTS_DIR");
-    if (base.isEmpty())
-        base = QDir::home().exists(u"Desktop"_s) ? QDir::home().filePath(u"Desktop/Daily Reports"_s)
-                                                 : QDir::home().filePath(u"Daily Reports"_s);
-    const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
-    return QDir(base).filePath(u"%1 day %2"_s.arg(date).arg(dayId));
-}
-
-QString TicketPrinter::saveEndOfDay(const PosSettings &settings, const std::vector<Report> &summary,
-                                    const Report &exceptions, const std::vector<ExceptionTicket> &tickets,
-                                    std::int64_t dayId, std::int64_t dayOpenedAt)
-{
-    const QString dir = saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
-    if (dir.isEmpty())
-        return {};
-    QStringList pictures;
-    for (const ExceptionTicket &t : tickets)
-        for (const char *ext : {".jpg", ".png"})
-            if (const QString f = QDir(dir).filePath(QString::fromStdString(t.file) + QLatin1StringView(ext)); QFile::exists(f)) {
-                pictures << f;
-                break;
-            }
+    const i18n::Scope language(i18n::printLanguage(QString::fromStdString(settings.language)));
+    const std::vector<QImage> pictures = exceptionPictures(settings, tickets);
     const QString date = QDateTime::fromMSecsSinceEpoch(dayOpenedAt ? dayOpenedAt : now_()).toString(u"yyyy-MM-dd"_s);
     const QString heading = QString::fromStdString(settings.storeName) + u" · End of day %1 (day %2)"_s.arg(date).arg(dayId);
-    writeDaySummaryPdf(QDir(dir).filePath(u"EOD Summary %1.pdf"_s.arg(date)), heading, summary, pictures);
-    return dir;
+    QByteArray bytes;
+    QBuffer out(&bytes);
+    if (!out.open(QIODevice::WriteOnly) || !writeDaySummaryPdf(&out, heading, summary, pictures))
+        return {};
+    out.close();
+    return bytes;
+}
+
+void TicketPrinter::printPdf(const PosSettings &settings, const QByteArray &pdf, const QString &title,
+                             const std::string &printerId)
+{
+    if (const PrinterConfig *p = settings.printer(printerId); p && p->effectiveFormat() == "pdf")
+        spooler_.submit(*p, pdf, title);
+}
+
+void TicketPrinter::printPictures(const PosSettings &settings, const std::vector<QByteArray> &pages,
+                                  const QString &title, const std::string &printerId)
+{
+    const PrinterConfig *p = receiptPrinter(settings, printerId);
+    if (!p)
+        return;
+    const int dots = p->width >= 42 ? 576 : 384;   // 80 mm or 58 mm paper
+    Document d;
+    d.text(title.toStdString(), Document::Align::Center, true);
+    d.rule();
+    for (const QByteArray &page : pages) {
+        if (auto r = rasterize(page, dots, dots * 3))
+            d.image(r);
+        d.rule();
+    }
+    d.blank();
+    d.cut = p->cutter;
+    send(settings, *p, d, title);
 }
 
 bool TicketPrinter::printTestPage(const PosSettings &settings, const std::string &printerId, bool kickDrawer)

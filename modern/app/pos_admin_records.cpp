@@ -138,6 +138,8 @@ QVariantList PosService::adminRecords(const QString &panel)
                   return l.join(u", "_s);
               }()},
              {u"backupCopyDir"_s, qs(s_->settings.backupCopyDir)},
+             {u"longTermArchiveDir"_s, qs(s_->settings.longTermArchiveDir)},
+             {u"longTermArchiveDays"_s, s_->settings.longTermArchiveDays},
              {u"askReasons"_s, s_->settings.askReasons},
              {u"serviceOn"_s, s_->settings.service.on}, {u"serviceCaution"_s, s_->settings.service.caution},
              {u"serviceStop"_s, s_->settings.service.stop}, {u"serviceWindowHours"_s, s_->settings.service.windowHours},

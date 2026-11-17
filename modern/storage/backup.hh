@@ -35,6 +35,11 @@ bool copyBackup(const QString &backup, const QString &dir, QString *note = nullp
 QStringList listBackups(const QString &dir);
 // Remove all but the newest `keep` backups in `dir`; returns what was removed.
 QStringList pruneBackups(const QString &dir, int keep);
+// The End of Day archive's PDFs (<data>/eod-archive) mirrored into `dest`: each PDF not there yet is
+// copied (written aside, then renamed) and made read-only; nothing there is replaced or removed.
+// Returns how many were copied; `error` says what couldn't be.
+int mirrorArchive(const QString &archiveDir, const QString &dest, QString *error = nullptr);
+
 // The store's backup key and salt from the database at `db` (read only);
 // both empty when its backups aren't encrypted.
 std::pair<QByteArray, QByteArray> backupKeyOf(const QString &db);
@@ -55,6 +60,9 @@ public:
     QString directory() const { return dir_; }
     // Also copy each backup to `dir` (empty: no second copy), keeping as many.
     void setCopyDirectory(const QString &dir) { copyDir_ = dir; }
+    // The End of Day archive folder: mirrored into <backups>/eod-archive (and the second copy's) with
+    // each backup, so the archived PDFs are backed up with the database that records them.
+    void setArchiveDirectory(const QString &dir) { archiveDir_ = dir; }
     // Encrypt backups with this key (see sealed.hh); empty: plain copies.
     // Encrypted backups are named viewtouch-<time>.vtbak.
     void setSealing(const QByteArray &key, const QByteArray &salt)
@@ -78,6 +86,7 @@ private:
     QString db_;
     QString dir_;
     QString copyDir_;
+    QString archiveDir_;
     QByteArray sealKey_;
     QByteArray sealSalt_;
     int keep_;

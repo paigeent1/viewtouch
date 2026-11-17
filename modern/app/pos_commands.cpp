@@ -395,6 +395,11 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
              return QVariant(p.countDrawerPieces(a.value(0).toLongLong(), a.value(1).toList())); }},
         {u"endOfDay"_s, [](PosService &p, const QVariantList &) { return QVariant(p.endOfDay()); }},
         {u"xReport"_s, [](PosService &p, const QVariantList &) { return QVariant(p.xReport()); }},
+        {u"eodArchive"_s, [](PosService &p, const QVariantList &) { return QVariant(p.eodArchive()); }},
+        {u"checkEodArchive"_s, [](PosService &p, const QVariantList &) { return QVariant(p.checkEodArchive()); }},
+        {u"eodArchivePagePart"_s, [](PosService &p, const QVariantList &a) {
+            return QVariant(p.eodArchivePagePart(a.value(0).toLongLong(), a.value(1).toInt(), a.value(2).toLongLong())); }},
+        {u"printEodArchive"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printEodArchive(a.value(0).toLongLong())); }},
         {u"saveExceptionTickets"_s, [](PosService &p, const QVariantList &) { return QVariant(p.saveExceptionTickets()); }},
         {u"printReport"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.printReport(a.value(0).toString(), a.value(1).toLongLong())); }},

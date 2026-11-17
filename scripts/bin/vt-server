@@ -45,6 +45,11 @@ if command -v dpkg >/dev/null && ! command -v ffmpeg >/dev/null; then
     echo "Installing ffmpeg (guest-screen videos)..."
     sudo apt-get install -y ffmpeg >/dev/null 2>&1 || echo "Couldn't install ffmpeg; guest-screen videos are copied as they are."
 fi
+# The End of Day archive's pages are drawn with pdftoppm (poppler-utils): installed once when missing.
+if command -v dpkg >/dev/null && ! command -v pdftoppm >/dev/null; then
+    echo "Installing poppler-utils (End of Day archive: showing its PDFs)..."
+    sudo apt-get install -y poppler-utils >/dev/null 2>&1 || echo "Couldn't install poppler-utils; the End of Day archive can't show its PDFs on screen."
+fi
 # The top bar's icons (battery, Wi-Fi, customer count) are emoji: installed once when the font is missing.
 if command -v dpkg >/dev/null && ! dpkg -s fonts-noto-color-emoji >/dev/null 2>&1; then
     echo "Installing the emoji font (the top bar's icons)..."

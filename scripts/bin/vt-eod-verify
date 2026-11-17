@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Check the End of Day archive from the shell: the same check ViewTouch runs at End of Day and on
+Manager > Reports > End of Day archive (modern/app/eod_archive.cpp).
+
+  vt-eod-verify                     the store on this Pi (~/.local/share/ViewTouch/ViewTouch/viewtouch.db)
+  vt-eod-verify --db /path/viewtouch.db [--archive /path/eod-archive] [--list]
+
+It recomputes every record's hash and the chain (each record names the one before it), every PDF's
+SHA-256 where it is now (the eod-archive folder, or the long-term folder it was moved to), checks no
+record is missing (1, 2, 3...) and that no PDF in the folder lacks a record. Read-only: it opens the
+database read-only and changes nothing.
+
+Exit status: 0 all is well (days in a long-term folder that can't be reached now are listed, not
+failures), 1 a problem was found (the first one is said first), 2 the archive can't be read.
+
+The chain makes a change detectable, not impossible: anyone with administrator rights on the Pi can
+edit files, but any change shows here.
+"""
+import argparse
+import hashlib
+import os
+import sqlite3
+import sys
+
+GENESIS = "0" * 64
+
+
+def record_hash(r):
+    text = r["prev_hash"] + "\n" + "|".join(str(x) for x in (
+        r["seq"], r["at"], r["day_id"], r["day_date"], r["kind"], r["of_seq"], r["file"], r["size"], r["pdf_sha256"]))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    size = 0
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+            size += len(block)
+    return h.hexdigest(), size
+
+
+def main():
+    default_db = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+    ap = argparse.ArgumentParser(description="Check the End of Day archive (read-only).")
+    ap.add_argument("--db", default=default_db, help="the store's viewtouch.db")
+    ap.add_argument("--archive", help="the eod-archive folder (default: beside the database)")
+    ap.add_argument("--list", action="store_true", help="list every archived day and where its PDF is")
+    a = ap.parse_args()
+    archive = a.archive or os.path.join(os.path.dirname(os.path.abspath(a.db)), "eod-archive")
+    if not os.path.exists(a.db):
+        print(f"No database at {a.db}")
+        return 2
+    try:
+        con = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
+        con.row_factory = sqlite3.Row
+        have = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='eod_archive'").fetchone()
+        rows = [dict(r) for r in con.execute("SELECT * FROM eod_archive ORDER BY seq")] if have else []
+        con.close()
+    except sqlite3.Error as e:
+        print(f"The archive's records can't be read: {e}")
+        return 2
+
+    problems = []
+    prev, expect, by_seq = GENESIS, 1, {}
+    for r in rows:
+        by_seq[r["seq"]] = r
+        if r["seq"] != expect:
+            problems.append(f"Record {expect} is missing from the archive (a record was removed): the chain is broken there.")
+        expect = r["seq"] + 1
+        if r["prev_hash"] != prev:
+            problems.append(f"Day {r['day_date']}: the archive's chain is broken here (a record before it was changed or removed).")
+        if record_hash(r) != r["record_hash"]:
+            problems.append(f"Day {r['day_date']}: its archive record was changed since it was written.")
+        prev = r["record_hash"]
+        if r["kind"] == "moved":
+            of = by_seq.get(r["of_seq"])
+            if of is None or of["pdf_sha256"] != r["pdf_sha256"]:
+                problems.append(f"Day {r['day_date']}: its long-term archive record doesn't match the day's own record.")
+
+    def where(r):
+        for m in reversed(rows):
+            if m["kind"] == "moved" and m["of_seq"] == r["seq"]:
+                return m["file"]
+        return r["file"] if os.path.isabs(r["file"]) else os.path.join(archive, r["file"])
+
+    known, days, checked, unreachable = set(), 0, 0, 0
+    for r in rows:
+        if r["kind"] == "moved":
+            continue
+        days += 1
+        local = os.path.normpath(os.path.join(archive, r["file"]))
+        known.add(local)
+        path = where(r)
+        state = "ok"
+        if not os.path.exists(path):
+            away = os.path.normpath(path) != local
+            if away and not os.path.isdir(os.path.dirname(os.path.dirname(path))):
+                state = "not reachable now"
+                unreachable += 1
+            else:
+                state = "missing"
+                problems.append(f"Day {r['day_date']}: the PDF is missing ({path}).")
+        else:
+            sha, size = sha256_file(path)
+            checked += 1
+            if sha != r["pdf_sha256"] or size != r["size"]:
+                state = "changed"
+                problems.append(f"Day {r['day_date']}: the PDF has changed since it was archived.")
+        if a.list:
+            print(f"  {r['day_date']}  day {r['day_id']:<6} {r['kind']:<12} {state:<18} {r['pdf_sha256'][:16]}  {path}")
+
+    orphans = []
+    if os.path.isdir(archive):
+        for top, _dirs, files in os.walk(archive):
+            for f in files:
+                if f.endswith(".pdf") and os.path.normpath(os.path.join(top, f)) not in known:
+                    orphans.append(os.path.relpath(os.path.join(top, f), archive))
+    for o in sorted(orphans)[:1]:
+        problems.append(f"{o} is in the archive folder but has no record (its record was removed).")
+
+    print(f"End of Day archive: {days} day(s) recorded, {checked} PDF(s) checked"
+          + (f", {unreachable} in the long-term folder, not reachable now" if unreachable else "") + ".")
+    if problems:
+        print("PROBLEM: " + problems[0])
+        for p in problems[1:]:
+            print("  also: " + p)
+        return 1
+    print("All is well: every record and PDF is as it was archived (any change would show).")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,5 +1,6 @@
 #include "app/ilsa_sync.hh"
 #include "app/legacy_history.hh"
+#include "app/eod_archive.hh"
 #include "app/pos_json.hh"
 #include "billboard.hh"
 #include "joincontroller.hh"
@@ -1428,6 +1429,14 @@ int runStore(const Args &cli, const Options &o)
             return vt::storage::drawersBetween(dbPath, from, to);
         };
     }
+    // The End of Day archive: each day's summary PDF beside the database, write-once, in a hash chain.
+    if (havePosStore) {
+        shared->archiveDb = dbPath;
+        shared->archiveDir = QFileInfo(dbPath).absoluteDir().filePath(u"eod-archive"_s);
+        QString archiveError;
+        if (!vt::app::eod::ensureTable(dbPath, &archiveError))
+            qWarning().noquote() << "End of Day archive: can't set up its table:" << archiveError;
+    }
     // ILSA's sales history, beside the database (scripts/bin/vt-ilsa-history writes it): read-only.
     shared->legacyDb = vt::app::legacy::historyPath(dbPath);
     // Store Settings > Billboards: vt-add-billboard does the TVs (in the background, from here), and its
@@ -1540,6 +1549,7 @@ int runStore(const Args &cli, const Options &o)
                                 QByteArray::fromBase64(QByteArray::fromStdString(shared->settings.backupSalt)));
         };
         applyBackupSettings();
+        backups->setArchiveDirectory(shared->archiveDir);
         QObject::connect(shared, &vt::app::PosShared::adminChanged, backups.get(), applyBackupSettings);
         QObject::connect(backups.get(), &vt::storage::BackupScheduler::finished, &pos,
                          [&pos, shared](bool ok, const QString &, const QString &error, const QString &copy, bool copyOk) {

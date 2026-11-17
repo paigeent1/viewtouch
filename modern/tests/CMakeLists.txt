@@ -11,6 +11,7 @@ if(TARGET vtm_layout)
     test_scan_data_app.cpp   # tobacco scan data for Altria: settings, Fill in makers, the report
     test_serial_scanner.cpp   # serial barcode scanners (several ports, pseudo-terminals)
     test_wipe.cpp     # the cutover step (scripts/bin/vt-wipe-transactions)
+    test_eod_archive.cpp   # the End of Day archive: write-once PDFs, the hash chain, the long-term folder
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
     )
 endif()

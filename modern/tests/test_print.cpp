@@ -330,15 +330,14 @@ TEST_CASE("No borrowing: a drawer opens only on the printer asked for, never ano
     CHECK_FALSE(readFile(dir.filePath(u"receipt.txt"_s)).contains(u"[drawer opened]"_s));
 }
 
-TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy showing voids",
-          "[print][exceptions]")
+TEST_CASE("Exception tickets are pictures in the End of Day PDF, the store's copy showing voids; nothing on the desktop",
+          "[print][exceptions][eodarchive]")
 {
     QTemporaryDir dir;
     auto seed = test::seedPosData();
     seed.settings.receiptShowVoids = false;   // the customer's receipt hides them; the store's copy doesn't
     PrintSpooler spooler;
     TicketPrinter printer(spooler, dir.path());
-    printer.setExceptionsDir(dir.filePath(u"exceptions"_s));
     core::Check c = burgerCheck(seed.settings, seed.menu);
     c.lines.front().voided = true;
     core::CashMovement m;
@@ -353,16 +352,9 @@ TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy
     std::vector<app::PosPrinter::ExceptionTicket> tickets;
     tickets.push_back({"check-" + std::to_string(c.id), "Check #" + std::to_string(c.id) + ": void", c, std::nullopt, 0, {}});
     tickets.push_back({"nosale-1", "No Sale #1: Make Change", std::nullopt, m, 1, "Drawer 1"});
-    const QString out = printer.saveExceptionTickets(seed.settings, r, tickets, 7, 1'700'000'000'000);
-    REQUIRE(!out.isEmpty());
-    const QDir d(out);
-    const QStringList pictures = d.entryList({u"*.jpg"_s, u"*.png"_s}, QDir::Files);
-    CHECK(pictures.size() == 3);   // the report, the check, the No Sale
-    CHECK(d.entryList({u"*.pdf"_s}, QDir::Files).size() == 1);
-    const QString ext = pictures.isEmpty() ? u"jpg"_s : QFileInfo(pictures.front()).suffix();
-    const QImage check(d.filePath(u"check-%1.%2"_s.arg(c.id).arg(ext)));
-    REQUIRE(!check.isNull());
-    CHECK(check.height() > check.width());   // a strip of paper
+    const std::vector<QImage> pictures = printer.exceptionPictures(seed.settings, tickets);
+    REQUIRE(pictures.size() == 2);   // the check, the No Sale
+    CHECK(pictures.front().height() > pictures.front().width());   // a strip of paper
 
     // The picture is the printer's layout: the voided line is on the store's copy.
     const Document text = receipt(c, [&] {
@@ -376,12 +368,11 @@ TEST_CASE("Exception tickets are saved as pictures and one PDF, the store's copy
     CHECK(!drawn.isNull());
     CHECK(drawn.pixelColor(2, 2) == QColor(Qt::white));
 
-    // End of day: the same folder gets the summary PDF (the reports, then the ticket pictures).
-    const QString eod = printer.saveEndOfDay(seed.settings, {r}, r, tickets, 7, 1'700'000'000'000);
-    REQUIRE(eod == out);
-    const QStringList pdfs = QDir(eod).entryList({u"EOD Summary *.pdf"_s}, QDir::Files);
-    REQUIRE(pdfs.size() == 1);
-    CHECK(QFileInfo(QDir(eod).filePath(pdfs.front())).size() > 1000);
+    // End of day: the summary PDF as bytes (the reports, then the ticket pictures); no files anywhere.
+    const QByteArray pdf = printer.endOfDayPdf(seed.settings, {r}, tickets, 7, 1'700'000'000'000);
+    CHECK(pdf.startsWith("%PDF"));
+    CHECK(pdf.size() > 1000);
+    CHECK(QDir(dir.path()).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
 }
 
 TEST_CASE("TicketPrinter sends labels in the label printer's language, or as slips", "[print][labels]")

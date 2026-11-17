@@ -300,6 +300,12 @@ public:
 
     // Run an operation by name (see PosService::invoke for the list).
     virtual void invoke(const QString &method, const QVariantList &args = {}, Reply reply = {}) = 0;
+    // For screens: an operation whose answer comes back as answered(tag, result) (here, or from
+    // the server on a tablet). The End of Day archive and the Exceptions search use it.
+    Q_INVOKABLE void ask(const QString &tag, const QString &method, const QVariantList &args = {});
+    // A page of an archived End of Day PDF (PosService::eodArchivePagePart), fetched a part at a
+    // time and kept as a picture file here: archivePageLoaded(seq, page, pages, url, error).
+    Q_INVOKABLE void loadArchivePage(qint64 seq, int page);
 
     virtual QString terminalName() const = 0;
     virtual bool online() const { return true; }
@@ -868,6 +874,8 @@ public:
     Q_INVOKABLE void stopPairing() { invoke(QStringLiteral("stopPairing")); }
 
 signals:
+    void answered(const QString &tag, const QVariant &result);
+    void archivePageLoaded(qint64 seq, int page, int pages, const QString &url, const QString &error);
     void updateChanged();
     void sessionChanged();
     void entryChanged();

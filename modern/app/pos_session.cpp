@@ -1,7 +1,17 @@
 #include "app/pos_session.hh"
 
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QPointer>
 #include <QSet>
+#include <QStandardPaths>
 #include <QTimer>
+#include <QUrl>
+
+#include <functional>
+#include <memory>
 
 #include "app/i18n.hh"
 
@@ -114,6 +124,76 @@ QVariantMap PosSession::snapshot() const
         {u"checkSearch"_s, checkSearch()}, {u"itemSearch"_s, itemSearch()}, {u"printerSearch"_s, printerSearch()}, {u"billboard"_s, billboard()},
         {u"tablets"_s, tablets()},
     };
+}
+
+void PosSession::ask(const QString &tag, const QString &method, const QVariantList &args)
+{
+    QPointer<PosSession> self(this);
+    invoke(method, args, [self, tag](const QVariant &result) {
+        if (self)
+            emit self->answered(tag, result);
+    });
+}
+
+namespace {
+
+struct PageFetch {
+    qint64 seq = 0;
+    int page = 0;
+    int pages = 0;
+    QByteArray data;
+};
+
+void fetchPagePart(PosSession *session, std::shared_ptr<PageFetch> fetch)
+{
+    QPointer<PosSession> self(session);
+    session->invoke(u"eodArchivePagePart"_s, {fetch->seq, fetch->page, qint64(fetch->data.size())},
+                    [self, fetch](const QVariant &r) {
+        if (!self)
+            return;
+        const QVariantMap m = r.toMap();
+        if (m.value(u"pages"_s).toInt() > 0)
+            fetch->pages = m.value(u"pages"_s).toInt();
+        fetch->page = m.value(u"page"_s, fetch->page).toInt();
+        const QString error = m.value(u"error"_s).toString();
+        const qint64 size = m.value(u"size"_s).toLongLong();
+        const QByteArray part = QByteArray::fromBase64(m.value(u"data"_s).toString().toLatin1());
+        if (!error.isEmpty() || size <= 0 || (part.isEmpty() && fetch->data.size() < size)) {
+            emit self->archivePageLoaded(fetch->seq, fetch->page, fetch->pages, QString(),
+                                         error.isEmpty() ? PosSession::tr("The page didn't arrive.") : error);
+            return;
+        }
+        fetch->data += part;
+        if (fetch->data.size() < size) {
+            fetchPagePart(self, fetch);
+            return;
+        }
+        const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + u"/eod-archive-view"_s;
+        QDir().mkpath(dir);
+        {   // Only the pages looked at lately are kept here.
+            const QFileInfoList old = QDir(dir).entryInfoList({u"*.jpg"_s}, QDir::Files, QDir::Time);
+            for (qsizetype i = 30; i < old.size(); ++i)
+                QFile::remove(old[i].absoluteFilePath());
+        }
+        const QString file = QDir(dir).filePath(u"%1-%2-%3.jpg"_s.arg(fetch->seq).arg(fetch->page)
+                                                    .arg(QDateTime::currentMSecsSinceEpoch()));
+        QFile f(file);
+        const bool ok = f.open(QIODevice::WriteOnly) && f.write(fetch->data) == fetch->data.size();
+        const QString why = f.errorString();
+        f.close();
+        emit self->archivePageLoaded(fetch->seq, fetch->page, fetch->pages, ok ? QUrl::fromLocalFile(file).toString() : QString(),
+                                     ok ? QString() : why);
+    });
+}
+
+} // namespace
+
+void PosSession::loadArchivePage(qint64 seq, int page)
+{
+    auto fetch = std::make_shared<PageFetch>();
+    fetch->seq = seq;
+    fetch->page = page;
+    fetchPagePart(this, fetch);
 }
 
 PosSession::PosSession(QObject *parent)

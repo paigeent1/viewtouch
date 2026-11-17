@@ -351,6 +351,10 @@ struct PosSettings {
     // A second folder every backup is also copied to (a USB drive, a
     // network share), so one dead disk can't take the backups with it.
     std::string backupCopyDir;
+    // The End of Day archive: PDFs older than longTermArchiveDays move from <data>/eod-archive to this
+    // folder (an absolute path: a mounted NAS share, say), under <store name>/<year>/. Empty: they stay.
+    std::string longTermArchiveDir;
+    int longTermArchiveDays = 90;
     // Encrypted backups: the key made from the backup password, and its salt
     // (base64). Empty: backups are plain copies.
     std::string backupKey;

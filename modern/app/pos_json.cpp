@@ -1243,6 +1243,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"cancelReasons"_s, [&] { QJsonArray a; for (const std::string &r : s.cancelReasons) a.append(qs(r)); return a; }()},
         {u"cashDenominations"_s, [&] { QJsonArray a; for (std::int64_t c : s.cashDenominations) a.append(qint64(c)); return a; }()},
         {u"backupCopyDir"_s, qs(s.backupCopyDir)},
+        {u"longTermArchiveDir"_s, qs(s.longTermArchiveDir)}, {u"longTermArchiveDays"_s, s.longTermArchiveDays},
         {u"backupKey"_s, qs(s.backupKey)}, {u"backupSalt"_s, qs(s.backupSalt)},
         {u"waitMinutesPerParty"_s, s.waitMinutesPerParty}, {u"hostsTakePayments"_s, s.hostsTakePayments},
         {u"autoLogoutMinutes"_s, s.autoLogoutMinutes}, {u"phoneLockSeconds"_s, s.phoneLockSeconds}, {u"tableLongMinutes"_s, s.tableLongMinutes},
@@ -1554,6 +1555,8 @@ PosSettings settingsFromJson(const QJsonObject &o)
             s.cashDenominations = pieces;
     }
     s.backupCopyDir = ss(o.value(u"backupCopyDir").toString());
+    s.longTermArchiveDir = ss(o.value(u"longTermArchiveDir").toString().trimmed());
+    s.longTermArchiveDays = std::clamp(o.value(u"longTermArchiveDays").toInt(90), 1, 3650);
     s.backupKey = ss(o.value(u"backupKey").toString());
     s.backupSalt = ss(o.value(u"backupSalt").toString());
     s.waitMinutesPerParty = std::clamp(o.value(u"waitMinutesPerParty").toInt(10), 1, 120);

@@ -535,7 +535,6 @@ QJsonArray actionTypes()
                             {"closeCheck", "Close check"}, {"removePayment", "Undo payment"},
                             {"noSale", "Open drawer (no sale)"}, {"openDrawerSession", "Start drawer (bank)"},
                             {"countDrawer", "Count drawer"}, {"endOfDay", "End of day"},
-                            {"saveExceptionTickets", "Save exception tickets (pictures + PDF)"},
                             {"xReport", "X report (print sales and drawer so far; nothing resets)"},
                             {"cancelSale", "Cancel sale (asks why; Cancel #n, an exception)"},
                             {"priceCheck", "Price check on/off (scans show the item, not rung in)"},

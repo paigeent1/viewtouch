@@ -2,6 +2,7 @@
 
 #include "app/pos_admin_shared.hh"
 
+#include <QDir>
 #include <QDateTime>
 #include <QHash>
 #include <QLocale>
@@ -573,6 +574,14 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         }
         if (record.contains(u"backupCopyDir"_s))
             s_->settings.backupCopyDir = ss(record.value(u"backupCopyDir"_s).toString().trimmed());
+        if (record.contains(u"longTermArchiveDir"_s)) {
+            const QString dir = record.value(u"longTermArchiveDir"_s).toString().trimmed();
+            if (!dir.isEmpty() && !QDir::isAbsolutePath(dir))
+                return fail(tr("Long-term archive folder: a full path, starting with / (e.g. /mnt/nas/viewtouch)."));
+            s_->settings.longTermArchiveDir = ss(dir);
+        }
+        if (record.contains(u"longTermArchiveDays"_s))
+            s_->settings.longTermArchiveDays = std::clamp(record.value(u"longTermArchiveDays"_s).toInt(), 1, 3650);
         if (record.contains(u"askReasons"_s))
             s_->settings.askReasons = record.value(u"askReasons"_s).toBool();
         {   // Responsible service: checked whole before anything of it changes.

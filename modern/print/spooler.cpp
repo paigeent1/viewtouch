@@ -238,7 +238,7 @@ private:
         if (p.type == "network")
             return toSocket(QString::fromStdString(p.host), quint16(p.port), job.data, error);
         if (p.type == "cups")
-            return toCups(QString::fromStdString(p.path), job.data, error);
+            return toCups(QString::fromStdString(p.path), job.data, error, p.effectiveFormat() == "pdf");
         *error = u"unknown printer type '%1'"_s.arg(QString::fromStdString(p.type));
         return false;
     }
@@ -375,16 +375,18 @@ private:
         return true;
     }
 
-    bool toCups(const QString &queue, const QByteArray &data, QString *error)
+    // `document`: a PDF for a full-page printer, which CUPS converts (not raw printer language).
+    bool toCups(const QString &queue, const QByteArray &data, QString *error, bool document = false)
     {
 #if !QT_CONFIG(process)
         Q_UNUSED(queue)
         Q_UNUSED(data)
+        Q_UNUSED(document)
         *error = u"CUPS printing is not available on this system"_s;
         return false;
 #else
         QProcess lp;
-        QStringList args{u"-o"_s, u"raw"_s};
+        QStringList args = document ? QStringList{} : QStringList{u"-o"_s, u"raw"_s};
         if (!queue.isEmpty())
             args << u"-d"_s << queue;
         lp.start(u"lp"_s, args);

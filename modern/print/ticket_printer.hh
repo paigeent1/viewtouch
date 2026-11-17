@@ -5,6 +5,7 @@
 #include "print/tickets.hh"
 
 #include <QByteArray>
+#include <QImage>
 #include <QString>
 
 #include <map>
@@ -41,18 +42,18 @@ public:
     void printLegacyReceipt(const core::PosSettings &settings, const core::Report &asReport,
                             const std::vector<std::pair<std::string, std::string>> &rows, const std::string &printerId) override;
     QString legacyReceiptText(const core::PosSettings &settings, const std::vector<std::pair<std::string, std::string>> &rows) override;
-    // Next to the Daily Reports folder: Desktop/Privacy Notice.txt (rewritten only when it changes).
+    // On the Pi's desktop: Desktop/Privacy Notice.txt (rewritten only when it changes).
     QString savePrivacyNotice(const core::PosSettings &settings) override;
-    QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
-                                 const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
-                                 std::int64_t dayOpenedAt) override;
-    QString saveEndOfDay(const core::PosSettings &settings, const std::vector<core::Report> &summary,
-                         const core::Report &exceptions, const std::vector<ExceptionTicket> &tickets,
-                         std::int64_t dayId, std::int64_t dayOpenedAt) override;
-    // Where each day's folder goes: $VT_REPORTS_DIR (an extra drive later), else "Daily Reports"
-    // on the Pi's desktop (or in the home folder without one).
-    void setExceptionsDir(QString dir) { exceptionsDir_ = std::move(dir); }
-    QString dayFolder(std::int64_t dayId, std::int64_t dayOpenedAt) const;
+    // End of Day: the day's summary PDF, as bytes (PosService keeps it in the End of Day archive).
+    QByteArray endOfDayPdf(const core::PosSettings &settings, const std::vector<core::Report> &summary,
+                           const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
+                           std::int64_t dayOpenedAt) override;
+    // The store's copy of each exception ticket, as the receipt printer lays it out.
+    std::vector<QImage> exceptionPictures(const core::PosSettings &settings, const std::vector<ExceptionTicket> &tickets);
+    void printPdf(const core::PosSettings &settings, const QByteArray &pdf, const QString &title,
+                  const std::string &printerId) override;
+    void printPictures(const core::PosSettings &settings, const std::vector<QByteArray> &pages, const QString &title,
+                       const std::string &printerId) override;
     void printLabels(const core::PosSettings &settings,
                      const std::vector<std::pair<std::string, std::vector<std::string>>> &labels,
                      const std::string &printerId) override;
@@ -71,7 +72,6 @@ private:
 
     PrintSpooler &spooler_;
     QString outputDir_;
-    QString exceptionsDir_;
     std::function<std::int64_t()> now_;
     std::function<QByteArray(const QString &)> imageSource_;
     // Dithered once per logo and paper width.

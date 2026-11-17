@@ -17,6 +17,7 @@
 #include "core/waitlist.hh"
 #include "app/pos_session.hh"
 
+#include <QByteArray>
 #include <QJsonObject>
 #include <QSet>
 #include <QTimer>
@@ -112,33 +113,34 @@ public:
                              const std::string &) {}
     // A self-order kiosk's slip for the guest: the order number to show at
     // the counter and what they ordered; `sent`: already being made.
-    // The day's exceptions kept as pictures instead of a second receipt stapled to paperwork:
-    // the Exceptions report and each ticket (the store's copy of a check with voids, error corrects
-    // or an employee's discount; each No Sale slip) as JPEGs, and all of them in one PDF.
-    // Returns the folder written (empty: not saved).
+    // The day's exception tickets: the store's copy of a check with voids, error corrects or an
+    // employee's discount, a cancelled sale, each No Sale slip (pictures in the End of Day PDF).
     struct ExceptionTicket {
-        std::string file;    // file name without extension: "check-123", "nosale-3"
+        std::string file;    // a name for it: "check-123", "nosale-3"
         std::string title;   // what made it an exception: "Check #123: void, discount"
         std::optional<core::Check> check;
         std::optional<core::CashMovement> noSale;
         int number = 0;      // No Sale #
         std::string drawer;
     };
-    virtual QString saveExceptionTickets(const core::PosSettings &settings, const core::Report &exceptions,
-                                         const std::vector<ExceptionTicket> &tickets, std::int64_t dayId,
-                                         std::int64_t dayOpenedAt)
+    // End of Day: the day's summary as a PDF (`summary`: the reports in order, then the exception
+    // tickets as pictures). Empty: none can be made here. PosService keeps it in the End of Day archive.
+    virtual QByteArray endOfDayPdf(const core::PosSettings &, const std::vector<core::Report> &,
+                                   const std::vector<ExceptionTicket> &, std::int64_t dayId, std::int64_t dayOpenedAt)
     {
-        (void)settings; (void)exceptions; (void)tickets; (void)dayId; (void)dayOpenedAt;
+        (void)dayId; (void)dayOpenedAt;
         return {};
     }
-    // End of day: the exception tickets (above) and, in the same folder, the day's summary PDF
-    // (`summary`: the reports in order, then the ticket pictures). Returns the folder.
-    virtual QString saveEndOfDay(const core::PosSettings &settings, const std::vector<core::Report> &summary,
-                                 const core::Report &exceptions, const std::vector<ExceptionTicket> &tickets,
-                                 std::int64_t dayId, std::int64_t dayOpenedAt)
+    // A PDF on a full-page printer (a printer whose format is "pdf": a CUPS queue).
+    virtual void printPdf(const core::PosSettings &, const QByteArray &pdf, const QString &title, const std::string &printerId)
     {
-        (void)summary;
-        return saveExceptionTickets(settings, exceptions, tickets, dayId, dayOpenedAt);
+        (void)pdf; (void)title; (void)printerId;
+    }
+    // Pictures (JPEG/PNG pages) on the receipt printer, one under the other.
+    virtual void printPictures(const core::PosSettings &, const std::vector<QByteArray> &pages, const QString &title,
+                               const std::string &printerId)
+    {
+        (void)pages; (void)title; (void)printerId;
     }
     // A copy of a receipt as text (on screen: Look Up Checks), or the gift receipt's.
     virtual QString receiptText(const core::PosSettings &, const core::Check &, bool gift) { (void)gift; return {}; }
@@ -394,6 +396,20 @@ public:
     // ILSA's sales history file (ilsa-history.db beside the database; set by main): read-only, for
     // the ILSA History reports and Receipt Lookup (pos_legacy.cpp). Empty: none.
     QString legacyDb;
+    // The End of Day archive (app/eod_archive.hh): the database its records are in and its folder,
+    // <data>/eod-archive (set by main). Empty: End of Day keeps no archive (tests that don't ask for one).
+    QString archiveDb;
+    QString archiveDir;
+    // The archive's last integrity check, and the last End of Day's news about the archive
+    // ({at, file, moved, warning, error}): for the archive screen.
+    QVariantMap archiveCheck;
+    QVariantMap archiveNews;
+    bool archiveChecking = false;
+    // Where the archive screen's pages are drawn for screens to fetch (default: a cache folder).
+    QString archivePagesDir;
+    // Cancel Sale's checks (status discarded, a Cancel #) closed in [from, to), from the database
+    // (set by main): the Exceptions report over days and the Exceptions search.
+    std::function<std::vector<core::Check>(std::int64_t from, std::int64_t to)> cancelledHistory;
     // Responsible service: alcohol_policy_audit.jsonl in the store's data folder (set by main). Empty
     // (tests, a new folder): the entries are kept in memory only (serviceAuditMemory).
     QString serviceAuditFile;
@@ -1000,8 +1016,27 @@ public:
     // This person counts drawers blind (not seeing what should be there).
     bool blindCount() const;
     bool endOfDay();
-    // The day's exception tickets as pictures and a PDF (also done at end of day). Manager.
+    // Retired (exception tickets are kept in the End of Day archive's PDF and found with the
+    // Exceptions search): says where to look. A page button may still call it.
     bool saveExceptionTickets();
+
+    // --- the End of Day archive (pos_eod_archive.cpp; managers) --------------------------------
+    // The archived days, newest first: [{seq, dayId, date, kind, size, sha, place: here | longTerm,
+    // path, state (from the last check)}], the last integrity check {ok, problem, days, checked,
+    // unreachable, at}, checking, longTerm {folder, days, reachable}, news (the last End of Day's).
+    QVariantMap eodArchive();
+    // The integrity check now (sync: tests, vt-eod-verify's twin); also kept for the screen.
+    QVariantMap checkEodArchiveNow();
+    // The same away from the screen; the result lands in eodArchive().check.
+    bool checkEodArchive();
+    // A page of a day's PDF as a JPEG, a part at a time (from byte `at`): {seq, page, pages, size, at,
+    // data (base64), error}. Drawn on the store's computer, so tablets need no PDF viewer.
+    QVariantMap eodArchivePagePart(qint64 seq, int page, qint64 at);
+    // A day's PDF on a full-page printer (format "pdf"), else its pages on the receipt printer.
+    bool printEodArchive(qint64 seq);
+    // End of Day: today's PDF into the archive, then (away from the screen) old ones moved to the
+    // long-term folder and the whole archive checked. The result is said on the screen.
+    void archiveEndOfDay();
     // X report: today's sales and the drawers so far on the receipt printer; nothing closes or resets
     // (End of day is the Z). Anyone who may open the drawer.
     bool xReport();
