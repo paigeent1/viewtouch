@@ -42,6 +42,11 @@ entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (
   owner's rights) was retired 2026-11-04 by the owner's decision; don't bring it back. Changes come as Git commits.
 - `/usr/local/bin/vt-label-utility` must stay the 5-line launcher from `scripts/bin/vt-label-utility`. Never copy
   `vt_label_utility.py` (or anything else) over it: ViewTouch would run that stale copy and no fix would show.
+- **Same build number on the Pis and the tablets (owner, 2026-11-16 and 2026-11-19).** The number is the commit
+  count of `main`, so every push to `main` needs a tablet app built from that same commit (`modern-android.yml`,
+  or let `vt-update-stores` build it) and every store updated with `vt-update-stores`, even when only one side changed.
+  Each notes entry says which side changed: **Tablet app: no change** (server/scripts only) or **Server: no change**
+  (tablet app only), so nobody hunts for a difference that isn't there.
 
 ## 3. Area notes
 - Label utility: read `modern/tools/LABEL_UTILITY_NOTES.md` before changing `modern/tools/vt_label_utility.py`

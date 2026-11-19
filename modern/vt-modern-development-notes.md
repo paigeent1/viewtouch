@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-19 12:41 ET — Bob (Claude) — Rule: same build number everywhere; notes say which side changed
+- **What:** AGENTS.md section 2 now states the owner's rule: every push to main gets a tablet app built from that commit and vt-update-stores to all stores, and each notes entry says 'Tablet app: no change' or 'Server: no change'. For today: 5a4ca5c4 (b592) changed the server and the Label Utility only (tablet app: no change); 8ccd543e (b593) changed the Pi scripts only (vt-server, vt-update-stores, vt-status; tablet app: no change). This commit (b594) changes notes only (tablet app: no change; server: no change); its tablet app is built so all screens show 594.
+- **Why:** Owner 2026-11-19: 'keep versions at matching numbers and put in dev notes if no change to tablet build or vice versa'. Bob pushed 8ccd543e without a matching tablet build, leaving HCA's server on 593 and its tablets on 592.
+- **Files:** (none)
+
 ### 2026-11-19 12:28 ET — Bob (Claude) — ViewTouch no longer stops when the ssh/terminal that started it closes
 - **What:** vt-server starts vtmodern with setsid (own session, stdin from /dev/null); vt-update-stores runs the other store's vt-server over ssh without -t; vt-status leads with VIEWTOUCH IS NOT RUNNING when no vtmodern process.
 - **Why:** HCA's ~/.vt-run.log ended in 'Stopping' (SIGHUP) after vt-update-stores' ssh -t session closed, so HCA's server was down and its tablets couldn't fetch build 592; vt-status still showed the built version, hiding it.
