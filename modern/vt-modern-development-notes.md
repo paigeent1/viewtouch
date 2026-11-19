@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-19 09:24 ET — Bob (Claude) — ViewTouch screen stays awake while the Label Utility is open
+- **What:** LayoutController::sleepTimeout also skips sleep when a vt_label_utility.py window runs on this computer (scans /proc cmdlines; ViewTouch's own --print-job/--preview-job runs don't count). Linux desktop only.
+- **Why:** Owner 2026-11-19: VT still goes to sleep while the Label Utility is running; input in the utility's window isn't seen by ViewTouch.
+- **Files:** (none)
+
 ### 2026-11-19 08:59 ET — Bob (Claude) — Label Printer Offset moves the whole print instead of clipping it
 - **What:** Printer Offset (v/h_offset_dots) no longer shifts the design inside the label picture. The picture is drawn unshifted; ZPL moves it with ^LT (vertical, clamped ±120 dots, the dialog now stops there too), ^LH for right (print width grows by the shift) and ^LS for left; the PDF path draws the picture shifted on the page. Offset dialog default now 12 to match printing; tip text updated. LABEL_UTILITY_NOTES rule 7 added.
 - **Why:** Owner 2026-11-19: offsetting down clipped the graphic, so he couldn't align labels. Tablet Labels screen uses the same code (--print-job), so it gets the fix too.

@@ -175,13 +175,39 @@ void LayoutController::restartSleep()
     sleepTimer_.start(ms);
 }
 
+namespace {
+// The Label Utility's window is open on this computer (Linux: a process running vt_label_utility.py
+// that isn't one of ViewTouch's own --print-job / --preview-job runs). Typing and clicking there
+// isn't seen by ViewTouch, so the screen would go to sleep under it (owner 2026-11-19).
+bool labelUtilityOpen()
+{
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+    const QDir proc(u"/proc"_s);
+    const QStringList pids = proc.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &pid : pids) {
+        bool num = false;
+        pid.toInt(&num);
+        if (!num)
+            continue;
+        QFile f(u"/proc/"_s + pid + u"/cmdline"_s);
+        if (!f.open(QIODevice::ReadOnly))
+            continue;
+        const QByteArray cmd = f.read(4096);
+        if (cmd.contains("vt_label_utility.py") && !cmd.contains("--print-job") && !cmd.contains("--preview-job"))
+            return true;
+    }
+#endif
+    return false;
+}
+}   // namespace
+
 void LayoutController::sleepTimeout()
 {
     // Screens people watch stay on: kitchen, bar and expo; the kiosk has its own pictures.
     const vt::layout::Page *page = activeLayout().page(pageId());
     const bool watched = page && page->kind == u"kitchen";
     const bool kiosk = pos_ && pos_->selfOrderInfo().value(u"on"_s).toBool();
-    if (watched || kiosk || editing()) {
+    if (watched || kiosk || editing() || labelUtilityOpen()) {
         restartSleep();
         return;
     }
