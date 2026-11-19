@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-19 08:59 ET — Bob (Claude) — Label Printer Offset moves the whole print instead of clipping it
+- **What:** Printer Offset (v/h_offset_dots) no longer shifts the design inside the label picture. The picture is drawn unshifted; ZPL moves it with ^LT (vertical, clamped ±120 dots, the dialog now stops there too), ^LH for right (print width grows by the shift) and ^LS for left; the PDF path draws the picture shifted on the page. Offset dialog default now 12 to match printing; tip text updated. LABEL_UTILITY_NOTES rule 7 added.
+- **Why:** Owner 2026-11-19: offsetting down clipped the graphic, so he couldn't align labels. Tablet Labels screen uses the same code (--print-job), so it gets the fix too.
+- **Files:** (none)
+
 ### 2026-11-17 13:17 ET — Archive helper (Claude helper) — Exceptions search: a check number finds that check only
 - **What:** A text that is a check number (1234, #1234, HCA-1234, hca1234) matches that check only, not item or reason words with those digits (Cancel #1 matched #1). Manual says so.
 - **Why:** CI: the search test found check 2's 'Cancel #1' when searching #1; a manager typing a check number wants that check.

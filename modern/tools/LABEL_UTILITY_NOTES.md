@@ -53,6 +53,10 @@ changes what the operator sees or does, raise it, add a line here, and tag the c
    (`printer_speaks_zpl`); a template may set `"printer_language": "zpl"|"escpos"`. Templates find their
    printer by ViewTouch printer *name* (`resolve_template_printer`) so IP changes in ViewTouch carry over.
 6. **Printer resolution** per template: `"printer_dpi"` (203/300/600). Offsets are in printer dots.
+7. **Printer Offset moves the whole print, never the design inside the picture** (2026-11-19). The picture
+   is drawn with no offset; ZPL places it with `^LT` (up/down, ±120 dots), `^LH`/`^LS` (right/left; `^PW` grows
+   for a right shift); the PDF draws it shifted on the page. Shifting inside the picture cut off what moved
+   past its edge.
 
 ## Template element keys (beyond the basics x/y/w/h/field/size/bold/align)
 - `font_family`: Sans | Serif | Mono | Arial | Arial Black | Courier New (resolved via fontconfig, `resolve_font_file`)

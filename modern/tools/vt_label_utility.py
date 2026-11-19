@@ -1104,9 +1104,9 @@ def render_label_pil_image(tpl, item, dpi=203, mono=True, dot_scale=1.0):
     h_dots = max(40, int(round(float(tpl.get("height_in", 1.0)) * dpi)))
     img = Image.new("L", (w_dots, h_dots), 255)
 
-    # Offsets are stored in printer dots; dot_scale converts them when rendering at another DPI (screen preview)
-    v_off = int(round(int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12) * dot_scale))
-    h_off = int(round(int(tpl.get("h_offset_dots", 0) or 0) * dot_scale))
+    # The picture is the design only. Printer Offset (v/h_offset_dots) moves the whole picture on the
+    # stock when it is sent (build_zpl_from_template, export_pdf_from_bitmaps), so nothing is cut off here.
+    v_off = h_off = 0
 
     def get_ttf(fam, bold, italic, px):
         px = max(8, int(px))
@@ -1303,12 +1303,15 @@ def export_pdf_from_bitmaps(items, tpl, out_pdf, copies=1):
     for item in items:
         img = render_label_pil_image(tpl, item, dpi=dpi).convert("L")
         reader = ImageReader(img)
+        # Printer Offset: the whole picture placed lower/right (+) or higher/left (-) on the page.
+        dx = int(tpl.get("h_offset_dots", 0) or 0) / float(dpi) * inch
+        dy = -int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12) / float(dpi) * inch
         n = max(1, int(item.get("qty", 1))) * max(1, int(copies))
         for _ in range(n):
             if not first:
                 c.showPage()
             first = False
-            c.drawImage(reader, 0, 0, width=w_pt, height=h_pt)
+            c.drawImage(reader, dx, dy, width=w_pt, height=h_pt)
     c.save()
 
 
@@ -1505,6 +1508,20 @@ def build_zpl_from_template(tpl_name, tpl, items, copies=1):
     darkness = int(tpl.get("darkness", 18) or 18)
     tear_off = int(tpl.get("tear_off", 0) or 0)
 
+    # Printer Offset moves the whole printed picture on the label stock (the printer's own position
+    # commands), not the design inside the picture: shifting inside the picture cut off whatever moved
+    # past its edge (owner 2026-11-19: "if I offset down, it will clip the graphic").
+    #   up/down:    ^LT (label top, -120..120 dots on Zebra firmware)
+    #   right (+):  ^LH (label home); the print width grows by the same amount so the right edge isn't cut
+    #   left (-):   ^LS (label shift; a positive value shifts left)
+    pos = []
+    if v_offset_dots:
+        pos.append(f"^LT{max(-120, min(120, v_offset_dots))}")
+    pos.append(f"^LH{max(0, h_offset_dots)},0")
+    if h_offset_dots < 0:
+        pos.append(f"^LS{-h_offset_dots}")
+    pw = w_dots + max(0, h_offset_dots)
+
     blocks = []
     if tear_off != 0:
         blocks.append(f"~TA{tear_off:+04d}")
@@ -1512,9 +1529,9 @@ def build_zpl_from_template(tpl_name, tpl, items, copies=1):
         qty = max(1, int(item.get("qty", 1))) * max(1, int(copies))
         lines = [
             "^XA",
-            f"^PW{w_dots}",
+            f"^PW{pw}",
             f"^LL{h_dots}",
-            "^LH0,0",
+            *pos,
             f"^MD{max(-30, min(30, darkness - 15))}",
             "^CI28"
         ]
@@ -4162,7 +4179,7 @@ class VTLabelUtility(tk.Tk):
         vf = tk.LabelFrame(body, text=" Vertical Position (Print Higher or Lower on Label) ", bg="#1e293b", fg="#38bdf8", font=("Sans", 10, "bold"), padx=12, pady=8)
         vf.pack(fill="x", pady=5)
 
-        cur_v = int(tpl.get("v_offset_dots", 18) if "v_offset_dots" in tpl else 18)
+        cur_v = int(tpl.get("v_offset_dots", 12) if "v_offset_dots" in tpl else 12)
         v_var = tk.IntVar(value=cur_v)
         dpi_var = tk.StringVar(value=str(label_dpi(tpl)))
         v_lbl = tk.Label(vf, text="", bg="#1e293b", fg="#f8fafc", font=("Monospace", 11, "bold"), width=34)
@@ -4174,7 +4191,7 @@ class VTLabelUtility(tk.Tk):
             v_lbl.config(text=f"{val:+d} dots ({inches:+.2f} in) [{dir_txt}]")
 
         def adj_v(delta):
-            v_var.set(max(-160, min(160, int(v_var.get()) + delta)))
+            v_var.set(max(-120, min(120, int(v_var.get()) + delta)))   # the Zebra's ^LT range
             update_v_label()
 
         make_vt_btn(vf, text="⬆ Print Higher (-8)", bg="#334155", fg="#ffffff", font=("Sans", 10, "bold"), command=lambda: adj_v(-8)).pack(side="left", padx=4)
@@ -4229,7 +4246,7 @@ class VTLabelUtility(tk.Tk):
                            activebackground="#1e293b", activeforeground="#ffffff", font=("Sans", 10, "bold"),
                            command=lambda: (update_v_label(), update_h_label())).pack(side="left", padx=8)
 
-        status_msg = tk.Label(sdlg, text="Tip: Positive (+) Vertical Offset moves print LOWER so the top line isn't clipped.", bg="#1e293b", fg="#94a3b8", font=("Sans", 9, "italic"))
+        status_msg = tk.Label(sdlg, text="Moves the whole print on the label (nothing gets cut off). The preview shows the design, not the shift.", bg="#1e293b", fg="#94a3b8", font=("Sans", 9, "italic"))
         status_msg.pack(pady=(4, 4))
 
         def save_settings(close_after=False):
