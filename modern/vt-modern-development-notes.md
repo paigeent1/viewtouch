@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-19 16:41 ET — Bob (Claude) — beep3 no longer restarts the guest screen
+- **What:** vt-install now writes beep3 as three short tones played with paplay/pw-play from ~/.vt-beep.wav (made by vt-install), and replaces an existing speaker-test beep3. Fixed on the BHDAN Pi by hand 2026-11-19 16:40.
+- **Why:** The old beep3 (speaker-test) grabbed the sound output; the guest screen's video lost its audio, failed, and its slideshow restarted every time a pasted command ended with ; beep3. The owner saw it as the POS 'cycling'.
+- **Files:** `AGENTS.md`, `scripts/bin/vt-install`
+- **Next person must know:** HCA Pi still has the old beep3 until vt-install runs there (or the same one-line fix).
+
 ### 2026-11-19 15:49 ET — Bob (Claude) — vt-copy-page: copy a store's pages to another store
 - **What:** New scripts/bin/vt-copy-page (run on the source Pi: vt-copy-page retail-entry HCA) and vt-page-import (the receiving end over one ssh): stops ViewTouch there, keeps viewtouch.db.before-copy-<time>, replaces the page and its phone/tablet versions, adds pages its buttons jump to that the store lacks, marks them seen so starter updates leave them, then git pull + vt-server. Tablet app: no change (Pi scripts only); the tablet app for this commit is built anyway so all screens show the same number.
 - **Why:** Owner 2026-11-19: all BHDAN functions should be the same on HCA; chose to copy BHDAN's Retail page (HCA's older copy had buttons jumping to missing pages).

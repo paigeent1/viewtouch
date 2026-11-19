@@ -33,12 +33,15 @@ for f in "$REPO"/scripts/bin/vt-*; do sudo ln -sf "$f" /usr/local/bin/; done
 
 step "4. Serial scanner and USB receipt printer access (dialout, lp), and the beep3 command"
 sudo usermod -aG dialout,lp "$USER"
-if ! grep -q '^beep3()' "$HOME/.bashrc"; then
-    cat >> "$HOME/.bashrc" <<'EOF'
-
-# Three long beeps when a pasted command finishes (vt-install).
-beep3() { for i in 1 2 3; do printf '\a'; command -v speaker-test >/dev/null && timeout 0.6 speaker-test -t sine -f 880 -l 1 >/dev/null 2>&1; sleep 0.3; done; }
-EOF
+# beep3 plays a short tone through the Pi's sound system (PipeWire), mixed with anything already
+# playing. The old one used speaker-test, which grabbed the sound output and restarted the guest
+# screen's video slideshow; it is replaced.
+python3 -c "import wave,struct,math,os;w=wave.open(os.path.expanduser('~/.vt-beep.wav'),'w');w.setnchannels(1);w.setsampwidth(2);w.setframerate(48000);w.writeframes(b''.join(struct.pack('<h',int(12000*math.sin(2*math.pi*880*i/48000))) for i in range(24000)));w.close()"
+BEEP3='beep3() { for i in 1 2 3; do paplay ~/.vt-beep.wav 2>/dev/null || pw-play ~/.vt-beep.wav 2>/dev/null; sleep 0.2; done; }'
+if grep -q '^beep3()' "$HOME/.bashrc"; then
+    if grep -q '^beep3().*speaker-test' "$HOME/.bashrc"; then sed -i "/^beep3()/c\\$BEEP3" "$HOME/.bashrc"; fi
+else
+    printf '\n# Three beeps when a pasted command finishes (vt-install).\n%s\n' "$BEEP3" >> "$HOME/.bashrc"
 fi
 
 step "5. Configure the build"

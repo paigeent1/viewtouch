@@ -54,7 +54,7 @@ entry at the **top** of the Log in **`modern/vt-modern-development-notes.md`** (
   `modern/docs/label-utility/` — update it when screens or buttons change.
 
 ## 4. Commands for the owner to paste on the Pi
-End every block with `; beep3` (three beeps when finished).
+End every block with `; beep3` (three beeps when finished; it plays through PipeWire, so it never disturbs the guest screen).
 
 ## 5. The End of Day archive (keep it, back it up)
 - Each End of Day's PDF is kept write-once in `eod-archive/` beside `viewtouch.db` (on the Pi:
