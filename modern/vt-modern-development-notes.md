@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-19 12:28 ET — Bob (Claude) — ViewTouch no longer stops when the ssh/terminal that started it closes
+- **What:** vt-server starts vtmodern with setsid (own session, stdin from /dev/null); vt-update-stores runs the other store's vt-server over ssh without -t; vt-status leads with VIEWTOUCH IS NOT RUNNING when no vtmodern process.
+- **Why:** HCA's ~/.vt-run.log ended in 'Stopping' (SIGHUP) after vt-update-stores' ssh -t session closed, so HCA's server was down and its tablets couldn't fetch build 592; vt-status still showed the built version, hiding it.
+- **Files:** (none)
+- **Next person must know:** This is likely why HCA tablets never self-updated before: check vt-status for the NOT RUNNING line after any remote update.
+
 ### 2026-11-19 09:24 ET — Bob (Claude) — ViewTouch screen stays awake while the Label Utility is open
 - **What:** LayoutController::sleepTimeout also skips sleep when a vt_label_utility.py window runs on this computer (scans /proc cmdlines; ViewTouch's own --print-job/--preview-job runs don't count). Linux desktop only.
 - **Why:** Owner 2026-11-19: VT still goes to sleep while the Label Utility is running; input in the utility's window isn't seen by ViewTouch.

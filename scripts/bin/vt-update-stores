@@ -95,7 +95,8 @@ update_store() {   # name target
         | ssh -o ConnectTimeout=10 "$2" 'mkdir -p ~/viewtouch-main/apks && tar xf - -C ~/viewtouch-main/apks'; then
         echo "      $1: couldn't copy the apps (is it on? ssh $2)"; return
     fi
-    ssh -t -o ConnectTimeout=10 "$2" 'cd ~/viewtouch-main && git pull -q --ff-only myfork main && DISPLAY=:0 vt-server' \
+    # No -t: a terminal there hangs up when ssh closes, and that stopped HCA's ViewTouch (2026-11-19).
+    ssh -o ConnectTimeout=10 "$2" 'cd ~/viewtouch-main && git pull -q --ff-only myfork main && DISPLAY=:0 vt-server' \
         || echo "      $1: the update didn't finish there; run vt-server on $1 and look at what it says."
 }
 each_store update_store

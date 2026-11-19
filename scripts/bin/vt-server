@@ -146,7 +146,9 @@ if [ ! -x "$BIN" ]; then
     echo "ViewTouch didn't start: $BIN is missing after the build."
     exit 1
 fi
-WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 "$BIN" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 &
+# setsid: ViewTouch in its own session, so closing the terminal or ssh that started it doesn't stop it
+# (the hang-up signal makes ViewTouch quit; HCA's stopped that way when vt-update-stores' ssh closed, 2026-11-19).
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) DISPLAY=:0 setsid "$BIN" --serve "${EXTRA[@]}" >"$HOME/.vt-run.log" 2>&1 </dev/null &
 pid=$!
 # Still running a few seconds later (it looks for another server of this store first)?
 sleep 4
