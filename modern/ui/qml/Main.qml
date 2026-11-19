@@ -143,7 +143,7 @@ ApplicationWindow {
                                         || receiptSheet.visible || setupLoader.active || jobChooser.visible || cashTipsPrompt.visible
                                         || approvalPad.visible || allergySheet.visible || couponSheet.visible || holdSheet.visible
                                         || TouchGuard.sheetOpen || reasonSheet.visible || handoffSheet.visible
-                                        || itemReturnSheet.visible
+                                        || itemReturnSheet.visible || floorPlanChooser.visible
 
     Loader {
         active: root.customerDisplay
@@ -1596,6 +1596,14 @@ ApplicationWindow {
         anchors.fill: parent
         z: 59
         pos: root.controller.pos as PosService
+        controller: root.controller
+    }
+
+    // Choose Floor Plan (a manager): tonight's setup for every screen.
+    FloorPlanChooser {
+        id: floorPlanChooser
+        anchors.fill: parent
+        z: 59
         controller: root.controller
     }
 

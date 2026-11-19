@@ -255,6 +255,7 @@ QVariantList PosService::adminRecords(const QString &panel)
         for (const char *job : {"server", "bartender", "cashier", "host", "manager"})
             store.insert(u"startPage."_s + QLatin1StringView(job),
                          s_->settings.startPages.contains(job) ? qs(s_->settings.startPages.at(job)) : QString());
+        store.insert(u"floorPlan"_s, qs(s_->settings.floorPlan));
         store.insert(aboutValues());
         store.insert(scanDataValues());   // this computer's own (pos_scan_data.cpp)
         out.last() = store;

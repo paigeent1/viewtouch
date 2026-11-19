@@ -341,6 +341,7 @@ void LayoutController::setPos(PosSession *pos)
             if (pos_->terminalLook() != lookedId_)
                 updateTerminalLook();   // Manager -> Terminals: this screen's look
             restAtLoginPage();      // a terminal just set to (or from) Time Clock
+            followFloorPlan();      // a manager chose tonight's floor plan
             installStoreFonts();   // before pages and font lists look for them
             updateMealPeriod();
             updateFormFactor();
@@ -439,6 +440,7 @@ QVariantList LayoutController::pageChoices(const QString &only) const
     for (const vt::layout::Page &p : activeLayout().pages)
         // "start": what a device may start on: floor plans, Open Checks, menus, tabs, deliveries.
         if (p.kind != u"template" && p.kind != u"library" && (only != u"floor" || floor(p))
+            && (only != u"floorPlan" || (p.kind == u"tables" && p.variantOf.isEmpty()))
             && (only != u"start" || (p.variantOf.isEmpty() && (floor(p) || p.kind == u"items" || p.role == u"checkList"
                                                                || p.id == u"tabs" || p.id == u"deliveries" || p.id == u"retail-entry"))))
             out.append(QVariantMap{{u"value"_s, p.id}, {u"text"_s, p.name}});
@@ -449,6 +451,85 @@ QString LayoutController::rolePage(const QString &role) const
 {
     const vt::layout::Page *p = activeLayout().pageByRole(role);
     return p ? p->id : QString();
+}
+
+namespace {
+// A floor plan a store can choose for tonight: a Tables page, not a phone or tablet version of one.
+bool choosableFloorPlan(const vt::layout::Page &p)
+{
+    return p.kind == u"tables" && p.variantOf.isEmpty();
+}
+} // namespace
+
+QString LayoutController::floorHome() const
+{
+    if (pos_) {
+        const QString chosen = pos_->storeFloorPlan();
+        // Deleted (or no longer a floor plan): the usual one, without a word.
+        if (const vt::layout::Page *p = chosen.isEmpty() ? nullptr : activeLayout().page(chosen);
+            p && choosableFloorPlan(*p))
+            return p->id;
+    }
+    return rolePage(u"tables"_s);
+}
+
+QVariantList LayoutController::floorPlanChoices() const
+{
+    const QString usual = rolePage(u"tables"_s);
+    const QString now = floorHome();
+    QVariantList out{QVariantMap{{u"value"_s, QString()}, {u"text"_s, tr("Normal (as built)")}, {u"current"_s, now == usual}}};
+    QVariantList plans;
+    for (const vt::layout::Page &p : activeLayout().pages)
+        if (choosableFloorPlan(p) && p.id != usual)   // the usual one is "Normal (as built)"
+            plans.append(QVariantMap{{u"value"_s, p.id}, {u"text"_s, p.name.isEmpty() ? p.id : p.name},
+                                     {u"current"_s, p.id == now}});
+    QCollator byName;
+    byName.setNumericMode(true);
+    byName.setCaseSensitivity(Qt::CaseInsensitive);
+    std::ranges::stable_sort(plans, [&](const QVariant &a, const QVariant &b) {
+        return byName.compare(a.toMap().value(u"text"_s).toString(), b.toMap().value(u"text"_s).toString()) < 0;
+    });
+    return out + plans;
+}
+
+void LayoutController::chooseFloorPlan(const QString &pageId)
+{
+    if (!pos_)
+        return closeFloorChooser();
+    // The usual page itself is "Normal": the setting goes back to empty.
+    const QString value = pageId == rolePage(u"tables"_s) ? QString() : pageId;
+    floorChosenHere_ = true;   // this screen, resting on the old plan, shows the new one at once
+    call(u"setFloorPlan"_s, {value}, [this](const QVariant &ok) {
+        if (ok.toBool())
+            closeFloorChooser();
+        else
+            floorChosenHere_ = false;
+    });
+}
+
+void LayoutController::closeFloorChooser()
+{
+    if (!floorChooserOpen_)
+        return;
+    floorChooserOpen_ = false;
+    emit floorChooserChanged();
+}
+
+void LayoutController::followFloorPlan()
+{
+    // Only a screen whose home is the floor plan: its own start page (the patio handheld, a job's) stays.
+    // Nobody's screen changes under them: the new plan shows when they next go home.
+    if (!pos_ || !pos_->loggedIn() || editing() || floorHomeId_.isEmpty() || nav_.home() != floorHomeId_)
+        return;
+    const QString floor = floorHome();
+    if (floor.isEmpty() || floor == floorHomeId_)
+        return;
+    const bool onOld = nav_.current() == floorHomeId_;
+    nav_.setHome(floor);
+    floorHomeId_ = floor;
+    // The manager who chose it, on the old plan with no check open: the new one now.
+    if (std::exchange(floorChosenHere_, false) && onOld && !pos_->hasCheck())
+        navigate(Navigator::Mode::Home);
 }
 
 void LayoutController::onLoggedInChanged(bool loggedIn)
@@ -463,7 +544,9 @@ void LayoutController::onLoggedInChanged(bool loggedIn)
     // Logged in, "home" is their start page (theirs, or their job's), else the
     // floor (tables); logged out, it is the login page.
     const QString login = loginPage();
-    QString tables = rolePage(u"tables"_s);
+    // The floor: tonight's floor plan (Manager -> Choose Floor Plan), else the usual one.
+    QString tables = floorHome();
+    floorHomeId_ = tables;
     const QVariantMap prefs = pos_ ? pos_->userPrefs() : QVariantMap();
     if (const QString start = prefs.value(u"startPage"_s).toString();
         loggedIn && !start.isEmpty() && activeLayout().page(start))
@@ -1860,7 +1943,10 @@ void LayoutController::runAction(const Action &a, Done done)
             setStatus(tr("Unknown jump mode '%1'").arg(modeName));
             return done(false);
         }
-        const QString target = layout_.resolveTarget(a.data);
+        QString target = layout_.resolveTarget(a.data);
+        // To the usual floor plan (‹ Tables, Main...): tonight's, when a manager chose one.
+        if (!editing() && !target.isEmpty() && target == rolePage(u"tables"_s))
+            target = floorHome();
         if ((*mode == Navigator::Mode::Push || *mode == Navigator::Mode::Replace) && target.isEmpty()) {
             setStatus(tr("This button's page does not exist"));
             return done(false);
@@ -2121,8 +2207,21 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
     }
 
     if (name == u"editFloorPlan") {
-        navigate(Navigator::Mode::Push, u"tables"_s);
+        const QString floor = floorHome();
+        navigate(Navigator::Mode::Push, floor.isEmpty() ? u"tables"_s : floor);
         requestEditMode();
+        return done(true);
+    }
+    // Tonight's floor plan, for every screen: a manager's choice, like the store's settings.
+    if (name == u"chooseFloorPlan") {
+        if (pos_ && !pos_->can(QString::fromLatin1(vt::core::perm::Manager))) {
+            setStatus(tr("Choosing the floor plan needs a manager."));
+            return done(false);
+        }
+        if (!floorChooserOpen_) {
+            floorChooserOpen_ = true;
+            emit floorChooserChanged();
+        }
         return done(true);
     }
     if (name == u"editMode")
@@ -2659,6 +2758,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"coupon"_s, QT_TR_NOOP("Gives the check a coupon's discount: its code typed or scanned.")},
             {u"holdCard"_s, QT_TR_NOOP("Holds the guest's card for the tab on the card reader (nothing is charged yet).")},
             {u"cardOnFile"_s, QT_TR_NOOP("The tab's held card: hold one, charge it with a tip, or let it go.")},
+            {u"chooseFloorPlan"_s, QT_TR_NOOP("Chooses tonight's floor plan for every screen (a manager).")},
         };
         const QString name = a.str(u"name");
         if (name == u"openDepartment")

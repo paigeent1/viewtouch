@@ -185,6 +185,7 @@ public:
     QString language() const override { return v(u"language").toString(); }
     QVariantMap userPrefs() const override { return v(u"userPrefs").toMap(); }
     QString storeLanguage() const override { return v(u"storeLanguage").toString(); }
+    QString storeFloorPlan() const override { return v(u"storeFloorPlan").toString(); }
     QVariantMap selfOrderInfo() const override { return v(u"selfOrder").toMap(); }
     QVariantMap clockInJobs() const override { return v(u"clockInJobs").toMap(); }
     QVariantMap cashTipsAsk() const override { return v(u"cashTipsAsk").toMap(); }

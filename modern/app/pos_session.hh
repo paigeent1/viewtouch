@@ -138,6 +138,7 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantMap userPrefs READ userPrefs NOTIFY sessionChanged)
     // The store's: the customer display's language.
     Q_PROPERTY(QString storeLanguage READ storeLanguage NOTIFY adminChanged)
+    Q_PROPERTY(QString storeFloorPlan READ storeFloorPlan NOTIFY adminChanged)
     // Self-order kiosk: {on, toGo, ordering, idleSeconds, lastOrder: {number,
     // name, sent}}; and what guests can order: {families, items: [{id, name,
     // family, price, description, image, available, choices}]}.
@@ -422,6 +423,8 @@ public:
     virtual QString language() const = 0;
     virtual QVariantMap userPrefs() const = 0;
     virtual QString storeLanguage() const = 0;
+    // Tonight's floor plan: the page every screen opens instead of the usual floor plan (empty: the usual one).
+    virtual QString storeFloorPlan() const = 0;
     virtual QVariantMap selfOrderInfo() const = 0;
     virtual QVariantMap kioskMenu() const = 0;
     virtual QVariantMap billboard() const = 0;
@@ -896,6 +899,8 @@ public:
     Q_INVOKABLE void cashOutTips() { invoke(QStringLiteral("cashOutTips")); }
     Q_INVOKABLE void startPairing(bool standby = false) { invoke(QStringLiteral("startPairing"), {standby}); }
     Q_INVOKABLE void stopPairing() { invoke(QStringLiteral("stopPairing")); }
+    // Tonight's floor plan for every screen (a manager; empty: back to the usual one).
+    Q_INVOKABLE void setFloorPlan(const QString &pageId) { invoke(QStringLiteral("setFloorPlan"), {pageId}); }
 
 signals:
     void answered(const QString &tag, const QVariant &result);

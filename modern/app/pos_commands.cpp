@@ -392,6 +392,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"mergeCheck"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.mergeCheck(a.value(0).toLongLong())); }},
         {u"reopenCheck"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.reopenCheck(a.value(0).toLongLong())); }},
         {u"stopPairing"_s, [](PosService &p, const QVariantList &) { return QVariant(p.stopPairing()); }},
+        {u"setFloorPlan"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.setFloorPlan(a.value(0).toString())); }},
         {u"openDrawerSession"_s, [](PosService &p, const QVariantList &) { return QVariant(p.openDrawerSession()); }},
         {u"countDrawer"_s, [](PosService &p, const QVariantList &) { return QVariant(p.countDrawer()); }},
         {u"countDrawerById"_s, [](PosService &p, const QVariantList &a) {

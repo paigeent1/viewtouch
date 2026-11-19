@@ -549,6 +549,7 @@ QJsonArray actionTypes()
                             {"splitBySeat", "Split the table by seat"}, {"printTableChecks", "Print every check at the table"},
                             {"combineTableChecks", "Put the table's checks back together"}, {"addComment", "Add note"},
                             {"openAdmin", "Admin screen"}, {"editMode", "Edit pages"},
+                            {"chooseFloorPlan", "Choose tonight's floor plan (manager)"},
                             {"addTip", "Add tip (args.percent)"}, {"gratuity", "Gratuity (args.percent)"},
                             {"setCashTip", "Cash tip for the server (the keypad amount)"},
                             {"payout", "Pay out of drawer"}, {"paidIn", "Pay into drawer"},

@@ -1320,6 +1320,9 @@ public:
     QString language() const override;
     QVariantMap userPrefs() const override;
     QString storeLanguage() const override { return QString::fromStdString(s_->settings.language); }
+    // Tonight's floor plan (PosSettings::floorPlan; empty: the usual one), and a manager choosing it.
+    QString storeFloorPlan() const override { return QString::fromStdString(s_->settings.floorPlan); }
+    bool setFloorPlan(const QString &pageId);
 
     // --- manager approval ---------------------------------------------------------
     // A manager's PIN lets the waiting operation (a void, a discount...) through once.

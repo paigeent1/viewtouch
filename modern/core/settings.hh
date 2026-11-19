@@ -370,6 +370,10 @@ struct PosSettings {
     std::string language = "en";
     // The page each job starts on at login (job -> page id); none: the floor plan.
     std::map<std::string, std::string> startPages;
+    // Tonight's floor plan (Manager -> Settings -> Start pages, or a Choose Floor Plan button): the page id
+    // every screen opens instead of the usual one (the Tables page) until a manager changes it back.
+    // Empty: the usual one. Each store's own (its own database), like its pages.
+    std::string floorPlan;
     // What "Extra" adds to an item's or a modifier's price: a percent of it
     // and/or an amount (extra cheese: +50%, or +$0.75). 0 and 0: no charge.
     int extraPercent = 0;

@@ -144,7 +144,7 @@ inline QVariantList storeSections(const QVariantList &fields)
         {"privacy", PosService::tr("Privacy notice"), {"privacyOnReceipts", "privacyShort", "privacyFull"}},
         {"ages", PosService::tr("Age-restricted sales"), {"ageAlcohol", "ageTobacco"}},
         {"startPages", PosService::tr("Start pages"),
-         {"startPage.server", "startPage.bartender", "startPage.cashier", "startPage.host", "startPage.manager"}},
+         {"floorPlan", "startPage.server", "startPage.bartender", "startPage.cashier", "startPage.host", "startPage.manager"}},
         {"cash", PosService::tr("Cash"), {"cashMode", "terminalsHaveDrawer", "checkoutNeedsClosedChecks", "blindDrawerCount", "cashDenominations",
           "expenseCategories"}},
         {"service", PosService::tr("Responsible service"),

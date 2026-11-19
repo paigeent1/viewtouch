@@ -345,6 +345,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             else
                 s_->settings.startPages[job] = ss(page);
         }
+        if (record.contains(u"floorPlan"_s))
+            s_->settings.floorPlan = ss(record.value(u"floorPlan"_s).toString().trimmed().left(80));
         if (record.contains(u"terminalsHaveDrawer"_s))
             s_->settings.terminalsHaveDrawer = record.value(u"terminalsHaveDrawer"_s).toBool();
         if (record.contains(u"paidBreaks"_s))

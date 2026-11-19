@@ -93,6 +93,8 @@ class LayoutController : public QObject {
     Q_PROPERTY(QStringList fontFamilies READ fontFamilies NOTIFY fontsChanged)
     // The setup guide is showing (opens for managers until it's finished).
     Q_PROPERTY(bool setupOpen READ setupOpen NOTIFY setupOpenChanged)
+    // The Choose Floor Plan window is showing (the chooseFloorPlan command).
+    Q_PROPERTY(bool floorChooserOpen READ floorChooserOpen NOTIFY floorChooserChanged)
     // Site Setup (sitesetup.cpp): goes up when this Pi's hardware settings or the last scan change.
     Q_PROPERTY(int siteRevision READ siteRevision NOTIFY siteChanged)
 
@@ -244,6 +246,16 @@ public:
     // The floor plans with tables, [{id, name}]: the floor (role "tables")
     // first, then in the order of its tabs, then any others.
     Q_INVOKABLE QVariantList floorPlans() const;
+    // Tonight's floor plan (the store's setting, PosSession::storeFloorPlan) when it is still a floor plan
+    // page here; else the usual one (the page with role "tables"). Where "the floor plan" opens.
+    QString floorHome() const;
+    // The Choose Floor Plan window: "Normal (as built)" first (value ""), then every floor plan page
+    // (kind "tables", not a phone or tablet version) by name: [{value, text, current}].
+    Q_INVOKABLE QVariantList floorPlanChoices() const;
+    bool floorChooserOpen() const { return floorChooserOpen_; }
+    // A manager's touch in it: every screen uses that plan ("": the usual one); the window closes.
+    Q_INVOKABLE void chooseFloorPlan(const QString &pageId);
+    Q_INVOKABLE void closeFloorChooser();
     // This screen's own build, for Store Settings -> About ("screen.version").
     Q_INVOKABLE QString screenBuild() const;
     // One plan's tables and pieces (walls, doors...), {x, y, w, h, zones:
@@ -383,6 +395,7 @@ signals:
     void menuScreensChanged();
     void fontsChanged();
     void setupOpenChanged();
+    void floorChooserChanged();
     void siteChanged();
     // The back of a license was scanned (the ID check has it).
     void idCardScanned();
@@ -473,6 +486,12 @@ private:
     QString menuCategory_;
     QVariantMap widgetState_;
     bool setupOpen_ = false;
+    bool floorChooserOpen_ = false;
+    // The floor plan this screen last took as home (floorHome()): a manager choosing another moves
+    // home there, for a screen whose home it was (not one with its own start page).
+    QString floorHomeId_;
+    bool floorChosenHere_ = false;
+    void followFloorPlan();
     QString afterLogin_;
     // This screen's mode the last time someone was logged in: the Retail register or hospitality (the
     // floor, the menus). A login lands back in it when the terminal has no Start screen (owner 2026-11-09).

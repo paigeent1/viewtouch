@@ -7054,6 +7054,143 @@ TEST_CASE("Flow: a device's own start screen: the patio handheld opens on the pa
     CHECK(usual != u"check-list"_s);
 }
 
+TEST_CASE("Flow: tonight's floor plan (band night): chosen by a manager, every login lands on it", "[flow][floorplan]")
+{
+    // The store's pages, with a setup made the owner's way: Main duplicated as "Band Night" (same table
+    // names), and a Choose Floor Plan button on Main.
+    Layout l = seedLayout();
+    REQUIRE(l.page(u"tables"_s));
+    vt::layout::Page band = *l.page(u"tables"_s);
+    band.id = u"tables-band"_s;
+    band.name = u"Band Night"_s;
+    band.role.clear();
+    l.pages.append(band);
+    l.page(u"tables"_s)->zones.append(vt::layout::Zone::fromJson(QJsonObject{
+        {u"id"_s, u"choose-floor"_s}, {u"kind"_s, u"button"_s}, {u"label"_s, u"Floor Plan"_s},
+        {u"rect"_s, QJsonObject{{u"x"_s, 8}, {u"y"_s, 8}, {u"w"_s, 120}, {u"h"_s, 60}}},
+        {u"actions"_s, QJsonArray{QJsonObject{{u"type"_s, u"command"_s}, {u"name"_s, u"chooseFloorPlan"_s}}}}}));
+    test::RecordingSink sink;
+    app::PosService pos{test::seedPosData(true), &sink};
+    LayoutController c{l};
+    c.setMealPeriod(u"lunch"_s);
+    c.setPos(&pos);
+
+    // Nothing chosen (older stores too): the usual floor plan.
+    CHECK(pos.shared()->settings.floorPlan.empty());
+    CHECK(pos.snapshot()[u"storeFloorPlan"_s].toString().isEmpty());
+    REQUIRE(pos.loginWithPin(u"1111"_s));                 // Sam, a server
+    CHECK(c.pageId() == u"tables"_s);
+
+    // A server can't choose it: not the button, not the operation.
+    c.activate(u"choose-floor"_s);
+    CHECK_FALSE(c.floorChooserOpen());
+    CHECK(c.statusText().contains(u"manager"_s));
+    CHECK_FALSE(pos.setFloorPlan(u"tables-band"_s));
+    CHECK(pos.shared()->settings.floorPlan.empty());
+    pos.logout();
+
+    // The manager's button: the chooser lists Normal, then only the floor plans (no phone versions,
+    // no other pages), by name; Normal is marked.
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK(c.pageId() == u"tables"_s);
+    c.activate(u"choose-floor"_s);
+    REQUIRE(c.floorChooserOpen());
+    const QVariantList choices = c.floorPlanChoices();
+    REQUIRE(choices.size() >= 2);
+    CHECK(choices.first().toMap()[u"value"_s].toString().isEmpty());
+    CHECK(choices.first().toMap()[u"text"_s] == u"Normal (as built)"_s);
+    CHECK(choices.first().toMap()[u"current"_s].toBool());
+    QStringList listed;
+    for (const QVariant &v : choices.mid(1)) {
+        const QString id = v.toMap()[u"value"_s].toString();
+        listed << id;
+        const vt::layout::Page *p = l.page(id);
+        REQUIRE(p);
+        CHECK(p->kind == u"tables"_s);
+        CHECK(p->variantOf.isEmpty());
+        CHECK_FALSE(v.toMap()[u"current"_s].toBool());
+    }
+    CHECK(listed.contains(u"tables-band"_s));
+    CHECK(listed.contains(u"floor-patio"_s));
+    CHECK_FALSE(listed.contains(u"tables"_s));            // that's Normal
+    CHECK_FALSE(listed.contains(u"tables-phone"_s));
+    CHECK_FALSE(listed.contains(u"floor-bar-phone"_s));
+    CHECK_FALSE(listed.contains(u"check-list"_s));
+    // Store Settings offers the same pages.
+    QStringList offered;
+    for (const QVariant &v : c.pageChoices(u"floorPlan"_s))
+        offered << v.toMap()[u"value"_s].toString();
+    CHECK(offered.contains(u"tables-band"_s));
+    CHECK_FALSE(offered.contains(u"floor-patio-phone"_s));
+    CHECK_FALSE(offered.contains(u"menu-all"_s));
+
+    // Chosen: saved with the store's settings, sent to every screen; the manager's screen, resting on
+    // the old plan, shows the new one.
+    c.chooseFloorPlan(u"tables-band"_s);
+    CHECK_FALSE(c.floorChooserOpen());
+    CHECK(pos.shared()->settings.floorPlan == "tables-band");
+    CHECK(pos.snapshot()[u"storeFloorPlan"_s] == u"tables-band"_s);
+    CHECK(pos.storeFloorPlan() == u"tables-band"_s);
+    CHECK(c.pageId() == u"tables-band"_s);
+    CHECK(app::settingsFromJson(app::toJson(pos.shared()->settings)).floorPlan == "tables-band");
+    QJsonObject older = app::toJson(pos.shared()->settings);
+    older.remove(u"floorPlan"_s);
+    CHECK(app::settingsFromJson(older).floorPlan.empty());   // a store from before: the usual plan
+    bool inRecord = false;
+    for (const QVariant &r : pos.adminRecords(u"store"_s))
+        inRecord |= r.toMap()[u"floorPlan"_s] == u"tables-band"_s;
+    CHECK(inRecord);
+    bool marked = false;
+    for (const QVariant &v : c.floorPlanChoices())
+        if (v.toMap()[u"value"_s] == u"tables-band"_s)
+            marked = v.toMap()[u"current"_s].toBool();
+    CHECK(marked);
+    pos.logout();
+
+    // Every login lands on it; ‹ Tables and Home go back to it.
+    REQUIRE(pos.loginWithPin(u"1111"_s));
+    CHECK(c.pageId() == u"tables-band"_s);
+    REQUIRE(c.jumpTo(u"tabs"_s));
+    c.activate(u"back"_s);                                 // ‹ Tables (the floor by its role)
+    CHECK(c.pageId() == u"tables-band"_s);
+    REQUIRE(c.jumpTo(u"check-list"_s));
+    c.goHome();
+    CHECK(c.pageId() == u"tables-band"_s);
+    pos.logout();
+
+    // A terminal's own start page still wins (the patio handheld).
+    core::TerminalConfig patio;
+    patio.name = pos.terminalName().toStdString();
+    patio.startPage = "floor-patio";
+    pos.shared()->settings.terminals.push_back(patio);
+    REQUIRE(pos.loginWithPin(u"1111"_s));
+    CHECK(c.pageId() == u"floor-patio"_s);
+    pos.logout();
+    pos.shared()->settings.terminals.pop_back();
+
+    // Changed back while Sam is on the band-night plan: his screen isn't touched; Home shows the usual.
+    REQUIRE(pos.loginWithPin(u"1111"_s));
+    CHECK(c.pageId() == u"tables-band"_s);
+    pos.shared()->settings.floorPlan.clear();
+    emit pos.shared()->adminChanged();
+    CHECK(c.pageId() == u"tables-band"_s);
+    REQUIRE(c.jumpTo(u"check-list"_s));
+    c.goHome();
+    CHECK(c.pageId() == u"tables"_s);
+    pos.logout();
+
+    // Chosen again, then the page deleted: the usual floor plan, without a word.
+    pos.shared()->settings.floorPlan = "tables-band";
+    l.pages.removeIf([](const vt::layout::Page &p) { return p.id == u"tables-band"; });
+    c.replaceLayout(l);
+    REQUIRE(pos.loginWithPin(u"1111"_s));
+    CHECK(c.pageId() == u"tables"_s);
+    CHECK(c.floorHome() == u"tables"_s);
+    // A page that isn't a floor plan: the same.
+    pos.shared()->settings.floorPlan = "menu-all";
+    CHECK(c.floorHome() == u"tables"_s);
+}
+
 TEST_CASE("Flow: an item's button added to a page built by hand, in its next free place", "[flow][alsoon]")
 {
     Session s;

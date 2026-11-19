@@ -329,6 +329,11 @@ QVariantList PosService::adminFields(const QString &panel)
                        tr("For screens nobody is logged in to, the customer display, receipts and tickets. "
                           "Each person can have their own (Employees).")),
                  u"options"_s, languageOptions(false)),
+            with(with(field(u"floorPlan"_s, tr("Floor plan now"), u"page"_s,
+                       tr("Tonight's setup (band night, a private party...): every screen opens this floor plan instead of the "
+                          "usual one until it is changed back. Make a setup by duplicating a floor plan in the page editor; keep "
+                          "the table names the same so open checks stay with their tables.")),
+                 u"emptyText"_s, tr("Normal (as built)")), u"pages"_s, u"floorPlan"_s),
             with(with(field(u"startPage.server"_s, tr("Servers start on"), u"page"_s,
                        tr("The floor plan each job sees first after login (a room drawn with a table map in the editor counts too). "
                           "Each person can have their own (Employees).")),

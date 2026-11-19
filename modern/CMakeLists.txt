@@ -190,6 +190,7 @@ if(Qt6_FOUND)
             ui/qml/DateMath.js
             ui/qml/PriceCheckOverlay.qml
             ui/qml/ItemReturnSheet.qml
+            ui/qml/FloorPlanChooser.qml
             ui/qml/WidgetGuestOrder.qml
             ui/qml/WidgetGuestMessages.qml
             ui/qml/WidgetSiteSetup.qml

@@ -94,6 +94,21 @@ bool PosService::stopPairing()
     return true;
 }
 
+bool PosService::setFloorPlan(const QString &pageId)
+{
+    if (!require(perm::Manager, tr("Choosing the floor plan")))
+        return false;
+    const std::string want = ss(pageId.trimmed().left(80));
+    if (want != s_->settings.floorPlan) {
+        s_->settings.floorPlan = want;
+        settingsChanged();
+        ++s_->adminRevision;
+        emit s_->adminChanged();   // every screen: the new plan the next time it goes home
+    }
+    emit notice(want.empty() ? tr("Floor plan: back to normal.") : tr("Floor plan changed for every screen."));
+    return true;
+}
+
 QString PosService::terminalLook() const
 {
     // The person's own, while they're logged in.

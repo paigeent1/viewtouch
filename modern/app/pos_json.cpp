@@ -1257,6 +1257,7 @@ QJsonObject toJson(const PosSettings &s)
         {u"topRibbonShowWifi"_s, s.topRibbonShowWifi},
         {u"topRibbonShowCustomerCount"_s, s.topRibbonShowCustomerCount},
         {u"replicaKey"_s, qs(s.replicaKey)}, {u"language"_s, qs(s.language)},
+        {u"floorPlan"_s, qs(s.floorPlan)},
         {u"startPages"_s, [&] {
              QJsonObject o;
              for (const auto &[job, page] : s.startPages)
@@ -1574,6 +1575,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.topRibbonShowCustomerCount = o.value(u"topRibbonShowCustomerCount").toBool(true);
     s.replicaKey = ss(o.value(u"replicaKey").toString());
     s.language = ss(o.value(u"language").toString(u"en"_s));
+    s.floorPlan = ss(o.value(u"floorPlan").toString().trimmed());   // missing (older stores): the usual floor plan
     const QJsonObject starts = o.value(u"startPages").toObject();
     for (auto it = starts.begin(); it != starts.end(); ++it)
         if (!it.value().toString().isEmpty())
