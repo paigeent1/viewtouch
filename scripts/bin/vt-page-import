@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""The receiving end of vt-copy-page (run there over ssh; not usually by hand).
+
+  vt-page-import <package.json>
+
+Stops ViewTouch (it keeps its pages in memory and writes them all back, so the database is only
+changed while it's stopped), keeps a copy of the database (viewtouch.db.before-copy-<time>),
+replaces the pages in "replace" (dropping this store's phone/tablet versions of them that the
+package doesn't have), adds the pages in "add_if_missing" that this store lacks, and marks the
+copied pages as this store's own so starter-page updates leave them alone. Start ViewTouch
+afterwards with vt-server (vt-copy-page does).
+"""
+import json
+import os
+import shutil
+import sqlite3
+import subprocess
+import sys
+import time
+
+DB = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+
+
+def stop_viewtouch():
+    if subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode != 0:
+        return True
+    subprocess.run(["pkill", "-TERM", "-x", "vtmodern"])
+    for _ in range(40):
+        time.sleep(0.5)
+        if subprocess.run(["pgrep", "-x", "vtmodern"], capture_output=True).returncode != 0:
+            return True
+    return False
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    pkg = json.load(open(argv[0], encoding="utf-8"))
+    replace = pkg.get("replace") or {}
+    add = pkg.get("add_if_missing") or {}
+    if not replace:
+        print("Nothing to copy.")
+        return 1
+    if not os.path.exists(DB):
+        print(f"No ViewTouch database at {DB}")
+        return 1
+    if not stop_viewtouch():
+        print("ViewTouch didn't stop in 20 seconds; nothing changed.")
+        return 1
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    shutil.copy2(DB, f"{DB}.before-copy-{stamp}")
+    con = sqlite3.connect(DB)
+    rows = {pid: json.loads(js) for pid, js in con.execute("SELECT id, json FROM layout_pages")}
+    pos = dict(con.execute("SELECT id, position FROM layout_pages"))
+    nextpos = (max(pos.values()) + 1) if pos else 0
+    bases = {p.get("variantOf") or pid for pid, p in replace.items()}
+    with con:
+        # this store's versions of those pages that the package doesn't bring
+        for pid, p in rows.items():
+            base = p.get("variantOf") or pid
+            if base in bases and pid not in replace:
+                con.execute("DELETE FROM layout_pages WHERE id = ?", (pid,))
+        added = []
+        for pid, p in list(replace.items()) + [(k, v) for k, v in add.items() if k not in rows]:
+            if pid in pos:
+                con.execute("UPDATE layout_pages SET json = ? WHERE id = ?", (json.dumps(p), pid))
+            else:
+                con.execute("INSERT INTO layout_pages (id, position, json) VALUES (?, ?, ?)",
+                            (pid, nextpos, json.dumps(p)))
+                nextpos += 1
+                added.append(pid)
+        # Copied pages count as this store's own: starter updates don't replace them.
+        row = con.execute("SELECT value FROM meta WHERE key = 'starter_pages'").fetchone()
+        if row:
+            state = json.loads(row[0])
+            seen = state.get("seen", [])
+            for pid in list(replace) + added:
+                if pid not in seen:
+                    seen.append(pid)
+            state["seen"] = seen
+            con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('starter_pages', ?)",
+                        (json.dumps(state, separators=(",", ":")),))
+    print("Pages copied in: " + ", ".join(sorted(replace)) + (f"; added: {', '.join(sorted(added))}" if added else "")
+          + f". (A copy from before: viewtouch.db.before-copy-{stamp})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

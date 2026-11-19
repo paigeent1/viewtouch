@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Copy pages from this store's ViewTouch to another store's, so both look and work the same
+(owner 2026-11-19: "all bhdan functions are same on hca").
+
+  vt-copy-page retail-entry HCA          the Retail page (and its phone/tablet versions) to HCA
+  vt-copy-page retail-entry directv HCA  several pages at once
+
+The other store is a name from OTHER_STORES in this Pi's site settings (vt-site), e.g. HCA=pi@192.168.6.81.
+Its own copy of each page is replaced. Pages these buttons open that the other store doesn't have
+are added too (its own pages with those names are left alone). Over there ViewTouch is stopped,
+a copy of its database is kept (viewtouch.db.before-copy-<time>), the pages are put in, and
+ViewTouch is started again (vt-server): its register is out for a minute or two. Run it while that
+store is quiet.
+"""
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+
+DB = os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/viewtouch.db")
+
+
+def site_stores():
+    conf = os.path.expanduser("~/.config/viewtouch/site.conf")
+    stores = {}
+    try:
+        for line in open(conf, encoding="utf-8"):
+            line = line.strip()
+            if line.startswith("OTHER_STORES="):
+                val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                for s in val.split():
+                    if "=" in s:
+                        name, target = s.split("=", 1)
+                        stores[name.lower()] = (name, target)
+    except OSError:
+        pass
+    return stores
+
+
+def jump_targets(page):
+    out = set()
+
+    def walk(o):
+        if isinstance(o, dict):
+            if o.get("type") == "jump" and o.get("page"):
+                out.add(str(o["page"]))
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(page)
+    return out
+
+
+def main(argv):
+    if len(argv) < 2 or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0 if argv and argv[0] in ("-h", "--help") else 2
+    stores = site_stores()
+    want = argv[-1].lower()
+    if want not in stores:
+        print(f"'{argv[-1]}' isn't one of the other stores (vt-site set OTHER_STORES \"HCA=pi@192.168.6.81\"). "
+              f"Known: {', '.join(n for n, _ in stores.values()) or 'none'}")
+        return 2
+    name, target = stores[want]
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    rows = {pid: json.loads(js) for pid, js in con.execute("SELECT id, json FROM layout_pages")}
+    pages, extras = {}, {}
+    for pid in argv[:-1]:
+        if pid not in rows:
+            print(f"{pid}: this store has no page by that name (vt-reset-page --list shows them).")
+            return 1
+        for v, p in rows.items():
+            if v == pid or p.get("variantOf") == pid:
+                pages[v] = p
+    for p in list(pages.values()):
+        for t in jump_targets(p):
+            if t in rows and t not in pages:
+                extras[t] = rows[t]
+    package = json.dumps({"replace": pages, "add_if_missing": extras})
+    print(f"Copying to {name}: " + ", ".join(sorted(pages)) +
+          (f" (and, where {name} lacks them: {', '.join(sorted(extras))})" if extras else ""))
+    remote = ("cat > /tmp/vt-copy-page.json && cd ~/viewtouch-main && git pull -q --ff-only myfork main"
+              " && python3 scripts/bin/vt-page-import /tmp/vt-copy-page.json && DISPLAY=:0 vt-server")
+    r = subprocess.run(["ssh", "-o", "ConnectTimeout=10", target, remote], input=package.encode())
+    if r.returncode != 0:
+        print(f"{name}: the copy didn't finish (see above). Nothing on this store changed.")
+        return 1
+    print(f"Done: {name} has this store's pages now.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
