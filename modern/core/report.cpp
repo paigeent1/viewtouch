@@ -368,7 +368,7 @@ Report auditReport(const std::vector<const Check *> &checks, const ReportContext
     }
     r.section("Summary");
     const std::pair<const char *, const char *> kinds[] = {
-        {"void", "Voids"}, {"errorCorrect", "Error corrects"}, {"discount", "Discounts"}, {"promo", "Coupons and rewards"}, {"reopen", "Reopened checks"}, {"cancel", "Cancelled sales"},
+        {"void", "Voids"}, {"errorCorrect", "Error corrects"}, {"itemReturn", "Item returns"}, {"discount", "Discounts"}, {"promo", "Coupons and rewards"}, {"reopen", "Reopened checks"}, {"cancel", "Cancelled sales"},
         {"transfer", "Transfers"}, {"move", "Table moves"}, {"merge", "Merges"}};
     for (const auto &[kind, label] : kinds) {
         if (const auto it = counts.find(kind); it != counts.end())
@@ -1089,6 +1089,7 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
     const Kind kinds[] = {
         {"Voids (items already sent)", {"void"}, true},
         {"Error corrects (retail, before paying)", {"errorCorrect"}, true},
+        {"Item returns (ITEM RETURN, scanned)", {"itemReturn"}, true},
         {"Discounts and comps", {"discount"}, true},
         {"Payments and discounts taken back", {"unpay", "undiscount"}, true},
         {"Reopened checks", {"reopen"}, true},
@@ -1189,7 +1190,8 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
         r.total({"All", count(all.times), k.money ? ctx.money(all.amount) : ""});
 
         // Voids and comps: why, when the screen asked.
-        if (k.kinds.front() != "void" && k.kinds.front() != "discount" && k.kinds.front() != "cancel")
+        if (k.kinds.front() != "void" && k.kinds.front() != "discount" && k.kinds.front() != "cancel"
+            && k.kinds.front() != "itemReturn")
             continue;
         std::map<std::string, Tally> byReason;
         bool reasons = false;
@@ -1203,8 +1205,9 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
                 }
         if (!reasons)
             continue;
-        r.section(k.kinds.front() == "void"     ? "Voids by reason"
-                  : k.kinds.front() == "cancel" ? "Cancelled sales by reason"
+        r.section(k.kinds.front() == "void"         ? "Voids by reason"
+                  : k.kinds.front() == "cancel"     ? "Cancelled sales by reason"
+                  : k.kinds.front() == "itemReturn" ? "Item returns by reason"
                                                 : "Discounts and comps by reason");
         std::vector<std::pair<std::string, Tally>> why(byReason.begin(), byReason.end());
         std::ranges::stable_sort(why, [](const auto &a, const auto &b) { return a.second.amount.cents() > b.second.amount.cents(); });
@@ -1256,8 +1259,8 @@ Report exceptionsReport(const std::vector<const Check *> &checks, const std::vec
 
 const std::vector<std::string> &exceptionTypes()
 {
-    static const std::vector<std::string> types = {"void", "errorCorrect", "discount", "takenBack", "reopen", "cancel",
-                                                   "noSale", "refund", "ageHand", "ageRefused"};
+    static const std::vector<std::string> types = {"void", "errorCorrect", "itemReturn", "discount", "takenBack", "reopen",
+                                                   "cancel", "noSale", "refund", "ageHand", "ageRefused"};
     return types;
 }
 
@@ -1266,6 +1269,7 @@ std::string exceptionReportSection(const std::string &type)
     static const std::map<std::string, std::string> sections = {
         {"void", "Voids (items already sent)"},
         {"errorCorrect", "Error corrects (retail, before paying)"},
+        {"itemReturn", "Item returns (ITEM RETURN, scanned)"},
         {"discount", "Discounts and comps"},
         {"takenBack", "Payments and discounts taken back"},
         {"reopen", "Reopened checks"},
@@ -1281,7 +1285,7 @@ std::vector<ExceptionEntry> exceptionEntries(const std::vector<const Check *> &c
 {
     // The check event kinds, as the Exceptions report groups them.
     static const std::map<std::string, std::string> typeOf = {
-        {"void", "void"}, {"errorCorrect", "errorCorrect"}, {"discount", "discount"}, {"unpay", "takenBack"},
+        {"void", "void"}, {"errorCorrect", "errorCorrect"}, {"itemReturn", "itemReturn"}, {"discount", "discount"}, {"unpay", "takenBack"},
         {"undiscount", "takenBack"}, {"reopen", "reopen"}, {"cancel", "cancel"}, {"ageHand", "ageHand"},
         {"ageRefused", "ageRefused"}};
     const auto nobody = [](const std::string &who) { return who.empty() ? std::string("(nobody logged in)") : who; };

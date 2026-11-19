@@ -32,6 +32,7 @@ QString typeLabel(const std::string &type)
     static const std::map<std::string, const char *> labels = {
         {"void", QT_TR_NOOP("Void (item already sent)")},
         {"errorCorrect", QT_TR_NOOP("Error correct")},
+        {"itemReturn", QT_TR_NOOP("Item return")},
         {"discount", QT_TR_NOOP("Comp / discount")},
         {"takenBack", QT_TR_NOOP("Payment taken back")},
         {"reopen", QT_TR_NOOP("Reopened check")},

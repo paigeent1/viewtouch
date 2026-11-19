@@ -534,7 +534,8 @@ Totals Check::totals(const TaxRates &now) const
     std::map<TaxClass, Money> byClass;
     std::map<TaxClass, Money> discountableByClass;   // None: untaxed lines
     Money discountable, staffDiscountable;   // what percent discounts and staff meals apply to
-    const auto mayDiscount = [](const OrderLine &l) { return !l.voided && !l.isGiftCard() && !l.noDiscount; };
+    // (An item return never: a percent off it would charge the customer.)
+    const auto mayDiscount = [](const OrderLine &l) { return !l.voided && !l.isGiftCard() && !l.noDiscount && !l.isReturn(); };
     for (const OrderLine &l : lines) {
         const Money lt = l.total();
         t.items += lt;
@@ -630,11 +631,13 @@ Totals Check::totals(const TaxRates &now) const
             continue;
         const Money net = amount - discountShare[cls];
         Money tax;
+        // Less than nothing in a class (more returned than bought): its tax comes back too
+        // (owner 2026-11-19: tax is always refunded with an item return).
         if (rates.pricesIncludeTax) {
-            if (net.cents() > 0)
+            if (net.cents() != 0)
                 tax = net - net.withoutTaxPpm(ppm);
             t.itemsExTax -= amount - amount.withoutTaxPpm(ppm);
-        } else if (net.cents() > 0) {
+        } else if (net.cents() != 0) {
             tax = net.ppm(ppm);
         }
         if (tax.cents() != 0)
@@ -646,7 +649,7 @@ Totals Check::totals(const TaxRates &now) const
     t.discountsExTax = t.itemsExTax - t.subtotal;
 
     // Gratuity: on the (discounted, pre-tax) subtotal, not taxed, added after tax.
-    t.gratuity = t.subtotal.percent(gratuityBp);
+    t.gratuity = t.subtotal.cents() > 0 ? t.subtotal.percent(gratuityBp) : Money();   // (none on a refund)
     t.total = t.subtotal + t.tax + t.gratuity;
     for (const Payment &p : payments) {
         t.tips += p.tip;

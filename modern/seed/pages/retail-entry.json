@@ -428,9 +428,8 @@
       },
       "actions": [
         {
-          "type": "jump",
-          "mode": "push",
-          "page": "find-check"
+          "type": "command",
+          "name": "itemReturn"
         }
       ]
     },

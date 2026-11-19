@@ -143,6 +143,7 @@ ApplicationWindow {
                                         || receiptSheet.visible || setupLoader.active || jobChooser.visible || cashTipsPrompt.visible
                                         || approvalPad.visible || allergySheet.visible || couponSheet.visible || holdSheet.visible
                                         || TouchGuard.sheetOpen || reasonSheet.visible || handoffSheet.visible
+                                        || itemReturnSheet.visible
 
     Loader {
         active: root.customerDisplay
@@ -1586,6 +1587,16 @@ ApplicationWindow {
         anchors.fill: parent
         z: 58
         pos: root.controller.pos as PosService
+    }
+
+    // ITEM RETURN: the old sale, or the item scanned at a price the cashier may change.
+    ItemReturnSheet {
+        id: itemReturnSheet
+        objectName: "itemReturnSheet"
+        anchors.fill: parent
+        z: 59
+        pos: root.controller.pos as PosService
+        controller: root.controller
     }
 
     ReasonSheet {

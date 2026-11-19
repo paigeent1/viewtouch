@@ -103,8 +103,13 @@ struct OrderLine {
     // and the seats it is shared across (a bottle, a bucket: evenly; empty: its own seat).
     double stdDrinks = 0;
     std::vector<int> drinkSeats;
+    // An item return (ITEM RETURN, scan or look up): a negative quantity at the price the cashier
+    // agreed (the price book's, or as changed), taxed in its item's class so the tax comes back too;
+    // why it came back (Defective, Wrong item...). Never discounted; stock goes back up when it's sent.
+    std::string returnReason;
 
     bool isComment() const { return itemId.empty(); }
+    bool isReturn() const { return quantity < 0 && !isComment(); }
     std::string printerOf() const { return printer.empty() ? std::string("kitchen") : printer; }
     std::string kitchenText() const
     {
@@ -123,7 +128,10 @@ struct OrderLine {
     // A charge, not food: the delivery fee ("fee:delivery").
     bool isFee() const { return itemId.starts_with("fee:"); }
     std::string giftCardNumber() const { return isGiftCard() ? itemId.substr(9) : std::string(); }
-    std::string displayName() const { return qualifierPrefix(qualifier) + name + weightText() + shareText(); }
+    std::string displayName() const
+    {
+        return (isReturn() ? std::string("RETURN  ") : std::string()) + qualifierPrefix(qualifier) + name + weightText() + shareText();
+    }
     // " 1.25 lb" for an item sold by weight, else empty.
     std::string weightText() const;
     // " (1/3)" for a piece of a shared item, else empty.

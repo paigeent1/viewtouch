@@ -221,15 +221,24 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: w.unit * 3
             radius: 10
-            color: w.owing ? "#3a2020" : "#173a26"
+            // An item return made the sale less than nothing: "Refund $x" (touch Cash), then "Refunded".
+            readonly property bool refundDue: w.totals.hasRefundDue ?? false
+            color: w.owing ? "#3a2020" : refundDue ? "#3a3020" : "#173a26"
             Line {
+                objectName: "payBalanceLine"
                 anchors.fill: parent
                 anchors.margins: w.unit * 0.6
-                name: w.owing ? qsTr("Balance due") : (w.totals.hasChange ? qsTr("Change") : qsTr("Paid in full"))
-                value: w.owing ? (w.totals.balance ?? "") : (w.totals.hasChange ? w.totals.change : "")
+                name: w.owing ? qsTr("Balance due")
+                      : parent.refundDue ? qsTr("Refund (touch Cash)")
+                      : (w.totals.hasRefunded ?? false) ? qsTr("Refunded in cash")
+                      : (w.totals.hasChange ? qsTr("Change") : qsTr("Paid in full"))
+                value: w.owing ? (w.totals.balance ?? "")
+                       : parent.refundDue ? (w.totals.refundDue ?? "")
+                       : (w.totals.hasRefunded ?? false) ? (w.totals.refunded ?? "")
+                       : (w.totals.hasChange ? w.totals.change : "")
                 strong: true
                 size: w.unit * 1.4
-                tint: w.owing ? "#ff9a9e" : "#7ee2a8"
+                tint: w.owing ? "#ff9a9e" : parent.refundDue ? "#f5b940" : "#7ee2a8"
             }
         }
     }

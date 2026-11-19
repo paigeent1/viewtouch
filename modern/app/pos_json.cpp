@@ -145,6 +145,8 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"noDiscount"_s, true);
         if (l.noStaffDiscount)
             lo.insert(u"noStaffDiscount"_s, true);
+        if (!l.returnReason.empty())
+            lo.insert(u"returnReason"_s, qs(l.returnReason));
         if (l.served) {
             lo.insert(u"served"_s, true);
             lo.insert(u"servedAt"_s, qint64(l.servedAt));
@@ -304,6 +306,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.upc = ss(lo.value(u"upc").toString());
         l.noDiscount = lo.value(u"noDiscount").toBool();
         l.noStaffDiscount = lo.value(u"noStaffDiscount").toBool();
+        l.returnReason = ss(lo.value(u"returnReason").toString());
         l.served = lo.value(u"served").toBool();
         l.servedAt = i64(lo.value(u"servedAt"));
         l.share = lo.value(u"share").toInt();

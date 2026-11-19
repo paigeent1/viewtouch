@@ -1670,7 +1670,7 @@
 <tr><td><b>VOID ITEM</b> / <b>RESTORE ITEM</b></td><td>Takes off the item touched on the check, as an error correct; on a struck-through item it puts it back (below).</td></tr>
 <tr><td><b>CANCEL SALE</b></td><td>Cancels the whole sale, with a reason (below).</td></tr>
 <tr><td><b>DISCOUNTS</b></td><td>A percent off one item or the whole sale (below).</td></tr>
-<tr><td><b>ITEM RETURN</b></td><td>Opens <b>Find a Check</b>: find the sale, then a manager uses <b>Refund…</b> (chapter 11). Scanning the receipt's barcode opens the check too (chapter 29).</td></tr>
+<tr><td><b>ITEM RETURN</b></td><td>Asks: <b>Find the old sale</b> (Find a Check, then a manager uses <b>Refund…</b>, chapter 11) or <b>Scan or look up the item</b> (below). Scanning the receipt's barcode finds the old sale too (chapter 29).</td></tr>
 <tr><td><b>NO SALE</b></td><td>Asks why, opens the drawer and prints a slip (chapter 10).</td></tr>
 <tr><td><b>CASHIER DUTY</b></td><td>The Cashier Duty screen (below).</td></tr>
 <tr><td><b>Reprint Receipt</b></td><td>Opens <b>Look Up Checks</b>, the same as CASHIER DUTY → LOOK UP CHECKS (below). <b>Cancel</b> there comes back to the Retail screen.</td></tr>
@@ -1720,7 +1720,17 @@
 </ul>
 <p class="shot"><img src="img/item-lookup.png" width="560" height="350"></p>
 <p class="caption">Item Look Up at the top of the tree: the department groups, each with how many items.</p>
-<div class="tip">A store whose Retail page was changed in the page editor may still have the old buttons. In edit mode, set <b>ALPHA LOOK UP</b> to <i>Jump to page</i> → <b>Item Look Up</b>, <b>ITEM RETURN</b> to <i>Jump to page</i> → <b>Find a Check</b>, and <b>Reprint Receipt</b> to <i>Jump to page</i> → <b>Look Up Checks</b> (chapter 13).</div>
+<div class="tip">A store whose Retail page was changed in the page editor may still have the old buttons. In edit mode, set <b>ALPHA LOOK UP</b> to <i>Jump to page</i> → <b>Item Look Up</b>, <b>ITEM RETURN</b> to <i>Command</i> → <b>Item return (old sale or scan)</b>, and <b>Reprint Receipt</b> to <i>Jump to page</i> → <b>Look Up Checks</b> (chapter 13).</div>
+
+<h2>Item return: scan the item</h2>
+<ol>
+<li>Touch <b>ITEM RETURN</b>, then <b>Scan or look up the item</b>.</li>
+<li>Scan the item (scanner or camera), or type its UPC or part of its name and touch <b>Find</b> (several names: touch the right one).</li>
+<li>A window shows the item with its price-book price already filled in. If it sold for another amount, change the price. Change <b>How many</b> if more than one comes back, and touch a reason: <i>Defective</i>, <i>Wrong item</i>, <i>Changed mind</i> or <i>Other</i>.</li>
+<li>Touch <b>Add return</b>. A manager approves with their PIN (as for a void). The sale shows <b>RETURN</b> and the item, at minus the price; the tax comes back too, at the item's own tax. <b>Cancel</b> adds nothing.</li>
+<li>Ring anything the customer is buying instead (an exchange), then <b>SUB TOTAL (PAY)</b>. If the sale is less than nothing, Pay shows <b>Refund (touch Cash)</b>: touch <b>Cash</b>, give the money back, and <b>Close Check</b> (the drawer opens).</li>
+</ol>
+<p>The item goes back into stock when the sale closes. Returns show on the Exceptions report (with their reasons), in the Exceptions search and, when large, in Loss Watch. A store where prices include tax types the price with the tax in it, as it sells.</p>
 
 <h2>Price check</h2>
 <ol>
@@ -1949,7 +1959,7 @@
 <tr><td>Back to the Retail screen</td><td>🏷️ Retail Mode (order screen, Tables, Open checks)</td></tr>
 <tr><td>Item or subtotal % discount</td><td>Retail → DISCOUNTS → ITEM DISCOUNT / SUBTOTAL DISCOUNT</td></tr>
 <tr><td>Find an item by name or department</td><td>Retail → ALPHA LOOK UP</td></tr>
-<tr><td>A return</td><td>Retail → ITEM RETURN → the check → Refund… (manager), or scan the receipt's barcode</td></tr>
+<tr><td>A return</td><td>Retail → ITEM RETURN → Find the old sale → Refund… (manager), or Scan or look up the item → price → Add return; or scan the receipt's barcode</td></tr>
 <tr><td>Price check</td><td>Retail → PRICE CHECK, scan; PRICE CHECK again to stop</td></tr>
 <tr><td>Scan with the tablet camera</td><td>Retail → 📷 SCAN</td></tr>
 <tr><td>Print shelf / price / cigar labels on a tablet</td><td>Log Out → Labels…</td></tr>

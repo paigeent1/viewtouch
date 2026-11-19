@@ -1703,6 +1703,16 @@ void LayoutController::scanned(const QString &code)
     }
     if (nowMs - lastIdScanAt_ < 3000)
         return;
+    // ITEM RETURN's window open: a receipt's barcode is the old sale (Find a Check, below); anything
+    // else is the item coming back (its price shown, to change if it sold for another amount).
+    const bool receiptCode = vt::core::parseReceiptReference(c.toStdString()).has_value();
+    if (pos_->itemReturn().value(u"on"_s).toBool()) {
+        if (!receiptCode) {
+            call(u"itemReturnCode"_s, {c}, [](const QVariant &) {});
+            return;
+        }
+        call(u"cancelItemReturn"_s, {}, [](const QVariant &) {});
+    }
     // A receipt's barcode (Store Settings > Print a barcode on receipts: "R-5012", "RHCA-5012"): never an
     // item. On the order and Retail screens, Find a check and Look Up Checks it opens that check on
     // Find a check (Refund… there for a return); from another store it says where it's from.
@@ -2318,6 +2328,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         // Retail CANCEL SALE ("cancelCheck" on the store's pages).
         {u"cancelSale"_s, {u"cancelSale"_s, {}}}, {u"cancelCheck"_s, {u"cancelSale"_s, {}}},
         {u"priceCheck"_s, {u"togglePriceCheck"_s, {}}},
+        // ITEM RETURN: the old sale (Find a Check) or the item scanned, at a price the cashier may change.
+        {u"itemReturn"_s, {u"startItemReturn"_s, {}}},
         {u"printReceipt"_s, {u"printReceipt"_s, {}}}, {u"noSale"_s, {u"noSale"_s, {}}},
         {u"xReport"_s, {u"xReport"_s, {}}},
         {u"openDrawer"_s, {u"noSale"_s, {}}}, {u"openDrawerSession"_s, {u"openDrawerSession"_s, {}}},
@@ -2356,6 +2368,13 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
                 cardReader_.charge(charge);
             done(true);
         });
+    }
+    // ITEM RETURN's "Find the old sale": Find a Check (Refund… there).
+    if (name == u"findOldSale") {
+        if (activeLayout().page(u"find-check"_s))
+            return done(navigate(Navigator::Mode::Push, u"find-check"_s));
+        setStatus(tr("This screen is not in your pages yet (start with --reset-layout to get it)."));
+        return done(false);
     }
     if (name == u"setupGuide") {
         openSetup();
@@ -2612,6 +2631,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"voidItem"_s, QT_TR_NOOP("Takes the touched item off the check (after it was sent: a void, which may need a manager).")},
             {u"printReceipt"_s, QT_TR_NOOP("Prints the check for the guest.")},
             {u"closeCheck"_s, QT_TR_NOOP("Closes the paid check.")},
+            {u"itemReturn"_s, QT_TR_NOOP("Item return: find the old sale, or scan the item and give back its price (a manager approves).")},
             {u"removePayment"_s, QT_TR_NOOP("Takes off the touched payment.")},
             {u"noSale"_s, QT_TR_NOOP("Opens the cash drawer without a sale (it's recorded).")},
             {u"xReport"_s, QT_TR_NOOP("Prints an X report: today's sales and drawers so far, nothing closed or reset.")},

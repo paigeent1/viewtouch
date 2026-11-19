@@ -190,6 +190,7 @@ public:
     QVariantMap cashTipsAsk() const override { return v(u"cashTipsAsk").toMap(); }
     QVariantMap reasonAsk() const override { return v(u"reasonAsk").toMap(); }
     QVariantMap priceCheck() const override { return v(u"priceCheck").toMap(); }
+    QVariantMap itemReturn() const override { return v(u"itemReturn").toMap(); }
     QVariantMap timeClock() const override { return v(u"timeClock").toMap(); }
     QVariantMap receiving() const override { return v(u"receiving").toMap(); }
     QVariantMap stockCounting() const override { return v(u"stockCounting").toMap(); }

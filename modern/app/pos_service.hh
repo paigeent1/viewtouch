@@ -722,6 +722,19 @@ public:
     // shown in a window and on the customer display. False: no such item.
     bool priceCheckCode(const QString &code);
     void closePriceCheck();
+    // ITEM RETURN (pos_returns.cpp): a small window asks "the old sale, or scan the item?". Scanned (or a
+    // UPC / part of the name typed), it shows the item at its price-book price, which the cashier may
+    // change, how many and why; Add puts a RETURN line on the sale (negative, taxed as the item, a
+    // manager's approval, an exception). The sale is then paid as usual: less than nothing is a cash refund.
+    QVariantMap itemReturn() const override { return itemReturn_; }
+    bool startItemReturn();
+    bool itemReturnStep(const QString &step);   // "choose" | "scan"
+    bool itemReturnCode(const QString &code);   // a scan, a UPC or part of a name typed
+    bool itemReturnPick(const QString &itemId); // one of the names found
+    bool addItemReturn(const QString &itemId, qint64 priceCents, int quantity, const QString &reason, const QString &upc);
+    void cancelItemReturn();
+    // The reasons ITEM RETURN offers (in the screen's language).
+    static QStringList itemReturnReasons();
     // Answers reasonAsk: the void or comp goes ahead with it ("": it doesn't).
     bool giveReason(const QString &reason);
     // The cash tips kept on the shift just clocked out ("12.50"; "" or "0": none).
@@ -1861,6 +1874,15 @@ private:
     std::optional<GivenReason> reason_;
     QVariantMap reasonAsk_;
     QVariantMap priceCheck_;   // {on, item}
+    QVariantMap itemReturn_;   // ITEM RETURN's window (itemReturn())
+    // A sale made less than nothing by an item return: what is still to give back in cash (0: none).
+    // (Ordinary change, from cash handed over, is never this.)
+    static Money refundDue(const core::Totals &t)
+    {
+        const Money cashIn = t.cashPaid.cents() > 0 ? t.cashPaid : Money();
+        return t.change > cashIn ? t.change - cashIn : Money();
+    }
+    bool showItemReturn(const core::MenuItem &m, const QString &code);
     QString reasonMethod_;
     QVariantList reasonArgs_;
     // Whether this can go ahead: no reason needed, or given. Else asks (false).

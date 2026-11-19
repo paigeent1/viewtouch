@@ -153,6 +153,9 @@ class PosSession : public QObject {
     // Price check mode (PRICE CHECK button): {on, item: {name, price, upc, related: [{name, price,
     // upc, relation}]}}; scans show the item instead of ringing it in.
     Q_PROPERTY(QVariantMap priceCheck READ priceCheck NOTIFY sessionChanged)
+    // ITEM RETURN: {on, step: "choose" | "scan" | "price", item: {id, name, upc, priceCents, price,
+    // byWeight}, matches: [{id, name, price, upc}] (a name typed), reasons: [...]}; empty: closed.
+    Q_PROPERTY(QVariantMap itemReturn READ itemReturn NOTIFY sessionChanged)
     // A void or comp waiting for its reason: {kind: "void" | "comp", what, reasons}.
     Q_PROPERTY(QVariantMap reasonAsk READ reasonAsk NOTIFY sessionChanged)
     // The Time Clock screen: who typed their PIN (not logged in), their status,
@@ -426,6 +429,7 @@ public:
     // Just clocked out here: the cash tips they kept? ({who, punchId}; {} none)
     virtual QVariantMap cashTipsAsk() const = 0;
     virtual QVariantMap priceCheck() const = 0;
+    virtual QVariantMap itemReturn() const = 0;
     virtual QVariantMap reasonAsk() const = 0;
     virtual QVariantMap timeClock() const = 0;
     virtual QVariantMap receiving() const = 0;
@@ -534,6 +538,16 @@ public:
     Q_INVOKABLE void xReport() { invoke(QStringLiteral("xReport")); }
     Q_INVOKABLE void togglePriceCheck() { invoke(QStringLiteral("togglePriceCheck")); }
     Q_INVOKABLE void closePriceCheck() { invoke(QStringLiteral("closePriceCheck")); }
+    Q_INVOKABLE void startItemReturn() { invoke(QStringLiteral("startItemReturn")); }
+    Q_INVOKABLE void itemReturnStep(const QString &step) { invoke(QStringLiteral("itemReturnStep"), {step}); }
+    Q_INVOKABLE void itemReturnCode(const QString &code) { invoke(QStringLiteral("itemReturnCode"), {code}); }
+    Q_INVOKABLE void itemReturnPick(const QString &itemId) { invoke(QStringLiteral("itemReturnPick"), {itemId}); }
+    Q_INVOKABLE void addItemReturn(const QString &itemId, qint64 priceCents, int quantity, const QString &reason,
+                                   const QString &upc)
+    {
+        invoke(QStringLiteral("addItemReturn"), {itemId, priceCents, quantity, reason, upc});
+    }
+    Q_INVOKABLE void cancelItemReturn() { invoke(QStringLiteral("cancelItemReturn")); }
     Q_INVOKABLE void printReport(const QString &id, qint64 dayId = 0) { invoke(QStringLiteral("printReport"), {id, dayId}); }
     Q_INVOKABLE void adminSave(const QString &panel, int index, const QVariantMap &record)
     {

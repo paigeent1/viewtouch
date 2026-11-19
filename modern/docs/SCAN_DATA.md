@@ -158,7 +158,10 @@ Code: `modern/core/scan_data.{hh,cpp}` (plain C++: the file, its checks, the fil
   a *Box* (others), holding as many units as the link says (10 and 5 usually). Otherwise it is a *Pack*,
   a *Can* or *Each*, 1 unit.
 - **Returns**: a line with a negative quantity is sent with negative quantity (18) and negative final
-  price (31). Money refunded after a check closed isn't by item, so the file shows that sale as rung, with a
+  price (31). The Retail screen's ITEM RETURN (scan or look up the item, 2026-11-19) makes exactly such a
+  line (RETURN, quantity −1 or more, at the price the cashier agreed), so a returned pack or carton is
+  reported as a negative sale of its UPC in the week it came back; returns never get a discount or
+  multi-pack fields. Money refunded after a check closed isn't by item, so the file shows that sale as rung, with a
   warning.
 - **Final price (31)**: the line's total less its share of every discount, **before sales tax**. In a
   store whose prices include tax (Store Settings → Taxes), the tax is backed out of each line's final

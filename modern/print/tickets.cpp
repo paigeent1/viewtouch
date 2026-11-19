@@ -3,6 +3,7 @@
 #include <QString>
 
 #include <algorithm>
+#include <cstdlib>
 #include <sstream>
 
 using namespace vt::core;
@@ -187,10 +188,12 @@ Document receipt(const Check &check, const TicketContext &ctx)
         }
             continue;
         }
-        const std::string qty = l.quantity > 1 ? std::to_string(l.quantity) + " x " : "";
+        const std::string qty = std::abs(l.quantity) > 1 ? std::to_string(std::abs(l.quantity)) + " x " : "";
         if (!l.upc.empty())
             d.text("  " + l.upc);   // small print above the description: the code it was rung in with
         d.columns(qty + l.displayName(), ctx.money(l.total()));
+        if (l.isReturn() && !l.returnReason.empty())   // an item return: why
+            d.text("  " + ctx.tr("Returned: %1", {l.returnReason}));
         // A fee says what it is (fee laws: it mustn't look like a tip).
         if (l.itemId == "fee:delivery")
             d.text("  " + (ctx.settings.deliveryFeeToDriver ? ctx.tr("Goes to the driver.")
@@ -235,7 +238,8 @@ Document receipt(const Check &check, const TicketContext &ctx)
             d.blank();
             paid = true;
         }
-        d.columns(p.tenderName, ctx.money(p.amount));
+        // A cash refund (an item return made the sale less than nothing): money given back.
+        d.columns(p.amount.cents() < 0 ? ctx.tr("%1 refund", {p.tenderName}) : p.tenderName, ctx.money(p.amount));
         // A card from a reader: which one, and its payment id for disputes.
         if (!p.last4.empty()) {
             std::string brand = p.cardBrand;

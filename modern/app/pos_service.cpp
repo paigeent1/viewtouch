@@ -1852,7 +1852,7 @@ bool PosService::setLineQuantity(qint64 lineId, int quantity)
         return fail(tr("Touch an item on the check first."));
     if (l->sent)
         return fail(tr("%1 was sent: Again adds more, Void takes it off.").arg(qs(l->displayName())));
-    if (l->weight > 0 || l->isGiftCard() || l->isShare())
+    if (l->weight > 0 || l->isGiftCard() || l->isShare() || l->isReturn())
         return fail(tr("%1 can't have a quantity.").arg(qs(l->displayName())));
     quantity = std::clamp(quantity, 1, 99);
     if (quantity == l->quantity)
@@ -1987,6 +1987,8 @@ bool PosService::changeLineQuantity(qint64 lineId, int by)
 {
     Check *c = current();
     const OrderLine *l = c ? c->line(lineId ? lineId : selectedLine_) : nullptr;
+    if (l && l->isReturn() && !l->voided)
+        return fail(tr("A return keeps its count: take it off (VOID ITEM) and ring the return again."));
     if (l && l->sent && by > 0)
         return repeatLine(l->id);
     if (l && !l->sent && !l->voided && l->quantity + by < 1)   // the last one: off the check
@@ -2002,6 +2004,8 @@ bool PosService::repeatLine(qint64 lineId)
     const OrderLine *l = c ? c->line(lineId ? lineId : selectedLine_) : nullptr;
     if (!l || l->isComment() || l->isGiftCard())
         return fail(tr("Touch an item on the check first."));
+    if (l->isReturn())
+        return fail(tr("Ring another return with ITEM RETURN."));
     const MenuItem *m = findItem(qs(l->itemId));
     if (!m || !m->available)
         return fail(tr("%1 is sold out.").arg(qs(l->name)));
@@ -2196,6 +2200,21 @@ bool PosService::tender(const QString &tenderId, std::optional<std::int64_t> amo
 
     const Totals before = c->totals(s_->settings.tax);
     Money amount;
+    // An item return made the sale less than nothing: the customer gets that back, in cash, out of
+    // the drawer (a card goes back with Find a Check > Refund… on its old sale).
+    if (const Money due = refundDue(before); due.cents() > 0 && t->kind != TenderKind::Discount) {
+        if (t->kind != TenderKind::Cash)
+            return fail(tr("Give the refund of %1 in cash (a card: Find a Check, then Refund… on the old sale).").arg(format(due)));
+        if (!require(perm::Settle, tr("Taking payments")))
+            return false;
+        Payment &back = c->addPayment(*t, -due);
+        stampPayment(back);
+        entry_.clear();
+        emit entryChanged();
+        emit notice(tr("Refund %1: give it to the customer from the drawer.").arg(format(due)));
+        changed(*c);
+        return true;
+    }
     if (t->kind != TenderKind::Discount) {
         if (before.balance.cents() <= 0)
             return fail(tr("Nothing is owed on this check."));
@@ -2390,10 +2409,13 @@ bool PosService::closeCheck()
     const Totals t = c->totals(s_->settings.tax);
     if (t.balance.cents() > 0)
         return fail(tr("%1 is still due.").arg(format(t.balance)));
+    // An item return: the refund is given (Cash) before the sale closes, so the drawer counts it.
+    if (const Money due = refundDue(t); due.cents() > 0 && !c->training)
+        return fail(tr("Refund %1 is due: touch Cash to give it back.").arg(format(due)));
     if (c->training)
         return closePractice(*c);
-    // (A cash tip handed over for the server is cash here too.)
-    const bool cash = t.cashPaid.cents() > 0 || c->cashTip.cents() > 0;
+    // (A cash tip handed over for the server is cash here too; a cash refund is cash out.)
+    const bool cash = t.cashPaid.cents() != 0 || c->cashTip.cents() > 0;
     // With server banks the cash stays with whoever closes the check (their
     // bank starts with the first cash sale); otherwise it goes in this
     // terminal's drawer, which must be open.
@@ -2446,7 +2468,9 @@ bool PosService::closeCheck()
     currentId_ = 0;
     selectedLine_ = 0;
     selectedPayment_ = 0;
-    emit notice(t.change.cents() > 0 ? tr("Check closed. Change: %1").arg(format(t.change)) : tr("Check closed"));
+    emit notice(t.change.cents() > 0 ? tr("Check closed. Change: %1").arg(format(t.change))
+                : t.cashPaid.cents() < 0 ? tr("Check closed. Refunded: %1").arg(format(-t.cashPaid))
+                                         : tr("Check closed"));
     emit checkChanged();
     emit s_->checksChanged();
     emit checkClosed(id);
@@ -2611,7 +2635,8 @@ QVariantList PosService::lines() const
             {u"price"_s, l.isComment() ? QString() : format(l.total())}, {u"comment"_s, l.isComment()},
             {u"sent"_s, l.sent}, {u"voided"_s, l.voided}, {u"corrected"_s, l.corrected}, {u"modifiers"_s, mods},
             // − / + / Again apply (not a comment, gift card or weighed item).
-            {u"countable"_s, !l.isComment() && !l.isGiftCard() && !l.isFee() && !l.voided && l.weight == 0 && !l.isShare()},
+            {u"countable"_s, !l.isComment() && !l.isGiftCard() && !l.isFee() && !l.voided && l.weight == 0 && !l.isShare() && !l.isReturn()},
+            {u"isReturn"_s, l.isReturn()}, {u"returnReason"_s, qs(l.returnReason)},
             {u"fee"_s, l.isFee()},
             {u"shared"_s, l.isShare()},
             {u"selected"_s, qint64(l.id) == selectedLine_},
@@ -2704,7 +2729,10 @@ QVariantMap PosService::totals() const
         {u"total"_s, format(t.total)}, {u"paid"_s, format(t.paid)},
         {u"balance"_s, format(t.balance.cents() > 0 ? t.balance : Money())},
         {u"balanceCents"_s, qint64(t.balance.cents())},
-        {u"change"_s, format(t.change)}, {u"hasChange"_s, t.change.cents() > 0},
+        {u"change"_s, format(t.change)}, {u"hasChange"_s, t.change.cents() > 0 && refundDue(t).cents() == 0},
+        // An item return made it less than nothing: the refund still to give (Cash), or given.
+        {u"refundDue"_s, format(refundDue(t))}, {u"hasRefundDue"_s, refundDue(t).cents() > 0},
+        {u"refunded"_s, format(-t.cashPaid)}, {u"hasRefunded"_s, t.cashPaid.cents() < 0 && t.balance.cents() == 0},
         {u"rounding"_s, format(t.rounding)}, {u"hasRounding"_s, t.rounding.cents() != 0},
         {u"gratuity"_s, format(t.gratuity)}, {u"hasGratuity"_s, t.gratuity.cents() > 0},
         {u"cashTip"_s, format(c->cashTip)}, {u"hasCashTip"_s, c->cashTip.cents() > 0},
