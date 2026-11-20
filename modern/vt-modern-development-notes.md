@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-20 12:39 ET — Bob (Claude) — CI: the label utility's Quick Label test runs even when Tests has its known failures
+- **What:** The 'Label utility (no window)' step in modern-checks.yml runs unless the run was cancelled.
+- **Why:** Tests always fails on the known cases in main.fails, which skipped every later step, so the Python test would never run.
+- **Files:** `.github/workflows/modern-checks.yml`
+- **Next person must know:** Server: no change. Tablet app: no change (CI only).
+
 ### 2026-11-20 12:39 ET — Bob (Claude) — Quick Label: the 'Printed N on <printer>' status from any 'Printed' answer
 - **What:** printQuickLabel takes any label-utility answer starting with 'Printed' (was 'Printed ' with a space) as the printed message it rewrites, translated, as 'Printed N on <printer>'.
 - **Why:** CI: the Quick Label tests' stand-in answers 'Printed', so the tablet showed the raw word instead of 'Printed 2 on Zebra Large Labels'.
