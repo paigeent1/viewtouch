@@ -123,6 +123,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-20 13:03 ET — Bob (Claude) — Quick Label sheet: print() renamed printLabel() (Android build)
+- **What:** QuickLabelSheet.qml: function print() -> printLabel() and its four callers.
+- **Why:** The Android Qt's qmlcachegen rejects a QML method named print ('Illegal method name'), so the b601 tablet app failed to build. Desktop CI didn't catch it. Server: no change (QML only); the Pi and tablets are rebuilt from this commit anyway so the numbers match.
+- **Files:** (none)
+
 ### 2026-11-20 12:39 ET — Bob (Claude) — CI: the label utility's Quick Label test runs even when Tests has its known failures
 - **What:** The 'Label utility (no window)' step in modern-checks.yml runs unless the run was cancelled.
 - **Why:** Tests always fails on the known cases in main.fails, which skipped every later step, so the Python test would never run.

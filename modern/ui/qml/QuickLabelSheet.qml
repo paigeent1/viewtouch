@@ -65,7 +65,7 @@ Rectangle {
     }
     onPreviewKeyChanged: if (open) previewTimer.restart()
 
-    function print() {
+    function printLabel() {
         if (!typed || roll === "" || (info.printing ?? false))
             return
         previewTimer.stop()
@@ -162,7 +162,7 @@ Rectangle {
                         maximumLength: sheet.maxChars
                         placeholderText: qsTr("Line 1")
                         KeyNavigation.tab: line2
-                        onAccepted: sheet.print()
+                        onAccepted: sheet.printLabel()
                         onEscaped: sheet.close()
                     }
                     LineField {
@@ -172,7 +172,7 @@ Rectangle {
                         maximumLength: sheet.maxChars
                         placeholderText: qsTr("Line 2 (optional)")
                         KeyNavigation.tab: line3
-                        onAccepted: sheet.print()
+                        onAccepted: sheet.printLabel()
                         onEscaped: sheet.close()
                     }
                     LineField {
@@ -182,7 +182,7 @@ Rectangle {
                         maximumLength: sheet.maxChars
                         placeholderText: qsTr("Line 3 (optional)")
                         KeyNavigation.tab: line1
-                        onAccepted: sheet.print()
+                        onAccepted: sheet.printLabel()
                         onEscaped: sheet.close()
                     }
                 }
@@ -310,7 +310,7 @@ Rectangle {
                     highlighted: true
                     enabled: sheet.typed && sheet.roll !== "" && !(sheet.info.printing ?? false) && (sheet.info.ready ?? true)
                     text: (sheet.info.printing ?? false) ? qsTr("Printing…") : qsTr("Print %n", "", sheet.copies)
-                    onClicked: sheet.print()
+                    onClicked: sheet.printLabel()
                 }
             }
 
