@@ -119,9 +119,27 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
   stores (Hat City Ale House; Buttheads Tobacco Emporium - Danbury; Buttheads Tobacco Emporium - Gaylordsville), and a
   per-terminal "This terminal's store" setting that overrides Store Settings > Gift card location (one shared Store Settings
   can't tell the stores apart). Until then each store's own Gift card location is used.
+* **Mobile ID age check (owner 2026-11-20, waiting on the state)**: verify a customer's mobile driver's license
+  (Connecticut Mobile ID, launched 2026-11-17; Google/Apple/Samsung Wallet IDs and other states later) in the age check,
+  showing only "21+ Verified" (green) or a red reason; nothing about the person is stored, only that the check passed,
+  kept on the check like today's ID check. Standard: ISO/IEC 18013-5 (QR code engagement + Bluetooth LE; tablets have
+  no NFC, QR is enough). Plan: the free open-source Multipaz reader (OpenWallet Foundation, recommended by Google) in
+  the Android app. Tablets (HCA) read directly; the Pi registers (BHDAN, Gaylordsville) get a small Android device
+  paired to the register in an "ID reader" mode whose result lands on that register's check (option 1, chosen first).
+  Later option 2: read the QR with the register's 2D scanner and do the Bluetooth part on the Pi itself (no Multipaz
+  for Linux: our own reader, bigger job). Blocked until: (a) CT DMV answers whether it publishes its Mobile ID issuer
+  (IACA) certificate or joins AAMVA's Digital Trust Service so readers other than IDEMIA's can verify it (owner emailed
+  2026-11-20); if not, the only path is IDEMIA's Verify SDK (ask IDEMIA for price and license terms); (b) the state's
+  consumer protection department (DCP) says whether Mobile ID is acceptable for tobacco sales. Meanwhile staff can
+  use IDEMIA's free Mobile ID Verify app on a phone.
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-20 18:14 ET — Bob (Claude) — Backlog: Mobile ID age check
+- **What:** Added 'Mobile ID age check' to section 5 (Pending Roadmap & Backlog): plan, tablet vs Pi register options, and what it's waiting on (CT DMV trust certificate answer, DCP tobacco answer). Server: no change. Tablet app: no change (notes only).
+- **Why:** Owner 2026-11-20: 'put on the development list' after emailing CT DMV about outside readers.
+- **Files:** (none)
 
 ### 2026-11-20 13:03 ET — Bob (Claude) — Quick Label sheet: print() renamed printLabel() (Android build)
 - **What:** QuickLabelSheet.qml: function print() -> printLabel() and its four callers.
