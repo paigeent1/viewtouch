@@ -132,9 +132,20 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
   2026-11-20); if not, the only path is IDEMIA's Verify SDK (ask IDEMIA for price and license terms); (b) the state's
   consumer protection department (DCP) says whether Mobile ID is acceptable for tobacco sales. Meanwhile staff can
   use IDEMIA's free Mobile ID Verify app on a phone.
+  Alternative to weigh first (owner 2026-11-20, We Card eNews): **TruAge** (NACS's age verification, free to POS
+  companies and retailers; works with existing 2D scanners; reads U.S. driver's licenses and state mobile licenses that
+  integrate TruAge; logs proof of each check; integrated by Verifone, Gilbarco, NCR Voyix, Clover app, Pinnacle,
+  Success Systems, Minor Decliner, Tenderfoot). If ViewTouch can integrate it, the Pi registers need no extra device.
+  Open: how a POS joins (API/SDK/certification), whether tobacco shops and bars qualify, whether CT Mobile ID works with
+  it, and whether it needs the internet. Contact: support@mytruage.org.
 * **Evaluated Upstream Candidates** (commit hashes from the upstream ViewTouch repository, not in this fork): `3f080bc0` (scan from any screen), `9c8a315d` (`v0.10-ui-audit` button fit), `c4b87db0` & `5cad9b09` (offline tablet selling & single-round offline kits), and `178c745e` & `222aeaf4` (peer-to-peer OTA tablet APK streaming).
 
 ## Log
+
+### 2026-11-20 18:34 ET — Bob (Claude) — Backlog: TruAge added to the Mobile ID age check item
+- **What:** Mobile ID age check backlog item now lists TruAge (NACS) as an alternative to weigh first, with what's known and the open questions. Server: no change. Tablet app: no change (notes only).
+- **Why:** Owner 2026-11-20 forwarded the We Card eNews about TruAge.
+- **Files:** (none)
 
 ### 2026-11-20 18:14 ET — Bob (Claude) — Backlog: Mobile ID age check
 - **What:** Added 'Mobile ID age check' to section 5 (Pending Roadmap & Backlog): plan, tablet vs Pi register options, and what it's waiting on (CT DMV trust certificate answer, DCP tobacco answer). Server: no change. Tablet app: no change (notes only).
