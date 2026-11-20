@@ -123,6 +123,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-20 12:39 ET — Bob (Claude) — Quick Label: the 'Printed N on <printer>' status from any 'Printed' answer
+- **What:** printQuickLabel takes any label-utility answer starting with 'Printed' (was 'Printed ' with a space) as the printed message it rewrites, translated, as 'Printed N on <printer>'.
+- **Why:** CI: the Quick Label tests' stand-in answers 'Printed', so the tablet showed the raw word instead of 'Printed 2 on Zebra Large Labels'.
+- **Files:** `modern/app/pos_inventory.cpp`
+- **Next person must know:** Server only; Tablet app: no change in this fix (the branch as a whole changes both).
+
 ### 2026-11-20 12:20 ET — Bob (Claude) — Quick Label on the tablets and any screen (Labels screen button, Cashier Duty QUICK LABEL, command quickLabel)
 - **What:** Quick Label (type up to 3 lines, see the label, pick the roll and copies, print) now works from every screen, as the Pi label utility's Quick Label window. Label utility: --quick-rolls, --quick-preview, --quick-job (no window; same template build, roll offsets/darkness/dpi and send_label_job as the window; remembers the roll and printer in quick_label.json, shared with the window); tkinter is now optional for the no-window modes. Server: PosService quickLabelRolls / quickLabelPreview / printQuickLabel / closeQuickLabel and the quickLabel state (sent to a tablet only while the sheet is up); anyone logged in; 3 lines x 40 characters, copies 1-50; the text goes in an owner-only job file, never on a command line, deleted after. Screens: QuickLabelSheet.qml (Main.qml), a Quick Label (type & print) button at the top of the Labels screen, the quickLabel page-editor command (Quick Label (type & print)), and a QUICK LABEL (type & print) button on Cashier Duty (cd-quicklabel, under LOOK UP CHECKS). Tests: test_quick_label.cpp, a tablet test in test_net.cpp, tools/test_vt_label_utility_quick.py (new CI step). Manual chapter 26 and Cashier Duty, LABEL_UTILITY_NOTES.md, translations.
 - **Why:** Owner 2026-11-20 (video): label items with typed text instead of a black Sharpie, from the tablets too, and a Quick Label button on Cashier Duty.

@@ -1773,7 +1773,7 @@ bool PosService::printQuickLabel(const QStringList &given, const QString &roll, 
         QFile::remove(job);
         quickPrinting_ = false;
         quickStatusOk_ = status == QProcess::NormalExit && code == 0 && o.value(u"ok").toBool();
-        if (quickStatusOk_ && !o.value(u"printer").toString().isEmpty() && o.value(u"message").toString().startsWith(u"Printed "))
+        if (quickStatusOk_ && !o.value(u"printer").toString().isEmpty() && o.value(u"message").toString().startsWith(u"Printed"))
             quickStatus_ = tr("Printed %1 on %2").arg(o.value(u"copies").toInt()).arg(o.value(u"printer").toString());
         else if (!o.value(u"message").toString().isEmpty())
             quickStatus_ = o.value(u"message").toString();
