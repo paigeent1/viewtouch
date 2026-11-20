@@ -13,7 +13,19 @@ Includes interactive 8-handle resizable field boxes (W x H + Font Size) in the R
 """
 import sys, logging
 from logging.handlers import RotatingFileHandler
-import tkinter as tk
+try:
+    import tkinter as tk
+    from tkinter import ttk, messagebox
+except ImportError:
+    # No Tk on this computer: the window can't open, but the modes without one (--print-job, --preview-job,
+    # --quick-job, --quick-preview, --quick-rolls) still work. Stand-ins only so the classes below define.
+    class _NoTk:
+        class _Missing:
+            def __init__(self, *_a, **_k):
+                raise RuntimeError("tkinter is not installed: the label utility's window can't open here")
+        def __getattr__(self, _name):
+            return self._Missing
+    tk = ttk = messagebox = _NoTk()
 
 _log_handler = RotatingFileHandler('/tmp/vt_label_utility.log', maxBytes=102400, backupCount=1)
 logging.basicConfig(level=logging.ERROR, handlers=[_log_handler], format='%(asctime)s [%(levelname)s] %(message)s')
@@ -29,8 +41,7 @@ tk.Tk.report_callback_exception = lambda self, exc, val, tb: _log_err(exc, val, 
 _trace = logging.getLogger("vt.trace")
 _trace.setLevel(logging.INFO)
 
-import datetime, glob, json, os, sqlite3, subprocess, tkinter as tk
-from tkinter import ttk, messagebox
+import datetime, glob, json, os, sqlite3, subprocess
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.graphics.barcode import code128
@@ -2878,6 +2889,10 @@ QUICK_LABEL_DEFAULT_IP = "192.168.1.24"   # the 2x1 Zebra
 _QUICK_LABEL_COPY_KEYS = ("width_in", "height_in", "printer_dpi", "v_offset_dots", "h_offset_dots", "darkness",
                           "tear_off", "printer_language", "media_stock", "media_type", "default_printer")
 
+def quick_printer_text(raw_p):
+    """A printer as people read it: "Zebra Large Labels (192.168.1.24:9100)", without "VT TCP:" or "[network]"."""
+    return re.sub(r"\s*\[[^\]]*\]$", "", re.sub(r"^(VT TCP|VT CUPS|VT File|CUPS):\s*", "", str(raw_p or ""))).strip()
+
 def quick_label_rolls(templates):
     """The label rolls Quick Label offers: one per saved template size + printer, as
     [(choice text, template name)]. The 2x1 Zebra (192.168.1.24) roll comes first."""
@@ -2885,7 +2900,7 @@ def quick_label_rolls(templates):
     for name, t in templates.items():
         w, h = float(t.get("width_in", 2.0)), float(t.get("height_in", 1.0))
         raw_p = str(t.get("default_printer", "") or "PDF Preview")
-        prn = re.sub(r"\s*\[[^\]]*\]$", "", re.sub(r"^(VT TCP|VT CUPS|VT File|CUPS):\s*", "", raw_p)).strip()
+        prn = quick_printer_text(raw_p)
         key = (round(w, 3), round(h, 3), _printer_display_name(raw_p))
         if key in seen:
             continue
@@ -2934,6 +2949,114 @@ def save_quick_label_prefs(roll, printer):
         os.replace(tmp, QUICK_LABEL_PREFS)
     except Exception as e:
         logging.error("Could not save the Quick Label settings: %s", e)
+
+
+# --- Quick Label with no window: ViewTouch's Labels screen and Quick Label button (tablets, any screen) ---
+# The job file comes from PosService (modern/app/pos_inventory.cpp); the text is never logged or kept.
+QUICK_MAX_LINES, QUICK_MAX_CHARS, QUICK_MAX_COPIES = 3, 40, 100
+
+def quick_job_lines(raw):
+    """Up to 3 lines of at most 40 characters, control characters dropped (empty lines are left out later)."""
+    raw = raw if isinstance(raw, list) else []
+    out = []
+    for ln in raw[:QUICK_MAX_LINES]:
+        out.append("".join(ch for ch in str(ln if ln is not None else "") if ch.isprintable()).strip()[:QUICK_MAX_CHARS])
+    return out
+
+def quick_roll_printer(roll, templates, printers, prefs):
+    """The printer a roll prints on, as the Quick Label window starts: the printer last used with that roll
+    (when it's still there), else the roll template's own printer."""
+    if prefs.get("roll") == roll and prefs.get("printer") in printers:
+        return prefs["printer"]
+    return resolve_template_printer(templates[roll].get("default_printer", ""), printers)
+
+def quick_pick_roll(templates, want, prefs):
+    """The template whose roll to use: the one asked for, else the last used, else the first offered."""
+    rolls = quick_label_rolls(templates)
+    for name in (str(want or ""), prefs.get("roll", "")):
+        if name and name in templates:
+            return name
+    return rolls[0][1] if rolls else ""
+
+def _write_out(out, data):
+    text = json.dumps(data)
+    if not out:
+        print(text)
+        return
+    tmp = out + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, out)
+
+def run_quick_rolls(out=""):
+    """The label rolls for Quick Label as JSON: {"rolls": [{key, name, size, printer}], "last": key}.
+    key is the template the roll comes from (what --quick-job's "roll" takes)."""
+    templates = load_templates()
+    prefs = load_quick_label_prefs()
+    printers = discover_all_printers()
+    rolls = []
+    for text, name in quick_label_rolls(templates):
+        t = templates[name]
+        rolls.append({"key": name, "name": text,
+                      "size": f"{float(t.get('width_in', 2.0)):g} x {float(t.get('height_in', 1.0)):g} in",
+                      "printer": quick_printer_text(quick_roll_printer(name, templates, printers, prefs))})
+    last = prefs.get("roll", "")
+    if not any(r["key"] == last for r in rolls):
+        last = rolls[0]["key"] if rolls else ""
+    _write_out(out, {"rolls": rolls, "last": last})
+    return 0
+
+def _read_quick_job(path):
+    with open(path, "r", encoding="utf-8") as f:
+        job = json.load(f)
+    return job if isinstance(job, dict) else {}
+
+def run_quick_preview(path, out_png):
+    """A picture of the quick label exactly as it prints (the printer's dots): {"lines": [...], "roll": key}.
+    Exit 2: no text, or no label roll to take the size from."""
+    job = _read_quick_job(path)
+    templates = load_templates()
+    roll = quick_pick_roll(templates, job.get("roll"), load_quick_label_prefs())
+    tpl = build_quick_label_template(quick_job_lines(job.get("lines")), templates[roll]) if roll else None
+    if not tpl or not tpl["elements"]:
+        logging.error("Quick Label preview: no text or no label roll")
+        return 2
+    img = render_label_pil_image(tpl, {}, dpi=label_dpi(tpl))
+    img.convert("L").save(out_png, "PNG", optimize=True)
+    return 0
+
+def run_quick_job(path, out=""):
+    """Prints a quick label with no window, exactly as the Quick Label window does: {"lines": [up to 3],
+    "roll": key (from --quick-rolls), "copies": n}. The roll's template gives the size, dpi, offsets,
+    darkness and language; the printer is the roll's (or the one last used with it). Remembers the roll
+    and printer (quick_label.json, shared with the window). Writes {"ok", "message", "printer", "copies"}
+    to out (else prints it). Exit 0 printed, 1 the printer failed, 2 nothing to print."""
+    job = _read_quick_job(path)
+    templates = load_templates()
+    prefs = load_quick_label_prefs()
+    roll = quick_pick_roll(templates, job.get("roll"), prefs)
+    tpl = build_quick_label_template(quick_job_lines(job.get("lines")), templates[roll]) if roll else None
+    try:
+        copies = max(1, min(QUICK_MAX_COPIES, int(job.get("copies", 1) or 1)))
+    except (TypeError, ValueError):
+        copies = 1
+    if not tpl or not tpl["elements"]:
+        _write_out(out, {"ok": False, "message": "Type the label's text first." if roll else
+                         "There are no label templates to take the label size and printer from.",
+                         "printer": "", "copies": 0})
+        return 2
+    printers = discover_all_printers()
+    chosen = quick_roll_printer(roll, templates, printers, prefs)
+    save_quick_label_prefs(roll, chosen)
+    shown = quick_printer_text(chosen)
+    try:
+        ok, msg, _pdf = send_label_job(QUICK_LABEL_NAME, tpl, [{"name": "", "upc": "", "price": 0.0, "qty": 1}], copies, chosen)
+    except Exception as e:
+        ok, msg = False, f"Couldn't print on {shown}: {e}"
+    (logging.info if ok else logging.error)("Quick Label x%d on %s: %s", copies, shown, msg)   # never the text
+    message = f"Printed {copies} on {shown}" if ok and "PDF" not in chosen else msg
+    _write_out(out, {"ok": bool(ok), "message": message, "printer": shown, "copies": copies if ok else 0})
+    return 0 if ok else 1
 
 
 def ask_template_name(parent, title, prompt, initial, existing, current=None):
@@ -4570,8 +4693,17 @@ if __name__ == "__main__":
     _ap.add_argument("--upc", default="", help="open straight to the label preview for this UPC")
     _ap.add_argument("--print-job", default="", help="print a job file from ViewTouch's Labels screen, with no window")
     _ap.add_argument("--preview-job", default="", help="draw one label of a job file as a PNG (ViewTouch's Labels screen preview)")
-    _ap.add_argument("--out", default="", help="the PNG --preview-job writes")
+    _ap.add_argument("--out", default="", help="the PNG --preview-job / --quick-preview writes; the JSON of --quick-job / --quick-rolls")
+    _ap.add_argument("--quick-job", default="", help="print a Quick Label job file ({lines, roll, copies}), with no window")
+    _ap.add_argument("--quick-preview", default="", help="draw a Quick Label job file ({lines, roll}) as a PNG")
+    _ap.add_argument("--quick-rolls", action="store_true", help="list Quick Label's label rolls as JSON")
     _args, _unknown = _ap.parse_known_args()
+    if _args.quick_rolls:
+        sys.exit(run_quick_rolls(_args.out))
+    if _args.quick_job:
+        sys.exit(run_quick_job(_args.quick_job, _args.out))
+    if _args.quick_preview:
+        sys.exit(run_quick_preview(_args.quick_preview, _args.out or _args.quick_preview + ".png"))
     if _args.print_job:
         sys.exit(run_print_job(_args.print_job))
     if _args.preview_job:

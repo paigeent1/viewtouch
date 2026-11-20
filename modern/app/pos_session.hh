@@ -182,6 +182,10 @@ class PosSession : public QObject {
     // {templates: [{name, size, product}], query, matches: [{id, name, price, upcs: [{label, code}]}],
     //  path: [group, category, brand], children: [{name, count}]} (the tree, browsed one level at a time).
     Q_PROPERTY(QVariantMap retailLabels READ retailLabels NOTIFY sessionChanged)
+    // Quick Label (typed text on a label, printed by the label utility on the main computer):
+    // {ready, rolls: [{key, name, size, printer}], roll, loading, preview, previewFor, previewBusy,
+    //  previewError, printing, status, statusOk, maxLines, maxChars, maxCopies}. Sent only to a screen showing it.
+    Q_PROPERTY(QVariantMap quickLabel READ quickLabel NOTIFY sessionChanged)
     // Finding checks: {query, loading, more, results: [{id, label, when,
     // server, customer, total, status}], selected: {..., lines, payments}}.
     Q_PROPERTY(QVariantMap checkSearch READ checkSearch NOTIFY sessionChanged)
@@ -443,6 +447,7 @@ public:
     virtual QVariantMap storeCheck() const = 0;
     virtual QVariantMap prepLabels() const = 0;
     virtual QVariantMap retailLabels() const = 0;
+    virtual QVariantMap quickLabel() const = 0;
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap exceptionSearch() const = 0;
     virtual QVariantMap itemSearch() const = 0;
@@ -710,6 +715,17 @@ public:
     Q_INVOKABLE void showRetailLabelItems(const QStringList &path) { invoke(QStringLiteral("showRetailLabelItems"), {path}); }
     Q_INVOKABLE void previewRetailLabel(const QVariantMap &job) { invoke(QStringLiteral("previewRetailLabel"), {job}); }
     Q_INVOKABLE void closeRetailLabelPreview() { invoke(QStringLiteral("closeRetailLabelPreview"), {}); }
+    // Quick Label: the label rolls, a picture of the lines on a roll, printing them (copies 1-50), done.
+    Q_INVOKABLE void quickLabelRolls() { invoke(QStringLiteral("quickLabelRolls")); }
+    Q_INVOKABLE void quickLabelPreview(const QStringList &lines, const QString &roll)
+    {
+        invoke(QStringLiteral("quickLabelPreview"), {lines, roll});
+    }
+    Q_INVOKABLE void printQuickLabel(const QStringList &lines, const QString &roll, int copies)
+    {
+        invoke(QStringLiteral("printQuickLabel"), {lines, roll, copies});
+    }
+    Q_INVOKABLE void closeQuickLabel() { invoke(QStringLiteral("closeQuickLabel")); }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }
     // Manager > Reports > Exceptions search (answers in exceptionSearch) and the End of Day archive.
     Q_INVOKABLE void searchExceptions(const QVariantMap &filter) { invoke(QStringLiteral("searchExceptions"), {filter}); }

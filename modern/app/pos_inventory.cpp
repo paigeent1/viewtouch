@@ -20,6 +20,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QTimer>
 #include <QFileInfo>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -828,7 +829,12 @@ bool PosService::printPrepLabels(const QVariantMap &r)
 
 namespace {
 
-const QString kLabelLauncher = u"/usr/local/bin/vt-label-utility"_s;
+// The label utility's launcher (scripts/bin/vt-label-utility). VT_LABEL_LAUNCHER stands in for it (tests).
+QString labelLauncher()
+{
+    const QString other = qEnvironmentVariable("VT_LABEL_LAUNCHER");
+    return other.isEmpty() ? u"/usr/local/bin/vt-label-utility"_s : other;
+}
 
 // The label utility's templates on this computer (the same file it uses). Read again only when one of its
 // files changes (every Look Up answer used to read and parse it); `generation` changes when it's read again.
@@ -1172,7 +1178,7 @@ QVariantMap PosService::retailLabels() const
     // answer, the very same data (so a tablet isn't sent it again either).
     std::uint64_t templatesGeneration = 0;
     const QJsonObject &all = labelTemplates(&templatesGeneration);
-    const bool ready = QFile::exists(kLabelLauncher);
+    const bool ready = QFile::exists(labelLauncher());
     const QString language = tr("Department groups");   // the words in the answer follow the screen's language
     if (!labelLookup_)
         labelLookup_ = std::make_shared<LabelLookup>();
@@ -1478,7 +1484,7 @@ bool PosService::previewRetailLabel(const QVariantMap &job)
     const QString tpl = job.value(u"template"_s).toString();
     if (tpl.isEmpty() || !labelTemplates().contains(tpl))
         return fail(tr("Choose a label."));
-    if (!QFile::exists(kLabelLauncher))
+    if (!QFile::exists(labelLauncher()))
         return fail(tr("The label utility isn't installed on the main computer."));
     const QString base = QDir::tempPath() + u"/vt_label_preview_"_s + QString::number(now());
     QFile f(base + u".json"_s);
@@ -1519,7 +1525,7 @@ bool PosService::previewRetailLabel(const QVariantMap &job)
         labelPreviewError_ = tr("Couldn't start the label utility.");
         emit sessionChanged();
     });
-    proc->start(kLabelLauncher, {u"--preview-job"_s, base + u".json"_s, u"--out"_s, base + u".png"_s});
+    proc->start(labelLauncher(), {u"--preview-job"_s, base + u".json"_s, u"--out"_s, base + u".png"_s});
     emit sessionChanged();
     return true;
 }
@@ -1542,7 +1548,7 @@ bool PosService::printRetailLabels(const QVariantMap &job)
     const QString tpl = job.value(u"template"_s).toString();
     if (tpl.isEmpty() || !labelTemplates().contains(tpl))
         return fail(tr("Choose a label."));
-    if (!QFile::exists(kLabelLauncher))
+    if (!QFile::exists(labelLauncher()))
         return fail(tr("The label utility isn't installed on the main computer."));
     QJsonArray items;
     int total = 0;
@@ -1566,9 +1572,241 @@ bool PosService::printRetailLabels(const QVariantMap &job)
         return fail(tr("Couldn't hand the labels to the label utility."));
     f.write(QJsonDocument(QJsonObject{{u"template"_s, tpl}, {u"items"_s, items}, {u"qty"_s, alone}}).toJson());
     f.close();
-    if (!QProcess::startDetached(kLabelLauncher, {u"--print-job"_s, path}))
+    if (!QProcess::startDetached(labelLauncher(), {u"--print-job"_s, path}))
         return fail(tr("Couldn't start the label utility."));
     emit notice(tr("Printing %n label(s): %1", "", total).arg(tpl));
+    return true;
+}
+
+// --- Quick Label (typed text, as the label utility's Quick Label window) ----------------------
+
+namespace {
+
+// Up to 3 lines of at most 40 characters, without control characters (the label utility checks again).
+QStringList quickLines(const QStringList &given)
+{
+    QStringList out;
+    for (const QString &line : given.mid(0, PosService::kQuickLabelLines)) {
+        QString clean;
+        for (QChar ch : line)
+            if (ch.isPrint())
+                clean += ch;
+        out << clean.trimmed().left(PosService::kQuickLabelChars);
+    }
+    return out;
+}
+
+// A file for the label utility, readable by this user only (it holds the typed text): its path, or empty.
+QString quickJobFile(const QString &kind, const QJsonObject &job)
+{
+    static int seq = 0;
+    const QString path = QDir::tempPath() + u"/vt_quick_label_"_s + kind + u'_'
+                         + QString::number(QDateTime::currentMSecsSinceEpoch()) + u'_' + QString::number(++seq) + u".json"_s;
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return {};
+    f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    f.write(QJsonDocument(job).toJson(QJsonDocument::Compact));
+    return path;
+}
+
+// What a preview shows, so the screen knows the picture is of what's typed now.
+QString quickPreviewKey(const QStringList &lines, const QString &roll)
+{
+    return QString::fromUtf8(QJsonDocument(QJsonArray{QJsonArray::fromStringList(lines), roll}).toJson(QJsonDocument::Compact));
+}
+
+constexpr int kQuickLabelTimeoutMs = 45'000;   // a printer that never answers: given up
+
+} // namespace
+
+QVariantMap PosService::quickLabel() const
+{
+    return {{u"ready"_s, QFile::exists(labelLauncher())}, {u"rolls"_s, quickRolls_}, {u"roll"_s, quickRoll_},
+            {u"loading"_s, quickLoading_}, {u"preview"_s, quickPreview_}, {u"previewFor"_s, quickPreviewFor_},
+            {u"previewBusy"_s, quickPreviewBusy_}, {u"previewError"_s, quickPreviewError_},
+            {u"printing"_s, quickPrinting_}, {u"status"_s, quickStatus_}, {u"statusOk"_s, quickStatusOk_},
+            {u"maxLines"_s, kQuickLabelLines}, {u"maxChars"_s, kQuickLabelChars}, {u"maxCopies"_s, kQuickLabelCopies}};
+}
+
+bool PosService::quickLabelRolls()
+{
+    if (!user())
+        return fail(tr("Log in first."));
+    if (!QFile::exists(labelLauncher()))
+        return fail(tr("The label utility isn't installed on the main computer."));
+    if (quickLoading_)
+        return true;
+    const QString out = QDir::tempPath() + u"/vt_quick_label_rolls_"_s + QString::number(QDateTime::currentMSecsSinceEpoch()) + u".json"_s;
+    quickLoading_ = true;
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc, out](int code, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        QFile f(out);
+        const QJsonObject o = status == QProcess::NormalExit && code == 0 && f.open(QIODevice::ReadOnly)
+                                  ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+        f.close();
+        QFile::remove(out);
+        quickLoading_ = false;
+        quickRolls_.clear();
+        for (const QJsonValue &v : o.value(u"rolls").toArray()) {
+            const QJsonObject r = v.toObject();
+            quickRolls_.append(QVariantMap{{u"key"_s, r.value(u"key").toString()}, {u"name"_s, r.value(u"name").toString()},
+                                           {u"size"_s, r.value(u"size").toString()}, {u"printer"_s, r.value(u"printer").toString()}});
+        }
+        quickRoll_ = o.value(u"last").toString();
+        if (quickRolls_.isEmpty()) {
+            quickStatus_ = o.isEmpty() ? tr("Couldn't ask the label utility for the label rolls (see /tmp/vt_label_utility.log on the main computer).")
+                                       : tr("There are no label templates to take the label size and printer from.");
+            quickStatusOk_ = false;
+        }
+        emit sessionChanged();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart)
+            return;
+        proc->deleteLater();
+        quickLoading_ = false;
+        quickStatus_ = tr("Couldn't start the label utility.");
+        quickStatusOk_ = false;
+        emit sessionChanged();
+    });
+    proc->start(labelLauncher(), {u"--quick-rolls"_s, u"--out"_s, out});
+    QTimer::singleShot(kQuickLabelTimeoutMs, proc, [proc] { proc->kill(); });
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::quickLabelPreview(const QStringList &given, const QString &roll)
+{
+    if (!user())
+        return fail(tr("Log in first."));
+    const QStringList lines = quickLines(given);
+    const QString key = quickPreviewKey(lines, roll);
+    const int run = ++quickPreviewRun_;
+    quickPreviewFor_ = key;
+    quickPreviewError_.clear();
+    if (std::ranges::all_of(lines, [](const QString &l) { return l.isEmpty(); })) {
+        quickPreview_.clear();   // nothing typed: nothing to draw
+        quickPreviewBusy_ = false;
+        emit sessionChanged();
+        return true;
+    }
+    if (roll.isEmpty() || !labelTemplates().contains(roll))
+        return fail(tr("Choose a label roll."));
+    if (!QFile::exists(labelLauncher()))
+        return fail(tr("The label utility isn't installed on the main computer."));
+    const QString job = quickJobFile(u"preview"_s, QJsonObject{{u"lines"_s, QJsonArray::fromStringList(lines)}, {u"roll"_s, roll}});
+    if (job.isEmpty())
+        return fail(tr("Couldn't hand the label to the label utility."));
+    const QString png = job + u".png"_s;
+    quickPreviewBusy_ = true;
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc, run, job, png, key](int code, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        QFile f(png);
+        const bool ok = status == QProcess::NormalExit && code == 0 && f.open(QIODevice::ReadOnly);
+        const QByteArray bytes = ok ? f.readAll() : QByteArray();
+        f.close();
+        QFile::remove(png);
+        QFile::remove(job);
+        if (run != quickPreviewRun_)
+            return;   // something newer was typed
+        quickPreviewBusy_ = false;
+        quickPreviewFor_ = key;
+        if (bytes.isEmpty()) {
+            quickPreview_.clear();
+            quickPreviewError_ = tr("Couldn't draw the label (see /tmp/vt_label_utility.log on the main computer).");
+        } else {
+            quickPreview_ = u"data:image/png;base64,"_s + QString::fromLatin1(bytes.toBase64());
+        }
+        emit sessionChanged();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, run, job](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart)
+            return;
+        proc->deleteLater();
+        QFile::remove(job);
+        if (run != quickPreviewRun_)
+            return;
+        quickPreviewBusy_ = false;
+        quickPreviewError_ = tr("Couldn't start the label utility.");
+        emit sessionChanged();
+    });
+    proc->start(labelLauncher(), {u"--quick-preview"_s, job, u"--out"_s, png});
+    QTimer::singleShot(kQuickLabelTimeoutMs, proc, [proc] { proc->kill(); });
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::printQuickLabel(const QStringList &given, const QString &roll, int copies)
+{
+    // Open to everyone, as on the main computer's label utility: anyone logged in.
+    if (!user())
+        return fail(tr("Log in first."));
+    const QStringList lines = quickLines(given);
+    if (std::ranges::all_of(lines, [](const QString &l) { return l.isEmpty(); }))
+        return fail(tr("Type the label's text first."));
+    if (roll.isEmpty() || !labelTemplates().contains(roll))
+        return fail(tr("Choose a label roll."));
+    if (!QFile::exists(labelLauncher()))
+        return fail(tr("The label utility isn't installed on the main computer."));
+    if (quickPrinting_)
+        return fail(tr("Still printing the last label: try again in a moment."));
+    const int n = std::clamp(copies, 1, kQuickLabelCopies);
+    const QString job = quickJobFile(u"print"_s, QJsonObject{{u"lines"_s, QJsonArray::fromStringList(lines)}, {u"roll"_s, roll},
+                                                             {u"copies"_s, n}});
+    if (job.isEmpty())
+        return fail(tr("Couldn't hand the label to the label utility."));
+    const QString out = job + u".out"_s;
+    quickPrinting_ = true;
+    quickRoll_ = roll;
+    quickStatus_ = tr("Printing %n label(s)…", "", n);
+    quickStatusOk_ = true;
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [this, proc, job, out](int code, QProcess::ExitStatus status) {
+        proc->deleteLater();
+        QFile f(out);
+        const QJsonObject o = f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+        f.close();
+        QFile::remove(out);
+        QFile::remove(job);
+        quickPrinting_ = false;
+        quickStatusOk_ = status == QProcess::NormalExit && code == 0 && o.value(u"ok").toBool();
+        if (quickStatusOk_ && !o.value(u"printer").toString().isEmpty() && o.value(u"message").toString().startsWith(u"Printed "))
+            quickStatus_ = tr("Printed %1 on %2").arg(o.value(u"copies").toInt()).arg(o.value(u"printer").toString());
+        else if (!o.value(u"message").toString().isEmpty())
+            quickStatus_ = o.value(u"message").toString();
+        else
+            quickStatus_ = tr("Couldn't print (see /tmp/vt_label_utility.log on the main computer).");
+        emit sessionChanged();
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, job](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart)
+            return;
+        proc->deleteLater();
+        QFile::remove(job);
+        quickPrinting_ = false;
+        quickStatus_ = tr("Couldn't start the label utility.");
+        quickStatusOk_ = false;
+        emit sessionChanged();
+    });
+    proc->start(labelLauncher(), {u"--quick-job"_s, job, u"--out"_s, out});
+    QTimer::singleShot(kQuickLabelTimeoutMs, proc, [proc] { proc->kill(); });
+    emit sessionChanged();
+    return true;
+}
+
+bool PosService::closeQuickLabel()
+{
+    ++quickPreviewRun_;
+    quickPreview_.clear();
+    quickPreviewFor_.clear();
+    quickPreviewError_.clear();
+    quickPreviewBusy_ = false;
+    if (!quickPrinting_)
+        quickStatus_.clear();
+    emit sessionChanged();
     return true;
 }
 

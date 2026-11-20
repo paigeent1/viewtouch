@@ -750,3 +750,58 @@ TEST_CASE("Kitchen and expo screens skip finished closed checks, and see recalle
     CHECK(shared.kitchenDone.empty());
     CHECK(pos.kitchenTicketsNow().isEmpty());
 }
+
+TEST_CASE("Quick Label from a tablet: the main computer prints it, and the tablet sees how it went", "[net][remote][labels][quick]")
+{
+    // The label utility's stand-in on the main computer (see test_quick_label.cpp), and a label template.
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QByteArray oldHome = qgetenv("HOME");
+    const QByteArray oldLauncher = qgetenv("VT_LABEL_LAUNCHER");
+    qputenv("HOME", dir.path().toUtf8());
+    QDir().mkpath(dir.path() + u"/.local/share/ViewTouch"_s);
+    {
+        QFile t(dir.path() + u"/.local/share/ViewTouch/label_templates.json"_s);
+        REQUIRE(t.open(QIODevice::WriteOnly));
+        t.write(R"({"2X1 VINYL": {"width_in": 2.0, "height_in": 1.0, "elements": []}})");
+        QFile f(dir.path() + u"/fake"_s);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write(QString::fromUtf8(
+                    "#!/bin/sh\n"
+                    "case \"$1\" in\n"
+                    "  --quick-rolls) printf '%s' '{\"rolls\":[{\"key\":\"2X1 VINYL\",\"name\":\"2 x 1 in\",\"size\":\"2 x 1 in\",\"printer\":\"Zebra Large Labels\"}],\"last\":\"2X1 VINYL\"}' > \"$3\" ;;\n"
+                    "  --quick-job) cp \"$2\" '%1/print-job.json'\n"
+                    "    printf '%s' '{\"ok\":true,\"message\":\"Printed\",\"printer\":\"Zebra Large Labels\",\"copies\":3}' > \"$4\" ;;\n"
+                    "esac\n").arg(dir.path()).toUtf8());
+        f.close();
+        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    }
+    qputenv("VT_LABEL_LAUNCHER", (dir.path() + u"/fake"_s).toUtf8());
+
+    {
+        Store store;
+        Screen stockRoom(store.terminal(u"Stock Room"_s));
+        stockRoom.pin("1111");                                      // a server
+        stockRoom.remote->quickLabelRolls();
+        waitFor([] { return false; }, 300);
+        CHECK(stockRoom.remote->quickLabel().isEmpty());            // not asked for: not sent
+        stockRoom.remote->want(u"quickLabel"_s, true);              // the Quick Label sheet is up
+        REQUIRE(waitFor([&] { return stockRoom.remote->quickLabel()[u"rolls"_s].toList().size() == 1; }));
+        CHECK(stockRoom.remote->quickLabel()[u"roll"_s].toString() == u"2X1 VINYL"_s);
+
+        stockRoom.remote->printQuickLabel({u"cosmic"_s, QString(), QString()}, u"2X1 VINYL"_s, 3);
+        REQUIRE(waitFor([&] { return stockRoom.remote->quickLabel()[u"status"_s].toString() == u"Printed 3 on Zebra Large Labels"_s; }));
+        CHECK(stockRoom.remote->quickLabel()[u"statusOk"_s].toBool());
+        QFile job(dir.path() + u"/print-job.json"_s);
+        REQUIRE(job.open(QIODevice::ReadOnly));
+        const QJsonObject o = QJsonDocument::fromJson(job.readAll()).object();
+        CHECK(o.value(u"lines").toArray().first().toString() == u"cosmic"_s);
+        CHECK(o.value(u"copies").toInt() == 3);
+        stockRoom.remote->want(u"quickLabel"_s, false);
+    }
+    qputenv("HOME", oldHome);
+    if (oldLauncher.isEmpty())
+        qunsetenv("VT_LABEL_LAUNCHER");
+    else
+        qputenv("VT_LABEL_LAUNCHER", oldLauncher);
+}

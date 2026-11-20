@@ -507,6 +507,14 @@ void LayoutController::chooseFloorPlan(const QString &pageId)
     });
 }
 
+void LayoutController::closeQuickLabel()
+{
+    if (!quickLabelOpen_)
+        return;
+    quickLabelOpen_ = false;
+    emit quickLabelChanged();
+}
+
 void LayoutController::closeFloorChooser()
 {
     if (!floorChooserOpen_)
@@ -2224,6 +2232,19 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         }
         return done(true);
     }
+    // Quick Label (owner 2026-11-20): typed text on a label, for anyone logged in, from any screen
+    // (the Labels screen's button, Cashier Duty's); the main computer's label utility prints it.
+    if (name == u"quickLabel") {
+        if (pos_ && !pos_->loggedIn()) {
+            setStatus(tr("Log in first."));
+            return done(false);
+        }
+        if (!quickLabelOpen_) {
+            quickLabelOpen_ = true;
+            emit quickLabelChanged();
+        }
+        return done(true);
+    }
     if (name == u"editMode")
         return done(requestEditMode());
 
@@ -2759,6 +2780,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"holdCard"_s, QT_TR_NOOP("Holds the guest's card for the tab on the card reader (nothing is charged yet).")},
             {u"cardOnFile"_s, QT_TR_NOOP("The tab's held card: hold one, charge it with a tip, or let it go.")},
             {u"chooseFloorPlan"_s, QT_TR_NOOP("Chooses tonight's floor plan for every screen (a manager).")},
+            {u"quickLabel"_s, QT_TR_NOOP("Quick Label: type up to 3 lines and print them on a label (anyone).")},
         };
         const QString name = a.str(u"name");
         if (name == u"openDepartment")

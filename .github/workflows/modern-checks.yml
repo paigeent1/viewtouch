@@ -49,6 +49,11 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: timeout 2400 ./build/tests/vtm_tests
 
+      - name: Label utility (no window)
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3-pil python3-reportlab fontconfig
+          python3 modern/tools/test_vt_label_utility_quick.py
+
       - name: Translations
         run: |
           for lang in es fr pt zh; do

@@ -274,7 +274,18 @@ Item {
                         text: qsTr("‹ Back")
                         onClicked: if (w.zone && w.zone.controller) w.zone.controller.goBack()
                     }
-                    Label { text: qsTr("Choose a label"); font.pixelSize: 22; font.bold: true }
+                    Label { Layout.fillWidth: true; text: qsTr("Choose a label"); font.pixelSize: 22; font.bold: true }
+                    // Typed text on a label, instead of writing on things with a marker (owner 2026-11-20).
+                    Button {
+                        objectName: "retailLabelQuick"
+                        implicitHeight: 72
+                        implicitWidth: w.narrow ? 170 : 320
+                        font.pixelSize: 20
+                        font.bold: true
+                        highlighted: true
+                        text: w.narrow ? qsTr("Quick Label") : qsTr("Quick Label (type & print)")
+                        onClicked: if (w.zone && w.zone.controller) w.zone.controller.command("quickLabel")
+                    }
                 }
                 Flow {
                     Layout.fillWidth: true

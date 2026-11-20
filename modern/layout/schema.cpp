@@ -550,6 +550,7 @@ QJsonArray actionTypes()
                             {"combineTableChecks", "Put the table's checks back together"}, {"addComment", "Add note"},
                             {"openAdmin", "Admin screen"}, {"editMode", "Edit pages"},
                             {"chooseFloorPlan", "Choose tonight's floor plan (manager)"},
+                            {"quickLabel", "Quick Label (type & print)"},
                             {"addTip", "Add tip (args.percent)"}, {"gratuity", "Gratuity (args.percent)"},
                             {"setCashTip", "Cash tip for the server (the keypad amount)"},
                             {"payout", "Pay out of drawer"}, {"paidIn", "Pay into drawer"},

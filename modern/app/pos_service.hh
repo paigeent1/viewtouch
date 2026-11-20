@@ -708,6 +708,17 @@ public:
     // arrives in retailLabels().preview a few seconds later.
     bool previewRetailLabel(const QVariantMap &job);
     bool closeRetailLabelPreview();
+    // Quick Label (as the label utility's Quick Label window; anyone logged in): 1-3 typed lines on a label
+    // roll (a label template's size and printer), drawn and printed by the label utility on this computer.
+    // State in quickLabel(): {ready, rolls: [{key, name, size, printer}], roll (last used), loading,
+    // preview (data: PNG), previewFor (the lines and roll it shows), previewBusy, previewError, printing,
+    // status, statusOk, maxLines, maxChars, maxCopies}.
+    QVariantMap quickLabel() const override;
+    bool quickLabelRolls();                                                          // asks for the rolls
+    bool quickLabelPreview(const QStringList &lines, const QString &roll);
+    bool printQuickLabel(const QStringList &lines, const QString &roll, int copies);
+    bool closeQuickLabel();                                                          // forgets the preview and status
+    static constexpr int kQuickLabelLines = 3, kQuickLabelChars = 40, kQuickLabelCopies = 50;
     std::string labelPrinterId() const;
     const std::vector<core::Waste> &wasteEntries() const { return s_->waste; }
     const std::vector<core::StockCount> &stockCounts() const { return s_->stockCounts; }
@@ -1818,6 +1829,16 @@ private:
     QString labelPreviewError_;
     int labelPreviewRun_ = 0;      // a newer preview wins over one still being drawn
     bool labelPreviewBusy_ = false;
+    // Quick Label (pos_inventory.cpp): what quickLabel() answers.
+    QVariantList quickRolls_;
+    QString quickRoll_;              // the roll last used (the label utility remembers it)
+    bool quickLoading_ = false;
+    QString quickPreview_, quickPreviewFor_, quickPreviewError_;
+    int quickPreviewRun_ = 0;
+    bool quickPreviewBusy_ = false;
+    bool quickPrinting_ = false;
+    QString quickStatus_;
+    bool quickStatusOk_ = false;
     // The Labels screen / Item Look Up answer last given, and the last search by name (pos_inventory.cpp):
     // given again as it is while nothing it comes from has changed; a longer search starts from the last.
     struct LabelLookup;

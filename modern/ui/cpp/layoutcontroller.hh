@@ -95,6 +95,8 @@ class LayoutController : public QObject {
     Q_PROPERTY(bool setupOpen READ setupOpen NOTIFY setupOpenChanged)
     // The Choose Floor Plan window is showing (the chooseFloorPlan command).
     Q_PROPERTY(bool floorChooserOpen READ floorChooserOpen NOTIFY floorChooserChanged)
+    // The Quick Label sheet is showing (the quickLabel command; the Labels screen's Quick Label button).
+    Q_PROPERTY(bool quickLabelOpen READ quickLabelOpen NOTIFY quickLabelChanged)
     // Site Setup (sitesetup.cpp): goes up when this Pi's hardware settings or the last scan change.
     Q_PROPERTY(int siteRevision READ siteRevision NOTIFY siteChanged)
 
@@ -256,6 +258,8 @@ public:
     // A manager's touch in it: every screen uses that plan ("": the usual one); the window closes.
     Q_INVOKABLE void chooseFloorPlan(const QString &pageId);
     Q_INVOKABLE void closeFloorChooser();
+    bool quickLabelOpen() const { return quickLabelOpen_; }
+    Q_INVOKABLE void closeQuickLabel();
     // This screen's own build, for Store Settings -> About ("screen.version").
     Q_INVOKABLE QString screenBuild() const;
     // One plan's tables and pieces (walls, doors...), {x, y, w, h, zones:
@@ -396,6 +400,7 @@ signals:
     void fontsChanged();
     void setupOpenChanged();
     void floorChooserChanged();
+    void quickLabelChanged();
     void siteChanged();
     // The back of a license was scanned (the ID check has it).
     void idCardScanned();
@@ -487,6 +492,7 @@ private:
     QVariantMap widgetState_;
     bool setupOpen_ = false;
     bool floorChooserOpen_ = false;
+    bool quickLabelOpen_ = false;
     // The floor plan this screen last took as home (floorHome()): a manager choosing another moves
     // home there, for a screen whose home it was (not one with its own start page).
     QString floorHomeId_;

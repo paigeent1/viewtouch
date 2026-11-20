@@ -183,6 +183,32 @@
       ]
     },
     {
+      "id": "cd-quicklabel",
+      "kind": "button",
+      "label": "QUICK LABEL\n(type & print)",
+      "shape": "pill",
+      "behavior": "blink",
+      "rect": {
+        "x": 160,
+        "y": 660,
+        "w": 560,
+        "h": 200
+      },
+      "style": {
+        "normal": {
+          "fill": "#b45309",
+          "text": "#ffffff",
+          "fontSize": 40
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "quickLabel"
+        }
+      ]
+    },
+    {
       "id": "cd-back",
       "kind": "button",
       "label": "\u2039 Back",

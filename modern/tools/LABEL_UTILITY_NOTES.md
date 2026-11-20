@@ -98,6 +98,18 @@ Record every change, time-stamped, at the top of `modern/vt-modern-development-n
 ## Used by ViewTouch's Labels screen (tablets)
 - `vt-label-utility --print-job job.json` prints with no window: `{"template", "items": [{"upc", "qty"}], "qty"}`, in the items' order.
 - `vt-label-utility --preview-job job.json --out label.png` draws one label exactly as it prints: `{"template", "upc"}` (exit 3: UPC not found).
+- Quick Label (2026-11-20; the Labels screen's Quick Label button, Cashier Duty's QUICK LABEL, command `quickLabel`):
+  - `vt-label-utility --quick-rolls [--out rolls.json]`: `{"rolls": [{key, name, size, printer}], "last": key}` (key = the
+    template the roll comes from; printer = the one it prints on, as the window would start).
+  - `vt-label-utility --quick-preview job.json --out label.png`: `{"lines": [up to 3], "roll": key}` drawn at the printer's dots (exit 2: no text).
+  - `vt-label-utility --quick-job job.json --out result.json`: `{"lines", "roll", "copies"}` prints exactly as the window
+    (`build_quick_label_template` + the roll's offsets/darkness/dpi, `send_label_job`); writes `{ok, message, printer, copies}`.
+    Exit 0 printed, 1 the printer failed, 2 nothing to print. Remembers the roll + printer in `quick_label.json` (shared with
+    the window, so the Pi and the tablets start on the same roll). Lines: 3 x 40 characters, control characters dropped.
+  - ViewTouch (`PosService::quickLabelRolls/quickLabelPreview/printQuickLabel`, pos_inventory.cpp) writes the job file
+    (owner-only, deleted after) and never puts the text on a command line; copies 1-50; anyone logged in.
+  - These modes and `--print-job`/`--preview-job` import without tkinter (a stand-in lets the classes define).
+    Test: `python3 modern/tools/test_vt_label_utility_quick.py`.
 - Both look items up in the same list the window uses: ViewTouch's items once it has 1,000+ retail items (the ILSA price book imported), else the ILSA temp price book while it exists.
 
 ## Barcodes print the code exactly as stored (2026-11-03)

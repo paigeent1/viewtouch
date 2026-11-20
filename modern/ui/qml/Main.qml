@@ -143,7 +143,7 @@ ApplicationWindow {
                                         || receiptSheet.visible || setupLoader.active || jobChooser.visible || cashTipsPrompt.visible
                                         || approvalPad.visible || allergySheet.visible || couponSheet.visible || holdSheet.visible
                                         || TouchGuard.sheetOpen || reasonSheet.visible || handoffSheet.visible
-                                        || itemReturnSheet.visible || floorPlanChooser.visible
+                                        || itemReturnSheet.visible || floorPlanChooser.visible || quickLabelSheet.visible
 
     Loader {
         active: root.customerDisplay
@@ -1593,6 +1593,16 @@ ApplicationWindow {
     ItemReturnSheet {
         id: itemReturnSheet
         objectName: "itemReturnSheet"
+        anchors.fill: parent
+        z: 59
+        pos: root.controller.pos as PosService
+        controller: root.controller
+    }
+
+    // QUICK LABEL (anyone): typed text on a label, printed by the label utility on the main computer.
+    QuickLabelSheet {
+        id: quickLabelSheet
+        objectName: "quickLabelSheet"
         anchors.fill: parent
         z: 59
         pos: root.controller.pos as PosService
