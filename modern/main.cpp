@@ -1192,6 +1192,15 @@ int runStore(const Args &cli, const Options &o)
                 }
                 state.seen << mark;
             }
+            // The Bar tab stays off the phones' order screen (as the meal tabs).
+            if (const QString mark = u"order-template-phone#tab-bar@hidden"_s; !state.seen.contains(mark)) {
+                if (vt::layout::Page *p = layout->page(u"order-template-phone"_s); p && !p->hiddenZones.contains(u"tab-bar"_s)
+                    && std::ranges::none_of(p->zones, [](const vt::layout::Zone &z) { return z.id == u"tab-bar"; })) {
+                    p->hiddenZones << u"tab-bar"_s;
+                    zonesAdded = true;
+                }
+                state.seen << mark;
+            }
             // A given button renamed later: once, and only if the store kept the old name.
             static const struct { const char16_t *pageId, *zoneId, *was, *renamed; } renamedZones[] = {
                 {u"hardware-config", u"vt-touch-map", u"Guest touch monitor sync (2x Tap)", u"Learn guest touchscreen (2x Tap)"},
