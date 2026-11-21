@@ -467,6 +467,10 @@ QVariantMap PosService::draftLines() const
             l.insert(u"percentLeft"_s, it->kegOz > 0 ? int(std::lround(100.0 * left / it->kegOz)) : 0);
             l.insert(u"since"_s, i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(it->tappedAt), u"ddd M/d h:mm AP"_s));
             l.insert(u"by"_s, qs(it->tappedBy));
+            // All of it rung up: kicked (Change keg).
+            l.insert(u"kicked"_s, it->kegOz > 0 && it->left() <= 0);
+            // What pours from it (the Draft page's sizes: 12oz, 16oz).
+            l.insert(u"items"_s, draftItemsOf(it->beer));
         }
         lines.append(l);
     }
@@ -475,7 +479,12 @@ QVariantMap PosService::draftLines() const
         if (g.kind == "keg")
             kegs.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"name"_s, qs(g.name)}, {u"beer"_s, qs(g.beer)},
                                     {u"onHand"_s, number(g.onHand)}});
-    return {{u"lines"_s, lines}, {u"kegs"_s, kegs}, {u"allowance"_s, s_->settings.kegAllowancePercent}};
+    QVariantMap out{{u"lines"_s, lines}, {u"kegs"_s, kegs}, {u"allowance"_s, s_->settings.kegAllowancePercent}};
+    if (can(u"manager"_s)) {
+        out.insert(u"fill"_s, fillDraftLinesPlan());
+        out.insert(u"fillUndo"_s, s_->draftFillUndo.has_value());
+    }
+    return out;
 }
 
 // --- the shelf count ---------------------------------------------------------------------
@@ -614,6 +623,209 @@ bool PosService::changeKeg(const QVariantMap &r)
     emit s_->dayChanged();
     emit notice((g ? tr("%1: %2 on.").arg(qs(lineId), qs(g->name)) : tr("%1: nothing on it now.").arg(qs(lineId)))
                 + (said.isEmpty() ? QString() : u' ' + said));
+    return true;
+}
+
+// --- the Draft page ----------------------------------------------------------------------
+
+QVariantList PosService::draftItemsOf(const std::string &beer) const
+{
+    const std::string key = keyOf(qs(beer));
+    std::vector<std::pair<double, std::string>> found;
+    for (const MenuItem &m : s_->menu) {
+        if (m.isModifier)
+            continue;
+        for (const RecipeLine &rl : m.recipe)
+            if (rl.ingredientId.starts_with(kDraftTag)
+                && keyOf(qs(rl.ingredientId.substr(std::string(kDraftTag).size()))) == key) {
+                found.emplace_back(rl.quantity, m.id);
+                break;
+            }
+    }
+    std::ranges::stable_sort(found, [](const auto &a, const auto &b) { return a.first < b.first; });
+    QVariantList out;
+    for (const auto &[oz, id] : found)
+        out.append(QVariantMap{{u"id"_s, qs(id)}, {u"oz"_s, oz}});
+    return out;
+}
+
+bool PosService::orderDraft(const QString &lineId, const QString &itemId)
+{
+    if (!require(perm::Order, tr("Ordering")))
+        return false;
+    const std::string id = ss(lineId.trimmed().toUpper());
+    const auto it = std::ranges::find(s_->settings.draftLines, id, &DraftLine::id);
+    if (it == s_->settings.draftLines.end() || it->kegId.empty())
+        return fail(tr("Nothing is on %1 (Change keg puts a keg on it).").arg(qs(id)));
+    if (it->kegOz > 0 && it->left() <= 0)
+        return fail(tr("%1's keg is kicked: change the keg first.").arg(qs(id)));
+    const QVariantList items = draftItemsOf(it->beer);
+    if (std::ranges::none_of(items, [&](const QVariant &v) { return v.toMap().value(u"id"_s).toString() == itemId; }))
+        return fail(tr("%1 doesn't pour from %2 (%3).").arg(itemId, qs(id), qs(it->beer)));
+    return addItem(itemId);
+}
+
+// --- Put draft beers on empty lines --------------------------------------------------------
+
+QVariantList PosService::fillDraftLinesPlan() const
+{
+    // The draft beers: linked already (a __draft__ line), or Link pours would link them.
+    std::vector<std::string> beers;
+    std::set<std::string> keys;
+    const auto add = [&](const std::string &beer) {
+        if (!beer.empty() && keys.insert(keyOf(qs(beer))).second)
+            beers.push_back(beer);
+    };
+    for (const MenuItem &m : s_->menu)
+        if (!m.isModifier)
+            for (const RecipeLine &rl : m.recipe)
+                if (rl.ingredientId.starts_with(kDraftTag))
+                    add(rl.ingredientId.substr(std::string(kDraftTag).size()));
+    for (const PourLink &l : pourLinkPlan())
+        if (l.kind == "draft" && l.status == "link")
+            add(l.goodName);
+    std::set<std::string> onLine;
+    for (const DraftLine &l : s_->settings.draftLines)
+        if (!l.kegId.empty())
+            onLine.insert(keyOf(qs(l.beer)));
+    std::vector<std::string> empty;
+    for (const std::string &id : draftLineIds()) {
+        const auto it = std::ranges::find(s_->settings.draftLines, id, &DraftLine::id);
+        if (it == s_->settings.draftLines.end() || it->kegId.empty())
+            empty.push_back(id);
+    }
+    QVariantList out;
+    std::size_t next = 0;
+    for (const std::string &beer : beers) {
+        if (onLine.contains(keyOf(qs(beer))) || next >= empty.size())
+            continue;
+        const Ingredient *keg = nullptr;
+        for (const Ingredient &g : s_->ingredients)
+            if (g.kind == "keg" && keyOf(qs(g.beer.empty() ? g.name : g.beer)) == keyOf(qs(beer)))
+                keg = &g;
+        out.append(QVariantMap{{u"line"_s, qs(empty[next++])}, {u"beer"_s, qs(beer)},
+                               {u"keg"_s, keg ? qs(keg->name) : qs(beer) + u' ' + kegSizeText(kOzHalfBarrel)},
+                               {u"newKeg"_s, keg == nullptr}});
+    }
+    return out;
+}
+
+bool PosService::fillDraftLines()
+{
+    if (!require(perm::Manager, tr("Putting draft beers on lines")))
+        return false;
+    QVariantList plan = fillDraftLinesPlan();
+    if (plan.isEmpty())
+        return fail(tr("No draft beer is waiting for a line (or no line is empty)."));
+    PosShared::DraftFillUndo undo;
+    // Draft items not linked yet: Link pours first (it keeps its own undo).
+    if (std::ranges::any_of(pourLinkPlan(), [](const PourLink &l) { return l.kind == "draft" && l.status == "link"; })) {
+        if (!linkPours())
+            return false;
+        undo.linked = true;
+        plan = fillDraftLinesPlan();
+    }
+    const std::string who = user() ? user()->name : ss(terminal_);
+    for (const QVariant &v : plan) {
+        const QVariantMap p = v.toMap();
+        const std::string beer = ss(p.value(u"beer"_s).toString());
+        Ingredient *g = nullptr;
+        for (Ingredient &x : s_->ingredients)
+            if (x.kind == "keg" && keyOf(qs(x.beer.empty() ? x.name : x.beer)) == keyOf(qs(beer)))
+                g = &x;
+        if (!g) {   // a keg good: 1/2 barrel, its cost left for the manager (Manager -> Inventory)
+            Ingredient k;
+            const QString name = qs(beer) + u' ' + kegSizeText(kOzHalfBarrel);
+            k.id = ss(admin::uniqueId(u"keg "_s + name, s_->ingredients, [](const Ingredient &x) { return x.id; }, -1));
+            k.name = ss(name);
+            k.kind = "keg";
+            k.unit = "keg";
+            k.packOz = kOzHalfBarrel;
+            k.beer = beer;
+            k.category = "Kegs";
+            s_->ingredients.push_back(k);
+            if (s_->sink)
+                s_->sink->saveIngredient(k, int(s_->ingredients.size()) - 1);
+            undo.kegsAdded.push_back(k.id);
+            g = &s_->ingredients.back();
+        }
+        const std::string lineId = ss(p.value(u"line"_s).toString());
+        auto it = std::ranges::find(s_->settings.draftLines, lineId, &DraftLine::id);
+        if (it == s_->settings.draftLines.end()) {
+            s_->settings.draftLines.push_back({});
+            it = std::prev(s_->settings.draftLines.end());
+        }
+        // As Change keg puts a keg on an empty line.
+        *it = DraftLine{};
+        it->id = lineId;
+        it->kegId = g->id;
+        it->kegName = g->name;
+        it->beer = g->beer.empty() ? g->name : g->beer;
+        it->kegOz = g->packOz;
+        it->kegCost = g->cost;
+        it->tappedAt = now();
+        it->tappedBy = who;
+        g->onHand -= 1;
+        g->sold += 1;
+        if (s_->sink)
+            s_->sink->saveIngredient(*g, int(g - s_->ingredients.data()));
+        undo.lines.emplace_back(lineId, g->id);
+    }
+    const int n = int(undo.lines.size());
+    s_->draftFillUndo = std::move(undo);
+    s_->draftSavedAt = now();
+    s_->saveSettings();
+    ++s_->adminRevision;
+    emit s_->adminChanged();
+    emit s_->dayChanged();
+    emit notice(tr("%n draft beer(s) put on empty lines", "", n));
+    return true;
+}
+
+bool PosService::undoFillDraftLines()
+{
+    if (!require(perm::Manager, tr("Putting draft beers on lines")))
+        return false;
+    if (!s_->draftFillUndo)
+        return fail(tr("There is nothing to undo."));
+    const PosShared::DraftFillUndo undo = *s_->draftFillUndo;
+    s_->draftFillUndo.reset();
+    // Off their lines again, unless poured from or changed since.
+    for (const auto &[lineId, kegId] : undo.lines) {
+        const auto it = std::ranges::find(s_->settings.draftLines, lineId, &DraftLine::id);
+        if (it == s_->settings.draftLines.end() || it->kegId != kegId || it->poured > 0)
+            continue;
+        *it = DraftLine{};
+        it->id = lineId;
+        if (Ingredient *g = s_->ingredient(kegId)) {
+            g->onHand += 1;
+            g->sold -= 1;
+            if (s_->sink)
+                s_->sink->saveIngredient(*g, int(g - s_->ingredients.data()));
+        }
+    }
+    // The keg goods it made, unless on a line, counted or received since.
+    bool removed = false;
+    for (const std::string &id : undo.kegsAdded) {
+        const auto it = std::ranges::find(s_->ingredients, id, &Ingredient::id);
+        if (it == s_->ingredients.end() || it->countedAt != 0 || it->received != 0
+            || std::ranges::any_of(s_->settings.draftLines, [&](const DraftLine &l) { return l.kegId == id; }))
+            continue;
+        s_->ingredients.erase(it);
+        if (s_->sink)
+            s_->sink->deleteIngredient(id);
+        removed = true;
+    }
+    if (removed && s_->sink)
+        for (int i = 0; i < int(s_->ingredients.size()); ++i)
+            s_->sink->saveIngredient(s_->ingredients[i], i);
+    s_->saveSettings();
+    ++s_->adminRevision;
+    emit s_->adminChanged();
+    if (undo.linked && s_->pourLinkUndo)
+        return undoLinkPours();
+    emit s_->dayChanged();
+    emit notice(tr("Draft lines as they were"));
     return true;
 }
 

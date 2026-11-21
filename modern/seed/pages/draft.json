@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "draft",
+  "name": "Draft",
+  "kind": "items",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "templateId": "order-template",
+  "zones": [
+    {
+      "id": "taps",
+      "kind": "draftTaps",
+      "rect": {
+        "x": 592,
+        "y": 104,
+        "w": 1312,
+        "h": 696
+      },
+      "shape": "rect",
+      "behavior": "none"
+    },
+    {
+      "id": "speed-row",
+      "kind": "speedRow",
+      "rect": {
+        "x": 592,
+        "y": 816,
+        "w": 1312,
+        "h": 148
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "props": {
+        "draft": false
+      }
+    }
+  ]
+}

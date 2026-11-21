@@ -100,6 +100,7 @@ public:
     QVariantList deliveries() const override { return v(u"deliveries").toList(); }
     QVariantList drivers() const override { return v(u"drivers").toList(); }
     QStringList popularItems() const override { return v(u"popularItems").toStringList(); }
+    QStringList topSellers() const override { return v(u"topSellers").toStringList(); }
     QVariantMap stockLeft() const override { return v(u"stockLeft").toMap(); }
     QVariantMap dashboard() const override { return v(u"dashboard").toMap(); }
     QVariantList lossAlerts() const override { return v(u"lossAlerts").toList(); }

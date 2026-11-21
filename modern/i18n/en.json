@@ -27,6 +27,10 @@
   "one": "%n closing task not done yet",
   "other": "%n closing tasks not done yet"
  },
+ "%n draft beer(s) put on empty lines": {
+  "one": "%n draft beer put on empty lines",
+  "other": "%n draft beers put on empty lines"
+ },
  "%n guest(s)": {
   "one": "%n guest",
   "other": "%n guests"
@@ -230,6 +234,14 @@
  "Remove %n item(s) from the menu?": {
   "one": "Remove %n item from the menu?",
   "other": "Remove %n items from the menu?"
+ },
+ "Repeated %n drink(s)": {
+  "one": "Repeated %n drink",
+  "other": "Repeated %n drinks"
+ },
+ "Repeated %n drink(s) (sold out: %1)": {
+  "one": "Repeated %n drink (sold out: %1)",
+  "other": "Repeated %n drinks (sold out: %1)"
  },
  "Same as last time: %n item(s)": {
   "one": "Same as last time: %n item",

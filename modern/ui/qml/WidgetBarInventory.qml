@@ -225,6 +225,36 @@ Item {
                         }
                     }
                 }
+                // Put draft beers on empty lines (managers): the plan first, then Apply; Undo after.
+                RowLayout {
+                    objectName: "draftFill"
+                    visible: w.manager && !w.draftOnly && ((w.draft.fill ?? []).length > 0 || w.draft.fillUndo === true)
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Label {
+                        objectName: "draftFillPlan"
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: (w.draft.fill ?? []).length > 0
+                              ? qsTr("Put draft beers on empty lines: %1").arg((w.draft.fill ?? []).map(f => f.line + " " + f.beer + (f.newKeg ? " (" + qsTr("new keg: %1").arg(f.keg) + ")" : "")).join(", "))
+                              : qsTr("Draft beers were put on empty lines.")
+                    }
+                    Button {
+                        objectName: "draftFillApply"
+                        visible: (w.draft.fill ?? []).length > 0
+                        text: qsTr("Apply")
+                        highlighted: true
+                        implicitHeight: 44
+                        onClicked: w.pos.fillDraftLines()
+                    }
+                    Button {
+                        objectName: "draftFillUndo"
+                        visible: w.draft.fillUndo === true
+                        text: qsTr("Undo")
+                        implicitHeight: 44
+                        onClicked: w.pos.undoFillDraftLines()
+                    }
+                }
                 RowLayout {   // keg allowance and a new keg good (managers)
                     visible: w.manager && !w.draftOnly
                     Layout.fillWidth: true

@@ -30,7 +30,7 @@
         "x": 592,
         "y": 192,
         "w": 1312,
-        "h": 772
+        "h": 608
       },
       "shape": "rect",
       "behavior": "none",
@@ -38,6 +38,18 @@
         "popular": true,
         "columns": 4
       }
+    },
+    {
+      "id": "speed-row",
+      "kind": "speedRow",
+      "rect": {
+        "x": 592,
+        "y": 816,
+        "w": 1312,
+        "h": 148
+      },
+      "shape": "rect",
+      "behavior": "none"
     }
   ]
 }

@@ -1876,17 +1876,20 @@ bool PosService::setLineQuantity(qint64 lineId, int quantity)
     return true;
 }
 
+bool PosService::isDrinkLine(const OrderLine &l) const
+{
+    // Drinks: the bar makes them, they're in a drinks family, or they have an ABV (standard drinks).
+    if (l.isComment() || l.voided || l.isGiftCard() || l.isReturn())
+        return false;
+    if (l.printerOf() == "bar" || l.stdDrinks > 0)
+        return true;
+    const MenuItem *m = findItem(qs(l.itemId));
+    return m && (QString::fromStdString(m->family).contains(u"drink"_s, Qt::CaseInsensitive) || standardDrinksOf(*m) > 0);
+}
+
 std::vector<const OrderLine *> PosService::lastRound(const Check &c) const
 {
-    // Drinks: the bar makes them, or they're in a drinks family.
-    const auto drink = [&](const OrderLine &l) {
-        if (l.isComment() || l.voided || !l.sent || l.isGiftCard())
-            return false;
-        if (l.printerOf() == "bar")
-            return true;
-        const MenuItem *m = findItem(qs(l.itemId));
-        return m && QString::fromStdString(m->family).contains(u"drink"_s, Qt::CaseInsensitive);
-    };
+    const auto drink = [&](const OrderLine &l) { return l.sent && isDrinkLine(l); };
     std::int64_t last = 0;
     for (const OrderLine &l : c.lines)
         if (drink(l))
@@ -1899,6 +1902,33 @@ std::vector<const OrderLine *> PosService::lastRound(const Check &c) const
 }
 
 bool PosService::anotherRound()
+{
+    return ringRoundAgain(u"anotherRound"_s);
+}
+
+bool PosService::repeatRound()
+{
+    return ringRoundAgain(u"repeatRound"_s);
+}
+
+bool PosService::sameAgain()
+{
+    if (!require(perm::Order, tr("Ordering")))
+        return false;
+    const Check *c = current();
+    if (!c)
+        return fail(tr("No check is open."));
+    // The newest drink on the check, sent or not.
+    const OrderLine *last = nullptr;
+    for (const OrderLine &l : c->lines)
+        if (isDrinkLine(l) && (!last || l.id > last->id))
+            last = &l;
+    if (!last)
+        return fail(tr("No drink on this check yet."));
+    return repeatLine(last->id);
+}
+
+bool PosService::ringRoundAgain(const QString &op)
 {
     if (!require(perm::Order, tr("Ordering")))
         return false;
@@ -1918,7 +1948,7 @@ bool PosService::anotherRound()
             for (const auto &[g, d] : lineGuests(*c, l))
                 adds.push_back({g, d});
         }
-        if (!serviceGate(c, adds, tr("Another round"), u"anotherRound"_s, {}))
+        if (!serviceGate(c, adds, op == u"repeatRound" ? tr("Repeat round") : tr("Another round"), op, {}))
             return false;
     }
     QStringList skipped;
@@ -1940,8 +1970,12 @@ bool PosService::anotherRound()
     }
     if (added == 0)
         return fail(tr("Sold out: %1").arg(skipped.join(u", "_s)));
-    emit notice(skipped.isEmpty() ? tr("Another round: %n drink(s)", nullptr, added)
-                                  : tr("Another round: %n drink(s) (sold out: %1)", nullptr, added).arg(skipped.join(u", "_s)));
+    if (op == u"repeatRound")
+        emit notice(skipped.isEmpty() ? tr("Repeated %n drink(s)", nullptr, added)
+                                      : tr("Repeated %n drink(s) (sold out: %1)", nullptr, added).arg(skipped.join(u", "_s)));
+    else
+        emit notice(skipped.isEmpty() ? tr("Another round: %n drink(s)", nullptr, added)
+                                      : tr("Another round: %n drink(s) (sold out: %1)", nullptr, added).arg(skipped.join(u", "_s)));
     changed(*c);
     return true;
 }

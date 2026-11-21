@@ -18,7 +18,19 @@
         "x": 592,
         "y": 104,
         "w": 1312,
-        "h": 860
+        "h": 696
+      },
+      "shape": "rect",
+      "behavior": "none"
+    },
+    {
+      "id": "speed-row",
+      "kind": "speedRow",
+      "rect": {
+        "x": 592,
+        "y": 816,
+        "w": 1312,
+        "h": 148
       },
       "shape": "rect",
       "behavior": "none"

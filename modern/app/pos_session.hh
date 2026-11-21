@@ -86,6 +86,8 @@ class PosSession : public QObject {
     Q_PROPERTY(QVariantList drivers READ drivers NOTIFY openChecksChanged)
     // Today's best sellers so far (item ids, most sold first): the Popular page.
     Q_PROPERTY(QStringList popularItems READ popularItems NOTIFY openChecksChanged)
+    // The store's best sellers, past four weeks and today (item ids, most sold first): the speed row.
+    Q_PROPERTY(QStringList topSellers READ topSellers NOTIFY openChecksChanged)
     // Checks closed today, newest first (managers, to reopen one).
     Q_PROPERTY(QVariantList closedChecks READ closedChecks NOTIFY dayChanged)
     // Active employees [{id, name, role, clockedIn, me}], to transfer checks to.
@@ -366,6 +368,7 @@ public:
     // The two parts put together: each check with mine, current, forMe, mayOpen, busyOn.
     static QVariantList mergeOpenChecks(const QVariantList &shared, const QVariantMap &viewer);
     virtual QStringList popularItems() const = 0;
+    virtual QStringList topSellers() const { return {}; }
     virtual QVariantList tableChecks() const = 0;
     virtual QString undoText() const = 0;
     virtual QVariantList closedChecks() const = 0;
@@ -586,6 +589,8 @@ public:
     Q_INVOKABLE void printerHasDrawer(const QString &printerId) { invoke(QStringLiteral("printerHasDrawer"), {printerId}); }
     Q_INVOKABLE void combineTableChecks() { invoke(QStringLiteral("combineTableChecks"), {}); }
     Q_INVOKABLE void anotherRound() { invoke(QStringLiteral("anotherRound"), {}); }
+    Q_INVOKABLE void repeatRound() { invoke(QStringLiteral("repeatRound"), {}); }
+    Q_INVOKABLE void sameAgain() { invoke(QStringLiteral("sameAgain"), {}); }
     Q_INVOKABLE void customDiscount(bool percent) { invoke(QStringLiteral("customDiscount"), {percent}); }
     // Time Clock: a PIN shows that person; then "in", "out" or "break"; Done forgets them.
     Q_INVOKABLE void timeClockStart(const QString &pin) { invoke(QStringLiteral("timeClockStart"), {pin}); }
@@ -685,6 +690,8 @@ public:
     Q_INVOKABLE void saveBarCount(const QVariantMap &count) { invoke(QStringLiteral("saveBarCount"), {count}); }
     Q_INVOKABLE void changeKeg(const QVariantMap &change) { invoke(QStringLiteral("changeKeg"), {change}); }
     Q_INVOKABLE void addKeg(const QVariantMap &keg) { invoke(QStringLiteral("addKeg"), {keg}); }
+    Q_INVOKABLE void fillDraftLines() { invoke(QStringLiteral("fillDraftLines")); }
+    Q_INVOKABLE void undoFillDraftLines() { invoke(QStringLiteral("undoFillDraftLines")); }
     Q_INVOKABLE void setKegAllowance(int percent) { invoke(QStringLiteral("setKegAllowance"), {percent}); }
     Q_INVOKABLE void problemsSeen() { invoke(QStringLiteral("problemsSeen")); }
     Q_INVOKABLE void alertsSeen() { invoke(QStringLiteral("alertsSeen")); }

@@ -93,6 +93,8 @@ Flickable {
                                                              (height - headings * headerHeight) / rowsFor(columns)))
 
     function categoryOf(id) { return categories.find(c => c.id === id) ?? ({}) }
+    // A drink's strength by its standard drinks per serving: light, medium or strong.
+    function strengthOf(drinks) { return drinks > 1.75 ? "strong" : drinks > 1.0 ? "medium" : "light" }
     function img(ref) { return pos && ref ? (pos.imageRevision < 0 ? undefined : pos.imageUrl(ref)) : "" }
     readonly property var allergenNames: pos ? pos.allergenList() : []
     function allergenName(id) { return (allergenNames.find(a => a.id === id) ?? { name: id }).name }
@@ -211,7 +213,27 @@ Flickable {
                                         font.bold: true
                                     }
                                 }
+                                // Strength at a glance (drinks with an ABV): standard drinks per serving,
+                                // light (up to 1), medium (up to 1.75) or strong (more).
+                                readonly property real drinks: cell.isGap ? 0 : Number(cell.modelData.stdDrinks || 0)
+                                Rectangle {
+                                    objectName: cell.isGap ? "" : "strengthDot-" + cell.modelData.id
+                                    visible: parent.drinks > 0
+                                    z: 2
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.margins: 8
+                                    anchors.leftMargin: cell.modelData.number ? 8 + numberText.implicitWidth + 6 : 8
+                                    readonly property string level: mb.strengthOf(parent.drinks)
+                                    width: Math.max(12, Math.min(cell.height * 0.13, 20))
+                                    height: width
+                                    radius: width / 2
+                                    color: level === "strong" ? "#ef4444" : level === "medium" ? "#f59e0b" : "#22c55e"
+                                    border.color: "#101317"
+                                    border.width: 2
+                                }
                                 Text {
+                                    id: numberText
                                     visible: !!cell.modelData.number
                                     z: 2
                                     anchors.top: parent.top

@@ -1972,6 +1972,15 @@ void LayoutController::openNewItemWithBarcode(const QString &code, const QString
     setWidgetState(u"pendingNewBarcode"_s, code.trimmed()); setWidgetState(u"pendingNewItemType"_s, itemType.trimmed().isEmpty() ? u"retail"_s : itemType.trimmed());
     navigate(Navigator::Mode::Push, activeLayout().page(u"menu-builder"_s) ? u"menu-builder"_s : u"admin-menu"_s);
 }
+void LayoutController::orderDraft(const QString &lineId, const QString &itemId)
+{
+    if (editing() || busy())
+        return;
+    Action a;
+    a.data = QJsonObject{{u"type"_s, u"addItem"_s}, {u"item"_s, itemId}, {u"draftLine"_s, lineId}};
+    runAction(a, [](bool) {});
+}
+
 void LayoutController::orderItem(const QString &itemId, bool clearTyped)
 {
     if (editing() || busy())
@@ -2033,6 +2042,9 @@ void LayoutController::runAction(const Action &a, Done done)
             setStatus(tr("Added %1").arg(item));
             return added(true);
         }
+        // A pour from a draft line (the Draft page): the line is checked first, then rung as addItem.
+        if (const QString line = a.str(u"draftLine"); !line.isEmpty())
+            return call(u"orderDraft"_s, {line, item}, [added](const QVariant &ok) { added(ok.toBool()); });
         return call(u"addItem"_s, {item}, [added](const QVariant &ok) { added(ok.toBool()); });
     }
 
@@ -2516,7 +2528,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         // Retail screen VOID PREV ITEM ("removeLine" on the store's pages): an error correct.
         {u"errorCorrect"_s, {u"errorCorrect"_s, {}}}, {u"removeLine"_s, {u"errorCorrect"_s, {}}},
         {u"lineLess"_s, {u"lineLess"_s, {0}}}, {u"repeatLine"_s, {u"repeatLine"_s, {0}}},
-        {u"undoLast"_s, {u"undoLast"_s, {}}}, {u"anotherRound"_s, {u"anotherRound"_s, {}}}, {u"timeClockDone"_s, {u"timeClockDone"_s, {}}},
+        {u"undoLast"_s, {u"undoLast"_s, {}}}, {u"anotherRound"_s, {u"anotherRound"_s, {}}},
+        {u"repeatRound"_s, {u"repeatRound"_s, {}}}, {u"sameAgain"_s, {u"sameAgain"_s, {}}}, {u"timeClockDone"_s, {u"timeClockDone"_s, {}}},
         {u"amountOff"_s, {u"customDiscount"_s, {false}}}, {u"percentOff"_s, {u"customDiscount"_s, {true}}}, {u"addComment"_s, {u"addComment"_s, {}}},
         {u"removePayment"_s, {u"removePayment"_s, {}}}, {u"closeCheck"_s, {u"closeCheck"_s, {}}},
         // Retail CANCEL SALE ("cancelCheck" on the store's pages).
@@ -2839,6 +2852,8 @@ QString LayoutController::describeAction(const Action &a) const
             {u"releaseCheck"_s, QT_TR_NOOP("Puts the check away (it stays open).")},
             {u"newTableCheck"_s, QT_TR_NOOP("Opens another check at this table.")},
             {u"anotherRound"_s, QT_TR_NOOP("Orders the drinks sent last again.")},
+            {u"repeatRound"_s, QT_TR_NOOP("Repeat round: rings again the drinks of this check's last Send, with their choices.")},
+            {u"sameAgain"_s, QT_TR_NOOP("Same again: rings the newest drink on the check once more, with its choices.")},
             {u"undoLast"_s, QT_TR_NOOP("Puts back the item just taken off.")},
             {u"repeatLine"_s, QT_TR_NOOP("Adds one more of the touched item, made the same way.")},
             {u"addComment"_s, QT_TR_NOOP("Adds a note for the kitchen.")},

@@ -118,6 +118,11 @@ QJsonArray widgetSettings(const QString &kind)
         out.append(hint(with(field(u"props.tab"_s, u"Opens on"_s, u"enum"_s, g), u"options"_s,
                              options({{"", "Shelf count"}, {"draft", "Draft lines"}, {"link", "Link pours to bottles"}})),
                         u"Draft lines alone: a Change keg page for the bar (anyone working)."_s));
+    } else if (kind == u"speedRow") {
+        out.append(hint(field(u"props.draft"_s, u"Draft key"_s, u"bool"_s, g),
+                        u"Off: no Draft key (the Draft page itself). On: shown while a keg is on a draft line."_s));
+        out.append(hint(intField(u"props.count"_s, u"Best sellers"_s, g, 0, 24),
+                        u"How many of the store's best sellers (past four weeks and today). Empty: 12."_s));
     } else if (kind == u"menuCategories") {
         out.append(hint(field(u"props.period"_s, u"Meal period"_s, u"string"_s, g),
                         u"Its categories (breakfast, lunch...: Menu Builder). Empty: what's on now."_s));
@@ -251,7 +256,7 @@ QStringList widgetKinds()
             u"guestOrder"_s, u"guestMessages"_s, u"guestMedia"_s, u"guestHeader"_s, u"loginPad"_s, u"guestCount"_s, u"checkList"_s,
             u"paymentPanel"_s, u"numPad"_s, u"keyboard"_s, u"splitCheck"_s, u"drawerPanel"_s,
             u"reportView"_s, u"endOfDay"_s, u"logoutPanel"_s, u"clock"_s, u"statusBar"_s,
-            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"barInventory"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s, u"eodArchive"_s, u"exceptionSearch"_s};
+            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"barInventory"_s, u"draftTaps"_s, u"speedRow"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s, u"eodArchive"_s, u"exceptionSearch"_s};
 }
 
 QStringList allKinds()
@@ -566,6 +571,8 @@ QJsonArray actionTypes()
                             {"lineLess", "One less of the item (−)"}, {"repeatLine", "Again (one more the same way)"},
                             {"undoLast", "Undo (put back the item just removed)"},
                             {"anotherRound", "Another round (the drinks sent last)"},
+                            {"repeatRound", "Repeat round (the drinks of the last Send, with their choices)"},
+                            {"sameAgain", "Same again (the newest drink once more, with its choices)"},
                             {"amountOff", "Discount: the dollars typed (manager)"}, {"percentOff", "Discount: the percent typed (manager)"}, {"coupon", "Coupon: type or scan its code"}, {"holdCard", "Hold the guest's card (bar tab)"}, {"cardOnFile", "Card on file (bar tab): charge or let go"}, {"printReceipt", "Print receipt"},
                             {"closeCheck", "Close check"}, {"removePayment", "Undo payment"},
                             {"noSale", "Open drawer (no sale)"}, {"openDrawerSession", "Start drawer (bank)"},

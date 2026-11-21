@@ -306,6 +306,8 @@ public:
     // Order a menu item as an Add Item button would (menuGrid panels).
     // clearTyped: the typed text cleared too (the Find page, ready for the next).
     Q_INVOKABLE void orderItem(const QString &itemId, bool clearTyped = false);
+    // The Draft page: a pour of itemId from a draft line (checked by the main computer, then as orderItem).
+    Q_INVOKABLE void orderDraft(const QString &lineId, const QString &itemId);
     // Ready-made looks: [{id, name, colors: [background, buttons, panels, text, accent]}],
     // with two made from the store logo's colors when there is one.
     Q_INVOKABLE QVariantList looks() const;

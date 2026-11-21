@@ -463,6 +463,18 @@ public:
         int links = 0;
     };
     std::optional<PourLinkUndo> pourLinkUndo;
+    // Put draft beers on empty lines: what it did, to undo it (lines filled, keg goods made, whether it
+    // linked pours first).
+    struct DraftFillUndo {
+        std::vector<std::pair<std::string, std::string>> lines;   // line -> keg good put on it
+        std::vector<std::string> kegsAdded;
+        bool linked = false;
+    };
+    std::optional<DraftFillUndo> draftFillUndo;
+    // Items sold over the past four weeks (from history, in the background; again after an hour).
+    std::map<std::string, int> pastSold;
+    std::int64_t pastSoldAt = 0;
+    bool pastSoldAsked = false;
     // Open a pairing (replacing any open one) and return its code.
     QString startPairing(bool standby = false);
 
@@ -867,6 +879,27 @@ public:
     // The drinks sent last (one Send), ordered again as new lines.
     bool anotherRound();
     std::vector<const core::OrderLine *> lastRound(const core::Check &c) const;
+    // Speed row (bar): REPEAT ROUND rings again the drinks of this check's most recent Send (what
+    // lastRound() finds), each with its choices: "Repeated 4 drinks". SAME AGAIN rings the newest drink
+    // on the check again (sent or not), with its choices. A drink: made at the bar, in a drinks
+    // family, or with an ABV (standard drinks). Sold-out items are skipped / refused.
+    bool repeatRound();
+    bool sameAgain();
+    bool isDrinkLine(const core::OrderLine &l) const;
+    bool ringRoundAgain(const QString &op);
+    // The Draft page: a pour of `itemId` from draft line `lineId` (T1-L1). Refused when nothing is on
+    // the line, its keg is kicked (all of it rung up), or the item doesn't pour the line's beer; then
+    // rung exactly as addItem (keg depletion, ABV / standard drinks, age check).
+    bool orderDraft(const QString &lineId, const QString &itemId);
+    // The menu items that pour `beer` (its __draft__ recipe line): {id, oz}, smallest first.
+    QVariantList draftItemsOf(const std::string &beer) const;
+    // Put draft beers on empty lines (managers): Link pours first when a draft item isn't linked yet; a
+    // keg good (1/2 barrel, no cost) for each draft beer that has none; each draft beer not on a line
+    // onto the next empty line, T1-L1 onward, as a Change keg by whoever is signed in. Beers already on
+    // a line stay. Plan: [{line, beer, keg, newKeg}]. Undo takes them off again (nothing poured since).
+    QVariantList fillDraftLinesPlan() const;
+    bool fillDraftLines();
+    bool undoFillDraftLines();
     bool sendOrder();
     // Orders for later: ready at `at` (epoch ms; 0 = as soon as possible).
     bool setDueAt(qint64 at);
@@ -1163,6 +1196,9 @@ public:
     QVariantList deliveries() const override;
     QVariantList drivers() const override;
     QStringList popularItems() const override;
+    // The store's best sellers over the past four weeks and today (item ids, most sold first, at most
+    // 24): the speed row's top 12.
+    QStringList topSellers() const override;
     // Often ordered with what's on this check (a hint on the order screen): {id, name}.
     QVariantList goesWith(const core::Check &c) const;
     // Arranging the self-filling menu by touch (managers): one place earlier

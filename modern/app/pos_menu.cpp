@@ -436,6 +436,61 @@ QStringList PosService::popularItemsNow() const
     return out;
 }
 
+QStringList PosService::topSellers() const
+{
+    return s_->memo(u"topSellers"_s, [this] {
+        // The past four weeks, off the screen's thread; again when an hour old.
+        if (s_->history && !s_->pastSoldAsked && (s_->pastSoldAt == 0 || now() - s_->pastSoldAt > 3'600'000)) {
+            s_->pastSoldAsked = true;
+            auto history = s_->history;
+            const std::int64_t to = now(), from = to - 28LL * 24 * 3600 * 1000;
+            QPointer<PosShared> shared(s_);
+            QThreadPool::globalInstance()->start([=] {
+                std::map<std::string, int> sold;
+                for (const Check &c : history(from, to)) {
+                    if (c.training || c.status == CheckStatus::Discarded || c.status == CheckStatus::Merged)
+                        continue;
+                    for (const OrderLine &l : c.lines)
+                        if (!l.isComment() && !l.voided && !l.isGiftCard())
+                            sold[l.itemId] += l.counted();
+                }
+                QMetaObject::invokeMethod(shared, [shared, to, sold = std::move(sold)]() mutable {
+                    if (!shared)
+                        return;
+                    shared->pastSold = std::move(sold);
+                    shared->pastSoldAt = to;
+                    shared->pastSoldAsked = false;
+                    emit shared->checksChanged();
+                }, Qt::QueuedConnection);
+            });
+        }
+        std::map<std::string, int> sold = s_->pastSold;
+        // Today's since then: checks closed after the past was read, and the open ones.
+        const auto count = [&](const Check &c) {
+            if (c.training || c.status == CheckStatus::Discarded || c.status == CheckStatus::Merged)
+                return;
+            for (const OrderLine &l : c.lines)
+                if (!l.isComment() && !l.voided && !l.isGiftCard())
+                    sold[l.itemId] += l.counted();
+        };
+        for (const Check &c : s_->closedToday)
+            if (s_->pastSoldAt == 0 || c.closedAt > s_->pastSoldAt)
+                count(c);
+        for (const auto &[id, c] : s_->open)
+            count(c);
+        std::vector<std::pair<int, std::string>> ranked;
+        for (const auto &[id, n] : sold)
+            if (const MenuItem *m = findItem(qs(id)); m && !m->isModifier && n > 0)
+                ranked.emplace_back(n, id);
+        std::ranges::stable_sort(ranked, [](const auto &a, const auto &b) { return a.first > b.first; });
+        QStringList out;
+        for (const auto &[n, id] : ranked)
+            if (out.size() < 24)
+                out << qs(id);
+        return QVariant(out);
+    }).toStringList();
+}
+
 namespace {
 // Each item on a check once (no modifiers, comments, voids or gift cards).
 std::vector<std::string> itemsOn(const Check &c)

@@ -1105,6 +1105,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
                 {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
+                {u"bar-inventory", u"draft"},            // Draft page › on Bar & Kegs (the Draft page, 2026-11-21)
                 {u"cashier-duty", u"cd-quicklabel"},     // QUICK LABEL (type & print), owner 2026-11-20
                 // CH # (number pad) on the DIRECTV Tune pages, under BOX off (owner at HCA 2026-11-21).
                 {u"directv-tune-all", u"rk-chpad"},

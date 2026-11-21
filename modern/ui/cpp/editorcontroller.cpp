@@ -310,6 +310,8 @@ QString EditorController::kindName(const QString &kind) const
         {u"receiveDelivery"_s, QT_TR_NOOP("Receive a delivery")},
         {u"stockCount"_s, QT_TR_NOOP("Count stock")},
         {u"barInventory"_s, QT_TR_NOOP("Bar: bottles and kegs")},
+        {u"draftTaps"_s, QT_TR_NOOP("Draft lines (ring a pour)")},
+        {u"speedRow"_s, QT_TR_NOOP("Speed row (best sellers, Repeat round, Same again)")},
         {u"wasteLog"_s, QT_TR_NOOP("Log waste")},
         {u"storeCheck"_s, QT_TR_NOOP("Store check")},
         {u"prepLabels"_s, QT_TR_NOOP("Prep labels")},

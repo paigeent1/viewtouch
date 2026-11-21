@@ -230,6 +230,9 @@ if(Qt6_FOUND)
             ui/qml/WidgetReceiveDelivery.qml
             ui/qml/WidgetStockCount.qml
             ui/qml/WidgetWasteLog.qml
+            ui/qml/WidgetBarInventory.qml
+            ui/qml/WidgetDraftTaps.qml
+            ui/qml/WidgetSpeedRow.qml
             ui/qml/WidgetStoreCheck.qml
             ui/qml/WidgetPrepLabels.qml
             ui/qml/WidgetRetailLabels.qml
