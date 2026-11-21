@@ -143,6 +143,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-21 17:01 ET — Bob (Claude) — SAMSUNG TV page: TV on powers on BAR FRONT's DIRECTV box (wakes the Samsung over HDMI)
+- **What:** seed/pages/tv-samsung.json: TV on (rk-poweron) now sends directv front key poweron instead of the Samsung's Wake-on-LAN, and the page note says so. Manual ch. 21: waking a Wi-Fi TV through the DIRECTV box plugged into it. test_editor.cpp's apply-to-all test now edits VOL + (rk-volup) and checks only the Samsung's own buttons. Server: changed (seed page). Tablet app: changed (same commit; seed pages are in both builds).
+- **Why:** Owner at HCA 2026-11-21: the Samsung (192.168.6.77, on Wi-Fi) turned off from its button but Wake-on-LAN never woke it; 'Samsung can be started with DIRECTV!' — BAR FRONT's box is plugged into it and wakes it over HDMI-CEC.
+- **Files:** `modern/docs/manual/manual.html`, `modern/seed/pages/tv-samsung.json`, `modern/tests/test_editor.cpp`
+- **Next person must know:** An unedited tv-samsung page refreshes at the next start; if HCA's copy was edited, run vt-reset-page tv-samsung on HCA (or set TV on in the button editor). TV off still goes straight to the Samsung.
+
 ### 2026-11-21 14:10 ET — Bob's helper (Claude) — TV button test: the vt-directv stand-in script's text fixed
 - **What:** test_net.cpp's new [tv] stand-in script had real line breaks inside its C++ string literals (did not compile); now \n and \" as the other stand-ins. Tablet app: no change. Server: no change (tests only).
 - **Why:** CI run 44938547011: test_net.cpp didn't compile.

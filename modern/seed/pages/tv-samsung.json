@@ -25,7 +25,7 @@
     {
       "id": "note",
       "kind": "label",
-      "label": "First time only: on HCA, vt-directv pair samsung (press Allow on the TV). TV on needs Power On with Mobile ON in the TV's network settings.",
+      "label": "First time only: vt-directv pair samsung (press Allow on the TV). TV on powers on the DIRECTV box plugged into it (BAR FRONT), which wakes the TV over HDMI.",
       "shape": "rect",
       "behavior": "none",
       "rect": {
@@ -57,7 +57,7 @@
           "type": "command",
           "name": "directv",
           "args": {
-            "box": "samsung",
+            "box": "front",
             "op": "key",
             "val": "poweron"
           }

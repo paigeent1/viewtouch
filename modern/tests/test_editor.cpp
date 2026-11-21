@@ -543,25 +543,27 @@ TEST_CASE("TV buttons: the TV / DIRECTV remote's settings, and one address for e
     const QJsonObject bar1Before = argsOf(u"directv-tune-bar1"_s, u"rk-chpad"_s);
 
     // SAMSUNG TV's Vol + given the TV's address and type, with every button for it.
-    QJsonArray actions = e.zoneField(u"tv-samsung"_s, u"rk-poweron"_s, u"actions"_s).toArray();
+    QJsonArray actions = e.zoneField(u"tv-samsung"_s, u"rk-volup"_s, u"actions"_s).toArray();
     QJsonObject a = actions.first().toObject();
     QJsonObject args = a.value(u"args").toObject();
     args.insert(u"ip"_s, u"192.168.6.7"_s);
     a.insert(u"args"_s, args);
     actions.replace(0, a);
     int others = -1;
-    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-volup"_s, actions, u"samsung"_s, &others));
     CHECK(others == samsungs - 1);
     // Typed on: the same undo step.
     args.insert(u"ip"_s, u"192.168.6.77"_s);
     args.insert(u"kind"_s, u"samsung"_s);
     a.insert(u"args"_s, args);
     actions.replace(0, a);
-    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-volup"_s, actions, u"samsung"_s, &others));
     CHECK(e.undoStack()->count() == 1);
     for (const Zone &z : e.layout().page(u"tv-samsung"_s)->zones)
         for (const Action &act : z.actions)
-            if (act.str(u"name") == u"directv") {
+            if (act.str(u"name") == u"directv"
+                && act.data.value(u"args").toObject().value(u"box").toString() == u"samsung"_s) {
+                // (TV on goes to BAR FRONT's box, which wakes the Samsung over HDMI: not this TV's button.)
                 const QJsonObject got = act.data.value(u"args").toObject();
                 CHECK(got.value(u"ip").toString() == u"192.168.6.77"_s);
                 CHECK(got.value(u"kind").toString() == u"samsung"_s);
@@ -575,7 +577,7 @@ TEST_CASE("TV buttons: the TV / DIRECTV remote's settings, and one address for e
     args.remove(u"kind"_s);
     a.insert(u"args"_s, args);
     actions.replace(0, a);
-    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-volup"_s, actions, u"samsung"_s, &others));
     CHECK_FALSE(argsOf(u"tv-samsung"_s, u"rk-poweroff"_s).contains(u"ip"));
     // One undo step puts everything back.
     e.undoStack()->undo();
