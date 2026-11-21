@@ -7,6 +7,8 @@
   vt-directv scan [--save]                find DIRECTV receivers and smart TVs on
                                           this Pi's own network (SSDP, then a sweep)
   vt-directv list                         the TVs this script knows
+  vt-directv check                        each DIRECTV receiver: answering?, model, on or
+                                          asleep, what it's showing (nothing is changed)
   vt-directv pair <tv>                    a Samsung TV: allow ViewTouch on it once (the TV
                                           asks; press Allow with its remote within 30 s)
 
@@ -105,6 +107,38 @@ def directv(ip, op, val):
     if code != 200:
         return f"refused ({code})"
     return f"-> {CHANNELS.get(val, val)} ({val})" if op == "tune" else f"{val} sent"
+
+
+def directv_check(ip):
+    """One line about a receiver, changing nothing: model, awake/asleep, channel."""
+    def get(path):
+        _, body = http(f"http://{ip}:8080{path}", timeout=3.0)
+        return json.loads(body)
+    try:
+        ver = get("/info/getVersion")
+    except urllib.error.HTTPError as e:
+        return "locked (allow External Device Access on the receiver)" if e.code == 403 else f"refused ({e.code})"
+    except Exception as e:
+        return f"NOT ANSWERING ({e.__class__.__name__})"
+    parts = [f"software {ver.get('stbSoftwareVersion', '?')}"]
+    try:
+        mode = get("/info/mode").get("mode")
+        parts.append({0: "ON", 1: "ASLEEP (standby)"}.get(mode, f"mode {mode}"))
+    except Exception:
+        parts.append("on/asleep unknown")
+    try:
+        t = get("/tv/getTuned")
+        parts.append(f"showing {t.get('major', '?')} {t.get('callsign', '')}".strip())
+    except Exception:
+        pass
+    try:
+        loc = get("/info/getLocations")
+        clients = [l for l in loc.get("locations", []) if l.get("clientAddr") not in (None, "0")]
+        if clients:
+            parts.append(f"also runs {len(clients)} Genie Mini(s)")
+    except Exception:
+        pass
+    return ", ".join(parts)
 
 
 def roku(ip, op, val):
@@ -434,6 +468,17 @@ def main(argv):
     if argv[0] == "list":
         for key, tv in load_tvs().items():
             print(f"  {key:10}  {tv.get('kind', 'directv'):9}  {tv.get('ip', ''):15}  {tv.get('name', '')}")
+        return 0
+    if argv[0] == "check":
+        tvs = load_tvs()
+        boxes = [(k, tv) for k, tv in tvs.items() if tv.get("kind", "directv") == "directv"]
+        with concurrent.futures.ThreadPoolExecutor(8) as pool:
+            results = list(pool.map(lambda kt: directv_check(kt[1]["ip"]), boxes))
+        for (k, tv), r in zip(boxes, results):
+            print(f"  {k:8} {tv.get('name', k)[:14]:14} {tv.get('ip', ''):15} {r}")
+        for k, tv in tvs.items():
+            if tv.get("kind", "directv") != "directv":
+                print(f"  {k:8} {tv.get('name', k)[:14]:14} {tv.get('ip', ''):15} ({tv.get('kind')} TV, not checked)")
         return 0
     if argv[0] == "pair":
         return pair(argv[1]) if len(argv) > 1 else (print("vt-directv pair <tv>  (vt-directv list)") or 2)

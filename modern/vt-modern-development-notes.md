@@ -142,6 +142,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-21 12:34 ET — Bob (Claude) — vt-directv check: read-only status of every DIRECTV receiver
+- **What:** New 'vt-directv check': for each receiver in tvs.json, whether it answers, its software, ON or ASLEEP (/info/mode), what it's showing (/tv/getTuned), and whether it serves Genie Minis (/info/getLocations). Changes nothing. Server: no change (Pi script only). Tablet app: no change.
+- **Why:** Owner 2026-11-21 at HCA: Sceptre TVs now follow CEC, but BAR 3's BOX on wakes the TV and not the receiver, buttons behave differently box to box, and tablet TV buttons do nothing. Needed facts per box before changing the pages.
+- **Files:** (none)
+
 ### 2026-11-21 10:10 ET — Bob (Claude) — Tables: Lounge chair shape
 - **What:** New zone Shape Lounge chair (shape: chair) in ZoneShape.qml and schema.cpp kShapes: a tub chair from above. A table set to it keeps everything a table does (checks, seats, status, picked rim); the whole chair takes the status color, back and arms a shade darker, seat cushion full color.
 - **Why:** Owner: HCA lounge chairs work like tables, the entire chair changing color on status.
