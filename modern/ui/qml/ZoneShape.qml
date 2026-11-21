@@ -44,6 +44,16 @@ Item {
             P(x + c, y + h); P(x, y + h / 2); P(x + c, y)
             return pts
         }
+        case "chair": {
+            // Lounge chair (a tub chair from above): round back along the top, front square.
+            const n = 32, rx = w / 2, ry = h / 2, cx = x + w / 2, cy = y + ry
+            for (let i = 0; i <= n; ++i) {
+                const a = Math.PI + Math.PI * i / n
+                P(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry)
+            }
+            P(x + w, y + h); P(x, y + h); P(x, y + ry)
+            return pts
+        }
         case "octagon": {
             const c = Math.min(w, h) * 0.29
             P(x + c, y); P(x + w - c, y); P(x + w, y + c); P(x + w, y + h - c)
@@ -71,6 +81,19 @@ Item {
             return pts
         }
         }
+    }
+
+    // Lounge chair: the seat cushion between the arms, below the back.
+    function chairSeat() {
+        const pts = [], f = frameWidth
+        const a = width * 0.2, b = height * 0.2
+        const sw = width - 2 * a, rx = sw / 2, ry = height * 0.3, cx = width / 2, cy = b + ry
+        for (let i = 0; i <= 32; ++i) {
+            const t = Math.PI + Math.PI * i / 32
+            pts.push(Qt.point(cx + Math.cos(t) * rx, cy + Math.sin(t) * ry))
+        }
+        pts.push(Qt.point(a + sw, height - f - 1)); pts.push(Qt.point(a, height - f - 1)); pts.push(Qt.point(a, cy))
+        return pts
     }
 
     // Textures: on GPU backends the tiled image is rendered into a texture
@@ -123,13 +146,21 @@ Item {
         // Face
         ShapePath {
             strokeWidth: -1
-            fillColor: root.fill
+            fillColor: root.shape === "chair" ? Qt.darker(root.fill, 1.3) : root.fill
             // fillItem: root.textured && !root.softwareRenderer ? textureSource : null
             PathPolyline {
                 path: root.outline(root.frameWidth, root.frameWidth,
                                    root.width - 2 * root.frameWidth, root.height - 2 * root.frameWidth,
                                    root.radius - root.frameWidth)
             }
+        }
+
+        // Lounge chair: the seat cushion, in the zone's own color (a table's status)
+        ShapePath {
+            strokeWidth: root.shape === "chair" ? 1.5 : -1
+            strokeColor: root.shape === "chair" ? Qt.darker(root.fill, 1.8) : "transparent"
+            fillColor: root.shape === "chair" ? root.fill : "transparent"
+            PathPolyline { path: root.shape === "chair" ? root.chairSeat() : [] }
         }
     }
 

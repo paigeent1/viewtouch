@@ -142,6 +142,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-21 10:10 ET — Bob (Claude) — Tables: Lounge chair shape
+- **What:** New zone Shape Lounge chair (shape: chair) in ZoneShape.qml and schema.cpp kShapes: a tub chair from above. A table set to it keeps everything a table does (checks, seats, status, picked rim); the whole chair takes the status color, back and arms a shade darker, seat cushion full color.
+- **Why:** Owner: HCA lounge chairs work like tables, the entire chair changing color on status.
+- **Files:** (none)
+
 ### 2026-11-21 07:10 ET — Bob (Claude) — Floor plan: Lounge chair piece
 - **What:** New floor plan piece Lounge chair (decor: chair): a leather tub chair seen from above, back along the top, arms down the sides, seat cushion. Default oxblood #8e2b22; the Color setting overrides. Files: ui/qml/WidgetDecor.qml, layout/schema.cpp, ui/qml/EditorToolbar.qml.
 - **Why:** HCA lounge seating (red leather tub chairs) on the floor plan; same build for BHDAN and HCA.

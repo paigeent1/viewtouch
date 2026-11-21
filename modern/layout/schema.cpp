@@ -46,7 +46,7 @@ QJsonObject intField(const QString &path, const QString &label, const QString &g
 }
 
 const QJsonArray kShapes = options({{"rect", "Rectangle"}, {"rounded", "Rounded"}, {"circle", "Circle"},
-                                    {"diamond", "Diamond"}, {"hexagon", "Hexagon"}, {"octagon", "Octagon"}});
+                                    {"diamond", "Diamond"}, {"hexagon", "Hexagon"}, {"octagon", "Octagon"}, {"chair", "Lounge chair"}});
 const QJsonArray kBehaviors = options({{"blink", "Blink on touch"}, {"toggle", "Toggle on/off"},
                                        {"select", "Stay lit (one per page)"}, {"double", "Double touch"},
                                        {"passthrough", "Ignore touches"}, {"none", "No feedback"}});
