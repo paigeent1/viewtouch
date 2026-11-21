@@ -311,7 +311,7 @@ QJsonArray zoneFields(const QString &kind)
         out.append(with(with(field(u"props.decor"_s, u"Piece"_s, u"enum"_s, general), u"options"_s,
                              options({{"wall", "Wall"}, {"window", "Window"}, {"door", "Door"}, {"counter", "Bar counter"},
                                       {"booth", "Booth bench"}, {"plant", "Plant"}, {"pillar", "Pillar"},
-                                      {"fence", "Fence or rail"}, {"entrance", "Entrance"}, {"area", "Area (a room's floor)"}})),
+                                      {"fence", "Fence or rail"}, {"chair", "Lounge chair"}, {"entrance", "Entrance"}, {"area", "Area (a room's floor)"}})),
                         u"hint"_s, u"Drawn on the floor plan; touching it does nothing."_s));
         out.append(with(field(u"label"_s, u"Words on it"_s, u"string"_s, general), u"hint"_s,
                         u"An area's name (Patio), Entrance, Restrooms… Empty: none."_s));

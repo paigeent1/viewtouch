@@ -96,7 +96,7 @@ Rectangle {
                                 { decor: "wall", text: qsTr("Wall") }, { decor: "window", text: qsTr("Window") },
                                 { decor: "door", text: qsTr("Door") }, { decor: "counter", text: qsTr("Bar counter") },
                                 { decor: "booth", text: qsTr("Booth bench") }, { decor: "plant", text: qsTr("Plant") },
-                                { decor: "pillar", text: qsTr("Pillar") }, { decor: "fence", text: qsTr("Fence or rail") },
+                                { decor: "pillar", text: qsTr("Pillar") }, { decor: "fence", text: qsTr("Fence or rail") }, { decor: "chair", text: qsTr("Lounge chair") },
                                 { decor: "entrance", text: qsTr("Entrance") }, { decor: "area", text: qsTr("Area (a room's floor)") },
                             ]
                             delegate: MenuItem {

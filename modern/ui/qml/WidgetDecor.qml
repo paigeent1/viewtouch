@@ -188,6 +188,62 @@ Item {
         }
     }
 
+    // Lounge chair: a leather tub chair seen from above, its back along the top
+    // and its arms down the sides, the seat cushion between them.
+    Item {
+        id: chair
+        visible: w.decor === "chair"
+        anchors.fill: parent
+        readonly property color hide: w.tone("#8e2b22")
+        readonly property real arm: w.width * 0.2
+        readonly property real back: w.height * 0.2
+        readonly property real ry: w.height * 0.5
+        Rectangle {
+            x: chair.arm; y: chair.back
+            width: w.width - 2 * chair.arm
+            height: w.height - chair.back - 3
+            topLeftRadius: width / 2; topRightRadius: width / 2
+            bottomLeftRadius: 4; bottomRightRadius: 4
+            color: Qt.lighter(chair.hide, 1.12)
+            border.color: Qt.darker(chair.hide, 1.8)
+            border.width: 2
+            Rectangle {
+                x: parent.width * 0.22; y: parent.height * 0.45
+                width: parent.width * 0.3; height: parent.height * 0.12
+                radius: height / 2
+                color: Qt.rgba(1, 1, 1, 0.15)
+            }
+        }
+        Shape {
+            anchors.fill: parent
+            ShapePath {
+                strokeColor: Qt.darker(chair.hide, 1.8)
+                strokeWidth: 2
+                fillColor: chair.hide
+                startX: 1; startY: w.height - 1
+                PathLine { x: 1; y: chair.ry }
+                PathArc { x: w.width - 1; y: chair.ry; radiusX: w.width / 2 - 1; radiusY: chair.ry - 1 }
+                PathLine { x: w.width - 1; y: w.height - 1 }
+                PathLine { x: w.width - chair.arm; y: w.height - 1 }
+                PathLine { x: w.width - chair.arm; y: chair.ry }
+                PathArc { x: chair.arm; y: chair.ry; radiusX: w.width / 2 - chair.arm; radiusY: chair.ry - chair.back; direction: PathArc.Counterclockwise }
+                PathLine { x: chair.arm; y: w.height - 1 }
+                PathLine { x: 1; y: w.height - 1 }
+            }
+            ShapePath {
+                strokeColor: Qt.alpha(Qt.lighter(chair.hide, 1.7), 0.6)
+                strokeWidth: 1
+                strokeStyle: ShapePath.DashLine
+                dashPattern: [3, 3]
+                fillColor: "transparent"
+                startX: chair.arm / 2; startY: w.height - 5
+                PathLine { x: chair.arm / 2; y: chair.ry }
+                PathArc { x: w.width - chair.arm / 2; y: chair.ry; radiusX: w.width / 2 - chair.arm / 2; radiusY: chair.ry - chair.back / 2 }
+                PathLine { x: w.width - chair.arm / 2; y: w.height - 5 }
+            }
+        }
+    }
+
     // Area: a room's floor, outlined, its name in the corner.
     Shape {
         visible: w.decor === "area"

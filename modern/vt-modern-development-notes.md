@@ -142,6 +142,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-21 07:10 ET — Bob (Claude) — Floor plan: Lounge chair piece
+- **What:** New floor plan piece Lounge chair (decor: chair): a leather tub chair seen from above, back along the top, arms down the sides, seat cushion. Default oxblood #8e2b22; the Color setting overrides. Files: ui/qml/WidgetDecor.qml, layout/schema.cpp, ui/qml/EditorToolbar.qml.
+- **Why:** HCA lounge seating (red leather tub chairs) on the floor plan; same build for BHDAN and HCA.
+- **Files:** `modern/layout/schema.cpp`, `modern/ui/qml/EditorToolbar.qml`, `modern/ui/qml/WidgetDecor.qml`
+
 ### 2026-11-20 18:34 ET — Bob (Claude) — Backlog: TruAge added to the Mobile ID age check item
 - **What:** Mobile ID age check backlog item now lists TruAge (NACS) as an alternative to weigh first, with what's known and the open questions. Server: no change. Tablet app: no change (notes only).
 - **Why:** Owner 2026-11-20 forwarded the We Card eNews about TruAge.
@@ -3058,3 +3063,5 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
   digits). Same picture for Zebra, CUPS and PDF. Exact print image in the preview. Rotation applied to
   printed labels. Printer resolution setting (203/300/600 dpi). Desktop launcher installer.
 - **Files:** `modern/tools/claude_label_utility.py`, `install_claude_label_utility.sh`. **Commit:** `18d0996`
+
+- 2026-11-21 07:00 Bob (Claude): new floor plan piece "Lounge chair" (decor: chair), a leather tub chair seen from above (back along the top, arms down the sides, seat cushion). Default oxblood #8e2b22, Color setting overrides. Files: ui/qml/WidgetDecor.qml, layout/schema.cpp, ui/qml/EditorToolbar.qml. Modeled on the HCA red leather tub chairs.
