@@ -1250,6 +1250,7 @@ bool PosService::openCheck(std::int64_t checkId)
     seat_ = 0;
     course_ = 1;
     choosingLine_ = 0;
+    mixerLine_ = 0;
     selectedLine_ = 0;
     selectedPayment_ = 0;
     pendingTable_.clear();
@@ -1397,6 +1398,7 @@ void PosService::releaseCheck()
     seat_ = 0;
     course_ = 1;
     choosingLine_ = 0;
+    mixerLine_ = 0;
     selectedLine_ = 0;
     selectedPayment_ = 0;
     pendingTable_.clear();
@@ -1576,6 +1578,12 @@ bool PosService::addItem(const QString &idOrName)
             if (s_->settings.modifierGroup(g))
                 choosingLine_ = line.id;
         }
+        // The bar (pos_bar_menu.cpp): a pour's notes from the pour picker; a spirit asks for its mixer.
+        if (!pourNotes_.isEmpty() && pourNotesItem_ == qs(item->id))
+            addBarNotes(line, pourNotes_);
+        pourNotes_.clear();
+        pourNotesItem_.clear();
+        mixerLine_ = choosingLine_ == 0 && mixerWanted(*item) ? line.id : 0;
     }
     if (qualifier_ != Qualifier::None) {
         qualifier_ = Qualifier::None;

@@ -149,6 +149,7 @@ inline QVariantList storeSections(const QVariantList &fields)
           "expenseCategories"}},
         {"service", PosService::tr("Responsible service"),
          {"serviceOn", "serviceCaution", "serviceStop", "serviceWindowHours", "serviceSubtract", "servicePerHour", "serviceReasons"}},
+        {"bar", PosService::tr("Bar menu"), {"barMixerGroup", "barNotesGroup", "barMixerMinAbv", "barMixerCategories"}},
         {"reasons", PosService::tr("Voids, comps, No Sale and Cancel Sale"), {"askReasons", "voidReasons", "compReasons", "noSaleReasons", "cancelReasons", "watch", "watchVoid", "watchComp"}},
         {"hours", PosService::tr("Staff hours"),
          {"laborState", "paidBreaks", "overtimeDailyHours", "doubleTimeDailyHours", "seventhDayRule", "overtimeWeeklyHours", "mealBreakAfterHours", "giftCardCashBelow", "weekStartsOn", "scheduleRequired", "clockInEarlyMinutes", "checksPerServerHour"}},

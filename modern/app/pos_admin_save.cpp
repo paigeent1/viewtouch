@@ -610,6 +610,21 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
                 return fail(tr("Responsible service: take off 0 to 10 drinks an hour."));
             s_->settings.service = sp;
         }
+        {   // The bar menu: which groups the mixers and notes come from, and which drinks ask.
+            PosSettings::BarMenu bm = s_->settings.barMenu;
+            if (record.contains(u"barMixerGroup"_s)) bm.mixerGroup = ss(record.value(u"barMixerGroup"_s).toString());
+            if (record.contains(u"barNotesGroup"_s)) bm.notesGroup = ss(record.value(u"barNotesGroup"_s).toString());
+            if (record.contains(u"barMixerMinAbv"_s)) bm.mixerMinAbv = record.value(u"barMixerMinAbv"_s).toDouble();
+            if (record.contains(u"barMixerCategories"_s)) {
+                bm.mixerCategories.clear();
+                for (const QString &line : record.value(u"barMixerCategories"_s).toString().split(u'\n', Qt::SkipEmptyParts))
+                    if (const std::string id = ss(line.trimmed()); !id.empty() && std::ranges::find(bm.mixerCategories, id) == bm.mixerCategories.end())
+                        bm.mixerCategories.push_back(id);
+            }
+            if (bm.mixerMinAbv < 0 || bm.mixerMinAbv > 100)
+                return fail(tr("Bar menu: the ABV is a percent, 0 to 100."));
+            s_->settings.barMenu = bm;
+        }
         if (record.contains(u"watch"_s))
             s_->settings.watch = record.value(u"watch"_s).toBool();
         for (const auto &[key, amount] : {std::pair{u"watchVoid", &s_->settings.watchVoid}, std::pair{u"watchComp", &s_->settings.watchComp}})

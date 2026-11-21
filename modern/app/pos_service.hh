@@ -840,6 +840,37 @@ public:
     bool shareDrink(qint64 lineId, const QVariantList &seats);
     // The guests on the open check and their counts now: [{key, label, drinks ("4.2"), value, level}].
     QVariantList drinkCounts() const;
+
+    // --- The bar menu (pos_bar_menu.cpp) ---------------------------------------------------------
+    // After a spirit is rung (Store Settings -> Bar menu: its categories, else ABV at least the minimum), a
+    // mixer from the Mixers modifier group, added to the drink as a choice (it prints and charges); none in
+    // the group: never asked. {active, lineId, item, mixers: [{index, name, price}], notes: [{name, chosen}]}.
+    QVariantMap mixerAsk() const override;
+    // A pour rung as addItem rings it, its notes (names from the Bar notes group: Neat, Rocks...) added to
+    // it at no charge once it is on the check (after an ID check or a responsible-service ask too).
+    bool orderPour(const QString &itemId, const QVariantList &notes);
+    // The mixer asked for: its index in the Mixers group, or -1 for none; the notes chosen then replace the
+    // drink's notes. Ends the ask.
+    bool answerMixer(int index, const QVariantList &notes);
+    // A drink that asks for a mixer when rung (the store's rule above).
+    bool mixerWanted(const core::MenuItem &item) const;
+    // A drink (ABV or pour given, taxed as alcohol) or something the bar makes (prints to the bar).
+    static bool barItem(const core::MenuItem &item);
+    // The pours of one bottle, for the bar's grids: item id -> {key (shared by the bottle's pours; only
+    // where it has two or more), bottle (its name), pour (the size: "1.25 oz", "Glass")}.
+    struct PourOf {
+        QString key, bottle, pour;
+    };
+    std::map<std::string, PourOf> pourGroups() const;
+    // Given once to a store (new or not): an empty Mixers group and a Bar notes group, names only and no
+    // prices (the owner prices them in Manager -> Modifiers). True when it changed the settings.
+    static bool seedBarGroups(core::PosSettings &settings);
+    // A drink's name split from its size ("Tito's 1.25oz": Tito's, oz, 1.25; "... Glass": glass); pos_bar.cpp.
+    struct DrinkSize {
+        QString base, size;
+        double value = 0;
+    };
+    static DrinkSize drinkSizeOf(const QString &name);
     // The audit file's entries in [from, to) (epoch ms), oldest first; and the Responsible Service report.
     std::vector<QJsonObject> serviceAuditEntries(std::int64_t from, std::int64_t to) const;
     core::Report serviceReport(std::int64_t from, std::int64_t to, const QString &label) const;
@@ -2071,6 +2102,10 @@ private:
     int course_ = 1;    // course for new items
     bool lineTouched_ = false;   // the selected line was touched (not just added)
     std::int64_t choosingLine_ = 0;   // the line whose modifiers are being chosen
+    std::int64_t mixerLine_ = 0;      // the bar: the spirit waiting for its mixer (pos_bar_menu.cpp)
+    QString pourNotesItem_;           // orderPour: the item whose notes wait to go on when it's rung
+    QStringList pourNotes_;
+    void addBarNotes(core::OrderLine &line, const QStringList &notes);
     // An item already on the check (Choose): as it was, for Cancel Changes;
     // empty: just added (Cancel Item takes it off).
     std::optional<core::OrderLine> choosingBefore_;

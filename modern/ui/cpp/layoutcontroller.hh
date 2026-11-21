@@ -86,6 +86,9 @@ class LayoutController : public QObject {
     // The menu category being shown (a self-filling menu with no category of
     // its own shows this one).
     Q_PROPERTY(QString menuCategory READ menuCategory WRITE setMenuCategory NOTIFY menuCategoryChanged)
+    // The bar menu: only that category's items of this product group ("": those without one); undefined:
+    // the whole category. Set with openCategoryGroup, cleared when the category changes.
+    Q_PROPERTY(QVariant menuGroup READ menuGroup NOTIFY menuCategoryChanged)
     // The store's meal pages have category buttons placed by hand (new
     // items show up on none): the Menu Builder offers to switch them.
     Q_PROPERTY(bool menuScreensHandBuilt READ menuScreensHandBuilt NOTIFY menuScreensChanged)
@@ -323,6 +326,10 @@ public:
     Q_INVOKABLE bool jumpTo(const QString &pageId);
     // A category's items: the menu page (role "menu", else "menu-all") on it.
     Q_INVOKABLE bool openCategory(const QString &categoryId);
+    // The bar menu's tiles: a category's items of one product group ("": those without one).
+    Q_INVOKABLE bool openCategoryGroup(const QString &categoryId, const QString &group);
+    // A pour from the bar's pour picker, rung as an Add Item button rings it, with its notes (Neat, Rocks).
+    Q_INVOKABLE void orderPour(const QString &itemId, const QVariantList &notes);
     bool menuScreensHandBuilt() const;
     // The meal pages made self-filling, in the page editor (one step: look it
     // over, then Save, or Undo); false when there's nothing to switch or
@@ -351,6 +358,7 @@ public:
     Q_INVOKABLE void keep(const QString &key, const QVariant &value) { if (value.isValid()) kept_.insert(key, value); else kept_.remove(key); }
     Q_INVOKABLE QVariant take(const QString &key) { return kept_.take(key); }
     QString menuCategory() const { return menuCategory_; }
+    QVariant menuGroup() const { return menuGroup_; }
     void setMenuCategory(const QString &id);
     // Holding a button: what it does, in plain words, instead of doing it.
     Q_INVOKABLE void explain(const QString &zoneId);
@@ -511,6 +519,7 @@ private:
     QTimer sleepTimer_;
     QVariantMap statusColors_;
     QString menuCategory_;
+    QVariant menuGroup_;
     QVariantMap widgetState_;
     bool setupOpen_ = false;
     bool floorChooserOpen_ = false;

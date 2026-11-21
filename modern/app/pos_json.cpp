@@ -1198,6 +1198,10 @@ QJsonObject toJson(const PosSettings &s)
              {u"on"_s, s.service.on}, {u"caution"_s, s.service.caution}, {u"stop"_s, s.service.stop},
              {u"windowHours"_s, s.service.windowHours}, {u"subtract"_s, s.service.subtract},
              {u"perHour"_s, s.service.perHour}, {u"overrideReasons"_s, strings(s.service.overrideReasons)}}},
+        {u"barMenu"_s, QJsonObject{
+             {u"mixerGroup"_s, qs(s.barMenu.mixerGroup)}, {u"notesGroup"_s, qs(s.barMenu.notesGroup)},
+             {u"mixerMinAbv"_s, s.barMenu.mixerMinAbv}, {u"mixerCategories"_s, strings(s.barMenu.mixerCategories)},
+             {u"groupsSeeded"_s, s.barMenu.groupsSeeded}}},
         {u"privacy"_s, QJsonObject{{u"onReceipts"_s, s.privacyOnReceipts}, {u"short"_s, qs(s.privacyShort)},
                                    {u"full"_s, qs(s.privacyFull)}, {u"updatedAt"_s, qint64(s.privacyUpdatedAt)}}},
         {u"gratuity"_s, QJsonObject{{u"percent"_s, double(s.gratuityBp) / 100.0}, {u"minGuests"_s, s.gratuityMinGuests}}},
@@ -1651,6 +1655,16 @@ PosSettings settingsFromJson(const QJsonObject &o)
         s.service.subtract = rs.value(u"subtract").toBool(d.subtract);
         s.service.perHour = std::clamp(rs.value(u"perHour").toDouble(d.perHour), 0.0, 10.0);
         s.service.overrideReasons = strings(rs.value(u"overrideReasons").toArray());
+    }
+    {
+        // The bar menu: mixers from "mixers", notes from "bar-notes", spirits of 20% ABV or more ask.
+        const QJsonObject bm = o.value(u"barMenu").toObject();
+        const PosSettings::BarMenu d;
+        s.barMenu.mixerGroup = ss(bm.value(u"mixerGroup").toString(qs(d.mixerGroup)));
+        s.barMenu.notesGroup = ss(bm.value(u"notesGroup").toString(qs(d.notesGroup)));
+        s.barMenu.mixerMinAbv = std::clamp(bm.value(u"mixerMinAbv").toDouble(d.mixerMinAbv), 0.0, 100.0);
+        s.barMenu.mixerCategories = strings(bm.value(u"mixerCategories").toArray());
+        s.barMenu.groupsSeeded = bm.value(u"groupsSeeded").toBool(false);
     }
     {
         const QJsonObject privacy = o.value(u"privacy").toObject();

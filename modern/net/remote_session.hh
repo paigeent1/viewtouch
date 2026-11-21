@@ -165,6 +165,7 @@ public:
     QVariantMap customerDuplicate() const override { return v(u"customerDuplicate").toMap(); }
     QVariantMap ageAsk() const override { return v(u"ageAsk").toMap(); }
     QVariantMap serviceAsk() const override { return v(u"serviceAsk").toMap(); }
+    QVariantMap mixerAsk() const override { return v(u"mixerAsk").toMap(); }
     QVariantMap idChecks() const override { return v(u"idChecks").toMap(); }
     QVariantMap pricing() const override { return v(u"pricing").toMap(); }
     int imageRevision() const override { return adminRevision() + imageRevision_; }

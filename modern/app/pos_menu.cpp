@@ -680,8 +680,30 @@ QVariantList PosService::menuCategoriesNow() const
 {
     QVariantList out;
     const std::string period = currentMealPeriod();
+    // The bar menu (index-bar): the categories with drinks (or what the bar makes), and in each the product
+    // groups of its items (Bourbon, Scotch...), in the menu's order, when there are two or more.
+    std::map<std::string, bool> bar;
+    std::map<std::string, std::vector<std::pair<std::string, int>>> groups;
+    for (const MenuItem &m : s_->menu) {
+        if (m.isModifier)
+            continue;
+        if (barItem(m))
+            bar[m.family] = true;
+        auto &g = groups[m.family];   // "": the ones without a product group (shown under the category's name)
+        const auto it = std::ranges::find_if(g, [&](const auto &x) { return x.first == m.productGroup; });
+        if (it == g.end())
+            g.emplace_back(m.productGroup, 1);
+        else
+            ++it->second;
+    }
     for (const MenuCategory &c : s_->categories()) {
         const auto count = std::ranges::count_if(s_->menu, [&](const MenuItem &m) { return m.family == c.id && !m.isModifier; });
+        const bool isBar = bar.contains(c.id) || QString::fromStdString(c.printer).compare(u"bar"_s, Qt::CaseInsensitive) == 0;
+        QVariantList barGroups;
+        if (isBar && groups.contains(c.id)
+            && std::ranges::count_if(groups[c.id], [](const auto &x) { return !x.first.empty(); }) > 1)
+            for (const auto &[name, n] : groups[c.id])
+                barGroups.append(QVariantMap{{u"name"_s, qs(name)}, {u"count"_s, n}});
         QStringList periods;
         for (const std::string &p : c.periods)
             periods << qs(p);
@@ -691,7 +713,8 @@ QVariantList PosService::menuCategoriesNow() const
                                {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)},
                                {u"taxClass"_s, qs(c.taxClass)}, {u"buttonSize"_s, qs(c.buttonSize)},
                                {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                               {u"noDiscount"_s, c.noDiscount}, {u"retailOnly"_s, c.retailOnly}});
+                               {u"noDiscount"_s, c.noDiscount}, {u"retailOnly"_s, c.retailOnly},
+                               {u"bar"_s, isBar}, {u"barGroups"_s, barGroups}});
     }
     return out;
 }
@@ -776,7 +799,9 @@ QVariantList PosService::menuItemsNow() const
         return out;
     const std::string period = currentMealPeriod();
     const core::scandata::ItemIndex scanIndex(s_->menu);   // how each sells for scan data (packs, cartons)
+    const std::map<std::string, PourOf> pours = pourGroups();   // the bar: pours grouped by bottle
     for (const MenuItem &m : s_->menu) {
+        const auto pour = pours.find(m.id);
         out.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"family"_s, qs(m.family)},
                                {u"price"_s, format(m.priceDuring(period))}, {u"modifier"_s, m.isModifier},
                                {u"regularPrice"_s, format(m.price)},
@@ -888,7 +913,13 @@ QVariantList PosService::menuItemsNow() const
                                {u"takeoutPrice"_s, m.takeoutPrice.cents() ? QString::number(double(m.takeoutPrice.cents()) / 100.0, 'f', 2) : QString()},
                                {u"deliveryPrice"_s, m.deliveryPrice.cents() ? QString::number(double(m.deliveryPrice.cents()) / 100.0, 'f', 2) : QString()},
                                {u"periodPrices"_s, [&m] { QVariantMap p; for (const auto &[k, v] : m.periodPrices) p.insert(qs(k), QString::number(double(v.cents()) / 100.0, 'f', 2)); return p; }()},
-                               {u"allergens"_s, [&m] { QStringList a; for (const std::string &x : m.allergens) a << qs(x); return a; }()}});
+                               {u"allergens"_s, [&m] { QStringList a; for (const std::string &x : m.allergens) a << qs(x); return a; }()},
+                               // The bar's grids (pos_bar_menu.cpp): one button per bottle, a pour picker.
+                               {u"productGroup"_s, qs(m.productGroup)},
+                               {u"priceCents"_s, qint64(m.priceDuring(period).cents())},
+                               {u"bottle"_s, pour != pours.end() ? pour->second.key : QString()},
+                               {u"bottleName"_s, pour != pours.end() ? pour->second.bottle : QString()},
+                               {u"pourName"_s, pour != pours.end() ? pour->second.pour : QString()}});
     }
     return out;
 }
