@@ -211,3 +211,34 @@ TEST_CASE("REPEAT ROUND and SAME AGAIN ring the right drinks with their choices"
     REQUIRE_FALSE(top.isEmpty());
     CHECK(top.front() == u"draft-beer"_s);
 }
+
+TEST_CASE("A tap list of one pour per beer: Link pours finds each beer; lines filled in import order", "[bar][draft][speed]")
+{
+    test::RecordingSink sink;
+    PosService pos(test::seedPosData(), &sink);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    // As a real tap list: one serving per beer, most 16oz, a few 12oz (made-up names).
+    const QVariantList rows{
+        draftRow("ZULU LAGER 16oz", "8.00", "16"), draftRow("ALPHA SOUR 12oz", "8.00", "12"),
+        draftRow("MIKE IPA 16oz", "8.00", "16"),   draftRow("BRAVO CIDER 12oz", "7.00", "12"),
+    };
+    REQUIRE(pos.importMenuRows(rows, QString(), false) == rows.size());
+    REQUIRE(pos.fillDraftLines());
+    // The beer is the name less its size; the first imported goes on T1-L1, the next on T1-L2...
+    CHECK(lineOf(pos, "T1-L1")->beer == "ZULU LAGER");
+    CHECK(lineOf(pos, "T1-L2")->beer == "ALPHA SOUR");
+    CHECK(lineOf(pos, "T1-L3")->beer == "MIKE IPA");
+    CHECK(lineOf(pos, "T1-L4")->beer == "BRAVO CIDER");
+    CHECK((!lineOf(pos, "T1-L5") || lineOf(pos, "T1-L5")->kegId.empty()));
+    // Each line has its one pour, which rings from it.
+    const QVariantList lines = pos.draftLines()[u"lines"_s].toList();
+    const QVariantList sour = lines[1].toMap()[u"items"_s].toList();
+    REQUIRE(sour.size() == 1);
+    CHECK(sour[0].toMap()[u"id"_s] == idOf(pos, "ALPHA SOUR 12oz"));
+    CHECK(sour[0].toMap()[u"oz"_s].toDouble() == 12.0);
+    REQUIRE(pos.startCheck(core::CheckType::Quick));
+    REQUIRE(pos.orderDraft(u"T1-L2"_s, idOf(pos, "ALPHA SOUR 12oz")));
+    REQUIRE(pos.sendOrder());
+    CHECK(lineOf(pos, "T1-L2")->poured == 12.0);
+    CHECK(lineOf(pos, "T1-L1")->poured == 0.0);
+}

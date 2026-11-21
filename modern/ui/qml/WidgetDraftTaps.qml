@@ -4,8 +4,8 @@ import QtQuick.Layouts
 
 // The Draft page: the bar's draft lines laid out as the bar has them, a tower to a column (T1, T2,
 // T3 side by side, its lines top to bottom), from the draft-line data (pos.draftLines). Each line is
-// a big key with the beer on it now and how full its keg is; touch one, then a size (12 oz, 16 oz,
-// with prices): rung as any item (the keg on that line pours it). A line with nothing on it, or
+// a big key with the beer on it now and how full its keg is; touch one: its one pour is rung at once,
+// or (two or more) choose the size (12 oz, 16 oz, with prices): rung as any item (the keg on that line pours it). A line with nothing on it, or
 // whose beer has no menu item, is grey and can't be touched; a kicked keg (all of it rung up) says
 // "Kicked — change keg" and opens Change keg.
 Item {
@@ -40,7 +40,9 @@ Item {
     function stateOf(line) {
         if (!line.keg) return "empty"
         if (line.kicked) return "kicked"
-        return sizesOf(line).length > 0 ? "ready" : "noItem"
+        const sizes = sizesOf(line)
+        if (sizes.length === 0) return "noItem"
+        return sizes.some(x => x.available) ? "ready" : "soldOut"
     }
     readonly property real gap: 10
     readonly property string face: zone && zone.st ? (zone.st.font ?? "DejaVu Sans") : "DejaVu Sans"
@@ -75,6 +77,7 @@ Item {
                         id: tap
                         required property var modelData
                         readonly property string state_: w.stateOf(modelData)
+                        readonly property var sizes: w.sizesOf(modelData)
                         readonly property bool usable: state_ === "ready" || state_ === "kicked"
                         objectName: "draftTap-" + modelData.id
                         Layout.fillWidth: true
@@ -124,12 +127,14 @@ Item {
                             width: parent.width - 16
                             horizontalAlignment: Text.AlignHCenter
                             wrapMode: Text.WordWrap
-                            maximumLineCount: 2
+                            maximumLineCount: 3
                             elide: Text.ElideRight
                             text: tap.state_ === "empty" ? qsTr("(empty)")
                                 : tap.state_ === "kicked" ? tap.modelData.beer + "\n" + qsTr("Kicked — change keg")
                                 : tap.state_ === "noItem" ? tap.modelData.beer + "\n" + qsTr("(not on the menu)")
-                                : tap.modelData.beer
+                                : tap.state_ === "soldOut" ? tap.modelData.beer + "\n" + qsTr("SOLD OUT")
+                                : tap.modelData.beer + (tap.sizes.length === 1 ? "\n" + (tap.sizes[0].oz > 0 ? qsTr("%1 oz").arg(tap.sizes[0].oz) + "  " : "")
+                                                                                 + (tap.sizes[0].available ? tap.sizes[0].price : qsTr("SOLD OUT")) : "")
                             color: "white"
                             font.family: w.face
                             font.pixelSize: Math.max(14, Math.min(26, tap.height * 0.24))
@@ -140,10 +145,18 @@ Item {
                             anchors.fill: parent
                             enabled: tap.usable
                             onClicked: {
-                                if (tap.state_ === "kicked")
+                                if (tap.state_ === "kicked") {
                                     w.zone.controller.jumpToPage("change-keg")
-                                else
+                                    return
+                                }
+                                // One pour for this beer: rung at once; two or more: choose the size.
+                                const sizes = w.sizesOf(tap.modelData)
+                                if (sizes.length === 1) {
+                                    if (sizes[0].available)
+                                        w.zone.controller.orderDraft(tap.modelData.id, sizes[0].id)
+                                } else {
                                     w.picked = tap.modelData
+                                }
                             }
                         }
                     }
