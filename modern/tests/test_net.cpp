@@ -805,3 +805,97 @@ TEST_CASE("Quick Label from a tablet: the main computer prints it, and the table
     else
         qputenv("VT_LABEL_LAUNCHER", oldLauncher);
 }
+
+TEST_CASE("TV buttons: vt-directv's argument rules", "[tv][directv]")
+{
+    CHECK(PosService::directvArgsOk(u"bar3"_s, u"key"_s, u"poweron"_s));
+    CHECK(PosService::directvArgsOk(u"all"_s, u"tune"_s, u"206"_s));
+    CHECK(PosService::directvArgsOk(u"BAR_3"_s, u"tune"_s, u"206"_s));
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3"_s, u"scan"_s, u"206"_s));           // tune or key only
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3"_s, u"pair"_s, u"206"_s));
+    CHECK_FALSE(PosService::directvArgsOk(QString(), u"tune"_s, u"206"_s));
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3"_s, u"tune"_s, QString()));
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3; rm -rf ~"_s, u"tune"_s, u"206"_s));  // never a shell
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3"_s, u"tune"_s, u"206 && reboot"_s));
+    CHECK_FALSE(PosService::directvArgsOk(u"-v"_s, u"tune"_s, u"206"_s));
+    CHECK_FALSE(PosService::directvArgsOk(u"bar3"_s, u"key"_s, u"x"_s.repeated(25)));
+    CHECK(PosService::directvArgsOk(u"bar3"_s, u"key"_s, u"x"_s.repeated(24)));
+}
+
+TEST_CASE("TV buttons on a tablet: the main computer works the TV, the answer shows on that tablet", "[net][remote][tv][directv]")
+{
+    // vt-directv's stand-in on the main computer: keeps what it was given, answers as vt-directv does.
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QString calls = dir.path() + u"/calls.txt"_s;
+    {
+        QFile f(dir.path() + u"/fake"_s);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write(QString::fromUtf8("#!/bin/sh\n"
+                                  "printf '%s|%s|%s\\n' \"$1\" \"$2\" \"$3\" >> '%1'\n"
+                                  "echo \"BAR 3: $3 sent\"\n").arg(calls).toUtf8());
+        f.close();
+        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    }
+    const QByteArray oldLauncher = qgetenv("VT_DIRECTV_LAUNCHER");
+    qputenv("VT_DIRECTV_LAUNCHER", (dir.path() + u"/fake"_s).toUtf8());
+    const auto called = [&] {
+        QFile f(calls);
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).trimmed() : QString();
+    };
+    {
+        Store store;
+        Screen bar(store.terminal(u"Bar Tablet"_s));
+        Screen floor(store.terminal(u"Floor Tablet"_s));
+
+        // Nobody signed in: refused, nothing run.
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"key"_s}, {u"val"_s, u"poweron"_s}});
+        REQUIRE(waitFor([&] { return bar.c.statusText() == u"Log in first."_s; }));
+
+        bar.pin("1111");   // a server: anyone signed in may use the TVs
+        floor.pin("2222");
+        // A button set up wrong (or a page made by hand with something else in it): refused, nothing run.
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3;reboot"_s}, {u"op"_s, u"key"_s}, {u"val"_s, u"poweron"_s}});
+        REQUIRE(waitFor([&] { return bar.c.statusText().contains(u"isn't set up right"_s); }));
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"scan"_s}, {u"val"_s, u"x"_s}});
+        REQUIRE(waitFor([&] { return bar.c.statusText().contains(u"isn't set up right"_s); }));
+        CHECK(called().isEmpty());
+
+        // TV on, BAR 3: run on the main computer with exactly those arguments; the answer comes back
+        // to this tablet's status line (after it was answered, on its own), not to the other tablet's.
+        const QString floorWas = floor.c.statusText();
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"key"_s}, {u"val"_s, u"poweron"_s}});
+        CHECK(bar.c.statusText() == u"Sending to the TV..."_s);
+        REQUIRE(waitFor([&] { return bar.c.statusText() == u"BAR 3: poweron sent"_s; }, 5000));
+        CHECK(called() == u"bar3|key|poweron"_s);
+        CHECK(floor.c.statusText() == floorWas);
+
+        // A channel, with the button's defaults (bar1, tune 206) for what it leaves out.
+        bar.c.command(u"directv"_s, {{u"val"_s, u"219"_s}});
+        REQUIRE(waitFor([&] { return bar.c.statusText() == u"BAR 3: 219 sent"_s; }, 5000));
+        CHECK(called().endsWith(u"bar1|tune|219"_s));
+
+        // No vt-directv on the main computer: said so on the tablet.
+        qputenv("VT_DIRECTV_LAUNCHER", (dir.path() + u"/missing"_s).toUtf8());
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"key"_s}, {u"val"_s, u"poweroff"_s}});
+        REQUIRE(waitFor([&] { return bar.c.statusText().contains(u"isn't set up on the main computer"_s); }));
+    }
+    {
+        // The Pi's own screen: the same path, run right there.
+        qputenv("VT_DIRECTV_LAUNCHER", (dir.path() + u"/fake"_s).toUtf8());
+        PosShared shared(test::seedPosData(), nullptr);
+        PosService pi(&shared, u"Bar"_s);
+        LayoutController c(seedLayout());
+        c.setPos(&pi);
+        c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"tune"_s}, {u"val"_s, u"206"_s}});
+        CHECK(c.statusText() == u"Log in first."_s);
+        REQUIRE(pi.loginWithPin(u"1111"_s));
+        c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"tune"_s}, {u"val"_s, u"206"_s}});
+        REQUIRE(waitFor([&] { return c.statusText() == u"BAR 3: 206 sent"_s; }, 5000));
+        CHECK(called().endsWith(u"bar3|tune|206"_s));
+    }
+    if (oldLauncher.isEmpty())
+        qunsetenv("VT_DIRECTV_LAUNCHER");
+    else
+        qputenv("VT_DIRECTV_LAUNCHER", oldLauncher);
+}

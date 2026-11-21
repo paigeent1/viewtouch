@@ -719,6 +719,15 @@ public:
     bool printQuickLabel(const QStringList &lines, const QString &roll, int copies);
     bool closeQuickLabel();                                                          // forgets the preview and status
     static constexpr int kQuickLabelLines = 3, kQuickLabelChars = 40, kQuickLabelCopies = 50;
+    // TV buttons (the pages' "directv" command): this (the main) computer runs
+    // /usr/local/bin/vt-directv <box> <op> <val> (VT_DIRECTV_LAUNCHER stands in for it: tests) in the
+    // background, killed after 10 s, and its one-line answer comes back as a notice on this terminal's
+    // screen only, so a tablet's TV buttons work as the Pi's own. Anyone logged in.
+    bool directv(const QString &box, const QString &op, const QString &val);
+    // vt-directv's own rules for its arguments: box and val [A-Za-z0-9_]{1,24}, op tune or key.
+    static bool directvArgsOk(const QString &box, const QString &op, const QString &val);
+    static QString directvProgram();
+    static constexpr int kDirectvTimeoutMs = 10'000;
     std::string labelPrinterId() const;
     const std::vector<core::Waste> &wasteEntries() const { return s_->waste; }
     const std::vector<core::StockCount> &stockCounts() const { return s_->stockCounts; }

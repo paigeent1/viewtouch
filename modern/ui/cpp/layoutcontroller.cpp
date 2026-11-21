@@ -2385,25 +2385,17 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         return done(true);
     }
     if (name == u"directv") {
-        // In the background: a receiver that doesn't answer mustn't freeze the
-        // screen (it used to wait up to 4 s). The answer shows in the status line.
-        const QStringList a{args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(),
-                            args.value(u"val"_s, u"206"_s).toString()};
-        auto *proc = new QProcess(this);
-        connect(proc, &QProcess::finished, this, [this, proc](int, QProcess::ExitStatus) {
-            const QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
-            setStatus(out.isEmpty() ? tr("DIRECTV command sent.") : out);
-            proc->deleteLater();
-        });
-        connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError e) {
-            if (e == QProcess::FailedToStart) {
-                setStatus(tr("TV control isn't set up on this device (vt-directv)."));
-                proc->deleteLater();
-            }
-        });
-        QTimer::singleShot(10000, proc, [proc] { proc->kill(); });
+        // The store's main computer works the TVs (PosService::directv runs vt-directv there, in the
+        // background, 10 s at most), so a tablet's TV buttons work as the Pi's own (HCA 2026-11-21: on a
+        // tablet they ran vt-directv on the tablet, which hasn't got it). Its answer comes back as a
+        // notice, in this screen's status line.
+        if (!pos_) {
+            setStatus(tr("TV control isn't set up on this device (vt-directv)."));
+            return done(false);
+        }
         setStatus(tr("Sending to the TV..."));
-        proc->start(u"/usr/local/bin/vt-directv"_s, a);
+        pos_->directv(args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(),
+                      args.value(u"val"_s, u"206"_s).toString());
         return done(true);
     }
     if (name == u"openAdmin") {

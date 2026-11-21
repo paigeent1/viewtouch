@@ -98,6 +98,8 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"printQuickLabel"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.printQuickLabel(a.value(0).toStringList(), a.value(1).toString(), a.value(2, 1).toInt())); }},
         {u"closeQuickLabel"_s, [](PosService &p, const QVariantList &) { return QVariant(p.closeQuickLabel()); }},
+        {u"directv"_s, [](PosService &p, const QVariantList &a) {
+             return QVariant(p.directv(a.value(0).toString(), a.value(1).toString(), a.value(2).toString())); }},
         {u"problemsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.problemsSeen()); }},
         {u"alertsSeen"_s, [](PosService &p, const QVariantList &) { return QVariant(p.alertsSeen()); }},
         {u"coachNotNow"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.coachNotNow(a.value(0).toString())); }},

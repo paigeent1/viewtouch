@@ -644,7 +644,11 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
                 scheduleFlushAll();
             });
         }
-        connect(s, &app::PosSession::notice, this, [c](const QString &text) { c->notices << text; });
+        connect(s, &app::PosSession::notice, this, [this, c](const QString &text) {
+            c->notices << text;
+            if (c != calling_)
+                scheduleFlushAll();   // a notice of its own (a TV's answer): sent with the next round
+        });
         connect(s, &app::PosSession::checkClosed, this, [c](qint64 id) {
             c->events << QJsonObject{{u"t"_s, u"event"_s}, {u"e"_s, u"checkClosed"_s}, {u"v"_s, id}};
         });
@@ -711,6 +715,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
     if (type == u"call") {
         const qint64 id = m.value(u"id").toInteger();
         QVariant result;
+        Connection *const outerCall = std::exchange(calling_, c);
         c->session->invoke(m.value(u"m").toString(), m.value(u"a").toArray().toVariantList(),
                            [&result](const QVariant &r) { result = r; });
         // State (and events) before the reply (nothing changes meanwhile: shared parts made once).
@@ -721,6 +726,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         roundJson_.clear();
         roundSame_.clear();
         shared_->endMemo();
+        calling_ = outerCall;
         c->channel->send({{u"t"_s, u"reply"_s}, {u"id"_s, id}, {u"r"_s, QJsonValue::fromVariant(result)}});
         for (const QString &n : std::exchange(c->notices, {}))
             c->channel->send({{u"t"_s, u"notice"_s}, {u"text"_s, n}});
@@ -810,7 +816,9 @@ void PosServer::handleBillboard(Connection *c, const QJsonObject &m)
             qCInfo(lcServer).noquote() << "a billboard may not" << method << "- refused";
         else
             c->session->invoke(method, args, [&result](const QVariant &r) { result = r; });
+        Connection *const outerCall = std::exchange(calling_, c);
         flush(c);
+        calling_ = outerCall;
         c->channel->send({{u"t"_s, u"reply"_s}, {u"id"_s, id}, {u"r"_s, QJsonValue::fromVariant(result)}});
         for (const QString &n : std::exchange(c->notices, {}))
             c->channel->send({{u"t"_s, u"notice"_s}, {u"text"_s, n}});
@@ -1244,6 +1252,11 @@ void PosServer::flush(Connection *c)
         c->channel->sendRaw("{\"t\":\"state\",\"set\":{" + changed + "}}");
     for (const QJsonObject &e : std::exchange(c->events, {}))
         c->channel->send(e);
+    // Notices that came on their own (after the call that started them was answered); a call's own
+    // go out after its reply (the call's handler sends them).
+    if (c != calling_)
+        for (const QString &n : std::exchange(c->notices, {}))
+            c->channel->send({{u"t"_s, u"notice"_s}, {u"text"_s, n}});
 }
 
 void PosServer::scheduleFlushAll()

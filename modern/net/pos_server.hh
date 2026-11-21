@@ -121,6 +121,9 @@ private:
     // all of them is compared and turned into JSON once (by the shared data
     // it points at; cleared after the round).
     bool inRound_ = false;
+    // The screen whose call is being answered: its notices go out after the reply (as always); any
+    // other notice (one that comes later, e.g. a TV's answer) goes out with the next round.
+    Connection *calling_ = nullptr;
     QHash<const void *, QByteArray> roundJson_;
     QHash<QPair<const void *, const void *>, bool> roundSame_;
     int updateRounds_ = 0;
