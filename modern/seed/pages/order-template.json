@@ -248,7 +248,7 @@
       "rect": {
         "x": 592,
         "y": 16,
-        "w": 156,
+        "w": 122,
         "h": 72
       },
       "shape": "rect",
@@ -263,7 +263,7 @@
       ],
       "style": {
         "normal": {
-          "fontSize": 26
+          "fontSize": 24
         }
       }
     },
@@ -271,9 +271,9 @@
       "id": "tab-lunch",
       "kind": "button",
       "rect": {
-        "x": 756,
+        "x": 722,
         "y": 16,
-        "w": 156,
+        "w": 122,
         "h": 72
       },
       "shape": "rect",
@@ -288,7 +288,7 @@
       ],
       "style": {
         "normal": {
-          "fontSize": 26
+          "fontSize": 24
         }
       }
     },
@@ -296,9 +296,9 @@
       "id": "tab-dinner",
       "kind": "button",
       "rect": {
-        "x": 920,
+        "x": 852,
         "y": 16,
-        "w": 156,
+        "w": 122,
         "h": 72
       },
       "shape": "rect",
@@ -313,7 +313,33 @@
       ],
       "style": {
         "normal": {
-          "fontSize": 26
+          "fontSize": 24
+        }
+      }
+    },
+    {
+      "id": "tab-bar",
+      "kind": "button",
+      "rect": {
+        "x": 982,
+        "y": 16,
+        "w": 122,
+        "h": 72
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Bar",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "replace",
+          "page": "index-bar"
+        }
+      ],
+      "style": {
+        "normal": {
+          "fontSize": 24,
+          "fill": "#8a4b16"
         }
       }
     },
@@ -324,9 +350,9 @@
       "shape": "rect",
       "behavior": "blink",
       "rect": {
-        "x": 1084,
+        "x": 1120,
         "y": 16,
-        "w": 156,
+        "w": 120,
         "h": 72
       },
       "style": {

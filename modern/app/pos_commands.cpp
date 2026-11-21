@@ -294,6 +294,8 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"acknowledgeService"_s, [](PosService &p, const QVariantList &) { return QVariant(p.acknowledgeService()); }},
         {u"overrideService"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.overrideService(a.value(0).toString(), a.value(1).toString())); }},
         {u"cancelService"_s, [](PosService &p, const QVariantList &) { return QVariant(p.cancelService()); }},
+        {u"orderPour"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.orderPour(a.value(0).toString(), a.value(1).toList())); }},
+        {u"answerMixer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.answerMixer(a.value(0).toInt(), a.value(1).toList())); }},
         {u"shareDrink"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.shareDrink(a.value(0).toLongLong(), a.value(1).toList())); }},
         {u"cancelAgeCheck"_s, [](PosService &p, const QVariantList &) { p.cancelAgeCheck(); return QVariant(true); }},
         {u"saveIdChecks"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveIdChecks(a.value(0).toMap())); }},

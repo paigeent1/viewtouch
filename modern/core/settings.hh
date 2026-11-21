@@ -256,6 +256,20 @@ struct PosSettings {
     // Responsible service (Store Settings -> Responsible service): standard drinks per guest, a caution
     // and a stop level. Off by default (core/over_service.hh).
     ServicePolicy service;
+    // The bar menu (app/pos_bar_menu.cpp; Store Settings -> Bar menu): after a spirit is rung, a mixer is
+    // offered from this modifier group (Manager -> Modifiers; none there or empty: no prompt), and the free
+    // notes (Neat, Rocks...) from the other. Which drinks ask: those in these categories (MenuCategory ids),
+    // or, with none listed, every drink of at least mixerMinAbv percent ABV. barGroupsSeeded: the Mixers and
+    // Bar notes groups were given to this store once (names only, no prices); deleted later, they stay so.
+    struct BarMenu {
+        std::string mixerGroup = "mixers";
+        std::string notesGroup = "bar-notes";
+        double mixerMinAbv = 20;
+        std::vector<std::string> mixerCategories;
+        bool groupsSeeded = false;
+        bool operator==(const BarMenu &) const = default;
+    };
+    BarMenu barMenu;
     bool privacyOnReceipts = true;
     std::string privacyShort;
     std::string privacyFull;

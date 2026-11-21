@@ -619,6 +619,39 @@ QVariantList PosService::adminFields(const QString &panel)
             asRows(field(u"serviceReasons"_s, tr("Reasons for a manager's override"), u"text"_s,
                          tr("The manager picks one, or types their own. Empty: the built-in list.")),
                    tr("+ Add a reason")),
+            // The bar menu (pos_bar_menu.cpp): the mixer offered after a spirit, and the free notes.
+            with(field(u"barMixerGroup"_s, tr("Mixers come from"), u"enum"_s,
+                       tr("After a spirit is rung, its mixer is chosen from this modifier group (Manager -> Modifiers: "
+                          "Cola, Tonic... with their prices). None, or a group with nothing in it: no mixer is asked.")),
+                 u"options"_s, ([this](const QString &none) {
+                     QVariantList o{QVariantMap{{u"value"_s, QString()}, {u"text"_s, none}}};
+                     for (const ModifierGroup &g : s_->settings.modifierGroups)
+                         o.append(QVariantMap{{u"value"_s, qs(g.id)}, {u"text"_s, qs(g.name)}});
+                     return o;
+                 })(tr("None: no mixer asked"))),
+            with(field(u"barNotesGroup"_s, tr("Bar notes come from"), u"enum"_s,
+                       tr("The free notes shown with the pour sizes and the mixers (Neat, Rocks, Up, Twist...), from "
+                          "this modifier group. None: no notes.")),
+                 u"options"_s, ([this](const QString &none) {
+                     QVariantList o{QVariantMap{{u"value"_s, QString()}, {u"text"_s, none}}};
+                     for (const ModifierGroup &g : s_->settings.modifierGroups)
+                         o.append(QVariantMap{{u"value"_s, qs(g.id)}, {u"text"_s, qs(g.name)}});
+                     return o;
+                 })(tr("None: no notes"))),
+            with(field(u"barMixerMinAbv"_s, tr("Ask for a mixer on drinks of at least (ABV %)"), u"number"_s,
+                       tr("With no categories listed below: every drink this strong or stronger asks (20: liquor, "
+                          "not beer or wine). The ABV is on the item card.")), u"min"_s, 0),
+            asRows(field(u"barMixerCategories"_s, tr("Ask for a mixer in these categories"), u"text"_s,
+                         tr("Only drinks in these categories ask for a mixer. None listed: by ABV, as above.")),
+                   tr("+ Add a category"),
+                   {with(column(tr("Category"), "enum", 0, [this] {
+                             QVariantList o;
+                             for (const MenuCategory &c : s_->categories())
+                                 o.append(QVariantMap{{u"value"_s, qs(c.id)}, {u"text"_s, qs(c.name)}});
+                             return o;
+                         }()),
+                         u"unique"_s, true)},
+                   uR"(^\s*(\S+)\s*$)"_s, u"%1"_s),
             field(u"askReasons"_s, tr("Ask why on voids and comps"), u"bool"_s,
                   tr("Voiding an item already sent, or a discount or comp, asks for a reason from the lists below. "
                      "The Exceptions report adds them up. Can be set per employee.")),
@@ -799,7 +832,9 @@ QVariantList PosService::adminFields(const QString &panel)
             with(field(u"startCategory"_s, tr("Start orders on"), u"enum"_s,
                        tr("A menu category orders opened here start on (the bar: Drinks). The meal's categories: the usual.")),
                  u"options"_s, [this] {
-                     QVariantList o{QVariantMap{{u"value"_s, QString()}, {u"text"_s, tr("The meal's categories")}}};
+                     QVariantList o{QVariantMap{{u"value"_s, QString()}, {u"text"_s, tr("The meal's categories")}},
+                                    // The Bar tab's page (seed/pages/index-bar.json): the bar's categories.
+                                    QVariantMap{{u"value"_s, u"page:index-bar"_s}, {u"text"_s, tr("The Bar menu")}}};
                      for (const MenuCategory &c : s_->categories())
                          o.append(QVariantMap{{u"value"_s, qs(c.id)}, {u"text"_s, qs(c.name)}});
                      return o;

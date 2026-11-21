@@ -1735,6 +1735,8 @@ ApplicationWindow {
     AgeCheckOverlay { controller: root.controller }
     // Responsible service: a drink waiting for the bartender (caution) or a manager (stop).
     OverServiceOverlay { controller: root.controller }
+    // The bar: a spirit just rung, waiting for its mixer (or No mixer) and notes.
+    MixerOverlay { controller: root.controller }
     // Find a Tablet: another screen is looking for this one ("Here I am", beeping), over everything.
     FindMeOverlay {
         parent: Overlay.overlay

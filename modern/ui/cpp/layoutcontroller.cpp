@@ -1117,9 +1117,10 @@ bool LayoutController::jumpTo(const QString &pageId)
 
 void LayoutController::setMenuCategory(const QString &id)
 {
-    if (id == menuCategory_)
+    if (id == menuCategory_ && !menuGroup_.isValid())
         return;
     menuCategory_ = id;
+    menuGroup_ = QVariant();
     emit menuCategoryChanged();
 }
 
@@ -1427,6 +1428,24 @@ bool LayoutController::switchToSelfFillingMenu()
     }
     setStatus(tr("Your menu pages now fill themselves. Look them over, then Save (Undo puts them back)."));
     return true;
+}
+
+bool LayoutController::openCategoryGroup(const QString &categoryId, const QString &group)
+{
+    const bool opened = openCategory(categoryId);
+    menuGroup_ = group;
+    emit menuCategoryChanged();
+    return opened;
+}
+
+void LayoutController::orderPour(const QString &itemId, const QVariantList &notes)
+{
+    if (editing() || busy())
+        return;
+    Action a;
+    a.data = QJsonObject{{u"type"_s, u"addItem"_s}, {u"item"_s, itemId},
+                         {u"notes"_s, QJsonArray::fromVariantList(notes)}};
+    runAction(a, [](bool) {});
 }
 
 bool LayoutController::openCategory(const QString &categoryId)
@@ -2033,6 +2052,9 @@ void LayoutController::runAction(const Action &a, Done done)
             setStatus(tr("Added %1").arg(item));
             return added(true);
         }
+        // The bar's pour picker: the pour with its notes (Neat, Rocks), rung the same way.
+        if (const QJsonArray notes = a.data.value(u"notes").toArray(); !notes.isEmpty())
+            return call(u"orderPour"_s, {item, notes.toVariantList()}, [added](const QVariant &ok) { added(ok.toBool()); });
         return call(u"addItem"_s, {item}, [added](const QVariant &ok) { added(ok.toBool()); });
     }
 
@@ -2642,7 +2664,12 @@ bool LayoutController::navigate(Navigator::Mode mode, const QString &target)
         QString menu = rolePage(u"menu"_s);
         if (menu.isEmpty() && activeLayout().page(u"menu-all"_s))
             menu = u"menu-all"_s;
-        if (!ordering && !start.isEmpty() && !menu.isEmpty()) {
+        // An index page instead (Terminals -> Start orders on: the Bar menu).
+        if (!ordering && start.startsWith(u"page:"_s)) {
+            if (const QString page = start.mid(5); activeLayout().page(page))
+                return navigate(Navigator::Mode::Replace, page);
+        }
+        if (!ordering && !start.isEmpty() && !start.startsWith(u"page:"_s) && !menu.isEmpty()) {
             setMenuCategory(start);
             return navigate(Navigator::Mode::Push, menu);
         }

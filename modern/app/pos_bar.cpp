@@ -127,6 +127,12 @@ Money costTag(const MenuItem &m)
 
 } // namespace
 
+PosService::DrinkSize PosService::drinkSizeOf(const QString &name)
+{
+    const DrinkName n = parseDrink(name);
+    return {n.base, n.size, n.value};
+}
+
 // --- Link pours to bottles ---------------------------------------------------------------
 
 std::vector<PosService::PourLink> PosService::pourLinkPlan() const

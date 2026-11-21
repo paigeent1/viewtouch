@@ -1116,6 +1116,8 @@ int runStore(const Args &cli, const Options &o)
                 // Retail Mode back to the Retail screen, from the order screens (above the check), the
                 // floor plan and Open checks (owner 2026-11-09: no way back from there).
                 {u"order-template", u"retail-mode-btn"},
+                // The Bar tab beside the meal tabs (the bar menu, owner 2026-11-21): after the room below.
+                {u"order-template", u"tab-bar"},
                 {u"tables", u"retail-mode-btn"},
                 {u"check-list", u"retail-mode-btn"},
             };
@@ -1129,6 +1131,31 @@ int runStore(const Args &cli, const Options &o)
                             z.rect = QRect(16, 104, 560, 860);
                             zonesAdded = true;
                         }
+                state.seen << mark;
+            }
+            // Room for the Bar tab: Breakfast / Lunch / Dinner a little narrower and Scan moved over, once, while
+            // all four are where they were given (else the Bar tab isn't added over the store's own buttons).
+            if (const QString mark = u"order-template#tab-bar@room"_s; !state.seen.contains(mark)) {
+                if (vt::layout::Page *mine = layout->page(u"order-template"_s)) {
+                    const std::pair<const char16_t *, QRect> was[] = {
+                        {u"tab-breakfast", QRect(592, 16, 156, 72)}, {u"tab-lunch", QRect(756, 16, 156, 72)},
+                        {u"tab-dinner", QRect(920, 16, 156, 72)}, {u"tab-scan", QRect(1084, 16, 156, 72)}};
+                    const std::pair<const char16_t *, QRect> now[] = {
+                        {u"tab-breakfast", QRect(592, 16, 122, 72)}, {u"tab-lunch", QRect(722, 16, 122, 72)},
+                        {u"tab-dinner", QRect(852, 16, 122, 72)}, {u"tab-scan", QRect(1120, 16, 120, 72)}};
+                    const bool asGiven = std::ranges::all_of(was, [&](const auto &w) {
+                        return std::ranges::any_of(mine->zones, [&](const vt::layout::Zone &z) {
+                            return z.id == QString::fromUtf16(w.first) && z.rect == w.second;
+                        });
+                    });
+                    if (asGiven)
+                        for (vt::layout::Zone &z : mine->zones)
+                            for (const auto &[id, rect] : now)
+                                if (z.id == QString::fromUtf16(id)) {
+                                    z.rect = rect;
+                                    zonesAdded = true;
+                                }
+                }
                 state.seen << mark;
             }
             for (const auto &[pageId, zoneId] : givenZones) {
@@ -1459,6 +1486,11 @@ int runStore(const Args &cli, const Options &o)
                                  .filePath(u"billboards"_s);
     if (vt::app::PosService::migrateBillboardsFile(shared->settings, shared->billboardsFile)) {
         qInfo().noquote() << "Billboards: their addresses taken from" << shared->billboardsFile;
+        shared->saveSettings();
+    }
+    // The bar menu: a Mixers and a Bar notes modifier group, given once (names only, no prices).
+    if (vt::app::PosService::seedBarGroups(shared->settings)) {
+        qInfo().noquote() << "Bar menu: the Mixers and Bar notes modifier groups given (Manager -> Modifiers)";
         shared->saveSettings();
     }
     // Tobacco scan data (Altria): this store's own settings, in a file on this computer only (never in the

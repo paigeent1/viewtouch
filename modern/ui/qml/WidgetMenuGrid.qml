@@ -99,13 +99,48 @@ Item {
     function categoryOf(id) { return categories.find(c => c.id === id) ?? ({}) }
     // The category shown: its own button size, photos, prices (Menu Builder).
     readonly property var shownCategory: !search && !popular && family !== "★" ? categoryOf(family) : ({})
+    // The bar menu's tile: only this product group of the category ("": those without one).
+    readonly property var group: zone && zone.controller && fixedFamily === "" && family === chosen ? zone.controller.menuGroup : undefined
+    readonly property bool grouped: group !== undefined && group !== null
+    // The bar: the pours of one bottle (pos_bar_menu.cpp: the same "bottle") as one button, named for the
+    // bottle, at its lowest price; touched, the pour picker. A bottle with one pour is its own button.
+    function byBottle(list) {
+        const out = []
+        const at = {}
+        for (const i of list) {
+            if (!i.bottle) {
+                out.push(i)
+                continue
+            }
+            if (at[i.bottle] === undefined) {
+                at[i.bottle] = out.length
+                out.push({ pours: [] })
+            }
+            out[at[i.bottle]].pours.push(i)
+        }
+        return out.map(b => {
+            if (!b.pours)
+                return b
+            const pours = b.pours.slice().sort((x, y) => (x.priceCents ?? 0) - (y.priceCents ?? 0))
+            if (pours.length === 1)
+                return pours[0]
+            return Object.assign({}, pours[0], {
+                name: pours[0].bottleName || pours[0].name,
+                available: pours.some(p => p.available),
+                number: "",
+                pours: pours
+            })
+        })
+    }
     // Searching: every family, best matches first (found by the main computer: foundItems).
     readonly property var shown: {
         if (search)
             return foundItems
         if (popular)
             return (pos ? pos.popularItems : []).map(id => items.find(i => i.id === id)).filter(i => i !== undefined)
-        return family === "★" ? favorites : items.filter(i => i.family === family)
+        if (family === "★")
+            return favorites
+        return byBottle(items.filter(i => i.family === family && (!grouped || (i.productGroup ?? "") === group)))
     }
     function title(f) {
         if (f === "★")
@@ -310,6 +345,7 @@ Item {
             allergies: w.allergies
             onItemTapped: item => {
                 if (w.arranging) w.pick(item.id)
+                else if (item.pours) pourPicker.show(item)
                 else if (item.available) w.zone.controller.orderItem(item.id, w.search)
             }
             // A manager holds one: changed right here.
@@ -418,6 +454,13 @@ Item {
                 colorPopup.close()
             }
         }
+    }
+
+    // The bar: a bottle's pours, each with its price, and the free notes (Neat, Rocks...).
+    PourPicker {
+        id: pourPicker
+        pos: w.pos
+        controller: w.zone ? w.zone.controller : null
     }
 
     QuickItemCard {
