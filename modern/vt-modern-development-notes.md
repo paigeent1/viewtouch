@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-21 13:38 ET — Bob (Claude) — Handoff: where Part Three left off
+- **What:** New modern/docs/HANDOFF_PART_FOUR.md: catch-up order (AGENTS/CLAUDE, Part Three brief, dev notes), owner's rules incl. same build number and tee'd long commands, how updates reach stores, state at 609, the tv-keypad branch in progress, owner's pending steps, waiting-on-others (Mobile ID, Altria), next up. Server: no change. Tablet app: no change (docs only); bundled before the tv-keypad release.
+- **Why:** Owner opened 'ViewTouch Development Part 4' chat, 2026-11-21.
+- **Files:** (none)
+
 ### 2026-11-21 13:20 ET — Bob (Claude) — TV channel number pad (CH # key on the DIRECTV Tune pages)
 - **What:** New command directvKeypad (page editor: 'TV: channel number pad'; arg box, else the Tune page's own box, else bar1) opens TvChannelPad.qml over the screen: title 'Channel for <box>' (the Tune page's name without 'Tune' and the address, else the box), the digits typed with the channel's name when it's one of the pages' 20 (LayoutController::tvChannelName), keys 1-9, Clear, 0, backspace, a big Tune; keyboard digits / Backspace / Delete / Enter / Esc work. LayoutController::tvPadTune refuses empty, over 4 digits or non-digits (status line, pad stays), else closes the pad and sends the existing directv command (box, tune, digits), so tablets go through the Pi as the channel buttons do. Close or a tap outside closes it. Seed: a blue 'CH # (number pad)' key (rk-chpad, 1490,924 400x120, under BOX off) on all 6 directv-tune pages; main.cpp givenZones adds it once to stores' edited copies when the spot is free. Notes section 3 + manual ch. 21: the pad, Sceptre TVs ignore CEC standby -> set each TV's no-signal power-off so BOX off turns the TV off (works at HCA 2026-11-21); a box that says ON but shows nothing: unplug and replug. Translations es/fr/pt/zh. Catch2 [tvpad] in test_net.cpp.
 - **Why:** Owner at HCA 2026-11-21: 'DIRECTV screen needs a channel select by number overlay window.'
