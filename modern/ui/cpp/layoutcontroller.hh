@@ -97,6 +97,11 @@ class LayoutController : public QObject {
     Q_PROPERTY(bool floorChooserOpen READ floorChooserOpen NOTIFY floorChooserChanged)
     // The Quick Label sheet is showing (the quickLabel command; the Labels screen's Quick Label button).
     Q_PROPERTY(bool quickLabelOpen READ quickLabelOpen NOTIFY quickLabelChanged)
+    // The TV channel number pad is showing (the directvKeypad command; the DIRECTV pages' CH # key),
+    // for which receiver (the button's box) and its title ("Channel for BAR 1").
+    Q_PROPERTY(bool tvPadOpen READ tvPadOpen NOTIFY tvPadChanged)
+    Q_PROPERTY(QString tvPadBox READ tvPadBox NOTIFY tvPadChanged)
+    Q_PROPERTY(QString tvPadTitle READ tvPadTitle NOTIFY tvPadChanged)
     // Site Setup (sitesetup.cpp): goes up when this Pi's hardware settings or the last scan change.
     Q_PROPERTY(int siteRevision READ siteRevision NOTIFY siteChanged)
 
@@ -260,6 +265,18 @@ public:
     Q_INVOKABLE void closeFloorChooser();
     bool quickLabelOpen() const { return quickLabelOpen_; }
     Q_INVOKABLE void closeQuickLabel();
+    // The TV channel number pad (owner at HCA 2026-11-21): up to kTvPadDigits digits, tuned with the
+    // same directv command the channel buttons send (so a tablet's goes through the main computer).
+    static constexpr int kTvPadDigits = 4;
+    bool tvPadOpen() const { return tvPadOpen_; }
+    QString tvPadBox() const { return tvPadBox_; }
+    QString tvPadTitle() const { return tvPadTitle_; }
+    // Tune: refused (false, said on the status line, the pad stays) for nothing typed, more than
+    // kTvPadDigits digits or anything but digits; else sends directv tune and closes the pad.
+    Q_INVOKABLE bool tvPadTune(const QString &digits);
+    Q_INVOKABLE void closeTvPad();
+    // The channel's name when it's one of the DIRECTV pages' channels ("206" -> "ESPN"), else "".
+    Q_INVOKABLE QString tvChannelName(const QString &digits) const;
     // This screen's own build, for Store Settings -> About ("screen.version").
     Q_INVOKABLE QString screenBuild() const;
     // One plan's tables and pieces (walls, doors...), {x, y, w, h, zones:
@@ -401,6 +418,7 @@ signals:
     void setupOpenChanged();
     void floorChooserChanged();
     void quickLabelChanged();
+    void tvPadChanged();
     void siteChanged();
     // The back of a license was scanned (the ID check has it).
     void idCardScanned();
@@ -493,6 +511,9 @@ private:
     bool setupOpen_ = false;
     bool floorChooserOpen_ = false;
     bool quickLabelOpen_ = false;
+    bool tvPadOpen_ = false;
+    QString tvPadBox_;
+    QString tvPadTitle_;
     // The floor plan this screen last took as home (floorHome()): a manager choosing another moves
     // home there, for a screen whose home it was (not one with its own start page).
     QString floorHomeId_;

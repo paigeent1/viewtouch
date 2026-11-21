@@ -1106,6 +1106,13 @@ int runStore(const Args &cli, const Options &o)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
                 {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
                 {u"cashier-duty", u"cd-quicklabel"},     // QUICK LABEL (type & print), owner 2026-11-20
+                // CH # (number pad) on the DIRECTV Tune pages, under BOX off (owner at HCA 2026-11-21).
+                {u"directv-tune-all", u"rk-chpad"},
+                {u"directv-tune-bar1", u"rk-chpad"},
+                {u"directv-tune-bar2", u"rk-chpad"},
+                {u"directv-tune-box72", u"rk-chpad"},
+                {u"directv-tune-front", u"rk-chpad"},
+                {u"directv-tune-vip", u"rk-chpad"},
                 // Retail Mode back to the Retail screen, from the order screens (above the check), the
                 // floor plan and Open checks (owner 2026-11-09: no way back from there).
                 {u"order-template", u"retail-mode-btn"},

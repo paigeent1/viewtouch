@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <limits>
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,6 +15,7 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QTimeZone>
 #include <QSignalSpy>
 #include <QTcpServer>
@@ -893,6 +895,122 @@ TEST_CASE("TV buttons on a tablet: the main computer works the TV, the answer sh
         c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"tune"_s}, {u"val"_s, u"206"_s}});
         REQUIRE(waitFor([&] { return c.statusText() == u"BAR 3: 206 sent"_s; }, 5000));
         CHECK(called().endsWith(u"bar3|tune|206"_s));
+    }
+    if (oldLauncher.isEmpty())
+        qunsetenv("VT_DIRECTV_LAUNCHER");
+    else
+        qputenv("VT_DIRECTV_LAUNCHER", oldLauncher);
+}
+
+TEST_CASE("TV channel number pad: the DIRECTV pages' CH # key, tuned through the directv command", "[net][remote][tv][directv][tvpad]")
+{
+    // Every Tune page has the CH # key, for its own box, under BOX off, over nothing else.
+    const layout::Layout pages = seedLayout();
+    for (const QString &box : {u"all"_s, u"bar1"_s, u"bar2"_s, u"box72"_s, u"front"_s, u"vip"_s}) {
+        INFO(box.toStdString());
+        const layout::Page *page = pages.page(u"directv-tune-"_s + box);
+        REQUIRE(page);
+        const auto pad = std::ranges::find_if(page->zones, [](const layout::Zone &z) { return z.id == u"rk-chpad"; });
+        REQUIRE(pad != page->zones.end());
+        CHECK(pad->label == u"CH # (number pad)"_s);
+        REQUIRE(pad->actions.size() == 1);
+        CHECK(pad->actions.front().type() == u"command"_s);
+        CHECK(pad->actions.front().str(u"name") == u"directvKeypad"_s);
+        CHECK(pad->actions.front().data.value(u"args"_s).toObject().value(u"box"_s).toString() == box);
+        for (const layout::Zone &z : page->zones)
+            if (z.id != pad->id)
+                CHECK_FALSE(z.rect.intersects(pad->rect));
+    }
+
+    // vt-directv's stand-in: keeps what it was given, answers as vt-directv does.
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QString calls = dir.path() + u"/calls.txt"_s;
+    {
+        QFile f(dir.path() + u"/fake"_s);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write(QString::fromUtf8("#!/bin/sh\n"
+                                  "printf '%s|%s|%s\\n' \"$1\" \"$2\" \"$3\" >> '%1'\n"
+                                  "echo \"TV: $3 sent\"\n").arg(calls).toUtf8());
+        f.close();
+        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    }
+    const QByteArray oldLauncher = qgetenv("VT_DIRECTV_LAUNCHER");
+    qputenv("VT_DIRECTV_LAUNCHER", (dir.path() + u"/fake"_s).toUtf8());
+    const auto called = [&] {
+        QFile f(calls);
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).trimmed() : QString();
+    };
+    {
+        // The Pi's own screen: the BAR 3 page's key opens the pad for box72.
+        PosShared shared(test::seedPosData(), nullptr);
+        PosService pi(&shared, u"Bar"_s);
+        LayoutController c(seedLayout());
+        c.setPos(&pi);
+        c.command(u"directvKeypad"_s, {{u"box"_s, u"box72"_s}});
+        CHECK_FALSE(c.tvPadOpen());                       // nobody logged in
+        CHECK(c.statusText() == u"Log in first."_s);
+        REQUIRE(pi.loginWithPin(u"1111"_s));              // a server: anyone signed in may use the TVs
+        REQUIRE(c.jumpTo(u"directv-tune-box72"_s));
+        c.activate(u"rk-chpad"_s);
+        REQUIRE(c.tvPadOpen());
+        CHECK(c.tvPadBox() == u"box72"_s);
+        CHECK(c.tvPadTitle() == u"Channel for BAR 3"_s);  // the page's name, without "Tune" and the address
+
+        // The channel's name as it's typed, when it's one of the pages' channels.
+        CHECK(c.tvChannelName(u"206"_s) == u"ESPN"_s);
+        CHECK(c.tvChannelName(u"634"_s) == u"MSG"_s);
+        CHECK(c.tvChannelName(u"20"_s).isEmpty());
+        CHECK(c.tvChannelName(u"9999"_s).isEmpty());
+
+        // Nothing typed, too long, or not a number: refused, said so, the pad stays, nothing sent.
+        CHECK_FALSE(c.tvPadTune(QString()));
+        CHECK(c.statusText() == u"Type the channel number first."_s);
+        CHECK_FALSE(c.tvPadTune(u"12345"_s));
+        CHECK(c.statusText() == u"A channel is 1 to 4 digits."_s);
+        CHECK_FALSE(c.tvPadTune(u"2a"_s));
+        CHECK_FALSE(c.tvPadTune(u"20;6"_s));
+        CHECK(c.tvPadOpen());
+        CHECK(called().isEmpty());
+
+        // Tune: directv tune with the digits typed, for the page's box; the pad closes, the answer shows.
+        CHECK(c.tvPadTune(u"634"_s));
+        CHECK_FALSE(c.tvPadOpen());
+        REQUIRE(waitFor([&] { return c.statusText() == u"TV: 634 sent"_s; }, 5000));
+        CHECK(called() == u"box72|tune|634"_s);
+        CHECK_FALSE(c.tvPadTune(u"206"_s));               // closed: nothing more sent
+        CHECK(called() == u"box72|tune|634"_s);
+
+        // Close: nothing sent. The ALL page's pad is for every box.
+        REQUIRE(c.jumpTo(u"directv-tune-all"_s));
+        c.activate(u"rk-chpad"_s);
+        REQUIRE(c.tvPadOpen());
+        CHECK(c.tvPadBox() == u"all"_s);
+        CHECK(c.tvPadTitle() == u"Channel for ALL 5 BOXES"_s);
+        c.closeTvPad();
+        CHECK_FALSE(c.tvPadOpen());
+        CHECK(called() == u"box72|tune|634"_s);
+        // A pad key given in the page editor (no box): the Tune page's own box.
+        REQUIRE(c.jumpTo(u"directv-tune-vip"_s));
+        c.command(u"directvKeypad"_s);
+        REQUIRE(c.tvPadOpen());
+        CHECK(c.tvPadBox() == u"vip"_s);
+        CHECK(c.tvPadTitle() == u"Channel for VIP"_s);
+        c.closeTvPad();
+        CHECK(c.describeAction(layout::Action{QJsonObject{{u"type"_s, u"command"_s}, {u"name"_s, u"directvKeypad"_s}}})
+                  .contains(u"channel number pad"_s));
+    }
+    {
+        // A tablet: the same pad, tuned by the main computer; a button off the Tune pages names its box.
+        Store store;
+        Screen bar(store.terminal(u"Bar Tablet"_s));
+        bar.pin("1111");
+        bar.c.command(u"directvKeypad"_s, {{u"box"_s, u"bar1"_s}});
+        REQUIRE(bar.c.tvPadOpen());
+        CHECK(bar.c.tvPadTitle() == u"Channel for BAR1"_s);
+        CHECK(bar.c.tvPadTune(u"703"_s));
+        REQUIRE(waitFor([&] { return bar.c.statusText() == u"TV: 703 sent"_s; }, 5000));
+        CHECK(called().endsWith(u"bar1|tune|703"_s));
     }
     if (oldLauncher.isEmpty())
         qunsetenv("VT_DIRECTV_LAUNCHER");

@@ -515,6 +515,45 @@ void LayoutController::closeQuickLabel()
     emit quickLabelChanged();
 }
 
+void LayoutController::closeTvPad()
+{
+    if (!tvPadOpen_)
+        return;
+    tvPadOpen_ = false;
+    emit tvPadChanged();
+}
+
+bool LayoutController::tvPadTune(const QString &digits)
+{
+    static const QRegularExpression channel(u"^[0-9]{1,%1}$"_s.arg(kTvPadDigits));
+    const QString typed = digits.trimmed();
+    if (!tvPadOpen_)
+        return false;
+    if (!channel.match(typed).hasMatch()) {
+        setStatus(typed.isEmpty() ? tr("Type the channel number first.")
+                                  : tr("A channel is 1 to %1 digits.").arg(kTvPadDigits));
+        return false;
+    }
+    const QString box = tvPadBox_;
+    closeTvPad();
+    // The channel buttons' own command: on a tablet it goes to the main computer, which works the TV.
+    command(u"directv"_s, {{u"box"_s, box}, {u"op"_s, u"tune"_s}, {u"val"_s, typed}});
+    return true;
+}
+
+QString LayoutController::tvChannelName(const QString &digits) const
+{
+    // The DIRECTV pages' channels (seed/pages/directv-tune-*.json; vt-directv's CHANNELS).
+    static const QHash<QString, QString> names = {
+        {u"206"_s, u"ESPN"_s}, {u"209"_s, u"ESPN2"_s}, {u"219"_s, u"FS1"_s}, {u"212"_s, u"NFL Net"_s},
+        {u"213"_s, u"MLB Net"_s}, {u"216"_s, u"NBA TV"_s}, {u"215"_s, u"NHL Net"_s}, {u"221"_s, u"CBS Sports"_s},
+        {u"631"_s, u"YES Net"_s}, {u"639"_s, u"SNY"_s}, {u"634"_s, u"MSG"_s}, {u"628"_s, u"NESN"_s},
+        {u"245"_s, u"TNT"_s}, {u"247"_s, u"TBS"_s}, {u"242"_s, u"USA"_s}, {u"218"_s, u"Golf"_s},
+        {u"703"_s, u"RedZone"_s}, {u"610"_s, u"BTN"_s}, {u"202"_s, u"CNN"_s}, {u"360"_s, u"Fox News"_s},
+    };
+    return names.value(digits.trimmed());
+}
+
 void LayoutController::closeFloorChooser()
 {
     if (!floorChooserOpen_)
@@ -2398,6 +2437,40 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
                       args.value(u"val"_s, u"206"_s).toString());
         return done(true);
     }
+    // TV channel number pad (owner at HCA 2026-11-21: "DIRECTV screen needs a channel select by number"):
+    // the pad for the button's box; its Tune sends the directv command above.
+    if (name == u"directvKeypad") {
+        if (pos_ && !pos_->loggedIn()) {
+            setStatus(tr("Log in first."));
+            return done(false);
+        }
+        // The button's box; one without (given it in the page editor, which has no box field): the
+        // Tune page's own ("directv-tune-bar2" -> bar2), else bar1 as the channel buttons.
+        QString box = args.value(u"box"_s).toString().trimmed();
+        if (box.isEmpty()) {
+            const auto *page = currentPage();
+            const QString id = page ? page->id : QString();
+            box = id.startsWith(u"directv-tune-"_s) ? id.mid(13) : u"bar1"_s;
+        }
+        // "Channel for BAR 1": the given title, else the Tune page's name ("Tune BAR 3 (192.168.6.72)"
+        // -> "BAR 3"), else the box's.
+        QString title = args.value(u"title"_s).toString().trimmed();
+        if (title.isEmpty()) {
+            const QString page = pageName().trimmed();
+            if (page.startsWith(u"Tune "_s, Qt::CaseInsensitive)) {
+                title = page.mid(5).trimmed();
+                if (const qsizetype open = title.indexOf(u" ("_s); open > 0)
+                    title = title.left(open).trimmed();
+            }
+        }
+        if (title.isEmpty())
+            title = box.compare(u"all"_s, Qt::CaseInsensitive) == 0 ? tr("every box") : box.toUpper();
+        tvPadBox_ = box;
+        tvPadTitle_ = tr("Channel for %1").arg(title);
+        tvPadOpen_ = true;
+        emit tvPadChanged();
+        return done(true);
+    }
     if (name == u"openAdmin") {
         static const QHash<QString, QString> pages = {
             {u"menu"_s, u"admin-menu"_s}, {u"employees"_s, u"admin-employees"_s},
@@ -2773,6 +2846,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"cardOnFile"_s, QT_TR_NOOP("The tab's held card: hold one, charge it with a tip, or let it go.")},
             {u"chooseFloorPlan"_s, QT_TR_NOOP("Chooses tonight's floor plan for every screen (a manager).")},
             {u"quickLabel"_s, QT_TR_NOOP("Quick Label: type up to 3 lines and print them on a label (anyone).")},
+            {u"directvKeypad"_s, QT_TR_NOOP("TV channel number pad: type a channel and tune this button's DIRECTV box to it.")},
         };
         const QString name = a.str(u"name");
         if (name == u"openDepartment")

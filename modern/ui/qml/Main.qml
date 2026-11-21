@@ -144,6 +144,7 @@ ApplicationWindow {
                                         || approvalPad.visible || allergySheet.visible || couponSheet.visible || holdSheet.visible
                                         || TouchGuard.sheetOpen || reasonSheet.visible || handoffSheet.visible
                                         || itemReturnSheet.visible || floorPlanChooser.visible || quickLabelSheet.visible
+                                        || tvChannelPad.visible
 
     Loader {
         active: root.customerDisplay
@@ -1603,6 +1604,16 @@ ApplicationWindow {
     QuickLabelSheet {
         id: quickLabelSheet
         objectName: "quickLabelSheet"
+        anchors.fill: parent
+        z: 59
+        pos: root.controller.pos as PosService
+        controller: root.controller
+    }
+
+    // TV channel number pad (the DIRECTV pages' CH # key): a channel typed, tuned on that box.
+    TvChannelPad {
+        id: tvChannelPad
+        objectName: "tvChannelPad"
         anchors.fill: parent
         z: 59
         pos: root.controller.pos as PosService

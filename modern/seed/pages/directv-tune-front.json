@@ -1109,6 +1109,33 @@
       ]
     },
     {
+      "id": "rk-chpad",
+      "kind": "button",
+      "label": "CH # (number pad)",
+      "shape": "rect",
+      "behavior": "blink",
+      "rect": {
+        "x": 1490,
+        "y": 924,
+        "w": 400,
+        "h": 120
+      },
+      "style": {
+        "normal": {
+          "fill": "#2f6fd6"
+        }
+      },
+      "actions": [
+        {
+          "type": "command",
+          "name": "directvKeypad",
+          "args": {
+            "box": "front"
+          }
+        }
+      ]
+    },
+    {
       "id": "bk-b",
       "kind": "button",
       "label": "\u2039 Select Box",

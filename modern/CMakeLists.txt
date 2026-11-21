@@ -192,6 +192,7 @@ if(Qt6_FOUND)
             ui/qml/PriceCheckOverlay.qml
             ui/qml/ItemReturnSheet.qml
             ui/qml/QuickLabelSheet.qml
+            ui/qml/TvChannelPad.qml
             ui/qml/FloorPlanChooser.qml
             ui/qml/WidgetGuestOrder.qml
             ui/qml/WidgetGuestMessages.qml

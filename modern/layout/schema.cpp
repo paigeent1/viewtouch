@@ -551,6 +551,7 @@ QJsonArray actionTypes()
                             {"openAdmin", "Admin screen"}, {"editMode", "Edit pages"},
                             {"chooseFloorPlan", "Choose tonight's floor plan (manager)"},
                             {"quickLabel", "Quick Label (type & print)"},
+                            {"directvKeypad", "TV: channel number pad"},
                             {"addTip", "Add tip (args.percent)"}, {"gratuity", "Gratuity (args.percent)"},
                             {"setCashTip", "Cash tip for the server (the keypad amount)"},
                             {"payout", "Pay out of drawer"}, {"paidIn", "Pay into drawer"},
