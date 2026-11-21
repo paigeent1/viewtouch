@@ -932,12 +932,9 @@ TEST_CASE("TV buttons with their own address: given to vt-directv on the Pi's sc
     {
         QFile f(dir.path() + u"/fake"_s);
         REQUIRE(f.open(QIODevice::WriteOnly));
-        f.write(QString::fromUtf8("#!/bin/sh
-"
-                                  "(IFS='|'; echo "$*") >> '%1'
-"
-                                  "echo "TV: sent"
-").arg(calls).toUtf8());
+        f.write(QString::fromUtf8("#!/bin/sh\n"
+                                  "(IFS='|'; echo \"$*\") >> '%1'\n"
+                                  "echo \"TV: sent\"\n").arg(calls).toUtf8());
         f.close();
         f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
     }
