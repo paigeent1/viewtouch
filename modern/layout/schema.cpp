@@ -500,6 +500,41 @@ QJsonArray themeFields()
     return out;
 }
 
+// Per command, the fields of its args ({"directv": [...]}): the action card shows them under the
+// command (a field's path is a key in args). A field with "when" {path, is, unset} shows only while
+// args[path] (unset: `unset`) is `is`. Other commands' args can be added here the same way.
+QJsonObject commandArgs()
+{
+    const QString g;
+    // The TV, as vt-directv knows it (scripts/bin/vt-directv; owner at HCA 2026-11-21: "ip settings
+    // should be part of the button properties"). No address: the Pi's TV list (tvs.json) has it.
+    const QJsonArray tv{
+        with(with(field(u"box"_s, u"TV name"_s, u"string"_s, g), u"suggest"_s, u"tvNames"_s), u"hint"_s,
+             u"The same name on every button for this TV (bar1, samsung...)"_s),
+        with(field(u"kind"_s, u"TV type"_s, u"enum"_s, g), u"options"_s,
+             options({{"", "(as in the Pi's TV list)"}, {"directv", "DIRECTV receiver"},
+                      {"samsung", "Samsung TV"}, {"roku", "Roku TV"}})),
+        with(with(field(u"ip"_s, u"IP address"_s, u"string"_s, g), u"tvAddress"_s, true), u"hint"_s,
+             u"Like 192.168.6.77. Empty: the address in the Pi's TV list"_s),
+    };
+    QJsonArray remote = tv;
+    remote.append(with(field(u"op"_s, u"What it does"_s, u"enum"_s, g), u"options"_s,
+                       options({{"tune", "Tune channel"}, {"key", "Key"}})));
+    const QJsonObject onKey{{u"path"_s, u"op"_s}, {u"is"_s, u"key"_s}, {u"unset"_s, u"tune"_s}};
+    const QJsonObject onTune{{u"path"_s, u"op"_s}, {u"is"_s, u"tune"_s}, {u"unset"_s, u"tune"_s}};
+    remote.append(with(with(field(u"val"_s, u"Key"_s, u"enum"_s, g), u"options"_s,
+                            options({{"poweron", "Power on"}, {"poweroff", "Power off"}, {"chanup", "Channel up"},
+                                     {"chandown", "Channel down"}, {"prev", "Previous channel"}, {"guide", "Guide"},
+                                     {"exit", "Exit"}, {"info", "Info"}, {"select", "Select (OK)"},
+                                     {"volup", "Volume up"}, {"voldown", "Volume down"}, {"mute", "Mute"},
+                                     {"up", "Up"}, {"down", "Down"}, {"left", "Left"}, {"right", "Right"},
+                                     {"home", "Home"}, {"back", "Back"}, {"input", "Input (source)"}})),
+                       u"when"_s, onKey));
+    remote.append(with(with(with(field(u"val"_s, u"Channel"_s, u"string"_s, g), u"hint"_s, u"Digits, like 206"_s),
+                            u"digits"_s, true), u"when"_s, onTune));
+    return QJsonObject{{u"directv"_s, remote}, {u"directvKeypad"_s, tv}};
+}
+
 QJsonArray actionTypes()
 {
     auto type = [](const QString &t, const QString &label, QJsonArray fields) {
@@ -510,7 +545,7 @@ QJsonArray actionTypes()
     for (const QJsonValue &v : pageRoleOptions())
         roles.append(v);
 
-    return {
+    QJsonArray out{
         type(u"jump"_s, u"Go to page"_s,
              {with(field(u"mode"_s, u"How"_s, u"enum"_s, g), u"options"_s, kJumpModes),
               field(u"page"_s, u"Page"_s, u"page"_s, g),
@@ -551,6 +586,7 @@ QJsonArray actionTypes()
                             {"openAdmin", "Admin screen"}, {"editMode", "Edit pages"},
                             {"chooseFloorPlan", "Choose tonight's floor plan (manager)"},
                             {"quickLabel", "Quick Label (type & print)"},
+                            {"directv", "TV / DIRECTV remote"},
                             {"directvKeypad", "TV: channel number pad"},
                             {"addTip", "Add tip (args.percent)"}, {"gratuity", "Gratuity (args.percent)"},
                             {"setCashTip", "Cash tip for the server (the keypad amount)"},
@@ -569,6 +605,11 @@ QJsonArray actionTypes()
         {"cancelWeighing", "Cancel weighing"}, {"guestsMore", "One more guest"}, {"guestsFewer", "One fewer guest"},
                             {"startDelivery", "Start delivery"}}))}),
     };
+    // A command's own settings (kept in the action's "args"), shown under the command when it's chosen.
+    QJsonObject command = out.last().toObject();
+    command.insert(u"commandArgs"_s, commandArgs());
+    out.replace(out.size() - 1, command);
+    return out;
 }
 
 } // namespace vt::layout::schema

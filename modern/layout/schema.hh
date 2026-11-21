@@ -50,5 +50,8 @@ QJsonArray themeFields();
 
 // Action types for the action-list editor: [{type, label, fields: [...]}].
 QJsonArray actionTypes();
+// A command's args fields, per command name ({"directv": [fields]}); also in actionTypes()'s
+// command type as "commandArgs".
+QJsonObject commandArgs();
 
 } // namespace vt::layout::schema

@@ -30,13 +30,47 @@ bool PosService::directvArgsOk(const QString &box, const QString &op, const QStr
     return (op == u"tune" || op == u"key") && word.match(box).hasMatch() && word.match(val).hasMatch();
 }
 
-bool PosService::directv(const QString &box, const QString &op, const QString &val)
+bool PosService::directvPrivateIp(const QString &ip)
+{
+    // Dotted, four numbers 0-255 without leading zeros, on a store network: 10/8, 172.16/12, 192.168/16.
+    static const QRegularExpression dotted(u"^(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})$"_s);
+    const QRegularExpressionMatch m = dotted.match(ip);
+    if (!m.hasMatch())
+        return false;
+    int n[4];
+    for (int i = 0; i < 4; ++i) {
+        n[i] = m.captured(i + 1).toInt();
+        if (n[i] > 255)
+            return false;
+    }
+    return n[0] == 10 || (n[0] == 172 && n[1] >= 16 && n[1] <= 31) || (n[0] == 192 && n[1] == 168);
+}
+
+QString PosService::directvTvProblem(const QString &box, const QString &ip, const QString &kind)
+{
+    if (!kind.isEmpty() && kind != u"directv" && kind != u"roku" && kind != u"samsung")
+        return tr("This TV button's TV type isn't one ViewTouch knows (DIRECTV receiver, Samsung TV or Roku TV).");
+    if (ip.isEmpty())
+        return {};
+    if (!directvPrivateIp(ip))
+        return tr("This TV button's IP address isn't a store network address (like 192.168.6.77).");
+    if (box == u"all")
+        return tr("A button for every box can't have one TV's IP address.");
+    return {};
+}
+
+bool PosService::directv(const QString &box, const QString &op, const QString &val, const QString &ip,
+                         const QString &kind)
 {
     // As on the Pi's own screen: anyone signed in.
     if (!user())
         return fail(tr("Log in first."));
     if (!directvArgsOk(box, op, val))
         return fail(tr("This TV button isn't set up right (box, tune or key, and a channel or key)."));
+    // The button's own address and type (owner at HCA 2026-11-21: "ip settings should be part of the
+    // button properties"); none: vt-directv finds the TV by name in the Pi's TV list, as before.
+    if (const QString problem = directvTvProblem(box, ip, kind); !problem.isEmpty())
+        return fail(problem);
     const QString program = directvProgram();
     if (!QFile::exists(program))
         return fail(tr("TV control isn't set up on the main computer (vt-directv)."));
@@ -61,7 +95,13 @@ bool PosService::directv(const QString &box, const QString &op, const QString &v
         proc->setProperty("vtTimedOut", true);
         proc->kill();
     });
-    proc->start(program, {box, op, val});
+    QStringList args;
+    if (!ip.isEmpty())
+        args << u"--ip"_s << ip;
+    if (!kind.isEmpty())
+        args << u"--kind"_s << kind;
+    args << box << op << val;
+    proc->start(program, args);
     return true;
 }
 

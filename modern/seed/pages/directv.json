@@ -25,7 +25,7 @@
     {
       "id": "b-bar1",
       "kind": "button",
-      "label": "\ud83d\udcfa BAR 1\n(192.168.6.74)",
+      "label": "\ud83d\udcfa BAR 1",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -51,7 +51,7 @@
     {
       "id": "b-bar2",
       "kind": "button",
-      "label": "\ud83d\udcfa BAR 2\n(192.168.6.71)",
+      "label": "\ud83d\udcfa BAR 2",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -77,7 +77,7 @@
     {
       "id": "b-front",
       "kind": "button",
-      "label": "\ud83d\udcfa BAR FRONT\n(192.168.6.70)",
+      "label": "\ud83d\udcfa BAR FRONT",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -103,7 +103,7 @@
     {
       "id": "b-72",
       "kind": "button",
-      "label": "\ud83d\udcfa BAR 3\n(192.168.6.72)",
+      "label": "\ud83d\udcfa BAR 3",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -129,7 +129,7 @@
     {
       "id": "b-vip",
       "kind": "button",
-      "label": "\ud83d\udcfa VIP\n(192.168.6.73)",
+      "label": "\ud83d\udcfa VIP",
       "shape": "rect",
       "behavior": "blink",
       "rect": {
@@ -181,7 +181,7 @@
     {
       "id": "b-samsung",
       "kind": "button",
-      "label": "\ud83d\udcfa SAMSUNG TV\n(192.168.6.200)",
+      "label": "\ud83d\udcfa SAMSUNG TV",
       "shape": "rect",
       "behavior": "blink",
       "rect": {

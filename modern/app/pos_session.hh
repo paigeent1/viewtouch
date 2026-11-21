@@ -727,9 +727,11 @@ public:
     }
     Q_INVOKABLE void closeQuickLabel() { invoke(QStringLiteral("closeQuickLabel")); }
     // A TV button (directv command): the store's main computer works the TV; its answer comes as a notice.
-    Q_INVOKABLE void directv(const QString &box, const QString &op, const QString &val)
+    // ip and kind: the button's own TV (empty: the main computer's TV list has it).
+    Q_INVOKABLE void directv(const QString &box, const QString &op, const QString &val, const QString &ip = {},
+                             const QString &kind = {})
     {
-        invoke(QStringLiteral("directv"), {box, op, val});
+        invoke(QStringLiteral("directv"), {box, op, val, ip, kind});
     }
     Q_INVOKABLE void searchChecks(const QString &query, int days = 365, int offset = 0) { invoke(QStringLiteral("searchChecks"), {query, days, offset}); }
     // Manager > Reports > Exceptions search (answers in exceptionSearch) and the End of Day archive.

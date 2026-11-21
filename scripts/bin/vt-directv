@@ -11,6 +11,15 @@
                                           asleep, what it's showing (nothing is changed)
   vt-directv pair <tv>                    a Samsung TV: allow ViewTouch on it once (the TV
                                           asks; press Allow with its remote within 30 s)
+  vt-directv pair --ip <ip> --kind samsung <tv>   the same, for a TV not in the list yet
+
+A button can carry its own TV (ViewTouch's page editor: the button > TV / DIRECTV remote):
+  vt-directv --ip 192.168.6.77 --kind samsung <box> key volup
+--ip (a store network address: 10.x, 172.16-31.x, 192.168.x) and --kind (directv, roku or
+samsung) go before the box. The TV is then the list's entry for <box> (or, if none is called
+that, the one at that address) with that address and kind, so a paired Samsung keeps its token
+and wake address; the list is updated to the button's address and kind, so list, check and
+pair follow the buttons.
 
 The TV list is ~/.config/viewtouch/tvs.json (not in the repo, not in the
 database), one per site. Start it with `vt-directv scan --save`, which
@@ -83,6 +92,67 @@ def load_tvs():
     except Exception as e:
         print(f"Couldn't read {CONFIG}: {e}", file=sys.stderr)
     return dict(DEFAULT_TVS)
+
+
+def save_tvs(tvs):
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CONFIG.with_name(CONFIG.name + ".tmp")
+    tmp.write_text(json.dumps(tvs, indent=2) + "\n")
+    os.replace(tmp, CONFIG)
+
+
+KINDS = ("directv", "roku", "samsung")
+
+
+def private_ip(text):
+    """A dotted IPv4 address on a store network (10/8, 172.16/12, 192.168/16)."""
+    if not re.fullmatch(r"(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}", text or ""):
+        return False
+    try:
+        ip = ipaddress.IPv4Address(text)
+    except ValueError:
+        return False
+    return any(ip in ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+
+
+def tv_options(argv):
+    """--ip <ip> / --kind <kind> at the front of argv (a button's own TV).
+    Returns (options, the rest); raises ValueError with what's wrong."""
+    opts, rest = {}, list(argv)
+    while rest and rest[0] in ("--ip", "--kind"):
+        if len(rest) < 2:
+            raise ValueError(f"{rest[0]} needs a value")
+        opts[rest[0][2:]] = rest[1]
+        rest = rest[2:]
+    if "ip" in opts and not private_ip(opts["ip"]):
+        raise ValueError(f"{opts['ip']} isn't a store network address (10.x, 172.16-31.x, 192.168.x)")
+    if "kind" in opts and opts["kind"] not in KINDS:
+        raise ValueError(f"{opts['kind']} isn't a TV type (directv, roku, samsung)")
+    return opts, rest
+
+
+def button_tv(tvs, box, opts):
+    """The TV a button names with its own address/kind: {name: box, kind, ip} over the list's entry
+    for box (else the one at that address), so a paired Samsung's token and mac are kept. Returns
+    (key, tv); the list (tvs) is updated, and saved, when the button's address or kind differ."""
+    key = box if box in tvs else None
+    if key is None and opts.get("ip"):
+        key = next((k for k, tv in tvs.items() if tv.get("ip") == opts["ip"]), None)
+    if key is None:
+        key = box
+    tv = dict(tvs.get(key, {}))
+    tv.setdefault("name", box)
+    tv.update(opts)
+    if not tv.get("ip"):
+        return key, None
+    old = tvs.get(key, {})
+    if old.get("ip") != tv["ip"] or old.get("kind", "directv") != tv.get("kind", "directv") or key not in tvs:
+        tvs[key] = tv
+        try:
+            save_tvs(tvs)
+        except OSError as e:
+            print(f"Couldn't update {CONFIG}: {e}", file=sys.stderr)
+    return key, tv
 
 
 def http(url, method="GET", timeout=2.0):
@@ -255,9 +325,14 @@ def samsung(tv, op, val):
     return f"-> channel {val}" if op == "tune" else f"{val} sent"
 
 
-def pair(key):
+def pair(key, opts=None):
     tvs = load_tvs()
-    if key not in tvs:
+    if opts:
+        key, tv = button_tv(tvs, key, opts)
+        if tv is None:
+            print(f"No address for {key}: vt-directv pair --ip <ip> --kind samsung {key}")
+            return 2
+    elif key not in tvs:
         print(f"No TV called {key} (vt-directv list)")
         return 2
     tv = tvs[key]
@@ -281,8 +356,7 @@ def pair(key):
     mac = _mac_of(tv["ip"])
     if mac:
         tv["mac"] = mac
-    CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG.write_text(json.dumps(tvs, indent=2) + "\n")
+    save_tvs(tvs)
     print(f"Paired {tv.get('name', key)}" + (f" (wake address {mac})" if mac else "") + ".")
     return 0
 
@@ -481,7 +555,15 @@ def main(argv):
                 print(f"  {k:8} {tv.get('name', k)[:14]:14} {tv.get('ip', ''):15} ({tv.get('kind')} TV, not checked)")
         return 0
     if argv[0] == "pair":
-        return pair(argv[1]) if len(argv) > 1 else (print("vt-directv pair <tv>  (vt-directv list)") or 2)
+        try:
+            opts, rest = tv_options(argv[1:])
+        except ValueError as e:
+            print(f"vt-directv pair: {e}")
+            return 2
+        if len(rest) != 1 or not re.fullmatch(r"[A-Za-z0-9_]{1,24}", rest[0]) or rest[0] == "all":
+            print("vt-directv pair [--ip <ip> --kind samsung] <tv>  (vt-directv list)")
+            return 2
+        return pair(rest[0], opts)
     if argv[0] == "scan":
         save = "--save" in argv
         nets = local_subnets()
@@ -491,13 +573,35 @@ def main(argv):
         scan(save, nets)
         return 0
 
+    try:
+        opts, argv = tv_options(argv)
+    except ValueError as e:
+        print(f"Refused: {e}")
+        return 2
+    if not argv:
+        print("Usage: vt-directv [--ip <ip>] [--kind <kind>] <box|all> tune <channel> | key <key>")
+        return 2
     box = argv[0]
     op = argv[1] if len(argv) > 1 else "tune"
     val = argv[2] if len(argv) > 2 else "206"
-    if op not in ("tune", "key") or not re.fullmatch(r"[A-Za-z0-9_]{1,24}", val):
-        print("Usage: vt-directv <box|all> tune <channel> | key <key>")
+    if (op not in ("tune", "key") or not re.fullmatch(r"[A-Za-z0-9_]{1,24}", val)
+            or not re.fullmatch(r"[A-Za-z0-9_]{1,24}", box)):
+        print("Usage: vt-directv [--ip <ip>] [--kind <kind>] <box|all> tune <channel> | key <key>")
         return 2
     tvs = load_tvs()
+    if opts and box == "all":
+        print("Refused: a button for every box can't have one TV's address")
+        return 2
+    if opts:
+        key, tv = button_tv(tvs, box, opts)
+        if tv is None:
+            print(f"No TV called {box} (vt-directv list), and the button has no address")
+            return 2
+        result = work(tv, op, val)
+        if op == "tune" and val.isdigit():
+            count_channel(val)
+        print(f"{tv.get('name', box)}: {result}")
+        return 0
     if box == "all":
         targets = [k for k, tv in tvs.items() if tv.get("kind", "directv") == "directv"]
     elif box in tvs:

@@ -902,6 +902,126 @@ TEST_CASE("TV buttons on a tablet: the main computer works the TV, the answer sh
         qputenv("VT_DIRECTV_LAUNCHER", oldLauncher);
 }
 
+TEST_CASE("TV buttons: the button's own TV address and type are checked", "[tv][directv]")
+{
+    // A store network address, dotted: 10/8, 172.16/12, 192.168/16.
+    for (const char *ok : {"192.168.6.77", "10.0.0.1", "172.16.0.1", "172.31.255.254", "192.168.0.0"})
+        CHECK(PosService::directvPrivateIp(QString::fromLatin1(ok)));
+    for (const char *bad : {"8.8.8.8", "172.32.0.1", "172.15.9.9", "192.169.1.1", "192.168.6", "192.168.6.77.1",
+                            "192.168.6.256", "192.168.06.77", "192.168.6.77 ", " 192.168.6.77", "192.168.6.77;reboot",
+                            "-v", "garbage", "", "::1", "0x0a.0.0.1"})
+        CHECK_FALSE(PosService::directvPrivateIp(QString::fromLatin1(bad)));
+    CHECK(PosService::directvTvProblem(u"samsung"_s, QString(), QString()).isEmpty());   // as before: the TV list
+    CHECK(PosService::directvTvProblem(u"samsung"_s, u"192.168.6.77"_s, u"samsung"_s).isEmpty());
+    CHECK(PosService::directvTvProblem(u"bar1"_s, u"192.168.6.74"_s, QString()).isEmpty());
+    CHECK(PosService::directvTvProblem(u"bar1"_s, QString(), u"directv"_s).isEmpty());
+    CHECK(PosService::directvTvProblem(u"r"_s, u"10.1.2.3"_s, u"roku"_s).isEmpty());
+    CHECK(PosService::directvTvProblem(u"samsung"_s, u"8.8.8.8"_s, u"samsung"_s).contains(u"store network address"_s));
+    CHECK(PosService::directvTvProblem(u"samsung"_s, u"garbage"_s, QString()).contains(u"store network address"_s));
+    CHECK(PosService::directvTvProblem(u"samsung"_s, u"192.168.6.77"_s, u"lg"_s).contains(u"TV type"_s));
+    CHECK(PosService::directvTvProblem(u"samsung"_s, QString(), u"--ip"_s).contains(u"TV type"_s));
+    CHECK(PosService::directvTvProblem(u"all"_s, u"192.168.6.77"_s, QString()).contains(u"every box"_s));
+}
+
+TEST_CASE("TV buttons with their own address: given to vt-directv on the Pi's screen and from a tablet", "[net][remote][tv][directv]")
+{
+    // vt-directv's stand-in: keeps every argument it was given, one call a line.
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QString calls = dir.path() + u"/calls.txt"_s;
+    {
+        QFile f(dir.path() + u"/fake"_s);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write(QString::fromUtf8("#!/bin/sh
+"
+                                  "(IFS='|'; echo "$*") >> '%1'
+"
+                                  "echo "TV: sent"
+").arg(calls).toUtf8());
+        f.close();
+        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    }
+    const QByteArray oldLauncher = qgetenv("VT_DIRECTV_LAUNCHER");
+    qputenv("VT_DIRECTV_LAUNCHER", (dir.path() + u"/fake"_s).toUtf8());
+    const auto called = [&] {
+        QFile f(calls);
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).trimmed() : QString();
+    };
+    const auto lastCall = [&] { return called().section(u'\n', -1); };
+    const QVariantMap samsung{{u"box"_s, u"samsung"_s}, {u"kind"_s, u"samsung"_s}, {u"ip"_s, u"192.168.6.77"_s},
+                              {u"op"_s, u"key"_s}, {u"val"_s, u"volup"_s}};
+    const auto with = [](QVariantMap m, const QString &key, const QVariant &v) {
+        m.insert(key, v);
+        return m;
+    };
+    {
+        // The Pi's own screen.
+        PosShared shared(test::seedPosData(), nullptr);
+        PosService pi(&shared, u"Bar"_s);
+        LayoutController c(seedLayout());
+        c.setPos(&pi);
+        REQUIRE(pi.loginWithPin(u"1111"_s));
+        c.command(u"directv"_s, samsung);
+        REQUIRE(waitFor([&] { return c.statusText() == u"TV: sent"_s; }, 5000));
+        CHECK(lastCall() == u"--ip|192.168.6.77|--kind|samsung|samsung|key|volup"_s);
+        // Only an address: only --ip.
+        c.command(u"directv"_s, with(with(samsung, u"kind"_s, QString()), u"ip"_s, u" 10.0.0.5 "_s));
+        REQUIRE(waitFor([&] { return lastCall() == u"--ip|10.0.0.5|samsung|key|volup"_s; }, 5000));
+        // A button without them: exactly as before (the TV list has it).
+        c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"key"_s}, {u"val"_s, u"poweron"_s}});
+        REQUIRE(waitFor([&] { return lastCall() == u"bar3|key|poweron"_s; }, 5000));
+        // Refused, said why, nothing run: a public address, garbage, a TV type it doesn't know, every box.
+        const int before = called().count(u'\n');
+        c.command(u"directv"_s, with(samsung, u"ip"_s, u"8.8.8.8"_s));
+        CHECK(c.statusText().contains(u"store network address"_s));
+        c.command(u"directv"_s, with(samsung, u"ip"_s, u"192.168.6.77; reboot"_s));
+        CHECK(c.statusText().contains(u"store network address"_s));
+        c.command(u"directv"_s, with(samsung, u"kind"_s, u"lg"_s));
+        CHECK(c.statusText().contains(u"TV type"_s));
+        c.command(u"directv"_s, with(samsung, u"box"_s, u"all"_s));
+        CHECK(c.statusText().contains(u"every box"_s));
+        waitFor([] { return false; }, 300);   // (anything started would have written by now)
+        CHECK(called().count(u'\n') == before);
+
+        // The number pad of a button with its own TV tunes that TV.
+        c.command(u"directvKeypad"_s, {{u"box"_s, u"samsung"_s}, {u"kind"_s, u"samsung"_s}, {u"ip"_s, u"192.168.6.77"_s}});
+        REQUIRE(c.tvPadOpen());
+        CHECK(c.tvPadIp() == u"192.168.6.77"_s);
+        CHECK(c.tvPadKind() == u"samsung"_s);
+        REQUIRE(c.tvPadTune(u"206"_s));
+        REQUIRE(waitFor([&] { return lastCall() == u"--ip|192.168.6.77|--kind|samsung|samsung|tune|206"_s; }, 5000));
+        c.command(u"directvKeypad"_s, {{u"box"_s, u"bar1"_s}});
+        REQUIRE(c.tvPadTune(u"219"_s));
+        REQUIRE(waitFor([&] { return lastCall() == u"bar1|tune|219"_s; }, 5000));
+    }
+    {
+        // A tablet: the main computer gets the address and type too.
+        Store store;
+        Screen bar(store.terminal(u"Bar Tablet"_s));
+        bar.pin("1111");
+        bar.c.command(u"directv"_s, samsung);
+        REQUIRE(waitFor([&] { return lastCall() == u"--ip|192.168.6.77|--kind|samsung|samsung|key|volup"_s; }, 5000));
+        REQUIRE(waitFor([&] { return bar.c.statusText() == u"TV: sent"_s; }, 5000));
+        bar.c.command(u"directv"_s, {{u"box"_s, u"bar3"_s}, {u"op"_s, u"tune"_s}, {u"val"_s, u"206"_s}});
+        REQUIRE(waitFor([&] { return lastCall() == u"bar3|tune|206"_s; }, 5000));
+        const int before = called().count(u'\n');
+        bar.c.command(u"directv"_s, with(samsung, u"ip"_s, u"1.1.1.1"_s));
+        REQUIRE(waitFor([&] { return bar.c.statusText().contains(u"store network address"_s); }));
+        bar.c.command(u"directv"_s, with(samsung, u"kind"_s, u"sony"_s));
+        REQUIRE(waitFor([&] { return bar.c.statusText().contains(u"TV type"_s); }));
+        // The pad on a tablet.
+        bar.c.command(u"directvKeypad"_s, {{u"box"_s, u"samsung"_s}, {u"kind"_s, u"samsung"_s}, {u"ip"_s, u"192.168.6.77"_s}});
+        REQUIRE(bar.c.tvPadOpen());
+        REQUIRE(bar.c.tvPadTune(u"634"_s));
+        REQUIRE(waitFor([&] { return lastCall() == u"--ip|192.168.6.77|--kind|samsung|samsung|tune|634"_s; }, 5000));
+        CHECK(called().count(u'\n') == before + 1);
+    }
+    if (oldLauncher.isEmpty())
+        qunsetenv("VT_DIRECTV_LAUNCHER");
+    else
+        qputenv("VT_DIRECTV_LAUNCHER", oldLauncher);
+}
+
 TEST_CASE("TV channel number pad: the DIRECTV pages' CH # key, tuned through the directv command", "[net][remote][tv][directv][tvpad]")
 {
     // Every Tune page has the CH # key, for its own box, under BOX off, over nothing else.

@@ -542,11 +542,12 @@ bool LayoutEditor::matchSize(const QString &pageId, const QStringList &zoneIds, 
     });
 }
 
-bool LayoutEditor::setZoneField(const QString &pageId, const QStringList &zoneIds, const QString &path,
-                                const QJsonValue &value)
+namespace {
+
+// setZoneField's edit, on a copy of the layout (also used with other edits in one undo step).
+bool setZoneFieldIn(Layout &l, const QString &pageId, const QStringList &zoneIds, const QString &path,
+                    const QJsonValue &value)
 {
-    if (path.isEmpty() || path == u"id")
-        return false;
     // A shared zone's own: where it sits, and the fields kept for its screen.
     const bool geometry = path == u"rect" || path.startsWith(u"rect.") || path == u"z" || path == u"rotation";
     auto ownHere = [&](const Zone &z) {
@@ -563,27 +564,126 @@ bool LayoutEditor::setZoneField(const QString &pageId, const QStringList &zoneId
         updated.rect = clampToCanvas(updated.rect, on.canvas);
         *z = updated;
     };
-    return apply(u"Change %1"_s.arg(path), [&](Layout &l) {
-        Page *page = l.page(pageId);
-        if (!page)
+    Page *page = l.page(pageId);
+    if (!page)
+        return false;
+    for (const QString &id : zoneIds) {
+        Zone *z = findZone(*page, id);
+        if (!z)
+            continue;
+        if (ownHere(*z)) {
+            edit(z, *page);
+            continue;
+        }
+        // The page's zone (on both screens); the version follows it.
+        const Page *owner = l.sourceOf(*page, id).owner;
+        Page *from = owner ? l.page(owner->id) : nullptr;
+        page = l.page(pageId);   // l.page() may have detached the list
+        if (Zone *src = from ? findZone(*from, id) : nullptr)
+            edit(src, *from);
+    }
+    return true;
+}
+
+bool isTvCommand(const QJsonObject &a)
+{
+    const QString name = a.value(u"name").toString();
+    return a.value(u"type").toString() == u"command" && (name == u"directv" || name == u"directvKeypad");
+}
+
+QString tvBoxOf(const QJsonObject &a)
+{
+    return a.value(u"args").toObject().value(u"box").toString().trimmed();
+}
+
+} // namespace
+
+bool LayoutEditor::setZoneField(const QString &pageId, const QStringList &zoneIds, const QString &path,
+                                const QJsonValue &value)
+{
+    if (path.isEmpty() || path == u"id")
+        return false;
+    return apply(u"Change %1"_s.arg(path),
+                 [&](Layout &l) { return setZoneFieldIn(l, pageId, zoneIds, path, value); });
+}
+
+bool LayoutEditor::setTvButtons(const QString &pageId, const QString &zoneId, const QJsonArray &actions,
+                                const QString &box, int *others)
+{
+    const QString name = box.trimmed();
+    if (name.isEmpty())
+        return false;
+    // The address and type as this zone's own TV action for the box has them.
+    QJsonObject from;
+    bool found = false;
+    for (const QJsonValue &v : actions)
+        if (isTvCommand(v.toObject()) && tvBoxOf(v.toObject()).compare(name, Qt::CaseInsensitive) == 0) {
+            from = v.toObject().value(u"args").toObject();
+            found = true;
+            break;
+        }
+    if (others)
+        *others = 0;
+    if (!found)
+        return setZoneField(pageId, {zoneId}, u"actions"_s, actions);
+    int count = 0;
+    const bool done = apply(u"Change the TV %1 on every page"_s.arg(name), [&](Layout &l) {
+        if (!setZoneFieldIn(l, pageId, {zoneId}, u"actions"_s, actions))
             return false;
-        for (const QString &id : zoneIds) {
-            Zone *z = findZone(*page, id);
-            if (!z)
-                continue;
-            if (ownHere(*z)) {
-                edit(z, *page);
-                continue;
+        for (Page &page : l.pages) {
+            for (Zone &z : page.zones) {
+                bool touched = false;
+                for (layout::Action &a : z.actions) {
+                    if (!isTvCommand(a.data) || tvBoxOf(a.data).compare(name, Qt::CaseInsensitive) != 0)
+                        continue;
+                    QJsonObject args = a.data.value(u"args").toObject();
+                    for (const QString key : {u"ip"_s, u"kind"_s}) {
+                        const QString v = from.value(key).toString().trimmed();
+                        if (v.isEmpty())
+                            args.remove(key);
+                        else
+                            args.insert(key, v);
+                    }
+                    if (args != a.data.value(u"args").toObject()) {
+                        a.data.insert(u"args"_s, args);
+                        touched = true;
+                    }
+                }
+                // (A phone version's shared copy of a button isn't another button.)
+                if (touched && page.variantOf.isEmpty() && !(page.id == pageId && z.id == zoneId))
+                    ++count;
             }
-            // The page's zone (on both screens); the version follows it.
-            const Page *owner = l.sourceOf(*page, id).owner;
-            Page *from = owner ? l.page(owner->id) : nullptr;
-            page = l.page(pageId);   // l.page() may have detached the list
-            if (Zone *src = from ? findZone(*from, id) : nullptr)
-                edit(src, *from);
         }
         return true;
-    });
+    }, u"tv:%1:%2:%3"_s.arg(pageId, zoneId, name.toLower()));
+    if (others)
+        *others = count;
+    return done;
+}
+
+int LayoutEditor::tvButtonCount(const QString &box) const
+{
+    int count = 0;
+    for (const Page &page : layout_.pages)
+        for (const Zone &z : page.zones)
+            if (page.variantOf.isEmpty() && std::ranges::any_of(z.actions, [&](const layout::Action &a) {
+                    return isTvCommand(a.data) && tvBoxOf(a.data).compare(box.trimmed(), Qt::CaseInsensitive) == 0;
+                }))
+                ++count;
+    return count;
+}
+
+QStringList LayoutEditor::tvNames() const
+{
+    QStringList names;
+    for (const Page &page : layout_.pages)
+        for (const Zone &z : page.zones)
+            for (const layout::Action &a : z.actions)
+                if (const QString box = tvBoxOf(a.data); isTvCommand(a.data) && !box.isEmpty()
+                    && !names.contains(box, Qt::CaseInsensitive))
+                    names.append(box);
+    names.sort(Qt::CaseInsensitive);
+    return names;
 }
 
 QJsonValue LayoutEditor::zoneField(const QString &pageId, const QString &zoneId, const QString &path) const

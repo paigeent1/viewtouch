@@ -270,6 +270,8 @@ public:
     static constexpr int kTvPadDigits = 4;
     bool tvPadOpen() const { return tvPadOpen_; }
     QString tvPadBox() const { return tvPadBox_; }
+    QString tvPadIp() const { return tvPadIp_; }
+    QString tvPadKind() const { return tvPadKind_; }
     QString tvPadTitle() const { return tvPadTitle_; }
     // Tune: refused (false, said on the status line, the pad stays) for nothing typed, more than
     // kTvPadDigits digits or anything but digits; else sends directv tune and closes the pad.
@@ -514,6 +516,9 @@ private:
     bool tvPadOpen_ = false;
     QString tvPadBox_;
     QString tvPadTitle_;
+    // The pad button's own TV address and type (args ip, kind; empty: the main computer's TV list).
+    QString tvPadIp_;
+    QString tvPadKind_;
     // The floor plan this screen last took as home (floorHome()): a manager choosing another moves
     // home there, for a screen whose home it was (not one with its own start page).
     QString floorHomeId_;

@@ -125,6 +125,12 @@ public:
     Q_INVOKABLE bool clearField(const QString &target, const QString &path);
     Q_INVOKABLE QVariantList actions() const;
     Q_INVOKABLE void setActions(const QVariantList &actions);
+    // TV buttons: the selected zone's actions set and every button for the TV `box` on every page
+    // given its TV action's address and type, one undo step (says how many in the notice).
+    Q_INVOKABLE int setActionsForTv(const QVariantList &actions, const QString &box);
+    // Buttons for the TV `box` on all pages; the TV names used on the pages (the TV name's choices).
+    Q_INVOKABLE int tvButtonCount(const QString &box) const;
+    Q_INVOKABLE QStringList tvNames() const;
 
     // --- pages ---
     Q_INVOKABLE QString newPage(const QString &name, const QString &kind, const QString &templateId);

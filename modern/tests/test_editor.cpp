@@ -499,3 +499,87 @@ TEST_CASE("Make a phone version from what phones show; back to automatic", "[edi
     REQUIRE(e.deletePage(itemsId));
     CHECK(!e.layout().page(framed));
 }
+
+// --- TV buttons: the TV's address and type are the button's (owner at HCA 2026-11-21) ---------
+
+TEST_CASE("TV buttons: the TV / DIRECTV remote's settings, and one address for every button of a TV", "[editor][tv]")
+{
+    // The command list has the TV remote; its args are fields of the command type.
+    QJsonObject command;
+    for (const QJsonValue &t : schema::actionTypes())
+        if (t.toObject().value(u"type").toString() == u"command")
+            command = t.toObject();
+    bool listed = false;
+    for (const QJsonValue &o : command.value(u"fields").toArray().first().toObject().value(u"options").toArray())
+        listed |= o.toObject().value(u"value").toString() == u"directv";
+    CHECK(listed);
+    const QJsonObject perCommand = command.value(u"commandArgs").toObject();
+    CHECK(perCommand == schema::commandArgs());
+    const auto paths = [&](const QString &name) {
+        QStringList out;
+        for (const QJsonValue &f : perCommand.value(name).toArray())
+            out << f.toObject().value(u"path").toString();
+        return out;
+    };
+    CHECK(paths(u"directv"_s) == QStringList{u"box"_s, u"kind"_s, u"ip"_s, u"op"_s, u"val"_s, u"val"_s});
+    CHECK(paths(u"directvKeypad"_s) == QStringList{u"box"_s, u"kind"_s, u"ip"_s});
+    QStringList keys;
+    for (const QJsonValue &f : perCommand.value(u"directv").toArray())
+        if (f.toObject().value(u"when").toObject().value(u"is").toString() == u"key")
+            for (const QJsonValue &o : f.toObject().value(u"options").toArray())
+                keys << o.toObject().value(u"value").toString();
+    CHECK(keys == QStringList{u"poweron"_s, u"poweroff"_s, u"chanup"_s, u"chandown"_s, u"prev"_s, u"guide"_s,
+                              u"exit"_s, u"info"_s, u"select"_s, u"volup"_s, u"voldown"_s, u"mute"_s, u"up"_s,
+                              u"down"_s, u"left"_s, u"right"_s, u"home"_s, u"back"_s, u"input"_s});
+
+    LayoutEditor e(seed());
+    CHECK(e.tvNames().contains(u"samsung"_s));
+    CHECK(e.tvNames().contains(u"box72"_s));
+    const int samsungs = e.tvButtonCount(u"samsung"_s);
+    REQUIRE(samsungs >= 10);
+    const auto argsOf = [&](const QString &page, const QString &zone) {
+        return e.layout().page(page)->zone(zone)->actions.front().data.value(u"args").toObject();
+    };
+    const QJsonObject bar1Before = argsOf(u"directv-tune-bar1"_s, u"rk-chpad"_s);
+
+    // SAMSUNG TV's Vol + given the TV's address and type, with every button for it.
+    QJsonArray actions = e.zoneField(u"tv-samsung"_s, u"rk-poweron"_s, u"actions"_s).toArray();
+    QJsonObject a = actions.first().toObject();
+    QJsonObject args = a.value(u"args").toObject();
+    args.insert(u"ip"_s, u"192.168.6.7"_s);
+    a.insert(u"args"_s, args);
+    actions.replace(0, a);
+    int others = -1;
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    CHECK(others == samsungs - 1);
+    // Typed on: the same undo step.
+    args.insert(u"ip"_s, u"192.168.6.77"_s);
+    args.insert(u"kind"_s, u"samsung"_s);
+    a.insert(u"args"_s, args);
+    actions.replace(0, a);
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    CHECK(e.undoStack()->count() == 1);
+    for (const Zone &z : e.layout().page(u"tv-samsung"_s)->zones)
+        for (const Action &act : z.actions)
+            if (act.str(u"name") == u"directv") {
+                const QJsonObject got = act.data.value(u"args").toObject();
+                CHECK(got.value(u"ip").toString() == u"192.168.6.77"_s);
+                CHECK(got.value(u"kind").toString() == u"samsung"_s);
+                CHECK(got.value(u"box").toString() == u"samsung"_s);   // their own key or volume stays
+            }
+    CHECK(argsOf(u"tv-samsung"_s, u"rk-poweroff"_s).value(u"val").toString() == u"poweroff"_s);
+    CHECK(argsOf(u"directv-tune-bar1"_s, u"rk-chpad"_s) == bar1Before);   // another TV: untouched
+
+    // The address taken off again: off every button (the Pi's TV list has it).
+    args.remove(u"ip"_s);
+    args.remove(u"kind"_s);
+    a.insert(u"args"_s, args);
+    actions.replace(0, a);
+    REQUIRE(e.setTvButtons(u"tv-samsung"_s, u"rk-poweron"_s, actions, u"samsung"_s, &others));
+    CHECK_FALSE(argsOf(u"tv-samsung"_s, u"rk-poweroff"_s).contains(u"ip"));
+    // One undo step puts everything back.
+    e.undoStack()->undo();
+    e.undoStack()->undo();
+    CHECK_FALSE(argsOf(u"tv-samsung"_s, u"rk-poweroff"_s).contains(u"ip"));
+    CHECK(e.undoStack()->index() == 0);
+}

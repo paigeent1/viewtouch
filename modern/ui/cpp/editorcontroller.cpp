@@ -109,6 +109,16 @@ QJsonObject translatedField(QJsonObject f)
             fields.append(translatedField(v.toObject()));
         f.insert(u"fields"_s, fields);
     }
+    if (f.contains(u"commandArgs"_s)) {   // the command type's: per command, its args' fields
+        QJsonObject perCommand = f.value(u"commandArgs"_s).toObject();
+        for (auto it = perCommand.begin(); it != perCommand.end(); ++it) {
+            QJsonArray fields;
+            for (const QJsonValue &v : it.value().toArray())
+                fields.append(translatedField(v.toObject()));
+            it.value() = fields;
+        }
+        f.insert(u"commandArgs"_s, perCommand);
+    }
     return f;
 }
 
@@ -622,6 +632,26 @@ void EditorController::setActions(const QVariantList &actions)
 {
     if (selection_.size() == 1)
         editor_.setZoneField(pageId_, selection_, u"actions"_s, QJsonArray::fromVariantList(actions));
+}
+
+int EditorController::setActionsForTv(const QVariantList &actions, const QString &box)
+{
+    if (selection_.size() != 1)
+        return 0;
+    int others = 0;
+    if (editor_.setTvButtons(pageId_, selection_.first(), QJsonArray::fromVariantList(actions), box, &others) && others > 0)
+        setNotice(tr("Also changed %n other button(s) for the TV %1.", "", others).arg(box.trimmed()));
+    return others;
+}
+
+int EditorController::tvButtonCount(const QString &box) const
+{
+    return editor_.tvButtonCount(box);
+}
+
+QStringList EditorController::tvNames() const
+{
+    return editor_.tvNames();
 }
 
 // --- pages ---------------------------------------------------------------------------

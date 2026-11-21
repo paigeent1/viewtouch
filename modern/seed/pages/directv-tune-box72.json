@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "directv-tune-box72",
-  "name": "Tune BAR 3 (192.168.6.72)",
+  "name": "Tune BAR 3",
   "kind": "custom",
   "canvas": {
     "w": 1920,
@@ -12,7 +12,7 @@
     {
       "id": "t",
       "kind": "label",
-      "label": "\ud83d\udcfa Tuning: BAR 3 (192.168.6.72)",
+      "label": "\ud83d\udcfa Tuning: BAR 3",
       "shape": "rect",
       "behavior": "none",
       "rect": {

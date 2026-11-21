@@ -723,7 +723,13 @@ public:
     // /usr/local/bin/vt-directv <box> <op> <val> (VT_DIRECTV_LAUNCHER stands in for it: tests) in the
     // background, killed after 10 s, and its one-line answer comes back as a notice on this terminal's
     // screen only, so a tablet's TV buttons work as the Pi's own. Anyone logged in.
-    bool directv(const QString &box, const QString &op, const QString &val);
+    // The button's own TV (optional): ip a store network IPv4 (10/8, 172.16/12, 192.168/16), kind
+    // directv, roku or samsung; given to vt-directv as --ip <ip> --kind <kind> before the box.
+    bool directv(const QString &box, const QString &op, const QString &val, const QString &ip = {},
+                 const QString &kind = {});
+    // Empty when ip and kind are right for the box (both may be empty), else what's wrong (translated).
+    static QString directvTvProblem(const QString &box, const QString &ip, const QString &kind);
+    static bool directvPrivateIp(const QString &ip);
     // vt-directv's own rules for its arguments: box and val [A-Za-z0-9_]{1,24}, op tune or key.
     static bool directvArgsOk(const QString &box, const QString &op, const QString &val);
     static QString directvProgram();

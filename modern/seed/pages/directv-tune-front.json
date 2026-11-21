@@ -12,7 +12,7 @@
     {
       "id": "t",
       "kind": "label",
-      "label": "\ud83d\udcfa Tuning: BAR FRONT (192.168.6.70)",
+      "label": "\ud83d\udcfa Tuning: BAR FRONT",
       "shape": "rect",
       "behavior": "none",
       "rect": {

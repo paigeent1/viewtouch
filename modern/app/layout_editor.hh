@@ -9,6 +9,7 @@
 #include "layout/layout.hh"
 
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QList>
@@ -71,6 +72,17 @@ public:
     bool setZoneField(const QString &pageId, const QStringList &zoneIds, const QString &path,
                       const QJsonValue &value);
     QJsonValue zoneField(const QString &pageId, const QString &zoneId, const QString &path) const;
+
+    // --- TV buttons (directv / directvKeypad commands, args.box names the TV) ---------------
+    // The zone's actions set to `actions` and, in the same undo step, every TV button for `box` on
+    // every page given the address and type (args ip, kind) the zone's own TV action for it has
+    // (empty: removed, so the Pi's TV list has them). Typing into the same field merges into one
+    // step. `others`: how many other buttons changed.
+    bool setTvButtons(const QString &pageId, const QString &zoneId, const QJsonArray &actions,
+                      const QString &box, int *others = nullptr);
+    // Buttons (not phone copies) with a TV action for `box`; the TV names used on the pages.
+    int tvButtonCount(const QString &box) const;
+    QStringList tvNames() const;
 
     // --- phone versions --------------------------------------------------------
     // A phone version of a page, laid out as phones show the page now (its

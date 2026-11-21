@@ -537,7 +537,12 @@ bool LayoutController::tvPadTune(const QString &digits)
     const QString box = tvPadBox_;
     closeTvPad();
     // The channel buttons' own command: on a tablet it goes to the main computer, which works the TV.
-    command(u"directv"_s, {{u"box"_s, box}, {u"op"_s, u"tune"_s}, {u"val"_s, typed}});
+    QVariantMap args{{u"box"_s, box}, {u"op"_s, u"tune"_s}, {u"val"_s, typed}};
+    if (!tvPadIp_.isEmpty())
+        args.insert(u"ip"_s, tvPadIp_);
+    if (!tvPadKind_.isEmpty())
+        args.insert(u"kind"_s, tvPadKind_);
+    command(u"directv"_s, args);
     return true;
 }
 
@@ -2433,8 +2438,10 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
             return done(false);
         }
         setStatus(tr("Sending to the TV..."));
+        // The button's own TV address and type, when it has them (else the main computer's TV list).
         pos_->directv(args.value(u"box"_s, u"bar1"_s).toString(), args.value(u"op"_s, u"tune"_s).toString(),
-                      args.value(u"val"_s, u"206"_s).toString());
+                      args.value(u"val"_s, u"206"_s).toString(), args.value(u"ip"_s).toString().trimmed(),
+                      args.value(u"kind"_s).toString().trimmed());
         return done(true);
     }
     // TV channel number pad (owner at HCA 2026-11-21: "DIRECTV screen needs a channel select by number"):
@@ -2466,6 +2473,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         if (title.isEmpty())
             title = box.compare(u"all"_s, Qt::CaseInsensitive) == 0 ? tr("every box") : box.toUpper();
         tvPadBox_ = box;
+        tvPadIp_ = args.value(u"ip"_s).toString().trimmed();
+        tvPadKind_ = args.value(u"kind"_s).toString().trimmed();
         tvPadTitle_ = tr("Channel for %1").arg(title);
         tvPadOpen_ = true;
         emit tvPadChanged();

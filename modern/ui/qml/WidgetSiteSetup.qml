@@ -361,6 +361,7 @@ Item {
                         }
                         Tool { text: qsTr("Scan the network for TVs"); onClicked: w.run("scan-tvs") }
                         Caption { text: qsTr("DIRECTV receivers need External Device access allowed (Menu > Settings > Whole-Home).") }
+                        Caption { text: qsTr("Set a TV's address on its buttons: Edit pages > the button > TV / DIRECTV remote.") }
                     }
                 }
 

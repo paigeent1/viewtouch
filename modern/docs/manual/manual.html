@@ -1916,6 +1916,17 @@
 <p>The TV buttons work the same on every screen: on the Pi's own screen and on the Android tablets. The store's Pi works the TVs (it runs <code>vt-directv</code>), whichever screen the button was touched on, and the answer (for example <i>BAR 3: poweron sent</i> or <i>not reachable</i>) shows in the status line of the screen that touched it. Anyone signed in may use them; with nobody signed in the screen says <i>Log in first.</i></p>
 <p><b>A channel by its number:</b> <b>CH # (number pad)</b>, under <b>BOX off</b> on each tuning page, opens a large number pad titled <i>Channel for BAR 1</i> (the page's box). Type up to 4 digits on the keys (or on a keyboard), with <b>⌫</b> to take one back and <b>Clear</b> to start again; a channel on the page's list shows its name as it is typed (206 shows <i>ESPN</i>). <b>Tune</b> (or Enter) tunes that box and closes the pad, and the answer shows in the status line as with the channel buttons. <b>Close</b>, or a touch outside the pad, closes it without tuning. Any button on a tuning page can be given it in the page editor: command <i>TV: channel number pad</i> (chapter 13); it tunes that page's box.</p>
 <p><b>TV power (Sceptre TVs):</b> the Sceptre TVs ignore the receiver's standby, so <b>BOX off</b> alone leaves the TV on. Set each TV's no-signal power-off (sleep when there is no signal) in the TV's own menu: then <b>BOX off</b> turns the TV off too (works at HCA, 2026-11-21). If a box says ON (<code>vt-directv check</code>) but the TV shows nothing from it, unplug the box and plug it back in.</p>
+<h3>A TV's address and type, on its buttons</h3>
+<p>Every TV button knows its own TV. In the page editor (chapter 13), touch the button; under <i>When touched</i> its action is the command <b>TV / DIRECTV remote</b> (a channel number pad's is <b>TV: channel number pad</b>), with these settings:</p>
+<ul>
+<li><b>TV name:</b> the same name on every button for that TV (for example <i>bar1</i> or <i>samsung</i>). <i>TV names on the pages…</i> lists the names already used.</li>
+<li><b>TV type:</b> <i>DIRECTV receiver</i>, <i>Samsung TV</i> or <i>Roku TV</i>.</li>
+<li><b>IP address:</b> the TV's address on the store network, for example <i>192.168.6.77</i> (10.x.x.x, 172.16–31.x.x or 192.168.x.x; any other address is refused and the button says so). Left empty, the Pi's own TV list (Site Setup → TVs and DIRECTV) has the address, as before.</li>
+<li><b>What it does:</b> <i>Key</i> (then <b>Key</b>: Power on, Power off, Channel up, Volume up, Mute, Input and the other remote keys) or <i>Tune channel</i> (then <b>Channel</b>: its digits, for example 206).</li>
+</ul>
+<p><b>The same address on every button for the TV:</b> with <i>Same address and type on all … button(s) for this TV (every page)</i> ticked (it is, to start with), changing the IP address or the TV type on one button changes it on every button with that TV name on every page, in one step (<b>Undo</b> takes it all back). The editor says how many other buttons changed. Untick it to change only that button.</p>
+<p>The Pi follows the buttons: when a button's address differs from its TV list, <code>vt-directv</code> updates the list (a paired Samsung keeps its pairing), so <code>vt-directv list</code>, <code>check</code> and <code>pair</code> use the new address. A Samsung TV still needs pairing once: on the Pi, <code>vt-directv pair samsung</code> (or, for a TV not in the list yet, <code>vt-directv pair --ip 192.168.6.77 --kind samsung samsung</code>), then press <b>Allow</b> on the TV within 30 seconds.</p>
+<p>The starter pages give the buttons TV names only, no addresses: each store sets its TVs' addresses on their buttons.</p>
 <p><b>Owner:</b> <b>Site Setup → TVs and DIRECTV → Scan the network for TVs</b> finds the DIRECTV receivers and smart TVs on the Pi's own network. Roku TVs can be worked from ViewTouch; others are listed. A DIRECTV receiver needs <i>External Device</i> access allowed in its own settings. The receivers are listed for each site (chapter 30).</p>
 
 <h2>Lenovo Android Tablet Kiosk Fleet &amp; System Controls</h2>
@@ -2706,6 +2717,7 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <tr><th>Command</th><th>What it does and when</th></tr>
 <tr><td><code>vt-add-billboard "<i>Front TV</i>" <i>address</i></code></td><td>Puts the billboard app on a Fire TV. Usually done from Store Settings → Billboards → <b>+ Add</b> (chapter 25). Run it again to update the app on that TV.</td></tr>
 <tr><td><code>vt-directv scan --save</code></td><td>Finds DIRECTV receivers and smart TVs on the store network and adds them to this site's list (Site Setup's <b>Scan the network for TVs</b>). <code>vt-directv list</code> shows the list.</td></tr>
+<tr><td><code>vt-directv pair <i>samsung</i></code></td><td>Lets ViewTouch work a Samsung TV (press <b>Allow</b> on the TV within 30 seconds). <code>vt-directv pair --ip <i>address</i> --kind samsung <i>name</i></code> does it for a TV not in the list yet. Set the TV's address on its buttons first (chapter 21).</td></tr>
 </table>
 
 <h2>Scanners and labels</h2>
