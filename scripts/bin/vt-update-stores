@@ -7,6 +7,7 @@
 #                                    or built there now (about 25 minutes; it waits)
 #                                 2. both apps into apks/ here, this Pi pulled and restarted (vt-server)
 #                                 3. each other store: the apps copied over, pulled and restarted the same way
+#                                    (and each store's billboards updated from its Pi: vt-update-billboards)
 #                                 4. what each store runs now (vt-status there)
 #   vt-update-stores --check    only step 4: what each store and its tablets run
 #   vt-update-stores --not-here steps 1-4 but this Pi isn't restarted (busy register: do it later)
@@ -14,8 +15,8 @@
 # The other stores: OTHER_STORES in this Pi's site settings, Name=user@address, separated by spaces:
 #   vt-site set OTHER_STORES "HCA=pi@192.168.6.81"
 # Restarting a store's ViewTouch blanks its register for a minute or two; its tablets set up for
-# ViewTouch put the new app in by themselves once nobody is signed in on them (Fire TV billboards:
-# Store Settings > Billboards > Update app).
+# ViewTouch put the new app in by themselves once nobody is signed in on them; Fire TV billboards get
+# it from their store's Pi right after (vt-update-billboards).
 # Asked for a password for each store every time? Once: ssh-copy-id pi@<address>.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 set -o pipefail
@@ -86,6 +87,7 @@ if [ "$MODE" = nothere ]; then
     echo "      This Pi has the new code; not restarted (--not-here): run vt-server when it's quiet."
 else
     vt-server || { echo "vt-server failed here."; exit 1; }
+    vt-update-billboards   # Fire TVs can't update themselves: the store's computer puts the app in
 fi
 
 # 3. The other stores.
@@ -96,7 +98,7 @@ update_store() {   # name target
         echo "      $1: couldn't copy the apps (is it on? ssh $2)"; return
     fi
     # No -t: a terminal there hangs up when ssh closes, and that stopped HCA's ViewTouch (2026-11-19).
-    ssh -o ConnectTimeout=10 "$2" 'cd ~/viewtouch-main && git pull -q --ff-only myfork main && DISPLAY=:0 vt-server' \
+    ssh -o ConnectTimeout=10 "$2" 'cd ~/viewtouch-main && git pull -q --ff-only myfork main && DISPLAY=:0 vt-server && vt-update-billboards' \
         || echo "      $1: the update didn't finish there; run vt-server on $1 and look at what it says."
 }
 each_store update_store

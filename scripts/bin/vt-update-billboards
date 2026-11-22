@@ -1,0 +1,35 @@
+#!/bin/bash
+# vt-update-billboards: every billboard (Fire TV) of this store gets the app this Pi now runs.
+# A Fire TV won't let ViewTouch install its own update, so the store's computer puts it in over the
+# TV's adb (a Fire TV keeps that on through restarts). vt-update-stores runs this on each store after
+# vt-server, so nobody has to tap Store Settings > Billboards > Update app (owner 2026-11-22).
+# A billboard already on this build is left alone. One that's off or unreachable is skipped and said.
+#   vt-update-billboards           update the ones that are behind
+#   vt-update-billboards --check   only say what each runs
+. "$(dirname "$(readlink -f "$0")")/vt-site-lib"
+LIST="$VT_CONF_DIR/billboards"
+[ -s "$LIST" ] || { echo "      billboards: none at this store"; exit 0; }
+command -v adb >/dev/null 2>&1 || { echo "      billboards: adb isn't installed here; skipped"; exit 0; }
+WANT=$(cat "$VT_BUILD/generated/vtm_build_number.hh" "$VT_BUILD/vtm_build_number.hh" 2>/dev/null \
+       | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
+adb start-server >/dev/null 2>&1
+while IFS='|' read -r name ip <&3; do
+    [ -z "$name" ] || [ -z "$ip" ] && continue
+    adb connect "$ip:5555" >/dev/null 2>&1 || true
+    have=$(timeout 15 adb -s "$ip:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null \
+           | awk -F= '/versionName/{print $2; exit}' | tr -d '\r ')
+    if [ -z "$have" ]; then
+        echo "      billboard $name ($ip): not reachable (off, or ADB debugging off on the TV); skipped"
+        continue
+    fi
+    if [ -n "$WANT" ] && [ "$have" = "$WANT" ]; then
+        echo "      billboard $name: on $have already"
+        continue
+    fi
+    if [ "$1" = "--check" ]; then
+        echo "      billboard $name: on $have (this store runs ${WANT:-?})"
+        continue
+    fi
+    echo "      billboard $name ($ip): $have -> ${WANT:-new}..."
+    vt-add-billboard "$name" "$ip" 2>&1 | sed -u 's/^/        /'
+done 3< "$LIST"
