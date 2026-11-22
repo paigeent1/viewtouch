@@ -9,6 +9,7 @@
 #include "net/layout_hub.hh"
 #include "net/pos_server.hh"
 #include "net/remote_session.hh"
+#include "net/tablet_care.hh"
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
 
@@ -23,6 +24,7 @@
 #include <QTemporaryDir>
 #include <QFileInfo>
 #include <QThread>
+#include <QProcess>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -1133,4 +1135,233 @@ TEST_CASE("TV channel number pad: the DIRECTV pages' CH # key, tuned through the
         qunsetenv("VT_DIRECTV_LAUNCHER");
     else
         qputenv("VT_DIRECTV_LAUNCHER", oldLauncher);
+}
+
+// --- Tablet care (HCA 2026-11-22: port 5555 never came back after `adb reboot`, vt-status said
+// "Offline" for tablets working fine in ViewTouch; the owner: no 24/7 help desk) -------------------
+
+namespace {
+
+QJsonArray readScreens(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return {};
+    return QJsonDocument::fromJson(f.readAll()).array();
+}
+
+QJsonObject screenNamed(const QString &path, const QString &name)
+{
+    for (const QJsonValue &v : readScreens(path))
+        if (v.toObject().value(u"name").toString() == name)
+            return v.toObject();
+    return {};
+}
+
+QString fileText(const QString &path)
+{
+    QFile f(path);
+    return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+}
+
+} // namespace
+
+TEST_CASE("Tablet care: the store keeps each tablet's debugging, health and log, and writes screens.json", "[net][tabletcare]")
+{
+    Store store;
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QString screensFile = dir.filePath(u"screens.json"_s);
+    const QString logDir = dir.filePath(u"tablet-logs"_s);
+    store.server.setScreensFile(screensFile);
+    store.server.setTabletLogDir(logDir);
+    CHECK(readScreens(screensFile).isEmpty());   // written at once: no screens yet
+
+    auto t = store.terminal(u"HCA 1"_s);
+    const QString key = QString::fromStdString(store.shared.settings.terminals.back().key);
+    t->reportAdbState({{u"grant"_s, true}, {u"adb"_s, true}, {u"wifiAdb"_s, true},
+                       {u"port"_s, 41235}, {u"tlsPort"_s, 41235}, {u"tcpPort"_s, 0}});
+    REQUIRE(waitFor([&] { return store.server.connections().value(0).toMap()[u"adb"_s].toMap()[u"port"_s] == 41235; }));
+    t->reportHealth({{u"battery"_s, 82}, {u"charging"_s, true}, {u"rssi"_s, -61}, {u"uptime"_s, 3600},
+                     {u"restarts"_s, 1}, {u"reconnects"_s, 0}, {u"lastRestart"_s, u"11-22 13:50 no store for 10 min"_s}});
+    REQUIRE(waitFor([&] { return store.server.connections().value(0).toMap()[u"health"_s].toMap()[u"battery"_s] == 82; }));
+    const QVariantMap health = store.server.connections().value(0).toMap()[u"health"_s].toMap();
+    CHECK(health[u"charging"_s].toBool());
+    CHECK(health[u"rssi"_s].toInt() == -61);
+    CHECK(health[u"restarts"_s].toInt() == 1);
+
+    // screens.json, for the Pi's scripts: what each said, and no secrets.
+    REQUIRE(waitFor([&] { return screenNamed(screensFile, u"HCA 1"_s).value(u"adb").toObject().value(u"port").toInt() == 41235; }));
+    REQUIRE(waitFor([&] { return screenNamed(screensFile, u"HCA 1"_s).value(u"health").toObject().value(u"battery").toInt() == 82; }));
+    QJsonObject row = screenNamed(screensFile, u"HCA 1"_s);
+    CHECK(row.value(u"connected").toBool());
+    CHECK(row.value(u"ip").toString() == u"127.0.0.1"_s);
+    CHECK(row.value(u"appVersion").toString() == net::appBuild().version);
+    CHECK(row.value(u"build").toInt() == net::appBuild().number);
+    CHECK(row.value(u"adb").toObject().value(u"grant").toBool());
+    CHECK(row.value(u"adb").toObject().value(u"wifiAdb").toBool());
+    CHECK(row.value(u"health").toObject().value(u"rssi").toInt() == -61);
+    CHECK_FALSE(fileText(screensFile).contains(key));
+    CHECK_FALSE(fileText(screensFile).contains(u"\"key\""_s));
+
+    // Its own log lines, kept per screen; a full log rotated to .log.1.
+    const QString log = QDir(logDir).filePath(net::PosServer::tabletLogName(u"HCA 1"_s));
+    CHECK(net::PosServer::tabletLogName(u"../x/y"_s).indexOf(u'/') < 0);
+    t->sendLog({u"first line"_s, u"second\nline"_s});
+    REQUIRE(waitFor([&] { return fileText(log).contains(u"second line"_s); }));
+    CHECK(fileText(log).contains(u"first line\n"_s));
+    {
+        QFile f(log);
+        REQUIRE(f.open(QIODevice::Append));
+        f.write(QByteArray(net::PosServer::kTabletLogBytes + 10, 'x'));
+    }
+    t->sendLog({u"after the rotation"_s});
+    REQUIRE(waitFor([&] { return fileText(log).contains(u"after the rotation"_s); }));
+    CHECK(QFileInfo(log).size() < 1000);
+    CHECK(fileText(log + u".1"_s).contains(u"first line"_s));
+
+    // Gone: still listed, not connected, what it said last kept.
+    t.reset();
+    REQUIRE(waitFor([&] { return !screenNamed(screensFile, u"HCA 1"_s).value(u"connected").toBool(true); }, 5000));
+    row = screenNamed(screensFile, u"HCA 1"_s);
+    CHECK(row.value(u"adb").toObject().value(u"port").toInt() == 41235);
+    CHECK(row.value(u"appVersion").toString() == net::appBuild().version);
+    CHECK(row.value(u"lastSeen").toInteger() == 1'700'000'000'000);
+}
+
+TEST_CASE("Tablet care: a pass reports debugging, health and the log; a stuck screen reconnects, then restarts", "[net][tabletcare]")
+{
+    Store store;
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    store.server.setTabletLogDir(dir.path());
+    auto t = store.terminal(u"Bar 2"_s);
+    int asked = 0;
+    net::TabletCare::Platform p;
+    p.debugging = [&](bool) {
+        ++asked;
+        return QVariantMap{{u"grant"_s, false}, {u"adb"_s, true}, {u"wifiAdb"_s, false}, {u"port"_s, 0}};
+    };
+    p.health = [] { return QVariantMap{{u"battery"_s, 50}, {u"charging"_s, false}, {u"uptime"_s, 120}}; };
+    p.restarts = [] { return 2; };
+    net::TabletCare::addLogLine(u"care test line"_s);
+    net::TabletCare care(t.get(), p);
+    REQUIRE(waitFor([&] { return store.server.connections().value(0).toMap()[u"health"_s].toMap()[u"restarts"_s] == 2; }));
+    CHECK(asked >= 1);
+    const QVariantMap c = store.server.connections().value(0).toMap();
+    CHECK(c[u"health"_s].toMap()[u"battery"_s] == 50);
+    CHECK_FALSE(c[u"adb"_s].toMap()[u"grant"_s].toBool());
+    REQUIRE(waitFor([&] { return fileText(QDir(dir.path()).filePath(u"Bar 2.log"_s)).contains(u"care test line"_s); }));
+    // The next pass sends only what is new.
+    net::TabletCare::addLogLine(u"care second line"_s);
+    care.pass();
+    REQUIRE(waitFor([&] { return fileText(QDir(dir.path()).filePath(u"Bar 2.log"_s)).contains(u"care second line"_s); }));
+    CHECK(fileText(QDir(dir.path()).filePath(u"Bar 2.log"_s)).count(u"care test line"_s) == 1);
+
+    // A screen that can't reach its store: connects again from scratch, then (nobody signed in) restarts.
+    net::RemoteSession lost(u"Lost"_s);
+    net::Credentials creds = store.pairedDevice(u"Lost"_s);
+    QTcpServer nothing;   // a port where nothing answers the way a store would
+    REQUIRE(nothing.listen(QHostAddress::LocalHost, 0));
+    creds.port = nothing.serverPort();
+    nothing.close();
+    lost.setCredentials(creds);
+    lost.connectTo(u"127.0.0.1"_s, creds.port);
+    QString restartedFor;
+    net::TabletCare::Platform lp;
+    lp.restartApp = [&](const QString &why) { restartedFor = why; };
+    net::TabletCare lostCare(&lost, lp);
+    lostCare.setTimes(60'000, 50, 200, 900);
+    REQUIRE(waitFor([&] { return lostCare.reconnects() >= 1; }, 3000));
+    CHECK(restartedFor.isEmpty());
+    REQUIRE(waitFor([&] { return !restartedFor.isEmpty(); }, 3000));
+    CHECK(restartedFor.startsWith(u"no store for"_s));
+}
+
+TEST_CASE("Tablet care on the Pi: vt-tablet-report, vt-adb-ensure and vt-status read screens.json", "[net][tabletcare][scripts]")
+{
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const QJsonArray screens{
+        QJsonObject{{u"name"_s, u"HCA 1"_s}, {u"ip"_s, u"192.168.6.82"_s}, {u"connected"_s, true}, {u"appVersion"_s, u"0.9.622"_s},
+                    {u"updateState"_s, u"up to date"_s},
+                    {u"adb"_s, QJsonObject{{u"grant"_s, true}, {u"adb"_s, true}, {u"wifiAdb"_s, true}, {u"port"_s, 41235}, {u"tlsPort"_s, 41235}, {u"tcpPort"_s, 0}}},
+                    {u"health"_s, QJsonObject{{u"battery"_s, 82}, {u"charging"_s, true}, {u"rssi"_s, -61}, {u"uptime"_s, 3600}, {u"restarts"_s, 0}}}},
+        QJsonObject{{u"name"_s, u"HCA 2"_s}, {u"ip"_s, u"192.168.6.83"_s}, {u"connected"_s, true}, {u"appVersion"_s, u"0.9.622"_s},
+                    {u"adb"_s, QJsonObject{{u"grant"_s, false}, {u"adb"_s, true}, {u"wifiAdb"_s, false}, {u"port"_s, 0}}},
+                    {u"health"_s, QJsonObject{{u"battery"_s, 15}, {u"charging"_s, false}, {u"restarts"_s, 2}}}},
+        QJsonObject{{u"name"_s, u"HCA 3"_s}, {u"ip"_s, u"192.168.6.84"_s}, {u"connected"_s, false}, {u"appVersion"_s, u"0.9.600"_s},
+                    {u"lastSeen"_s, now - 25 * 60 * 1000}}};
+    const QString file = dir.filePath(u"screens.json"_s);
+    {
+        QFile f(file);
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write(QJsonDocument(screens).toJson());
+    }
+    // A stand-in adb: says what it was asked; nothing is on 5555 yet.
+    const QString bin = dir.filePath(u"bin"_s);
+    QDir().mkpath(bin);
+    const QString adbLog = dir.filePath(u"adb.log"_s);
+    {
+        QFile f(QDir(bin).filePath(u"adb"_s));
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write("#!/bin/bash\necho \"$*\" >> \"$ADB_LOG\"\ncase \"$1\" in\n  devices) echo 'List of devices attached' ;;\n"
+                "  connect) echo \"connected to $2\" ;;\nesac\nexit 0\n");
+        f.setPermissions(f.permissions() | QFileDevice::ExeOwner);
+    }
+    QDir().mkpath(dir.filePath(u"home/.config/viewtouch"_s));
+    {
+        QFile f(dir.filePath(u"home/.config/viewtouch/tablets"_s));
+        REQUIRE(f.open(QIODevice::WriteOnly));
+        f.write("HCA 1|192.168.6.82\nHCA 2|192.168.6.83\nHCA 3|192.168.6.84\n");
+    }
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert(u"VT_SCREENS_FILE"_s, file);
+    env.insert(u"ADB_LOG"_s, adbLog);
+    env.insert(u"HOME"_s, dir.filePath(u"home"_s));
+    env.insert(u"PATH"_s, bin + u":"_s + env.value(u"PATH"_s));
+    const auto run = [&](const QString &program, const QStringList &args, const QByteArray &input = {}) {
+        QProcess p;
+        p.setProcessEnvironment(env);
+        p.start(program, args);
+        REQUIRE(p.waitForStarted(10000));
+        p.write(input);
+        p.closeWriteChannel();
+        REQUIRE(p.waitForFinished(60000));
+        return QString::fromUtf8(p.readAllStandardOutput()) + QString::fromUtf8(p.readAllStandardError());
+    };
+    const QString scripts = QStringLiteral(VTM_SCRIPTS_DIR);
+
+    const QString table = run(u"python3"_s, {scripts + u"/vt-tablet-report"_s});
+    CHECK(table.contains(u"HCA 1"_s));
+    CHECK(table.contains(u"on :41235"_s));
+    CHECK(table.contains(u"off (no permission)"_s));
+    CHECK(table.contains(u"82% +"_s));
+    CHECK(table.contains(u"-61 dBm"_s));
+    CHECK(table.contains(u"Problems: "_s));
+    CHECK(table.contains(u"HCA 2: debugging off: no permission"_s));
+    CHECK(table.contains(u"HCA 2: battery 15%, not charging"_s));
+    CHECK(table.contains(u"HCA 2: restarted itself 2 time(s)"_s));
+    CHECK(table.contains(u"HCA 3: not connected for 25 min"_s));
+
+    const QString status = run(u"python3"_s, {scripts + u"/vt-tablet-report"_s, u"--status"_s},
+                               "HCA 1|192.168.6.82\nHCA 3|192.168.6.84\n");
+    CHECK(status.contains(u"HCA 1|192.168.6.82|1|0.9.622|\n"_s));
+    CHECK(status.contains(u"HCA 3|192.168.6.84|0||\n"_s));
+
+    // vt-adb-ensure: straight to the port HCA 1 reported, then 5555; HCA 2 (debugging off) not searched.
+    const QString ensure = run(u"bash"_s, {scripts + u"/vt-adb-ensure"_s});
+    const QString asked = fileText(adbLog);
+    CHECK(asked.contains(u"connect 192.168.6.82:41235"_s));
+    CHECK(asked.contains(u"-s 192.168.6.82:41235 tcpip 5555"_s));
+    CHECK_FALSE(asked.contains(u"-s 192.168.6.83"_s));
+    CHECK(ensure.contains(u"HCA 1 (192.168.6.82): Wireless debugging port 41235 switched to 5555"_s));
+
+    // vt-status: versions from ViewTouch; adb only for HCA 3, which isn't connected (and adb can't say).
+    const QString line = run(u"bash"_s, {scripts + u"/vt-status"_s});
+    CHECK(line.contains(u"HCA 1: 0.9.622"_s));
+    CHECK(line.contains(u"HCA 2: 0.9.622 (debugging off: no permission)"_s));
+    CHECK(line.contains(u"HCA 3: not connected to ViewTouch"_s));
+    CHECK(line.contains(u"Problems: "_s));
 }

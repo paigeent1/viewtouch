@@ -60,7 +60,21 @@ before or together with the tablets.
 adb logcat -s ViewTouch | grep update     # "update: installing … by itself"
 ```
 
-On the Pi, Manager → Network lists each screen's build.
+On the Pi, Manager → Network lists each screen's build, its self-update state, Debugging and health;
+`vt-tablet-report` shows the same in a terminal. No adb is needed for any of it.
+
+## Tablet care: what each tablet reports (2026-11-22)
+
+`net/tablet_care.hh`: at start, when it gets the store back and every 15 minutes, a tablet turns
+Wireless debugging back on (needs `WRITE_SECURE_SETTINGS`, granted once over USB:
+`adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS`), asks for an update
+(this self-update), and sends the store its debugging state and port, its health (battery, charging,
+RSSI, uptime, restarts, reconnects) and its own log lines (at most 200 a pass, to
+`tablet-logs/<screen>.log` beside the database). Reconnecting for 3 minutes: it connects from scratch;
+10 minutes with nobody signed in: it restarts the app (counted). The server writes it all to
+`screens.json` beside the database for the Pi's scripts: `vt-tablet-report` (a table and a problems
+line), `vt-status` (versions from ViewTouch, adb only for a tablet not connected) and `vt-adb-ensure`
+(straight to the reported port). Manager → Network shows a **Debugging** and a health line per tablet.
 
 ## Known limits / next ideas
 

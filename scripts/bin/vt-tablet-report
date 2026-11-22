@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""The store's tablets as ViewTouch sees them, from the file it keeps for the Pi's scripts.
+
+  vt-tablet-report              a table: name, connected, version, self-update, debugging, battery,
+                                Wi-Fi, last seen, restarts; then a line of problems (or "No problems.")
+  vt-tablet-report --status     (for vt-status) reads "Name|IP" lines on stdin (vt_tablets) and prints
+                                "Name|IP|connected 1/0|version|note" for each (version from ViewTouch)
+  vt-tablet-report --adb        (for vt-adb-ensure) "IP PORT WIFIADB GRANT NAME" for each connected tablet
+                                that reported its debugging (PORT 0: not known)
+
+The file: ~/.local/share/ViewTouch/ViewTouch/screens.json (VT_SCREENS_FILE to use another), written by
+ViewTouch on the store's server whenever a screen connects, goes or says something new, and once a
+minute. Every tablet looks after itself (net/tablet_care.hh) and reports here, so no adb is needed to
+see how they are. Reads only; changes nothing.
+"""
+import json
+import os
+import sys
+import time
+
+PATH = os.environ.get("VT_SCREENS_FILE") or os.path.expanduser("~/.local/share/ViewTouch/ViewTouch/screens.json")
+
+
+def load():
+    try:
+        with open(PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return (data if isinstance(data, list) else []), os.path.getmtime(PATH)
+    except (OSError, ValueError):
+        return None, 0
+
+
+def debugging(s):
+    a = s.get("adb")
+    if not isinstance(a, dict):
+        return "-"
+    if a.get("tcpPort") == 5555:
+        return "on :5555"
+    if a.get("wifiAdb"):
+        return "on :%d" % a["port"] if a.get("port") else "on (port?)"
+    return "off (no permission)" if not a.get("grant") else "off"
+
+
+def debugging_note(s):
+    a = s.get("adb")
+    if not isinstance(a, dict) or a.get("wifiAdb") or a.get("tcpPort") == 5555:
+        return ""
+    return "debugging off: no permission" if not a.get("grant") else "debugging off"
+
+
+def ago(ms, now):
+    if not ms:
+        return "never"
+    mins = int((now - ms / 1000) // 60)
+    if mins < 1:
+        return "just now"
+    if mins < 120:
+        return "%d min ago" % mins
+    if mins < 48 * 60:
+        return "%d h ago" % (mins // 60)
+    return "%d days ago" % (mins // 1440)
+
+
+def battery(h):
+    if "battery" not in h:
+        return "-"
+    return "%d%%%s" % (h["battery"], " +" if h.get("charging") else "")
+
+
+def wifi(h):
+    return "%d dBm" % h["rssi"] if "rssi" in h else "-"
+
+
+def problems(screens, written, now):
+    out = []
+    if written and now - written > 180:
+        out.append("ViewTouch hasn't updated %s for %d min (is it running? vt-server)" % (os.path.basename(PATH), (now - written) // 60))
+    for s in screens:
+        name = s.get("name", "?")
+        h = s.get("health") or {}
+        if not s.get("connected"):
+            if s.get("billboard"):
+                continue
+            seen = s.get("lastSeen") or 0
+            out.append("%s: not connected%s" % (name, " for " + ago(seen, now).replace(" ago", "") if seen else " since ViewTouch started"))
+            continue
+        note = debugging_note(s)
+        if note:
+            out.append("%s: %s" % (name, note))
+        if "battery" in h and h["battery"] < 20 and not h.get("charging"):
+            out.append("%s: battery %d%%, not charging" % (name, h["battery"]))
+        if "rssi" in h and h["rssi"] < -75:
+            out.append("%s: weak Wi-Fi (%d dBm)" % (name, h["rssi"]))
+        if h.get("restarts"):
+            out.append("%s: restarted itself %d time(s)%s" % (name, h["restarts"], " (last %s)" % h["lastRestart"] if h.get("lastRestart") else ""))
+        if "can't" in (s.get("updateState") or ""):
+            out.append("%s: %s" % (name, s["updateState"]))
+    return out
+
+
+def table(screens, written, now):
+    rows = [("Name", "Connected", "Version", "Self-update", "Debugging", "Battery", "Wi-Fi", "Last seen", "Restarts")]
+    for s in screens:
+        h = s.get("health") or {}
+        rows.append((s.get("name", "?") + (" (billboard)" if s.get("billboard") else ""),
+                     "yes" if s.get("connected") else "no",
+                     s.get("appVersion") or "-",
+                     (s.get("updateState") or "-")[:40],
+                     debugging(s), battery(h), wifi(h),
+                     "now" if s.get("connected") else ago(s.get("lastSeen"), now),
+                     str(h.get("restarts", "-"))))
+    widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    for r in rows:
+        print("  ".join(c.ljust(w) for c, w in zip(r, widths)).rstrip())
+    p = problems(screens, written, now)
+    print("Problems: " + "; ".join(p) if p else "No problems.")
+
+
+def main():
+    screens, written = load()
+    now = time.time()
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    if mode in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    if mode == "--adb":
+        for s in screens or []:
+            a = s.get("adb")
+            if s.get("connected") and s.get("ip") and isinstance(a, dict):
+                print(s["ip"], int(a.get("port") or 0), int(bool(a.get("wifiAdb"))), int(bool(a.get("grant"))),
+                      s.get("name", "?").replace(" ", "_"))
+        return 0
+    if mode == "--status":
+        by_ip = {s.get("ip"): s for s in screens or [] if s.get("connected") and s.get("ip")}
+        for line in sys.stdin:
+            name, _, ip = line.strip().partition("|")
+            if not ip:
+                continue
+            s = by_ip.get(ip.strip())
+            if s:
+                print("|".join((name, ip, "1", s.get("appVersion") or "?", debugging_note(s))))
+            else:
+                print("|".join((name, ip, "0", "", "")))
+        return 0
+    if screens is None:
+        print("No %s yet: ViewTouch writes it on the store's server while it runs (vt-server)." % PATH)
+        return 1
+    if not screens:
+        print("No paired screens (Manager > Terminals).")
+        return 0
+    table(screens, written, now)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

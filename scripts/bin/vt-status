@@ -1,16 +1,31 @@
 #!/bin/bash
-# The server's build and each tablet's app version (this site's tablets: vt-site).
+# The server's build and each tablet's app version (this site's tablets: vt-site), then a line of
+# problems. Versions come from ViewTouch (screens.json, via vt-tablet-report: the tablets report to the
+# store themselves); adb only for a tablet not connected to ViewTouch. vt-tablet-report: the full table.
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
-/usr/local/bin/vt-adb-ensure >/dev/null 2>&1 || true
+REPORT="$(dirname "$(readlink -f "$0")")/vt-tablet-report"
 GIT_HASH=$(git -C "$VT_REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LATEST=$(cat "$VT_BUILD/generated/vtm_build_number.hh" "$VT_BUILD/vtm_build_number.hh" 2>/dev/null | grep -m1 VTM_BUILD_VERSION | awk '{print $3}' | tr -d '"')
 line="Server: ${LATEST:-unknown (not built?)} (Git: ${GIT_HASH})"
 pgrep -x vtmodern >/dev/null || line="VIEWTOUCH IS NOT RUNNING (start it: vt-server) | $line"
-while IFS='|' read -r name ip <&3; do
+while IFS='|' read -r name ip connected version note <&3; do
     [ -z "$ip" ] && continue
-    adb connect "$ip:5555" >/dev/null 2>&1 || true
-    v=$(adb -s "$ip:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r ')
-    line="$line | $name: ${v:-Offline}"
-done 3< <(vt_tablets)
+    if [ "$connected" = 1 ]; then
+        line="$line | $name: $version${note:+ ($note)}"
+        continue
+    fi
+    # Not connected to ViewTouch: what adb can still say (it may be on, just not in ViewTouch).
+    v=""
+    if command -v adb >/dev/null 2>&1; then
+        adb connect "$ip:5555" >/dev/null 2>&1 || true
+        v=$(timeout 10 adb -s "$ip:5555" shell dumpsys package org.viewtouch.pos 2>/dev/null | awk -F= '/versionName/{print $2; exit}' | tr -d '\r ')
+    fi
+    if [ -n "$v" ]; then
+        line="$line | $name: $v (over adb; not connected to ViewTouch)"
+    else
+        line="$line | $name: not connected to ViewTouch"
+    fi
+done 3< <(vt_tablets | python3 "$REPORT" --status)
 [ -z "$(vt_tablets)" ] && line="$line | no tablets listed (vt-site tablet add)"
 echo "$line"
+python3 "$REPORT" | grep -m1 -e '^Problems: ' -e '^No problems.' -e '^No ' || true

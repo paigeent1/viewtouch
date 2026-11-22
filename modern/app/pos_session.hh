@@ -334,6 +334,9 @@ public:
     Q_INVOKABLE virtual void autoUpdate() {}
     // A remote screen tells the store what its self-update is doing (Manager > Network shows it).
     Q_INVOKABLE virtual void reportUpdateState(const QString &state) { Q_UNUSED(state) }
+    // A tablet tells the store about its Wireless debugging (Manager > Network shows it; the Pi's
+    // vt-adb-ensure reads it from screens.json): {grant, adb, wifiAdb, port, tlsPort, tcpPort}.
+    virtual void reportAdbState(const QVariantMap &state) { Q_UNUSED(state) }
     virtual bool loggedIn() const = 0;
     virtual QString userName() const = 0;
     virtual QString userRole() const = 0;

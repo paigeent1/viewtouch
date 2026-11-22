@@ -128,6 +128,105 @@ object Kiosk {
             try { dpm.setGlobalSetting(who, k, v) } catch (_: Exception) {}
         try { dpm.setSystemSetting(who, "screen_off_timeout", "2147483647") } catch (_: Exception) {}
     }
+    // Tablet care (net/tablet_care.hh): what the store's Network page and the Pi's scripts are told.
+    // HCA 2026-11-22: port 5555 never came back after `adb reboot` and nobody could see why.
+    private var lastEnsure = 0L
+    private var watchingNetwork = false
+    private fun prop(key: String): String = try {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java).invoke(null, key) as? String ?: ""
+    } catch (_: Throwable) { "" }
+
+    // {grant, adb, wifiAdb, port, tlsPort, tcpPort}: whether ViewTouch holds WRITE_SECURE_SETTINGS (granted
+    // once over USB), USB and Wireless debugging on, and the port the Pi can reach (5555 once it ran
+    // `adb tcpip 5555`, else Wireless debugging's own). Off: switched on again (when connecting to the
+    // store, else at most every 5 minutes: Android turns it off on Wi-Fi it doesn't trust yet).
+    @JvmStatic
+    fun debuggingState(ctx: Context, connecting: Boolean): String {
+        watchNetwork(ctx)
+        val cr = ctx.contentResolver
+        fun global(k: String) = try { Settings.Global.getInt(cr, k, 0) } catch (_: Exception) { 0 }
+        val now = android.os.SystemClock.elapsedRealtime()
+        if ((connecting || global("adb_enabled") != 1 || global("adb_wifi_enabled") != 1)
+            && (connecting || lastEnsure == 0L || now - lastEnsure > 5 * 60_000L)) {
+            lastEnsure = now
+            ensureWirelessAdb(ctx)
+        }
+        val tls = prop("service.adb.tls.port").toIntOrNull() ?: 0
+        val tcp = (prop("service.adb.tcp.port").toIntOrNull() ?: 0).let { if (it > 0) it else prop("persist.adb.tcp.port").toIntOrNull() ?: 0 }
+        return org.json.JSONObject()
+            .put("grant", ctx.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED)
+            .put("adb", global("adb_enabled") == 1)
+            .put("wifiAdb", global("adb_wifi_enabled") == 1)
+            .put("port", if (tcp > 0) tcp else tls)
+            .put("tlsPort", tls)
+            .put("tcpPort", tcp)
+            .toString()
+    }
+
+    // Wi-Fi back (after a drop, or later than the app started): debugging on again at once.
+    private fun watchNetwork(ctx: Context) {
+        if (watchingNetwork || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        watchingNetwork = true
+        try {
+            val cm = ctx.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    lastEnsure = android.os.SystemClock.elapsedRealtime()
+                    ensureWirelessAdb(ctx.applicationContext)
+                }
+            })
+        } catch (_: Exception) {}
+    }
+
+    // {battery, charging, rssi, uptime (s), lastRestart}.
+    @JvmStatic
+    fun health(ctx: Context): String {
+        val o = org.json.JSONObject()
+        try {
+            val i = ctx.applicationContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val lvl = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scl = i?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            if (lvl >= 0 && scl > 0) o.put("battery", (lvl * 100) / scl)
+            val st = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            o.put("charging", st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
+                || (i?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0)
+        } catch (_: Exception) {}
+        try {
+            val wm = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            val rssi = wm.connectionInfo?.rssi ?: -127
+            if (rssi > -127 && rssi < 0) o.put("rssi", rssi)
+        } catch (_: Exception) {}
+        o.put("uptime", android.os.SystemClock.elapsedRealtime() / 1000)
+        val why = prefs(ctx).getString("lastRestart", "") ?: ""
+        if (why.isNotEmpty()) o.put("lastRestart", why)
+        return o.toString()
+    }
+
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences("tablet-care", Context.MODE_PRIVATE)
+
+    @JvmStatic
+    fun restarts(ctx: Context): Int = prefs(ctx).getInt("restarts", 0)
+
+    // No store for 10 minutes and nobody signed in: ViewTouch starts again (counted). As the device owner
+    // (and the home screen) it may open itself from the background.
+    @JvmStatic
+    fun restartApp(ctx: Context, why: String) {
+        val stamp = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+        prefs(ctx).edit().putInt("restarts", restarts(ctx) + 1).putString("lastRestart", "$stamp $why").commit()
+        try {
+            val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+            if (launch != null) {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                val pi = android.app.PendingIntent.getActivity(ctx, 7719, launch,
+                    android.app.PendingIntent.FLAG_CANCEL_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+                val am = ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+                am.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 1500, pi)
+            }
+        } catch (_: Exception) {}
+        android.os.Process.killProcess(android.os.Process.myPid())
+    }
+
     @JvmStatic
     fun batteryInfo(activity: Activity): Int {
         return try {

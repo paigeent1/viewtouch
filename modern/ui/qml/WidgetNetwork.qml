@@ -107,25 +107,75 @@ Item {
                 Repeater {
                     model: w.serving ? (w.net.terminals ?? []) : []
                     delegate: Rectangle {
+                        id: screenRow
                         required property var modelData
                         Layout.fillWidth: true
-                        implicitHeight: modelData.updateState ? 82 : 54
+                        implicitHeight: 54 + (extra.implicitHeight > 0 ? extra.implicitHeight + 8 : 0)
                         radius: 8
                         color: "#232933"
-                        // What its self-update is doing, as the screen last said (Main.qml autoUpdate).
-                        Label {
-                            objectName: "screenUpdateState-" + modelData.name
-                            visible: !!modelData.updateState
+                        // A tablet's Wireless debugging, as it last said (Kiosk.debuggingState): the Pi's
+                        // vt-adb-ensure reaches it by this port.
+                        readonly property var adb: modelData.adb ?? ({})
+                        readonly property string debugText: adb.grant === undefined ? ""
+                            : adb.tcpPort === 5555 ? qsTr("Debugging: on, port 5555")
+                            : adb.wifiAdb && adb.port > 0 ? qsTr("Debugging: on, port %1").arg(adb.port)
+                            : adb.wifiAdb ? qsTr("Debugging: on (Android doesn't say the port)")
+                            : !adb.grant ? qsTr("Debugging: off — ViewTouch lacks the permission (needs USB once: adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS)")
+                            : qsTr("Debugging: off — Android turned it off (a Wi-Fi network it doesn't trust yet?); the tablet tries again")
+                        // Its health (TabletCare): battery, Wi-Fi, how long it has been on, restarts.
+                        readonly property var health: modelData.health ?? ({})
+                        readonly property string healthText: {
+                            const h = health
+                            const parts = []
+                            if (h.battery !== undefined)
+                                parts.push(h.charging ? qsTr("Battery %1% (charging)").arg(h.battery) : qsTr("Battery %1%").arg(h.battery))
+                            if (h.rssi !== undefined)
+                                parts.push(qsTr("Wi-Fi %1 dBm").arg(h.rssi))
+                            if (h.uptime !== undefined)
+                                parts.push(qsTr("on for %1 h %2 min").arg(Math.floor(h.uptime / 3600)).arg(Math.floor(h.uptime % 3600 / 60)))
+                            if (h.restarts)
+                                parts.push(qsTr("restarted itself %1 time(s)").arg(h.restarts))
+                            if (h.reconnects)
+                                parts.push(qsTr("reconnected from scratch %1 time(s)").arg(h.reconnects))
+                            return parts.join(" · ")
+                        }
+                        Column {
+                            id: extra
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             anchors.leftMargin: 44
                             anchors.rightMargin: 14
                             anchors.bottomMargin: 8
-                            font.pixelSize: 14
-                            opacity: 0.75
-                            elide: Text.ElideRight
-                            text: qsTr("Self-update: %1").arg(modelData.updateState ?? "")
+                            spacing: 2
+                            // What its self-update is doing, as the screen last said (Main.qml autoUpdate).
+                            Label {
+                                objectName: "screenUpdateState-" + modelData.name
+                                visible: !!modelData.updateState
+                                width: parent.width
+                                font.pixelSize: 14
+                                opacity: 0.75
+                                elide: Text.ElideRight
+                                text: qsTr("Self-update: %1").arg(modelData.updateState ?? "")
+                            }
+                            Label {
+                                objectName: "screenDebugging-" + modelData.name
+                                visible: text !== ""
+                                width: parent.width
+                                font.pixelSize: 14
+                                opacity: 0.75
+                                wrapMode: Text.WordWrap
+                                text: screenRow.debugText
+                            }
+                            Label {
+                                objectName: "screenHealth-" + modelData.name
+                                visible: text !== ""
+                                width: parent.width
+                                font.pixelSize: 14
+                                opacity: 0.75
+                                elide: Text.ElideRight
+                                text: screenRow.healthText
+                            }
                         }
                         RowLayout {
                             anchors.left: parent.left

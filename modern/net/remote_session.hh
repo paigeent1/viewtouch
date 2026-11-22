@@ -64,6 +64,16 @@ public:
     void getUpdate() override;
     void autoUpdate() override;
     void reportUpdateState(const QString &state) override;
+    void reportAdbState(const QVariantMap &state) override;
+    // Tablet care (net/tablet_care.hh): the tablet's health ({battery, charging, rssi, uptime, restarts,
+    // reconnects}) and its own log lines, for the store's Network page, screens.json and tablet-logs.
+    void reportHealth(const QVariantMap &health);
+    void sendLog(const QStringList &lines);
+    // Since when this screen has been without the store (0: connected); from when it started if never.
+    qint64 offlineSince() const { return welcomed_ ? 0 : offlineSince_; }
+    // Give up the connection (or the try under way) and connect again from scratch, looking for the
+    // store on the network too (Reconnecting for minutes).
+    void reconnectFresh();
     bool online() const override { return welcomed_; }
     bool loggedIn() const override { return v(u"loggedIn").toBool(); }
     QString userName() const override { return v(u"userName").toString(); }
@@ -262,6 +272,8 @@ private:
     int refusals_ = 0;
     int failures_ = 0;       // connection attempts in a row that got nowhere
     qint64 connectingSince_ = 0;   // when the try under way began
+    qint64 offlineSince_ = 0;      // when it last lost (or never had) the store
+    QVariantMap reportedHealth_;
     ServerFinder finder_;    // to find the server again after an address change
     QString standbyHost_;    // the store's standby, heard while the server was out of reach
     quint16 standbyPort_ = 0;
@@ -283,6 +295,7 @@ private:
     bool autoUpdate_ = false;    // this one fetched by itself: not opened when it's here
     bool autoRefused_ = false;
     QString autoWhy_;               // why the store said no / the download failed (updateInfo "autoWhy")
+    QVariantMap reportedAdb_;   // last debugging state told to the store (reportAdbState)
     QString reportedUpdateState_;   // last self-update state told to the store (reportUpdateState)   // the store said no (an older store: managers only): not till next time
     void finishUpdate(const QJsonObject &done);
     // A store that can (updateTicket): the update on a connection of its own, picked up where it got to.

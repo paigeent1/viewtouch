@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QHostAddress>
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSet>
 #include <QObject>
@@ -89,6 +90,20 @@ public:
     int standbyCount() const;
     // Who is connected, for the Network screen: [{name, address, since, standby}].
     QVariantList connections() const;
+    // The store's screens for the Pi's scripts (vt-status, vt-adb-ensure): every paired screen, connected
+    // or not, as a JSON list [{name, ip, connected, platform, appVersion, build, updateState, adb, lastSeen}]
+    // (no keys or other secrets), written (atomically) to this file whenever a screen connects, goes or
+    // says something new, and once a minute. Empty: none written.
+    void setScreensFile(const QString &path);
+    QString screensFile() const { return screensFile_; }
+    // Where tablets' own log lines go (TabletCare): <dir>/<screen name>.log, the older half in .log.1
+    // past about 1 MB.
+    void setTabletLogDir(const QString &dir) { tabletLogDir_ = dir; }
+    QString tabletLogDir() const { return tabletLogDir_; }
+    static QString tabletLogName(const QString &screen);   // a safe file name for it
+    static constexpr qint64 kTabletLogBytes = 1024 * 1024;
+    QVariantList screens() const;
+    bool writeScreensFile();
 
 signals:
     void terminalsChanged();
@@ -143,6 +158,19 @@ private:
     qint64 lastAccepted_ = 0;
     qint64 silentMs_ = 15'000;
     QString updatesDir_;
+    QString screensFile_, tabletLogDir_;
+    void appendTabletLog(const QString &screen, const QJsonArray &lines);
+    QTimer screensTimer_;   // once a minute
+    QTimer screensSoon_;    // soon after a change (several at once: one write)
+    void screensChanged();
+    // What each paired screen (terminal id) last said, kept after it goes: where it was and what it ran.
+    struct Heard {
+        QString ip, version, platform, updateState;
+        int build = 0;
+        QVariantMap adb, health;
+    };
+    QHash<QString, Heard> heard_;
+    void remember(const Connection *c);
     QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
     void sendUpdate(Connection *c, bool fast, bool byItself = false);
     void pumpPacedUpdate(Connection *c);

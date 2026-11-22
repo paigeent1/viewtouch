@@ -13,6 +13,7 @@
 #include <QRegularExpression>
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QDir>
 #include <QCryptographicHash>
 #include <QJsonArray>
@@ -60,6 +61,8 @@ struct PosServer::Connection {
     bool billboard = false;
     bool fastUpdates = false;   // hello: "updates": 2 (fetches its update on a connection of its own)
     QString updateState;        // what its self-update is doing, as it last said (updateState)
+    QVariantMap health;         // a tablet's battery, Wi-Fi, uptime, restarts (TabletCare: health)
+    QVariantMap adb;            // its Wireless debugging, as it last said (adbState): grant, adb, wifiAdb, port...
     // An older screen's update, the old way: a part at a time, the next once the last has gone out.
     struct PacedUpdate {
         QFile file;
@@ -355,6 +358,13 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
                                        << socket->peerAddress().toString();
     });
     connect(shared_, &app::PosShared::adminChanged, this, &PosServer::dropRevoked);
+    // screens.json for the Pi's scripts: soon after a change, and once a minute.
+    screensSoon_.setSingleShot(true);
+    screensSoon_.setInterval(300);
+    connect(&screensSoon_, &QTimer::timeout, this, &PosServer::writeScreensFile);
+    screensTimer_.setInterval(60'000);
+    connect(&screensTimer_, &QTimer::timeout, this, &PosServer::writeScreensFile);
+    connect(this, &PosServer::terminalsChanged, this, &PosServer::screensChanged);
     // Find a Tablet: a message to one paired screen (not a billboard: a TV gets only its slides).
     shared_->sendToScreen = [this](const std::string &terminalId, const QJsonObject &message) {
         bool sent = false;
@@ -656,6 +666,7 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
                     }
             QMetaObject::invokeMethod(shared_, &app::PosShared::networkChanged, Qt::QueuedConnection);
         }
+        remember(c);
         if (c->billboard) {   // a TV with the store's slides: nothing else, ever
             welcomeBillboard(c);
             return;
@@ -739,7 +750,53 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         return;
     }
     if (type == u"updateState") {
-        c->updateState = m.value(u"state").toString().left(160);
+        const QString state = m.value(u"state").toString().left(160);
+        if (state != c->updateState) {
+            c->updateState = state;
+            remember(c);
+            screensChanged();
+        }
+        return;
+    }
+    if (type == u"health") {
+        // A tablet's health (TabletCare): numbers and yes/no only.
+        const QJsonObject a = m.value(u"health").toObject();
+        QVariantMap health;
+        for (const auto key : {u"battery"_s, u"rssi"_s, u"uptime"_s, u"restarts"_s, u"reconnects"_s})
+            if (a.contains(key))
+                health.insert(key, qint64(a.value(key).toDouble()));
+        if (a.contains(u"charging"_s))
+            health.insert(u"charging"_s, a.value(u"charging").toBool());
+        if (a.contains(u"lastRestart"_s))
+            health.insert(u"lastRestart"_s, a.value(u"lastRestart").toString().left(120));
+        if (health != c->health) {
+            c->health = health;
+            remember(c);
+            screensChanged();
+            emit terminalsChanged();
+        }
+        return;
+    }
+    if (type == u"tabletLog") {
+        appendTabletLog(c->session->terminalName(), m.value(u"lines").toArray());
+        return;
+    }
+    if (type == u"adbState") {
+        // A tablet's Wireless debugging (HCA 2026-11-22: port 5555 never came back after a restart and the
+        // Pi couldn't tell why): only these, as plain values.
+        const QJsonObject a = m.value(u"adb").toObject();
+        QVariantMap adb{{u"grant"_s, a.value(u"grant").toBool()}, {u"adb"_s, a.value(u"adb").toBool()},
+                        {u"wifiAdb"_s, a.value(u"wifiAdb").toBool()}};
+        for (const auto key : {u"port"_s, u"tlsPort"_s, u"tcpPort"_s}) {
+            const int port = a.value(key).toInt();
+            adb.insert(key, port > 0 && port < 65536 ? port : 0);
+        }
+        if (adb != c->adb) {
+            c->adb = adb;
+            remember(c);
+            screensChanged();
+            emit terminalsChanged();   // Manager > Network shows it
+        }
         return;
     }
 
@@ -1023,9 +1080,112 @@ QVariantList PosServer::connections() const
                                {u"behind"_s, !c->standby && mine > 0 && c->build < mine},
                                {u"ahead"_s, !c->standby && mine > 0 && c->build > mine},
                                {u"hasUpdate"_s, !c->standby && !updateFor(c->platform, c->build).path.isEmpty()},
-                               {u"updateState"_s, c->updateState}});
+                               {u"updateState"_s, c->updateState}, {u"adb"_s, c->adb},
+                               {u"health"_s, c->health}});
     }
     return out;
+}
+
+void PosServer::remember(const Connection *c)
+{
+    if (c->terminalId.isEmpty() || c->standby)
+        return;
+    Heard &h = heard_[c->terminalId];
+    h.ip = c->socket->peerAddress().toString().remove(u"::ffff:"_s);
+    h.version = c->version;
+    h.platform = c->platform;
+    h.build = c->build;
+    h.updateState = c->updateState;
+    h.adb = c->adb;
+    h.health = c->health;
+}
+
+void PosServer::setScreensFile(const QString &path)
+{
+    screensFile_ = path;
+    if (path.isEmpty()) {
+        screensTimer_.stop();
+        return;
+    }
+    writeScreensFile();
+    screensTimer_.start();
+}
+
+void PosServer::screensChanged()
+{
+    if (!screensFile_.isEmpty() && !screensSoon_.isActive())
+        screensSoon_.start();
+}
+
+QVariantList PosServer::screens() const
+{
+    QVariantList out;
+    for (const core::TerminalConfig &t : shared_->settings.terminals) {
+        if (t.id.empty())
+            continue;   // set up by name only: never connects
+        const QString id = QString::fromStdString(t.id);
+        const Connection *c = nullptr;
+        for (const auto &x : connections_)
+            if (x->session && !x->standby && !x->downloader && x->terminalId == id)
+                c = x.get();
+        const Heard h = heard_.value(id);
+        QVariantMap row{{u"name"_s, QString::fromStdString(t.name)}, {u"connected"_s, c != nullptr},
+                        {u"ip"_s, h.ip}, {u"platform"_s, h.platform.isEmpty() ? QString::fromStdString(t.platform) : h.platform},
+                        {u"appVersion"_s, h.version}, {u"build"_s, h.build}, {u"updateState"_s, h.updateState},
+                        {u"billboard"_s, t.screen == "billboard"}};
+        if (!h.adb.isEmpty())
+            row.insert(u"adb"_s, h.adb);
+        if (!h.health.isEmpty())
+            row.insert(u"health"_s, h.health);
+        if (const auto it = shared_->screenLinks.find(t.id); it != shared_->screenLinks.end())
+            row.insert(u"lastSeen"_s, qint64(it->second.lastSeen));
+        out.append(row);
+    }
+    return out;
+}
+
+QString PosServer::tabletLogName(const QString &screen)
+{
+    QString name;
+    for (const QChar ch : screen.left(60))
+        name += ch.isLetterOrNumber() || ch == u'-' || ch == u'_' || ch == u' ' ? ch : u'_';
+    name = name.trimmed();
+    return (name.isEmpty() ? u"screen"_s : name) + u".log"_s;
+}
+
+void PosServer::appendTabletLog(const QString &screen, const QJsonArray &lines)
+{
+    if (tabletLogDir_.isEmpty() || lines.isEmpty())
+        return;
+    QDir().mkpath(tabletLogDir_);
+    const QString path = QDir(tabletLogDir_).filePath(tabletLogName(screen));
+    if (QFileInfo(path).size() > kTabletLogBytes) {   // the older lines to .log.1 (one older file kept)
+        QFile::remove(path + u".1"_s);
+        QFile::rename(path, path + u".1"_s);
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::Append | QIODevice::Text))
+        return;
+    int n = 0;
+    for (const QJsonValue &line : lines) {
+        if (++n > 200)   // at most 200 a pass
+            break;
+        QString text = line.toString().left(500);
+        text.replace(u'\n', u' ').replace(u'\r', u' ');
+        f.write(text.toUtf8() + '\n');
+    }
+}
+
+bool PosServer::writeScreensFile()
+{
+    if (screensFile_.isEmpty())
+        return false;
+    QDir().mkpath(QFileInfo(screensFile_).absolutePath());
+    QSaveFile f(screensFile_);
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    f.write(QJsonDocument(QJsonArray::fromVariantList(screens())).toJson(QJsonDocument::Indented));
+    return f.commit();
 }
 
 // --- updates for the screens ---------------------------------------------------------

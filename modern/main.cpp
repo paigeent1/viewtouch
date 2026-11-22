@@ -17,6 +17,7 @@
 #include "net/standby.hh"
 #include "net/protocol.hh"
 #include "net/remote_session.hh"
+#include "net/tablet_care.hh"
 #include "net/stress.hh"
 #include "print/printer_monitor.hh"
 #include "print/printer_finder.hh"
@@ -836,6 +837,11 @@ int runTerminal(const Args &cli, const Options &o)
             remote.setRequestedScreen(cli.value(o.screen));
         QObject::connect(&remote, &vt::net::RemoteSession::credentialsChanged, &remote, save);
         remote.connectTo(creds->host, creds->port);
+#if defined(Q_OS_ANDROID)
+        // The tablet looks after itself (debugging, updates, health, its log, a stuck connection).
+        vt::net::TabletCare::captureLog();
+        vt::net::TabletCare care(&remote, vt::net::TabletCare::androidPlatform());
+#endif
         qInfo().noquote() << "Connecting to" << creds->host << "port" << creds->port << "as" << creds->terminalName
                           << "...";
         // A billboard (Manager -> Terminals, or --screen billboard): the slides full screen, nothing
@@ -1820,6 +1826,9 @@ int runStore(const Args &cli, const Options &o)
         // Updates for the screens: put the new tablet app (and Linux packages) here.
         server->setUpdatesDir(QDir(dataDirOf(cli, o)).filePath(u"updates"_s));
         QDir().mkpath(server->updatesDir());
+        // For the Pi's scripts (vt-status, vt-adb-ensure, vt-tablet-report): the screens and what each said.
+        server->setScreensFile(QDir(dataDirOf(cli, o)).filePath(u"screens.json"_s));
+        server->setTabletLogDir(QDir(dataDirOf(cli, o)).filePath(u"tablet-logs"_s));
         // The standby's copy: the whole database when it connects, then
         // every change the writer saves.
         if (writer) {

@@ -1693,6 +1693,18 @@
 <h2>Manager → Network</h2>
 <p class="shot"><img src="shots/m52-network-standby.png" width="560" height="315"></p>
 <p class="caption">Network: this computer, the standby, the screens connected (and who is on them), and how each printer did last.</p>
+<h3>Each tablet's lines: Self-update, Debugging and health</h3>
+<p>Under each tablet in <b>Screens connected</b>, up to three short lines, as the tablet itself last said (no cable or adb needed):</p>
+<ul>
+<li><b>Self-update:</b> what its own update is doing (<i>up to date</i>, <i>getting the update, 40%</i>, <i>update here; waiting for nobody signed in</i>).</li>
+<li><b>Debugging:</b> Android's Wireless debugging, which the Pi uses to reach the tablet for jobs like <code>vt-tablets</code>. <i>Debugging: on, port 41235</i> or <i>on, port 5555</i> is fine: the Pi switches it to 5555 by itself within a minute. <i>Debugging: off — ViewTouch lacks the permission</i> means the tablet can't switch it back on after a restart. Fix it once, with the tablet plugged into the Pi by USB:
+<pre>adb shell pm grant org.viewtouch.pos android.permission.WRITE_SECURE_SETTINGS; beep3</pre>
+<i>Debugging: off — Android turned it off</i> happens on a Wi-Fi network Android doesn't trust yet; the tablet tries again by itself. Updates don't need debugging: the tablets get them over ViewTouch's own connection.</li>
+<li><b>Health:</b> battery (and whether it's charging), Wi-Fi signal in dBm (−50 is strong, below −75 is weak), how long it has been on, and how many times it had to restart itself or reconnect from scratch.</li>
+</ul>
+<h3>Tablets look after themselves</h3>
+<p>Each tablet checks itself when it starts, whenever it gets the store back, and every 15 minutes: it turns Wireless debugging back on if Android turned it off, asks for an update (installed only while nobody is signed in, as always), tells the store its health, and sends the store its own log lines (at most 200 each time). If it has shown <i>Reconnecting</i> for 3 minutes it connects again from scratch; after 10 minutes with nobody signed in it restarts ViewTouch (counted in its health line). The store keeps each tablet's log in <code>~/.local/share/ViewTouch/ViewTouch/tablet-logs/<i>tablet name</i>.log</code> (the older part in <code>.log.1</code> past about 1 MB), so you can see why a tablet misbehaved without adb. On the Pi, the tablets at a glance, with a line of problems at the end:</p>
+<pre>vt-tablet-report; beep3</pre>
 <div class="warn">If the cable between the two computers breaks while both keep running, both may take orders for a few seconds. Orders taken on the old main computer in that time are only in its <code>-before-standby</code> backup.</div>
 
 <!-- ======================================================================= -->
@@ -2743,7 +2755,8 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <tr><td><code>vt-check-tablets</code></td><td>Are the tablets on the server's version? (The <b>Check Tablets</b> button.)</td></tr>
 <tr><td><code>vt-tablets</code></td><td>Sends the newest app to every tablet. A tablet asleep or off Wi-Fi is skipped after 3 minutes: run it again later. (The <b>Tablets</b> button.)</td></tr>
 <tr><td><code>vt-os-update</code></td><td>Opens Android's system update screen on every tablet. (The <b>Android OS Update</b> button.)</td></tr>
-<tr><td><code>vt-adb-ensure</code></td><td>Keeps the Pi's connection to each tablet. ViewTouch runs it by itself about once a minute; you don't need to.</td></tr>
+<tr><td><code>vt-adb-ensure</code></td><td>Keeps the Pi's connection to each tablet. ViewTouch runs it by itself about once a minute; you don't need to. It goes straight to the Wireless debugging port each tablet reports to ViewTouch (Manager → Network, <i>Debugging</i>), and searches for it only as a last resort.</td></tr>
+<tr><td><code>vt-tablet-report</code></td><td>Each tablet as ViewTouch sees it: connected, version, self-update, debugging, battery, Wi-Fi, last seen and restarts, then a line of problems (<i>HCA 2: not connected for 25 min</i>). From the file ViewTouch keeps for the Pi's scripts (<code>screens.json</code> beside the database); no adb needed. <code>vt-status</code> (the <b>Status</b> button) gives each tablet's version from it too, and says <i>not connected to ViewTouch</i> for one that isn't.</td></tr>
 </table>
 
 <h2>TVs and billboards</h2>

@@ -2,6 +2,29 @@
 . "$(dirname "$(readlink -f "$0")")/vt-site-lib"
 export ADB_MDNS_OPENSCREEN=1
 adb start-server >/dev/null 2>&1
+# 0. The tablets say their Wireless debugging port to ViewTouch themselves (Kiosk.debuggingState, in
+#    screens.json): straight there and switched to 5555, no mDNS, no port search (HCA 2026-11-22: the
+#    search took 3.5 min a tablet and found nothing). A tablet that says debugging is off (or that
+#    ViewTouch lacks the permission) isn't searched either: nothing would answer.
+REPORT="$(dirname "$(readlink -f "$0")")/vt-tablet-report"
+no_scan=" "
+while read -r ip port wifi grant name; do
+    [ -z "$ip" ] && continue
+    adb devices | grep -q "^${ip}:5555[[:space:]]*device" && continue
+    if [ "$wifi" != 1 ] || [ "$port" = 0 ]; then
+        no_scan="$no_scan$ip "
+        continue
+    fi
+    [ "$port" = 5555 ] && { adb connect "$ip:5555" >/dev/null 2>&1 || true; no_scan="$no_scan$ip "; continue; }
+    if adb connect "$ip:$port" 2>/dev/null | grep -q "connected"; then
+        adb -s "$ip:$port" tcpip 5555 >/dev/null 2>&1 || true
+        sleep 3
+        adb connect "${ip}:5555" >/dev/null 2>&1 || true
+        echo "vt-adb-ensure: ${name//_/ } ($ip): Wireless debugging port $port switched to 5555" >&2
+    fi
+    no_scan="$no_scan$ip "   # the port it said is the one a search would find
+done < <(python3 "$REPORT" --adb 2>/dev/null)
+
 # 1. If any tablet is on mDNS TLS Wireless Debugging, flip it to port 5555 automatically
 while read -r line; do
     addr=$(echo "$line" | awk '{print $3}')
@@ -28,7 +51,7 @@ for ip in $(vt_tablet_ips); do
     adb connect "${ip}:5555" >/dev/null 2>&1 || true
 done
 
-# 3. A tablet on the network but not on 5555 (restarted): find its Wireless debugging port without
+# 3. Last resort: a tablet on the network but not on 5555 (restarted) that didn't say its port: find its Wireless debugging port without
 #    mDNS (the Pi's mDNS finds nothing) by trying ports 30000-50000, then switch it to 5555. Needs the
 #    Pi still paired on that tablet. One search at a time, each tablet at most every 30 minutes
 #    (ViewTouch runs this script about once a minute).
@@ -36,6 +59,7 @@ exec 9>/tmp/vt-adb-ensure.lock
 if flock -n 9; then
     for ip in $(vt_tablet_ips); do
         adb devices | grep -q "^${ip}:5555[[:space:]]*device" && continue
+        case "$no_scan" in *" $ip "*) continue ;; esac   # its own report says: nothing to find
         stamp=/tmp/vt-adb-scan-${ip}
         [ -f "$stamp" ] && [ $(( $(date +%s) - $(stat -c %Y "$stamp") )) -lt 1800 ] && continue
         ping -c1 -W1 "$ip" >/dev/null 2>&1 || continue

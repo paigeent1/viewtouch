@@ -79,6 +79,7 @@ RemoteSession::RemoteSession(QString terminalName, QObject *parent)
     , terminal_(std::move(terminalName))
     , channel_(std::make_unique<LineChannel>(&socket_))
 {
+    offlineSince_ = QDateTime::currentMSecsSinceEpoch();
     socket_.setSslConfiguration(tlsConfiguration());
     connect(&socket_, &QSslSocket::preSharedKeyAuthenticationRequired, this, [this](QSslPreSharedKeyAuthenticator *a) {
         a->setIdentity(deviceIdentity(credentials_.terminalId));
@@ -466,6 +467,7 @@ void RemoteSession::onDisconnected()
             r(QVariant(false));
     }
     if (was) {
+        offlineSince_ = QDateTime::currentMSecsSinceEpoch();
         if (lastDrop_.isEmpty())
             lastDrop_ = socket_.error() != QAbstractSocket::UnknownSocketError ? socket_.errorString() : u"closed"_s;
         qCWarning(lcRemote).noquote() << "lost the server (" + lastDrop_ + "); reconnecting";
@@ -513,6 +515,9 @@ void RemoteSession::handle(const QJsonObject &m)
         autoRefused_ = false;
         autoWhy_.clear();
         reportedUpdateState_.clear();   // a new connection: tell the store again
+        reportedAdb_.clear();
+        reportedHealth_.clear();
+        offlineSince_ = 0;
         emit updateChanged();
         welcomed_ = true;
         for (auto it = wanted_.cbegin(); it != wanted_.cend(); ++it)
@@ -786,6 +791,49 @@ void RemoteSession::reportUpdateState(const QString &state)
         return;
     reportedUpdateState_ = s;
     send({{u"t"_s, u"updateState"_s}, {u"state"_s, s}});
+}
+
+void RemoteSession::reportAdbState(const QVariantMap &state)
+{
+    // The tablet's Wireless debugging, for the store's Network page and the Pi's scripts (only when it
+    // changes, and again on each new connection).
+    if (!welcomed_ || state.isEmpty() || state == reportedAdb_)
+        return;
+    reportedAdb_ = state;
+    send({{u"t"_s, u"adbState"_s}, {u"adb"_s, QJsonObject::fromVariantMap(state)}});
+}
+
+void RemoteSession::reportHealth(const QVariantMap &health)
+{
+    if (!welcomed_ || health.isEmpty() || health == reportedHealth_)
+        return;
+    reportedHealth_ = health;
+    send({{u"t"_s, u"health"_s}, {u"health"_s, QJsonObject::fromVariantMap(health)}});
+}
+
+void RemoteSession::sendLog(const QStringList &lines)
+{
+    if (welcomed_ && !lines.isEmpty())
+        send({{u"t"_s, u"tabletLog"_s}, {u"lines"_s, QJsonArray::fromStringList(lines)}});
+}
+
+void RemoteSession::reconnectFresh()
+{
+    if (rejected_)
+        return;
+    qCWarning(lcRemote) << "reconnecting from scratch";
+    reconnect_.stop();
+    lastDrop_ = u"reconnecting from scratch"_s;
+    socket_.abort();
+    if (welcomed_)
+        onDisconnected();
+    reconnect_.stop();
+    failures_ = 0;
+    if (!credentials_.serverId.isEmpty())
+        finder_.search(discoveryPort_);
+    encrypted_ = false;
+    connectingSince_ = QDateTime::currentMSecsSinceEpoch();
+    socket_.connectToHostEncrypted(host_, port_);
 }
 
 void RemoteSession::autoUpdate()
