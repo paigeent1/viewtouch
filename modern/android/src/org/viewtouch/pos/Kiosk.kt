@@ -227,6 +227,21 @@ object Kiosk {
         android.os.Process.killProcess(android.os.Process.myPid())
     }
 
+    // The screen's brightness, 5..255 (setAutoBrightness, the store's dim/bright setting): this
+    // window's own brightness, so no system permission is needed. Was called from the screen but
+    // never written: every call left Java's NoSuchMethodError behind (BHDAN 1's log, 2026-11-22).
+    @JvmStatic
+    fun setBrightnessRaw(ctx: Context, value: Int) {
+        val activity = ctx as? Activity ?: return
+        activity.runOnUiThread {
+            try {
+                val lp = activity.window.attributes
+                lp.screenBrightness = value.coerceIn(5, 255) / 255f
+                activity.window.attributes = lp
+            } catch (_: Exception) {}
+        }
+    }
+
     @JvmStatic
     fun batteryInfo(activity: Activity): Int {
         return try {

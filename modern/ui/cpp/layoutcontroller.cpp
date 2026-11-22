@@ -2378,7 +2378,7 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
 #ifdef Q_OS_ANDROID
         QJniObject a = QNativeInterface::QAndroidApplication::context();
         if (a.isValid())
-            QJniObject::callStaticMethod<void>("org/viewtouch/pos/Kiosk", "setBrightnessRaw", "(Landroid/app/Activity;I)V", a.object<jobject>(), jint(val));
+            QJniObject::callStaticMethod<void>("org/viewtouch/pos/Kiosk", "setBrightnessRaw", "(Landroid/content/Context;I)V", a.object<jobject>(), jint(val));
 #else
         QDir blDir(u"/sys/class/backlight"_s);
         for (const QString &dev : blDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {

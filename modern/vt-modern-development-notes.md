@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 15:56 ET — Bob (Claude) — Tablets: brightness call that was never written (setBrightnessRaw)
+- **What:** Kiosk.kt gets setBrightnessRaw(Context, Int): sets this window's brightness (5..255). layoutcontroller.cpp's setAutoBrightness calls it with a Context signature. Also, for the record: the two Lounge chair commits of 2026-11-21 (f4fa6a6 decor piece, 650e4ed table shape) should have said 'Tablet app: changed. Server: changed.' Server: changed. Tablet app: changed.
+- **Why:** BHDAN 1's own log (tablet-logs, 2026-11-22 14:58 and 15:01): java.lang.NoSuchMethodError: no static method Kiosk.setBrightnessRaw at every start; the screen called a Java method nobody wrote. Notes line per the Pt 3 handoff (owner rule in AGENTS.md).
+- **Files:** `modern/android/src/org/viewtouch/pos/Kiosk.kt`, `modern/ui/cpp/layoutcontroller.cpp`
+
 ### 2026-11-22 15:44 ET — Bob (Claude) — Guest screen taps no longer blocked by the register's keyboard
 - **What:** TouchGuard (the rule that a tap under the on-screen keyboard is ignored) now knows which window the keyboard is in (Main binds keyboardWindowItem); covered(point, item) ignores a tap only when the item is in that window. All 21 tap handlers pass their item. So the guest screen (its own window) answers taps whatever the register's keyboard is doing. Server: changed. Tablet app: changed.
 - **Why:** Owner at BHDAN 2026-11-22: 'Earn rewards: touch to add your phone' on the guest screen didn't respond. TouchGuard was one setting for the whole program: while the register's keyboard was up, every guest-screen tap below the keyboard's top edge (in the guest window's own coordinates) was thrown away.
