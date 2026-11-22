@@ -1951,6 +1951,8 @@ private:
     bool terminalHasDrawer() const { return s_->settings.hasDrawer(terminal_.toStdString()); }
     // Why cash can't go in this terminal's drawer (none, or not started).
     QString noDrawerMessage() const;
+    // A cash refund on a terminal without a cash drawer (a tablet): suspend the sale, the register gives it.
+    QString noDrawerRefundMessage() const;
     // Whether the logged-in person must close their checks before checking out.
     bool mustCloseChecksToCheckOut() const;
     core::DrawerSession *myDrawer();

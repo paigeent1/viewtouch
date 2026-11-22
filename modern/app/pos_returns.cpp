@@ -6,6 +6,10 @@
 // check, owner 2026-11-19), never discounted, a manager's approval, an exception (EOD, Loss Watch).
 // The sale is paid as usual; less than nothing is a cash refund out of the drawer (tender()), and
 // closing it puts the items back in stock the way a sale takes them out (takeStock on the negative).
+// Owner 2026-11-22: a return that leaves the sale owing the customer takes the Retail screen to Pay
+// (refundToGive), where Cash gives the refund, closes the sale and opens the drawer. Only a terminal
+// with a cash drawer gives cash back; on one without (a tablet) the cashier suspends the sale and the
+// register recalls it and gives the refund there.
 
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
@@ -175,6 +179,11 @@ bool PosService::addItemReturn(const QString &itemId, qint64 priceCents, int qua
     emit sessionChanged();
     emit notice(tr("Return: %1").arg(name));
     changed(c);
+    // Less than nothing now: a refund to give. The Retail screen goes to Pay (owner 2026-11-22), where
+    // Cash gives it and opens the drawer; a terminal without a drawer says to suspend the sale.
+    // An exchange that still owes money stays where it is.
+    if (refundDue(c.totals(s_->settings.tax)).cents() > 0)
+        emit refundToGive(c.id);
     return true;
 }
 

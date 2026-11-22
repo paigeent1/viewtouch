@@ -16,7 +16,7 @@
 //   {t: "state", set: {key: value...}}           changed session properties
 //   {t: "reply", id, r}                          answer to call / saveLayout
 //   {t: "notice", text}                          status message
-//   {t: "event", e: "checkClosed", v}            one-off happenings
+//   {t: "event", e: "checkClosed", v}            one-off happenings (also refundToGive, findMe)
 //   {t: "layout", layout}                        pages saved on another terminal
 //
 // For each call the server sends state first, then events, the reply, and

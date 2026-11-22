@@ -2243,18 +2243,24 @@ bool PosService::tender(const QString &tenderId, std::optional<std::int64_t> amo
     const Totals before = c->totals(s_->settings.tax);
     Money amount;
     // An item return made the sale less than nothing: the customer gets that back, in cash, out of
-    // the drawer (a card goes back with Find a Check > Refund… on its old sale).
+    // the drawer (a card goes back with Find a Check > Refund… on its old sale). Only on a terminal
+    // with a cash drawer (owner 2026-11-22): elsewhere (a tablet) the sale is suspended and finished
+    // at the register. Cash records the refund, closes the sale and opens the drawer in one touch.
     if (const Money due = refundDue(before); due.cents() > 0 && t->kind != TenderKind::Discount) {
         if (t->kind != TenderKind::Cash)
             return fail(tr("Give the refund of %1 in cash (a card: Find a Check, then Refund… on the old sale).").arg(format(due)));
-        if (!require(perm::Settle, tr("Taking payments")))
-            return false;
+        if (!terminalHasDrawer())
+            return fail(noDrawerRefundMessage());
+        if (!c->training && !serverBank() && !myDrawer())
+            return fail(noDrawerMessage());   // this terminal's drawer isn't started (Drawer…)
         Payment &back = c->addPayment(*t, -due);
         stampPayment(back);
         entry_.clear();
         emit entryChanged();
-        emit notice(tr("Refund %1: give it to the customer from the drawer.").arg(format(due)));
         changed(*c);
+        if (!closeCheck())   // as a cash sale closes: the drawer opens, the receipt prints (or is offered)
+            return true;     // the refund is on the sale; Close Check finishes it (closeCheck said why)
+        emit notice(tr("Refund %1: give it to the customer from the drawer.").arg(format(due)));
         return true;
     }
     if (t->kind != TenderKind::Discount) {
@@ -2453,7 +2459,11 @@ bool PosService::closeCheck()
         return fail(tr("%1 is still due.").arg(format(t.balance)));
     // An item return: the refund is given (Cash) before the sale closes, so the drawer counts it.
     if (const Money due = refundDue(t); due.cents() > 0 && !c->training)
-        return fail(tr("Refund %1 is due: touch Cash to give it back.").arg(format(due)));
+        return fail(terminalHasDrawer() ? tr("Refund %1 is due: touch Cash to give it back.").arg(format(due))
+                                        : noDrawerRefundMessage());
+    // A cash refund comes out of a drawer: only on a terminal with one (owner 2026-11-22).
+    if (t.cashPaid.cents() < 0 && !terminalHasDrawer())
+        return fail(noDrawerRefundMessage());
     if (c->training)
         return closePractice(*c);
     // (A cash tip handed over for the server is cash here too; a cash refund is cash out.)
@@ -2774,6 +2784,9 @@ QVariantMap PosService::totals() const
         {u"change"_s, format(t.change)}, {u"hasChange"_s, t.change.cents() > 0 && refundDue(t).cents() == 0},
         // An item return made it less than nothing: the refund still to give (Cash), or given.
         {u"refundDue"_s, format(refundDue(t))}, {u"hasRefundDue"_s, refundDue(t).cents() > 0},
+        // No cash drawer here (a tablet): the refund is given at the register (SUSPEND, then recall it there).
+        {u"refundNoDrawer"_s, refundDue(t).cents() > 0 && !terminalHasDrawer()},
+        {u"refundNoDrawerText"_s, noDrawerRefundMessage()},
         {u"refunded"_s, format(-t.cashPaid)}, {u"hasRefunded"_s, t.cashPaid.cents() < 0 && t.balance.cents() == 0},
         {u"rounding"_s, format(t.rounding)}, {u"hasRounding"_s, t.rounding.cents() != 0},
         {u"gratuity"_s, format(t.gratuity)}, {u"hasGratuity"_s, t.gratuity.cents() > 0},

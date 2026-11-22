@@ -583,6 +583,8 @@ void RemoteSession::handle(const QJsonObject &m)
     } else if (type == u"event") {
         if (m.value(u"e").toString() == u"checkClosed")
             emit checkClosed(m.value(u"v").toInteger());
+        else if (m.value(u"e").toString() == u"refundToGive")   // an item return: the Retail screen goes to Pay
+            emit refundToGive(m.value(u"v").toInteger());
         else if (m.value(u"e").toString() == u"findMe")   // Find a Tablet: another screen looks for this one
             emit findMe(m.value(u"v").toObject().toVariantMap());
     } else if (type == u"layout") {

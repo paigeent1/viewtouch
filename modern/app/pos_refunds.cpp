@@ -95,6 +95,9 @@ bool PosService::refundPayment(qint64 checkId, qint64 paymentId, qint64 cents, c
     const QString why = reason.trimmed();
     if (why.isEmpty())
         return fail(tr("Say why (the reason goes in the check's history)."));
+    // Cash comes out of a drawer: only on a terminal with one (owner 2026-11-22). A card needs none.
+    if (p->kind == TenderKind::Cash && !terminalHasDrawer())
+        return fail(tr("No cash drawer here: give this cash refund at the register."));
     const QString key = u"%1/%2"_s.arg(checkId).arg(paymentId);
     if (s_->refundsUnderway.contains(key))
         return fail(tr("That refund is on its way."));

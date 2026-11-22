@@ -960,6 +960,8 @@ signals:
     void notice(const QString &message);
     void loggedInChanged(bool loggedIn);
     void checkClosed(qint64 checkId);
+    // An item return left the sale owing the customer (a refund to give): the Retail screen goes to Pay.
+    void refundToGive(qint64 checkId);
     // Another screen is looking for this one (Find a Tablet): {on, from (that screen), by (who),
     // seconds}. on false: stop.
     void findMe(const QVariantMap &info);

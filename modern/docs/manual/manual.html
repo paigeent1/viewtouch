@@ -1257,7 +1257,7 @@
 </tr></table>
 <ul>
 <li><b>A card from a Stripe reader</b> goes back to the guest's card through Stripe right away; their bank shows it in 5–10 business days (often sooner when it's the same day).</li>
-<li><b>Cash</b> comes out of your drawer (or your bank) as a refund pay-out, so the drawer still counts right.</li>
+<li><b>Cash</b> comes out of your drawer (or your bank) as a refund pay-out, so the drawer still counts right. Only on a terminal with a cash drawer: a tablet says <i>No cash drawer here: give this cash refund at the register.</i></li>
 <li><b>A card typed in</b> (taken on another machine) is recorded here; give it back on that machine.</li>
 <li>Every refund goes in the check's history and on <b>today's</b> reports (Sales: a <i>Refunds</i> section and <i>Collected after refunds</i>; Deposit: <i>Card refunds</i> off the card batch), whatever day the check was from. You can't refund more than was paid.</li>
 <li>On a check that's still open, <b>Undo Payment</b> on a Stripe card refunds it, and also needs a manager.</li>
@@ -1785,8 +1785,10 @@
 <li>Scan the item (scanner or camera), or type its UPC or part of its name and touch <b>Find</b> (several names: touch the right one).</li>
 <li>A window shows the item with its price-book price already filled in. If it sold for another amount, change the price. Change <b>How many</b> if more than one comes back, and touch a reason: <i>Defective</i>, <i>Wrong item</i>, <i>Changed mind</i> or <i>Other</i>.</li>
 <li>Touch <b>Add return</b>. A manager approves with their PIN (as for a void). The sale shows <b>RETURN</b> and the item, at minus the price; the tax comes back too, at the item's own tax. <b>Cancel</b> adds nothing.</li>
-<li>Ring anything the customer is buying instead (an exchange), then <b>SUB TOTAL (PAY)</b>. If the sale is less than nothing, Pay shows <b>Refund (touch Cash)</b>: touch <b>Cash</b>, give the money back, and <b>Close Check</b> (the drawer opens).</li>
+<li>An exchange (the customer buys something instead): ring it in, before or after the return, then <b>SUB TOTAL (PAY)</b> and pay what's still owed as usual. While the sale still owes money, the Retail screen stays put.</li>
+<li>A return that leaves the sale less than nothing (the store owes the customer) goes straight to Pay, which shows <b>Refund (touch Cash)</b> and the amount. Touch <b>Cash</b>: the refund is recorded, the sale closes and the drawer opens; give the money back. (To ring in more first, touch <b>‹ Back to Order</b>.)</li>
 </ol>
+<p><b>Cash refunds only at a register with a cash drawer.</b> On a screen without one (a tablet), Pay shows <b>Refund (at the register)</b> and <i>No cash drawer here: touch SUSPEND and finish the refund at the register.</i>; <b>Cash</b> won't give it. Touch <b>SUSPEND</b> (on Pay, or on the Retail screen): the sale stays open. At the register, <b>RESUME</b> it, touch <b>SUB TOTAL (PAY)</b>: <b>Refund (touch Cash)</b> as above, and <b>Cash</b> gives it and opens the drawer. A cash refund through Find a Check (<b>Refund…</b>, chapter 11) is the same: only at a register with a drawer. A card refund needs no drawer and works anywhere.</p>
 <p>The item goes back into stock when the sale closes. Returns show on the Exceptions report (with their reasons), in the Exceptions search and, when large, in Loss Watch. A store where prices include tax types the price with the tax in it, as it sells.</p>
 
 <h2>Price check</h2>

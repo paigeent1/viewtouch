@@ -694,6 +694,9 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         connect(s, &app::PosSession::checkClosed, this, [c](qint64 id) {
             c->events << QJsonObject{{u"t"_s, u"event"_s}, {u"e"_s, u"checkClosed"_s}, {u"v"_s, id}};
         });
+        connect(s, &app::PosSession::refundToGive, this, [c](qint64 id) {
+            c->events << QJsonObject{{u"t"_s, u"event"_s}, {u"e"_s, u"refundToGive"_s}, {u"v"_s, id}};
+        });
         c->subscribes = m.value(u"subscribes").toBool();
         c->sent = s->snapshot();
         for (auto it = c->sent.begin(); it != c->sent.end();)

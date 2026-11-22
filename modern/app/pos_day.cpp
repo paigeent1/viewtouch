@@ -604,6 +604,11 @@ QString PosService::noDrawerMessage() const
                : tr("%1 has no cash drawer. Take cash on a terminal with one, or use your own bank.").arg(terminal_);
 }
 
+QString PosService::noDrawerRefundMessage() const
+{
+    return tr("No cash drawer here: touch SUSPEND and finish the refund at the register.");
+}
+
 QString PosService::drawerProblemFor(const std::string &terminal) const
 {
     // The terminal's own printer only: another printer's drawer is never opened instead.

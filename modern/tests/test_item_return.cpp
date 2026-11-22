@@ -6,6 +6,8 @@
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
 
+#include <QSignalSpy>
+
 #include <algorithm>
 
 using namespace Qt::StringLiterals;
@@ -180,18 +182,17 @@ TEST_CASE("Item return: a sale less than nothing settles with a cash refund from
     CHECK_FALSE(pos.closeCheck());
     CHECK_FALSE(pos.tender(u"credit"_s));   // a card: the old sale's Refund…
 
+    // Cash gives it back and closes the sale in one touch (owner 2026-11-22).
     REQUIRE(pos.tender(u"cash"_s));
-    totals = pos.totals();
-    CHECK_FALSE(totals[u"hasRefundDue"_s].toBool());
-    CHECK(totals[u"hasRefunded"_s].toBool());
-    CHECK(totals[u"refunded"_s] == u"$10.83"_s);
-    REQUIRE(current(pos).payments.size() == 1);
-    CHECK(current(pos).payments.front().amount.cents() == -1083);
-    REQUIRE(pos.closeCheck());
+    CHECK_FALSE(pos.hasCheck());
 
     // Out of the drawer: $100.00 - $10.83.
     const auto closed = std::ranges::find(pos.shared()->closedToday, id, &core::Check::id);
     REQUIRE(closed != pos.shared()->closedToday.end());
+    REQUIRE(closed->payments.size() == 1);
+    CHECK(closed->payments.front().amount.cents() == -1083);
+    const core::Totals done = closed->totals(pos.shared()->settings.tax);
+    CHECK(done.cashPaid.cents() == -1083);
     REQUIRE(closed->drawerSession != 0);
     const auto drawer = std::ranges::find(pos.shared()->drawers, closed->drawerSession, &core::DrawerSession::id);
     REQUIRE(drawer != pos.shared()->drawers.end());
@@ -262,4 +263,158 @@ TEST_CASE("Item return: prices including tax", "[itemreturn]")
     const core::Totals t = current(pos).totals(pos.shared()->settings.tax);
     CHECK(t.total.cents() == -1000);   // the price, tax in it
     CHECK(t.tax.cents() == -76);       // 10.00 - 10.00 / 1.0825 = 0.76
+}
+
+// Owner 2026-11-22: "refund in retail mode should return to payment screen to pop drawer if cash.
+// Cash refund should only be available at terminal with cash drawer. If no cash drawer, cashier
+// should be instructed to suspend sale and send to cashier."
+namespace {
+
+struct DrawerKicks : app::PosPrinter {
+    int kicks = 0;
+    void printKitchen(const core::PosSettings &, const core::Check &, const std::vector<core::OrderLine> &, bool) override {}
+    void printReceipt(const core::PosSettings &, const core::Check &, const std::string &) override {}
+    void printReport(const core::PosSettings &, const core::Report &, const std::string &) override {}
+    void openDrawer(const core::PosSettings &, const std::string &) override { ++kicks; }
+};
+
+// The register (BHDAN's counter, with the drawer) and a tablet without one.
+app::PosData registerAndTablet()
+{
+    app::PosData d = returnData();
+    d.settings.terminals = {{"Register", "receipt", "yes"}, {"Tablet", "receipt", "no"}};
+    return d;
+}
+
+const QString kNoDrawer = u"No cash drawer here: touch SUSPEND and finish the refund at the register."_s;
+
+} // namespace
+
+TEST_CASE("Item return at the register: to Pay, Cash gives the refund, closes the sale, opens the drawer",
+          "[itemreturn][drawers]")
+{
+    app::PosShared shared(registerAndTablet(), nullptr);
+    DrawerKicks printer;
+    shared.printer = &printer;
+    PosService reg(&shared, u"Register"_s);
+    openDrawer(reg);
+    const int kicksBefore = printer.kicks;
+    QSignalSpy toPay(&reg, &PosService::refundToGive);
+
+    scanReturn(reg, QString::fromLatin1(kUpc));
+    REQUIRE(reg.addItemReturn(u"cutter"_s, 1000, 1, u"Defective"_s, QString::fromLatin1(kUpc)));
+    const qint64 id = reg.checkInfo()[u"id"_s].toLongLong();
+    REQUIRE(toPay.count() == 1);   // the Retail screen goes to Pay
+    CHECK(toPay.first()[0].toLongLong() == id);
+    const QVariantMap totals = reg.totals();
+    CHECK(totals[u"hasRefundDue"_s].toBool());
+    CHECK(totals[u"refundDue"_s] == u"$10.83"_s);
+    CHECK_FALSE(totals[u"refundNoDrawer"_s].toBool());
+
+    REQUIRE(reg.tender(u"cash"_s));
+    CHECK_FALSE(reg.hasCheck());                       // closed
+    CHECK(printer.kicks == kicksBefore + 1);           // the drawer opened
+    const auto closed = std::ranges::find(shared.closedToday, id, &core::Check::id);
+    REQUIRE(closed != shared.closedToday.end());
+    CHECK(closed->drawerSession != 0);
+    REQUIRE(closed->payments.size() == 1);
+    CHECK(closed->payments.front().amount.cents() == -1083);
+}
+
+TEST_CASE("Item return: an exchange that still owes money stays on the Retail screen", "[itemreturn]")
+{
+    PosService pos(returnData(), nullptr);
+    openDrawer(pos);
+    QSignalSpy toPay(&pos, &PosService::refundToGive);
+    REQUIRE(pos.startCheck(core::CheckType::Quick));
+    REQUIRE(pos.addItem(u"cutter"_s));
+    REQUIRE(pos.addItem(u"cutter"_s));                 // two new ones
+    scanReturn(pos, QString::fromLatin1(kUpc));
+    REQUIRE(pos.addItemReturn(u"cutter"_s, 1000, 1, u"Defective"_s, {}));
+    CHECK(toPay.count() == 0);
+    CHECK_FALSE(pos.totals()[u"hasRefundDue"_s].toBool());
+}
+
+TEST_CASE("Item return on a tablet: no cash refund there; suspended, the register gives it", "[itemreturn][drawers]")
+{
+    app::PosShared shared(registerAndTablet(), nullptr);
+    DrawerKicks printer;
+    shared.printer = &printer;
+    PosService tablet(&shared, u"Tablet"_s);
+    PosService reg(&shared, u"Register"_s);
+    openDrawer(reg);
+    const int kicksBefore = printer.kicks;
+
+    REQUIRE(tablet.loginWithPin(u"1234"_s));   // a manager
+    scanReturn(tablet, QString::fromLatin1(kUpc));
+    REQUIRE(tablet.addItemReturn(u"cutter"_s, 1000, 1, u"Defective"_s, QString::fromLatin1(kUpc)));
+    const qint64 id = tablet.checkInfo()[u"id"_s].toLongLong();
+
+    // Pay says what to do instead of taking cash.
+    QVariantMap totals = tablet.totals();
+    CHECK(totals[u"hasRefundDue"_s].toBool());
+    CHECK(totals[u"refundNoDrawer"_s].toBool());
+    CHECK(totals[u"refundNoDrawerText"_s] == kNoDrawer);
+    QSignalSpy notices(&tablet, &PosService::notice);
+    CHECK_FALSE(tablet.tender(u"cash"_s));
+    REQUIRE(notices.count() > 0);
+    CHECK(notices.last()[0].toString() == kNoDrawer);
+    CHECK_FALSE(tablet.closeCheck());
+    CHECK(notices.last()[0].toString() == kNoDrawer);
+    CHECK(shared.open.at(id).payments.empty());        // nothing given
+    CHECK(printer.kicks == kicksBefore);
+
+    // SUSPEND: put away, still open.
+    tablet.releaseCheck();
+    CHECK_FALSE(tablet.hasCheck());
+    REQUIRE(shared.open.contains(id));
+
+    // At the register: recalled, Pay shows the refund, Cash gives it and opens the drawer.
+    REQUIRE(reg.openCheck(id));
+    totals = reg.totals();
+    CHECK(totals[u"hasRefundDue"_s].toBool());
+    CHECK_FALSE(totals[u"refundNoDrawer"_s].toBool());
+    REQUIRE(reg.tender(u"cash"_s));
+    CHECK_FALSE(reg.hasCheck());
+    CHECK(printer.kicks == kicksBefore + 1);
+    const auto closed = std::ranges::find(shared.closedToday, id, &core::Check::id);
+    REQUIRE(closed != shared.closedToday.end());
+    REQUIRE(closed->payments.size() == 1);
+    CHECK(closed->payments.front().amount.cents() == -1083);
+}
+
+TEST_CASE("Find a Check: a cash refund only where there's a drawer; a card anywhere", "[itemreturn][refunds][drawers]")
+{
+    app::PosShared shared(registerAndTablet(), nullptr);
+    DrawerKicks printer;
+    shared.printer = &printer;
+    PosService reg(&shared, u"Register"_s);
+    PosService tablet(&shared, u"Tablet"_s);
+    openDrawer(reg);
+
+    const auto sale = [&](const QString &tender) {
+        REQUIRE(reg.startCheck(core::CheckType::Quick));
+        REQUIRE(reg.addItem(u"cutter"_s));
+        const qint64 id = reg.checkInfo()[u"id"_s].toLongLong();
+        REQUIRE(reg.tender(tender));
+        REQUIRE(reg.closeCheck());
+        return id;
+    };
+    const qint64 cash = sale(u"cash"_s);
+    const qint64 card = sale(u"credit"_s);
+    const auto paymentOf = [&](qint64 id) {
+        const auto c = std::ranges::find(shared.closedToday, id, &core::Check::id);
+        REQUIRE(c != shared.closedToday.end());
+        return c->payments.front().id;
+    };
+
+    REQUIRE(tablet.loginWithPin(u"1234"_s));
+    QSignalSpy notices(&tablet, &PosService::notice);
+    CHECK_FALSE(tablet.refundPayment(cash, paymentOf(cash), 0, u"Defective"_s));
+    REQUIRE(notices.count() > 0);
+    CHECK(notices.last()[0].toString() == u"No cash drawer here: give this cash refund at the register."_s);
+    CHECK(tablet.refundPayment(card, paymentOf(card), 0, u"Defective"_s));   // recorded: the card machine
+
+    REQUIRE(reg.refundPayment(cash, paymentOf(cash), 0, u"Defective"_s));     // the register gives it
+    CHECK(shared.refundsToday.size() == 2);
 }

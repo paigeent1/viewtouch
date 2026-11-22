@@ -229,6 +229,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: w.unit * 0.6
                 name: w.owing ? qsTr("Balance due")
+                      : parent.refundDue && (w.totals.refundNoDrawer ?? false) ? qsTr("Refund (at the register)")
                       : parent.refundDue ? qsTr("Refund (touch Cash)")
                       : (w.totals.hasRefunded ?? false) ? qsTr("Refunded in cash")
                       : (w.totals.hasChange ? qsTr("Change") : qsTr("Paid in full"))
@@ -239,6 +240,32 @@ Item {
                 strong: true
                 size: w.unit * 1.4
                 tint: w.owing ? "#ff9a9e" : parent.refundDue ? "#f5b940" : "#7ee2a8"
+            }
+        }
+
+        // A refund on a terminal without a cash drawer (a tablet): no cash here. Suspend the sale;
+        // the register (with the drawer) recalls it, and Cash there gives the refund (owner 2026-11-22).
+        Text {
+            objectName: "refundNoDrawerText"
+            visible: w.pos !== null && w.pos.hasCheck && (w.totals.refundNoDrawer ?? false)
+            Layout.fillWidth: true
+            text: w.totals.refundNoDrawerText ?? ""
+            wrapMode: Text.WordWrap
+            color: "#f5b940"
+            font.family: w.face
+            font.pixelSize: w.unit * 0.9
+            font.bold: true
+        }
+        WidgetKey {
+            objectName: "refundSuspendKey"
+            visible: w.pos !== null && w.pos.hasCheck && (w.totals.refundNoDrawer ?? false)
+            Layout.fillWidth: true
+            Layout.preferredHeight: w.unit * 2.4
+            text: qsTr("SUSPEND")
+            fontScale: 0.45
+            onClicked: {
+                w.zone.controller.command("releaseCheck")
+                w.zone.controller.goHome()
             }
         }
     }

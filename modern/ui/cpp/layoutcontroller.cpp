@@ -334,6 +334,16 @@ void LayoutController::setPos(PosSession *pos)
         connect(pos_, &PosSession::onlineChanged, this, &LayoutController::sendUnsentCards);
         connect(pos_, &PosSession::loggedInChanged, this, &LayoutController::onLoggedInChanged);
         connect(pos_, &PosSession::checkClosed, this, [this] { navigate(Navigator::Mode::Home); });
+        // ITEM RETURN left the sale owing the customer: from the Retail screen to Pay (the page its
+        // SUB TOTAL (PAY) key opens), to give the refund there (owner 2026-11-22).
+        connect(pos_, &PosSession::refundToGive, this, [this] {
+            const vt::layout::Page *here = currentPage();
+            if (editing() || !here || retailPage().isEmpty() || here->id != retailPage())
+                return;
+            const QString settle = activeLayout().page(u"settle"_s) ? u"settle"_s : rolePage(u"settle"_s);
+            if (!settle.isEmpty())
+                navigate(Navigator::Mode::Push, settle);
+        });
         connect(pos_, &PosSession::qualifierChanged, this, &LayoutController::refresh);
         connect(pos_, &PosSession::adminChanged, this, [this] {
             cardReader_.setKind(pos_->terminalCardReader());   // Manager -> Terminals: this screen's reader
