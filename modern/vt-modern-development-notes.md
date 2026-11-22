@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 11:42 ET — Bob (Claude) — Report for official ViewTouch: screens' port stops accepting
+- **What:** New modern/docs/upstream-reports/2026-11-22-screens-port-stops-accepting.md: what happened at HCA this morning, the evidence (51 queued on a backlog of 50, server idle), the likely cause, the fork's fix (4d11fba) and what to capture if it recurs. Official main (46f1395, 2026-11-19) has the same listener code in net/pos_server.cpp and net/standby.cpp. Server: no change. Tablet app: no change.
+- **Why:** Owner 2026-11-22: post the report in the fork's main so official ViewTouch can see it (this session can't write to their repository).
+- **Files:** `modern/docs/upstream-reports/2026-11-22-screens-port-stops-accepting.md`
+
 ### 2026-11-22 11:34 ET — Bob (Claude) — Screens' port renews itself when nothing comes in; speed row's best sellers show on Qt 6.12
 - **What:** net/pos_server: room for 256 pending connections, and once a minute, when no connection has come in for two minutes, the listener is closed and opened again (screens already in keep their connections); logs 'renewed the screens' port: N of M screens in' when screens are missing. WidgetSpeedRow.qml: its 'top' property renamed 'best' (Qt 6.12 refuses to override Item's FINAL 'top', so the top sellers never showed). Server: changed. Tablet app: changed.
 - **Why:** HCA 2026-11-22 ~9:00-11:30: every tablet and the billboard on 'Reconnecting'; ss showed vtmodern's port 7719 with 51 connections queued (backlog 50) while ViewTouch sat idle (load 0.12, main thread in its event loop): Qt's SSL server had stopped taking connections. Restarting ViewTouch brought them back; this lets it recover by itself.
