@@ -60,7 +60,7 @@ Item {
             TapHandler {
                 id: tap
                 onTapped: {
-                    if (TouchGuard.covered(point.scenePressPosition)) return   // the keyboard's touch
+                    if (TouchGuard.covered(point.scenePressPosition, parent)) return   // the keyboard's touch
                     w.pos.transferCheck(cell.modelData.id)
                     w.zone.controller.goBack()
                 }

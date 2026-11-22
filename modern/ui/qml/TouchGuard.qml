@@ -13,7 +13,24 @@ QtObject {
     // page under it is off, as for Main's own sheets (Main.pageCovered).
     property bool sheetOpen: false
 
-    function covered(scenePoint) {
-        return keyboardTop >= 0 && scenePoint.y >= keyboardTop
+    // An item of the window the keyboard is in (Main's): a touch on another window - the guest
+    // screen - is never under this keyboard (BHDAN 2026-11-22: "Earn rewards: touch to add your
+    // phone" ignored on the guest screen while the register's keyboard was up).
+    property Item keyboardWindowItem: null
+
+    function topOf(item) {
+        let it = item
+        while (it && it.parent)
+            it = it.parent
+        return it
+    }
+
+    // item: the handler's item (pass it, so a touch on another window counts as not covered).
+    function covered(scenePoint, item) {
+        if (keyboardTop < 0 || scenePoint.y < keyboardTop)
+            return false
+        if (item && keyboardWindowItem && topOf(item) !== topOf(keyboardWindowItem))
+            return false
+        return true
     }
 }

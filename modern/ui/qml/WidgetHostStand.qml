@@ -243,7 +243,7 @@ Item {
                             font.pixelSize: w.unit * 0.8
                         }
                     }
-                    TapHandler { id: partyTap; onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.pickParty(row.modelData.id) } }
+                    TapHandler { id: partyTap; onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; w.pickParty(row.modelData.id) } }
                 }
                 Small {
                     anchors.centerIn: parent

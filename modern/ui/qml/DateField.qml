@@ -102,7 +102,7 @@ Rectangle {
     TapHandler {
         id: tap
         gesturePolicy: TapHandler.ReleaseWithinBounds
-        onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; f.choose() }
+        onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; f.choose() }
     }
 
     DatePickerPopup {

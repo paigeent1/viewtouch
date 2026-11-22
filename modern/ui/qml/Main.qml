@@ -339,6 +339,11 @@ ApplicationWindow {
         property: "keyboardTop"
         value: touchKeys.visible ? root.height - touchKeys.height : -1
     }
+    Binding {
+        target: TouchGuard
+        property: "keyboardWindowItem"
+        value: root.contentItem
+    }
 
     // The on-screen keyboard: over the screen, above every dialog, and it
     // never takes the focus from the field.

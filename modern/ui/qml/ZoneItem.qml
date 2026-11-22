@@ -377,9 +377,9 @@ Item {
         id: tap
         enabled: zone.interactive && !zone.editing
         longPressThreshold: 0.7
-        onLongPressed: { if (TouchGuard.covered(point.scenePressPosition)) return; zone.explainRequested() }
+        onLongPressed: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; zone.explainRequested() }
         onTapped: {
-            if (TouchGuard.covered(point.scenePressPosition)) return   // the keyboard's touch
+            if (TouchGuard.covered(point.scenePressPosition, parent)) return   // the keyboard's touch
             switch (zone.behavior) {
             case "toggle":
                 zone.toggled = !zone.toggled

@@ -98,7 +98,7 @@ Item {
             TapHandler {
                 enabled: w.hasCheck
                 onTapped: {
-                    if (TouchGuard.covered(point.scenePressPosition)) return
+                    if (TouchGuard.covered(point.scenePressPosition, parent)) return
                     const h = w.host()
                     if (!h || h.overlayOpen) return
                     if ((w.loyalty.member ?? "") === "")

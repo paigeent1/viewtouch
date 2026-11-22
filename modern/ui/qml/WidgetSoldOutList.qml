@@ -79,7 +79,7 @@ Item {
             }
             TapHandler {
                 id: tap
-                onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.pos.setAvailable(cell.modelData.id, !cell.modelData.available) }
+                onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; w.pos.setAvailable(cell.modelData.id, !cell.modelData.available) }
             }
         }
     }

@@ -543,7 +543,7 @@ Item {
                     TapHandler {
                         id: tap
                         onTapped: {
-                            if (TouchGuard.covered(point.scenePressPosition)) return   // the keyboard's touch
+                            if (TouchGuard.covered(point.scenePressPosition, parent)) return   // the keyboard's touch
                             const t = card.ticket
                             if (!w.expo) {
                                 w.pos.bumpTicket(t.checkId, t.sentAt, w.station)

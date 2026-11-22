@@ -55,7 +55,7 @@ Rectangle {
         longPressThreshold: key.holdable ? 0.5 : 0
         dragThreshold: Math.max(Application.styleHints.startDragDistance, Math.min(40, Math.min(key.width, key.height) * 0.25))
         gesturePolicy: key.takesTouch ? TapHandler.ReleaseWithinBounds : TapHandler.DragThreshold
-        onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; key.clicked() }
-        onLongPressed: { if (TouchGuard.covered(point.scenePressPosition)) return; if (key.holdable) key.held() }
+        onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; key.clicked() }
+        onLongPressed: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; if (key.holdable) key.held() }
     }
 }

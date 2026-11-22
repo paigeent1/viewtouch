@@ -455,7 +455,7 @@ Item {
                 border.width: w.touchToSelect && lit ? 3 : 0
                 border.color: "#fde047"
 
-                TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.pos.selectedLine = row.modelData.id } }
+                TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; w.pos.selectedLine = row.modelData.id } }
                 // Swipe left: off the check (a void once sent). Swipe right: one more.
                 readonly property real swipeAt: width * 0.28
                 DragHandler {

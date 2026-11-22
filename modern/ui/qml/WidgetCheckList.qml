@@ -79,7 +79,7 @@ Item {
             font.family: w.face
             font.pixelSize: 26
         }
-        TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; w.pos.checkFilter = "" } }
+        TapHandler { onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; w.pos.checkFilter = "" } }
     }
 
     GridView {
@@ -152,7 +152,7 @@ Item {
             TapHandler {
                 id: tap
                 onTapped: {
-                    if (TouchGuard.covered(point.scenePressPosition)) return   // the keyboard's touch
+                    if (TouchGuard.covered(point.scenePressPosition, parent)) return   // the keyboard's touch
                     if (w.mode === "merge") {
                         w.pos.mergeCheck(card.modelData.id)
                         w.zone.controller.goBack()

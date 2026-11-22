@@ -189,7 +189,7 @@ ColumnLayout {
                     TapHandler {
                         id: tableTap
                         enabled: piece.isTable
-                        onTapped: { if (TouchGuard.covered(point.scenePressPosition)) return; v.tableTouched(piece.name) }
+                        onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; v.tableTouched(piece.name) }
                     }
                 }
             }
