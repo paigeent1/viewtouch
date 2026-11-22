@@ -32,18 +32,11 @@ ColumnLayout {
     signal tableTouched(string name)
 
     // Read again whenever the pages change (an edit, a save, pages from the server): pageChanged.
-    readonly property var plans: {
-        if (!controller) return []
-        void controller.pageId
-        return controller.floorPlans()
-    }
+    readonly property var plans: controller && controller.pageId !== undefined ? controller.floorPlans() : []
     property string planId: startPlan !== "" ? startPlan : controller ? (controller.widgetState(stateKey) ?? "") : ""
     readonly property string planShown: plans.find(p => p.id === planId) ? planId : (plans.length ? plans[0].id : "")
-    readonly property var plan: {
-        if (!controller || planShown === "") return { x: 0, y: 0, w: 0, h: 0, zones: [] }
-        void controller.pageId
-        return controller.floorPlan(planShown)
-    }
+    readonly property var plan: controller && planShown !== "" && controller.pageId !== undefined
+                                ? controller.floorPlan(planShown) : ({ x: 0, y: 0, w: 0, h: 0, zones: [] })
     // A room's own page reuses the panel of the page before: its room again.
     onStartPlanChanged: if (startPlan !== "") planId = startPlan
     function choose(id) {

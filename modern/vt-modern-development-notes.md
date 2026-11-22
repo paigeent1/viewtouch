@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 12:10 ET — Bob (Claude) — Seating refresh: a dependency the compiler keeps
+- **What:** FloorPlanView.qml and WidgetHostStand.qml depend on pageChanged by testing controller.pageId (pageId !== undefined ? ... : ...), the codebase's way, instead of 'void controller.pageId', which compiled QML throws away (the lint test 'Screens never depend on a value they throw away' caught it). Server: no change. Tablet app: changed.
+- **Why:** CI on c656ff9 failed that lint test; the Seating refresh would not have worked on the tablets.
+- **Files:** `modern/ui/qml/FloorPlanView.qml`, `modern/ui/qml/WidgetHostStand.qml`
+
 ### 2026-11-22 11:53 ET — Bob (Claude) — Seating (host stand) follows the edited floor plan
 - **What:** FloorPlanView.qml (rooms and the room shown) and WidgetHostStand.qml (its table list) re-read on pageChanged, so an edit, a save or pages from the server show without a restart. LayoutController::floorPlans() starts from the store's chosen floor plan (floorHome(): Choose Floor Plan, else the usual Tables page) instead of always the Tables role page; tables() reads activeLayout() (the pages in use) instead of the saved layout_. Test: the host stand's first room is the chosen plan. Server: changed. Tablet app: changed.
 - **Why:** Owner at HCA 2026-11-22: after editing the original floor plan, Seating still showed the old map and opened on the wrong room, so tables couldn't be marked Available against the new map (handoff from the other Bob chat, causes checked against b3a28f4).
