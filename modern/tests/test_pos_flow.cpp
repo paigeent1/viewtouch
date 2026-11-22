@@ -7145,6 +7145,9 @@ TEST_CASE("Flow: tonight's floor plan (band night): chosen by a manager, every l
         if (v.toMap()[u"value"_s] == u"tables-band"_s)
             marked = v.toMap()[u"current"_s].toBool();
     CHECK(marked);
+    // The host stand's rooms (Seating) open on the chosen plan too (HCA 2026-11-22: it kept the old one).
+    REQUIRE_FALSE(c.floorPlans().isEmpty());
+    CHECK(c.floorPlans().first().toMap()[u"id"_s] == u"tables-band"_s);
     pos.logout();
 
     // Every login lands on it; ‹ Tables and Home go back to it.

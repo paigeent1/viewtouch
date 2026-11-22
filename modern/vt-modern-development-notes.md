@@ -143,6 +143,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 11:53 ET — Bob (Claude) — Seating (host stand) follows the edited floor plan
+- **What:** FloorPlanView.qml (rooms and the room shown) and WidgetHostStand.qml (its table list) re-read on pageChanged, so an edit, a save or pages from the server show without a restart. LayoutController::floorPlans() starts from the store's chosen floor plan (floorHome(): Choose Floor Plan, else the usual Tables page) instead of always the Tables role page; tables() reads activeLayout() (the pages in use) instead of the saved layout_. Test: the host stand's first room is the chosen plan. Server: changed. Tablet app: changed.
+- **Why:** Owner at HCA 2026-11-22: after editing the original floor plan, Seating still showed the old map and opened on the wrong room, so tables couldn't be marked Available against the new map (handoff from the other Bob chat, causes checked against b3a28f4).
+- **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/cpp/layoutcontroller.cpp`, `modern/ui/qml/FloorPlanView.qml`, `modern/ui/qml/WidgetHostStand.qml`
+- **Next person must know:** Test on HCA: open Seating, the edited map shows; move a table in the editor, save, and the host stand updates without a restart.
+
 ### 2026-11-22 11:42 ET — Bob (Claude) — Report for official ViewTouch: screens' port stops accepting
 - **What:** New modern/docs/upstream-reports/2026-11-22-screens-port-stops-accepting.md: what happened at HCA this morning, the evidence (51 queued on a backlog of 50, server idle), the likely cause, the fork's fix (4d11fba) and what to capture if it recurs. Official main (46f1395, 2026-11-19) has the same listener code in net/pos_server.cpp and net/standby.cpp. Server: no change. Tablet app: no change.
 - **Why:** Owner 2026-11-22: post the report in the fork's main so official ViewTouch can see it (this session can't write to their repository).

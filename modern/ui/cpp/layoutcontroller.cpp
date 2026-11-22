@@ -982,7 +982,8 @@ QVariantList LayoutController::tables() const
 {
     QVariantList out;
     QSet<QString> seen;
-    for (const vt::layout::Page &p : layout_.pages) {
+    // The pages in use (an edit being made, or this screen's look), not only the saved ones.
+    for (const vt::layout::Page &p : activeLayout().pages) {
         for (const vt::layout::Zone &z : p.zones) {
             const QString name = z.label.trimmed();
             if (z.kind != u"table" || name.isEmpty() || seen.contains(name.toLower()))
@@ -1016,7 +1017,8 @@ QVariantList LayoutController::floorPlans() const
             && std::ranges::any_of(l.effectiveZones(p.id), [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"table"; });
     };
     QStringList order;
-    const vt::layout::Page *floor = l.pageByRole(u"tables"_s);
+    // The store's floor plan (Manager -> Choose Floor Plan), as the Tables screen opens on, else the usual one.
+    const vt::layout::Page *floor = l.page(floorHome());
     if (floor && hasTables(*floor)) {
         order << floor->id;
         // Its tabs: the plans it jumps to, left to right.

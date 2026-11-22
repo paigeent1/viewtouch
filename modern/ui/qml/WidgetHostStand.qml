@@ -17,7 +17,12 @@ Item {
                                         : Math.max(14, Math.min(w.width / 60, w.height / 30))
 
     readonly property var floor: pos ? pos.floor : ({})
-    readonly property var tables: zone && zone.controller ? zone.controller.tables() : []
+    // Read again whenever the pages change (an edit, a save): pageChanged.
+    readonly property var tables: {
+        if (!zone || !zone.controller) return []
+        void zone.controller.pageId
+        return zone.controller.tables()
+    }
 
     readonly property var info: pos ? pos.waitlist : ({})
     readonly property var waiting: info.waiting ?? []
