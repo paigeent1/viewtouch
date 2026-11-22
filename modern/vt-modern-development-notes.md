@@ -143,6 +143,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 11:34 ET — Bob (Claude) — Screens' port renews itself when nothing comes in; speed row's best sellers show on Qt 6.12
+- **What:** net/pos_server: room for 256 pending connections, and once a minute, when no connection has come in for two minutes, the listener is closed and opened again (screens already in keep their connections); logs 'renewed the screens' port: N of M screens in' when screens are missing. WidgetSpeedRow.qml: its 'top' property renamed 'best' (Qt 6.12 refuses to override Item's FINAL 'top', so the top sellers never showed). Server: changed. Tablet app: changed.
+- **Why:** HCA 2026-11-22 ~9:00-11:30: every tablet and the billboard on 'Reconnecting'; ss showed vtmodern's port 7719 with 51 connections queued (backlog 50) while ViewTouch sat idle (load 0.12, main thread in its event loop): Qt's SSL server had stopped taking connections. Restarting ViewTouch brought them back; this lets it recover by itself.
+- **Files:** `modern/net/pos_server.cpp`, `modern/net/pos_server.hh`, `modern/ui/qml/WidgetSpeedRow.qml`
+- **Next person must know:** Watch HCA's ~/.vt-run.log for 'renewed the screens' port'. If tablets get stuck again, run on the Pi: ss -tanp | grep 7719 (Recv-Q at the backlog = not accepting) and grab the main thread's backtrace (gdb -p PID -batch -ex 'thread 1' -ex bt) before restarting.
+
 ### 2026-11-21 18:20 ET — Bob's helper A (Claude) — Bar menu: the Bar tab hidden on the phones' order screen
 - **What:** Tablet app: changed (same commit, seed page). Server: changed. seed/pages/order-template-phone.json hides tab-bar like the meal tabs; main.cpp hides it once on existing stores' phone order screens (mark order-template-phone#tab-bar@hidden).
 - **Why:** CI run 44959848667: the layout check said the phone version lacked the order template's new Bar tab (test_seed, test_editor, test_phone, test_edit_mode).

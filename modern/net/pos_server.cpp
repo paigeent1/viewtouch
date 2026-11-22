@@ -463,7 +463,37 @@ bool PosServer::listen(const QHostAddress &address, quint16 port)
     if (!tlsAvailable(&error_))
         return false;
     error_.clear();
-    return server_.listen(address, port);
+    listenAddress_ = address;
+    listenPort_ = port;
+    lastAccepted_ = QDateTime::currentMSecsSinceEpoch();
+    // Room for every screen reconnecting at once, with some still in their handshake.
+    server_.setMaxPendingConnections(256);
+    if (!server_.listen(address, port))
+        return false;
+    // Each minute: when no connection has come in for two, the listener is closed and opened again
+    // (screens already in keep their own connections). A listener that stopped taking connections
+    // (Qt counting handshakes that never finished) comes back by itself instead of every screen
+    // waiting on "Reconnecting" until ViewTouch is restarted.
+    if (!listenTimer_.isActive()) {
+        listenTimer_.setInterval(60'000);
+        connect(&listenTimer_, &QTimer::timeout, this, [this] {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (!server_.isListening() || now - lastAccepted_ < 120'000)
+                return;
+            const qsizetype paired = std::ranges::count_if(shared_->settings.terminals,
+                                                           [](const core::TerminalConfig &t) { return !t.key.empty(); });
+            server_.close();
+            if (!server_.listen(listenAddress_, listenPort_)) {
+                qCWarning(lcServer).noquote() << "couldn't open the screens' port again:" << server_.errorString();
+                return;
+            }
+            lastAccepted_ = now;
+            if (terminalCount() < paired)
+                qCInfo(lcServer) << "renewed the screens' port:" << terminalCount() << "of" << paired << "screens in";
+        });
+        listenTimer_.start();
+    }
+    return true;
 }
 
 void PosServer::onPreSharedKey(QSslSocket *socket, QSslPreSharedKeyAuthenticator *auth)
@@ -500,6 +530,7 @@ int PosServer::terminalCount() const
 void PosServer::onNewConnection()
 {
     while (auto *socket = qobject_cast<QSslSocket *>(server_.nextPendingConnection())) {
+        lastAccepted_ = QDateTime::currentMSecsSinceEpoch();
         auto c = std::make_unique<Connection>();
         c->socket = socket;
         c->terminalId = socket->property("vtTerminalId").toString();

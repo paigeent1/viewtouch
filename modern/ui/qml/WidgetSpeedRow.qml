@@ -14,7 +14,7 @@ Item {
     readonly property bool draftKey: !(zone && zone.props && zone.props.draft === false)
                                      && (pos ? (pos.draftLines.lines ?? []).some(l => !!l.keg) : false)
     readonly property var items: pos ? pos.orderItems.filter(i => !i.modifier) : []
-    readonly property var top: {
+    readonly property var best: {
         const out = []
         for (const id of (pos ? pos.topSellers : [])) {
             const i = items.find(x => x.id === id)
@@ -36,7 +36,7 @@ Item {
             spacing: w.gap
             width: w.perRow * (w.keyW + w.gap) - w.gap
             Repeater {
-                model: w.top
+                model: w.best
                 delegate: Rectangle {
                     id: key
                     required property var modelData

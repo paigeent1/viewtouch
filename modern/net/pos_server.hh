@@ -135,6 +135,12 @@ private:
     QTimer flushTimer_;
     QTimer tickTimer_;   // refresh time-based fields (minutes open)
     QTimer pingTimer_;   // the standby knows the main is alive; terminals, the store
+    // The listener, renewed when nothing has come in for a while (HCA 2026-11-22: Qt stopped taking
+    // connections - 51 queued at the door - while the screens kept trying; a fresh listener takes them).
+    QTimer listenTimer_;
+    QHostAddress listenAddress_;
+    quint16 listenPort_ = 0;
+    qint64 lastAccepted_ = 0;
     qint64 silentMs_ = 15'000;
     QString updatesDir_;
     QString guestVideoDir_ = QDir::home().filePath(QStringLiteral("Pictures/Guest Screen"));
