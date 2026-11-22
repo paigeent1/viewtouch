@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-22 16:02 ET — Bob (Claude) — Tablets never sleep; ViewTouch's screen saver dims them
+- **What:** Kiosk.apply (each time ViewTouch comes to the front) sets FLAG_KEEP_SCREEN_ON, so Android never turns the tablet's screen off. ViewTouch's own screen saver (Store Settings screen saver minutes, default 3) dims it to 40/255 via setBrightnessRaw (written in the previous commit) and a touch brightens it. Server: no change. Tablet app: changed.
+- **Why:** BHDAN 1 2026-11-22: asleep from ~15:13, Android paused ViewTouch, so it dropped off, missed the restart at 15:47 and reconnected only when touched at 15:57. Owner chose: never sleep, dim when idle.
+- **Files:** `modern/android/src/org/viewtouch/pos/Kiosk.kt`
+
 ### 2026-11-22 15:56 ET — Bob (Claude) — Tablets: brightness call that was never written (setBrightnessRaw)
 - **What:** Kiosk.kt gets setBrightnessRaw(Context, Int): sets this window's brightness (5..255). layoutcontroller.cpp's setAutoBrightness calls it with a Context signature. Also, for the record: the two Lounge chair commits of 2026-11-21 (f4fa6a6 decor piece, 650e4ed table shape) should have said 'Tablet app: changed. Server: changed.' Server: changed. Tablet app: changed.
 - **Why:** BHDAN 1's own log (tablet-logs, 2026-11-22 14:58 and 15:01): java.lang.NoSuchMethodError: no static method Kiosk.setBrightnessRaw at every start; the screen called a Java method nobody wrote. Notes line per the Pt 3 handoff (owner rule in AGENTS.md).

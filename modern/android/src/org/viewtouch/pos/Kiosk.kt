@@ -47,6 +47,12 @@ object Kiosk {
     // ViewTouch as the home screen, pinned. Called each time it comes to the front.
     @JvmStatic
     fun apply(activity: Activity) {
+        // Never let Android turn the screen off: asleep, Android pauses ViewTouch (no connection, no
+        // tablet care, no updates; BHDAN 1 2026-11-22 dropped off until touched). ViewTouch's own
+        // screen saver dims it instead (Store Settings: screen saver minutes, brightness 40 of 255).
+        activity.runOnUiThread {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         val dpm = policy(activity) ?: return
         val who = admin(activity)
         dpm.setLockTaskPackages(who, arrayOf(activity.packageName))
