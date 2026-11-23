@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-23 08:29 ET — Bob (Claude) — Cash refunds open the drawer for everyone
+- **What:** pos_refunds.cpp (Find a Check > Refund on a cash payment) and closeCheck (an item return's cash back) open the register's drawer whenever the terminal has one, also for someone on their own server bank (where it was skipped). A cash sale on a server bank still doesn't open it (that cash stays in the bank). Server: changed. Tablet app: changed.
+- **Why:** Owner at BHDAN 2026-11-23: scanned ticket 70, Refund with 'Wrong item', the receipt shows refunded but the drawer didn't open. The pop was skipped for a server bank; owner's rule (2026-11-22): every cash refund goes through the register's drawer.
+- **Files:** `modern/app/pos_refunds.cpp`, `modern/app/pos_service.cpp`
+
 ### 2026-11-23 07:01 ET — Bob (Claude) — Older Samsung TVs (2013 or so) worked from ViewTouch
 - **What:** vt-directv: a samsung TV with no Tizen remote (ports 8001/8002) but port 55000 open is worked with Samsung's older network remote (the protocol samsungctl calls legacy): off (KEY_POWEROFF), volume, mute, channels, input, arrows, Home (KEY_CONTENTS). vt-directv pair on one waits 35 s for the TV's Allow and remembers proto: legacy in tvs.json. TV on can't be done over the network on these: it says to let its DIRECTV box wake it (HDMI-CEC, Anynet+). Same TV type in the button editor (Samsung TV). Self-tested against a stand-in TV on port 55000. Server: no change. Tablet app: no change.
 - **Why:** Owner 2026-11-23: HCA's Bar 2 is getting a 2013 Samsung UN65F7100; owner chose to add older-Samsung support (off, volume, keys) with power on through the DIRECTV box.

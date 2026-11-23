@@ -2504,7 +2504,9 @@ bool PosService::closeCheck()
         c->drawerSession = drawer->id;
     if (s_->sink)
         s_->sink->saveCheck(*c);
-    if (cash && s_->printer && !serverBank() && terminalHasDrawer())
+    // A refund (cash back on an item return) opens the drawer even on a server bank: it is handed
+    // from the register's drawer (owner 2026-11-22); a cash sale on a server bank stays in the bank.
+    if (cash && s_->printer && terminalHasDrawer() && (!serverBank() || t.cashPaid.cents() < 0))
         openCashDrawer();
     s_->kitchenAgain(c->id);   // closed again after a reopen: looked at afresh
     s_->closedToday.push_back(*c);

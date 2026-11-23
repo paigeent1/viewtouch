@@ -162,7 +162,9 @@ bool PosService::refundPayment(qint64 checkId, qint64 paymentId, qint64 cents, c
         d->movements.push_back(m);
         if (s_->sink)
             s_->sink->saveDrawer(*d);
-        if (s_->printer && !serverBank() && terminalHasDrawer())
+        // Cash back always comes out of the register's drawer (owner 2026-11-22: drawer only), so it
+        // opens even for someone on their own server bank (BHDAN 2026-11-23: ticket 70 refunded, no pop).
+        if (s_->printer && terminalHasDrawer())
             openCashDrawer();
         emit s_->drawerChanged();
     }
