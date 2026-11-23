@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-23 18:42 ET — Bob (Claude) — Menu Builder Select: + Add Item greyed, hint says touch Done
+- **What:** Tablet app: changed. Server: no change. While Select is on, the + Add Item tile is drawn faded (0.35) and the hint reads 'Touch the items to change together. To change one item or add one, touch Done.' (es, fr, pt, zh added). Touches still only tick items while selecting, as before.
+- **Why:** Owner 2026-11-23 18:38-18:41 (BHDAN photos): in Select, + Add Item looked live but did nothing and he couldn't see how to edit the chosen item.
+- **Files:** (none)
+
 ### 2026-11-23 18:31 ET — Bob (Claude) — Card scroll bar test moved to a case that runs in CI
 - **What:** Tablet app: no change. Server: no change. The scroll bar check is in 'UI: Menu Builder: an item's Price check, with tax and back' (passes in CI) instead of 'a choice priced by size' (one of main's known CI failures, which stops before the check): when the item card needs scrolling, builderCardBar is shown with its right edge on the card's; otherwise it's hidden.
 - **Why:** The check has to run to guard the fix.

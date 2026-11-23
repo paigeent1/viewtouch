@@ -1188,7 +1188,7 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        text: w.selecting ? qsTr("Touch the items to change together.")
+                        text: w.selecting ? qsTr("Touch the items to change together. To change one item or add one, touch Done.")
                             : w.treePartial ? (w.items.length > 0 && !w.narrow ? qsTr("Hold one and drag it onto a category to move it.") : "")
                             : w.items.length > 1 ? (w.narrow ? qsTr("Hold one and drag it to move it (the order screen follows).")
                                                              : qsTr("Hold one and drag it to move it, or onto a category."))
@@ -1431,7 +1431,7 @@ Item {
                             readonly property string tint: modelData.add ? "#1f5f3a"
                                                           : (modelData.buttonColor || (w.category ? w.category.color : "") || "#343c49")
                             color: tint
-                            opacity: modelData.add || modelData.availableSet ? 1 : 0.5
+                            opacity: modelData.add ? (w.selecting ? 0.35 : 1) : modelData.availableSet ? 1 : 0.5   // + Add Item waits for Done
                             readonly property bool marked: !modelData.add && (w.selecting ? w.selected.includes(modelData.id)
                                                                                            : w.editingItem && w.itemId === modelData.id)
                             border.color: marked ? "#f5b940" : Qt.darker(tint, 1.3)
