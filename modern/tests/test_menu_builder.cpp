@@ -1051,3 +1051,190 @@ TEST_CASE("Menu import: prices that aren't amounts (NaN, infinity, 1e999) aren't
         }
     }
 }
+
+// --- a category's kind: Retail, Hospitality or Event (owner, 2026-11-23: each Menu Builder mode
+// shows its own categories only) ---
+
+namespace {
+
+QStringList idsOfScope(PosService &pos, const QString &scope)
+{
+    QStringList out;
+    for (const QVariant &v : pos.menuCategories())
+        if (v.toMap()[u"scope"_s] == scope)
+            out << v.toMap()[u"id"_s].toString();
+    return out;
+}
+
+bool markedRetail(PosService &pos, const QString &name) { return item(pos, name)[u"isRetail"_s].toBool(); }
+bool markedEvent(PosService &pos, const QString &name) { return item(pos, name)[u"isEvent"_s].toBool(); }
+
+} // namespace
+
+TEST_CASE("Category kinds: worked out for categories that don't have one yet", "[menubuilder][scope]")
+{
+    using core::MenuCategory;
+    const auto cat = [](std::string id, std::string name, bool retailOnly = false, std::string group = {}) {
+        MenuCategory c;
+        c.id = std::move(id);
+        c.name = std::move(name);
+        c.retailOnly = retailOnly;
+        c.group = std::move(group);
+        return c;
+    };
+    // Retail: sold on the Retail screen only, or a price book department.
+    CHECK(core::categoryScope(cat("premium-cigars", "PREMIUM CIGARS", true)) == "retail");
+    CHECK(core::categoryScope(cat("cigarettes", "CIGARETTES", false, "CIGARETTES")) == "retail");
+    // Event: a word of its name or id starting with "event" (BH's EVENT TICKETS too, though Retail-only)...
+    CHECK(core::categoryScope(cat("event-tickets", "EVENT TICKETS", true)) == "event");
+    CHECK(core::categoryScope(cat("events", "Events")) == "event");
+    CHECK(core::categoryScope(cat("prevention", "PREVENTION", true)) == "retail");   // not a word starting with it
+    // ...or most of its items are tickets.
+    CHECK(core::categoryScope(cat("specials", "Specials"), 3, 2) == "event");
+    CHECK(core::categoryScope(cat("specials", "Specials"), 4, 2) == "hospitality");
+    // Hospitality: the rest (food and drink).
+    CHECK(core::categoryScope(cat("burgers", "Burgers")) == "hospitality");
+    CHECK(core::categoryScope(cat("bourbon", "Bourbon")) == "hospitality");
+    // One chosen wins.
+    MenuCategory chosen = cat("events", "Events");
+    chosen.scope = "hospitality";
+    CHECK(core::categoryScope(chosen) == "hospitality");
+    chosen.scope = "nonsense";
+    CHECK(core::categoryScope(chosen) == "event");
+
+    // The categories of one kind, in the menu's order.
+    std::vector<MenuCategory> list{cat("a", "Drinks"), cat("b", "PREMIUM CIGARS", true), cat("c", "Burgers"),
+                                   cat("d", "EVENT TICKETS", true)};
+    const auto ids = [](const std::vector<MenuCategory> &l) {
+        std::vector<std::string> out;
+        for (const MenuCategory &c : l)
+            out.push_back(c.id);
+        return out;
+    };
+    CHECK(ids(core::categoriesOfScope(list, {}, "hospitality")) == std::vector<std::string>{"a", "c"});
+    CHECK(ids(core::categoriesOfScope(list, {}, "retail")) == std::vector<std::string>{"b"});
+    CHECK(ids(core::categoriesOfScope(list, {}, "event")) == std::vector<std::string>{"d"});
+}
+
+TEST_CASE("Category kinds: kept in the settings, Retail always Retail-screen-only", "[menubuilder][scope]")
+{
+    core::PosSettings s;
+    core::MenuCategory a;
+    a.id = "drinks";
+    a.name = "Drinks";
+    a.scope = "event";
+    core::MenuCategory b;
+    b.id = "cigars";
+    b.name = "Cigars";
+    b.scope = "retail";   // (and Retail-only, even if a file says otherwise)
+    core::MenuCategory c;
+    c.id = "burgers";
+    c.name = "Burgers";   // none chosen: none written
+    s.menuCategories = {a, b, c};
+    QJsonObject json = app::toJson(s);
+    QJsonArray cats = json[u"menuCategories"_s].toArray();
+    CHECK(cats[0].toObject()[u"scope"_s].toString() == u"event"_s);
+    CHECK_FALSE(cats[2].toObject().contains(u"scope"_s));
+    const core::PosSettings back = app::settingsFromJson(json);
+    REQUIRE(back.menuCategories.size() == 3);
+    CHECK(back.menuCategories[0].scope == "event");
+    CHECK(back.menuCategories[1].scope == "retail");
+    CHECK(back.menuCategories[1].retailOnly);
+    CHECK(back.menuCategories[2].scope.empty());
+    // Older settings: none, so worked out.
+    QJsonObject old = cats[1].toObject();
+    old.remove(u"scope"_s);
+    old.insert(u"retailOnly"_s, true);
+    cats[1] = old;
+    json[u"menuCategories"_s] = cats;
+    const core::PosSettings older = app::settingsFromJson(json);
+    CHECK(older.menuCategories[1].scope.empty());
+    CHECK(core::categoryScope(older.menuCategories[1]) == "retail");
+}
+
+TEST_CASE("Category kinds: each Menu Builder mode's categories, and moving one", "[menubuilder][scope]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    const QStringList hospitalityBefore = idsOfScope(pos, u"hospitality"_s);
+    CHECK_FALSE(hospitalityBefore.isEmpty());   // the seed menu: food and drink
+    CHECK(idsOfScope(pos, u"retail"_s).isEmpty());
+    CHECK(idsOfScope(pos, u"event"_s) == QStringList{u"events"_s});   // the seed's Events (a ticket)
+
+    // Made in a mode: that kind. Retail is Retail-screen-only.
+    REQUIRE(pos.saveCategory({{u"name"_s, u"PREMIUM CIGARS"_s}, {u"scope"_s, u"retail"_s}}));
+    REQUIRE(pos.saveCategory({{u"name"_s, u"Wine Dinners"_s}, {u"scope"_s, u"event"_s}}));
+    REQUIRE(pos.saveCategory({{u"name"_s, u"EVENT TICKETS"_s}, {u"retailOnly"_s, true}}));   // none chosen: by its name
+    CHECK_FALSE(pos.saveCategory({{u"name"_s, u"Odd"_s}, {u"scope"_s, u"sideways"_s}}));
+    CHECK(idsOfScope(pos, u"retail"_s) == QStringList{u"premium-cigars"_s});
+    CHECK(category(pos, u"premium-cigars"_s)[u"retailOnly"_s].toBool());
+    CHECK(idsOfScope(pos, u"event"_s) == QStringList({u"events"_s, u"wine-dinners"_s, u"event-tickets"_s}));
+    CHECK(category(pos, u"event-tickets"_s)[u"retailOnly"_s].toBool());   // still sold at the Retail counter
+    CHECK(idsOfScope(pos, u"hospitality"_s) == hospitalityBefore);
+
+    // A ticket at BH's Retail counter: found by its barcode and rung, as before.
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Cigar Night Ticket"_s}, {u"price"_s, u"40.00"_s}, {u"family"_s, u"event-tickets"_s},
+                                  {u"barcodes"_s, u"200000000017"_s}, {u"isRetail"_s, true}}));
+    CHECK(pos.itemForCode(u"200000000017"_s).value(u"name"_s) == u"Cigar Night Ticket"_s);
+    REQUIRE(pos.startCheck(core::CheckType::Quick));
+    REQUIRE(pos.addItem(item(pos, u"Cigar Night Ticket"_s)[u"id"_s].toString()));
+    REQUIRE(pos.currentCheck());
+    CHECK(pos.currentCheck()->lines.size() == 1);
+    const core::OrderLine &rung = pos.currentCheck()->lines.back();
+    CHECK((rung.kitchenHide || (!rung.printer.empty() && rung.printer != "kitchen")));   // never the kitchen's ticket
+
+    // Moved to another kind: its items' marks go with it; the order screens follow (Retail: off them).
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Robusto"_s}, {u"price"_s, u"12.00"_s}, {u"family"_s, u"wine-dinners"_s}}));
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Toro"_s}, {u"price"_s, u"14.00"_s}, {u"family"_s, u"wine-dinners"_s}}));
+    REQUIRE(pos.saveCategory({{u"id"_s, u"wine-dinners"_s}, {u"name"_s, u"Wine Dinners"_s}, {u"scope"_s, u"retail"_s}}));
+    CHECK(idsOfScope(pos, u"retail"_s).contains(u"wine-dinners"_s));
+    CHECK(category(pos, u"wine-dinners"_s)[u"retailOnly"_s].toBool());
+    CHECK(markedRetail(pos, u"Robusto"_s));
+    CHECK_FALSE(markedEvent(pos, u"Toro"_s));
+    // To Event: tickets, still retail (a ticket rung at the Retail counter stays out of the kitchen).
+    REQUIRE(pos.saveCategory({{u"id"_s, u"wine-dinners"_s}, {u"name"_s, u"Wine Dinners"_s}, {u"scope"_s, u"event"_s}}));
+    CHECK(markedEvent(pos, u"Robusto"_s));
+    CHECK(markedRetail(pos, u"Robusto"_s));
+    // To Hospitality: neither, and on the menus.
+    REQUIRE(pos.saveCategory({{u"id"_s, u"wine-dinners"_s}, {u"name"_s, u"Wine Dinners"_s}, {u"scope"_s, u"hospitality"_s}}));
+    CHECK_FALSE(markedEvent(pos, u"Toro"_s));
+    CHECK_FALSE(markedRetail(pos, u"Toro"_s));
+    CHECK_FALSE(category(pos, u"wine-dinners"_s)[u"retailOnly"_s].toBool());
+    // One step: Undo puts the category and its items back.
+    REQUIRE(pos.undoMenuChange());
+    CHECK(markedEvent(pos, u"Toro"_s));
+    CHECK(idsOfScope(pos, u"event"_s).contains(u"wine-dinners"_s));
+    // Saved again in the same kind: its items stay as they are.
+    REQUIRE(pos.saveCategory({{u"id"_s, u"event-tickets"_s}, {u"name"_s, u"EVENT TICKETS"_s}, {u"scope"_s, u"event"_s}}));
+    CHECK_FALSE(markedEvent(pos, u"Cigar Night Ticket"_s));   // (it was never marked a ticket)
+    CHECK(markedRetail(pos, u"Cigar Night Ticket"_s));
+    // The old Retail-only switch on a chosen kind: the kind follows it.
+    REQUIRE(pos.saveCategory({{u"id"_s, u"premium-cigars"_s}, {u"name"_s, u"PREMIUM CIGARS"_s}, {u"retailOnly"_s, false}}));
+    CHECK(category(pos, u"premium-cigars"_s)[u"scope"_s] == u"hospitality"_s);
+}
+
+TEST_CASE("Category kinds: imported categories", "[menubuilder][scope]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    // A spreadsheet imported in a mode: the categories it makes are that mode's.
+    REQUIRE(pos.importMenuRows({QVariantMap{{u"name"_s, u"Zen Tube"_s}, {u"price"_s, 8.99}, {u"category"_s, u"Accessories"_s},
+                                            {u"scope"_s, u"retail"_s}}},
+                               {}, false) == 1);
+    CHECK(idsOfScope(pos, u"retail"_s) == QStringList{u"accessories"_s});
+    // None given: worked out.
+    REQUIRE(pos.importMenuRows({QVariantMap{{u"name"_s, u"Gala Ticket"_s}, {u"price"_s, 50.0}, {u"category"_s, u"Gala Events"_s}}},
+                               {}, false) == 1);
+    CHECK(idsOfScope(pos, u"event"_s) == QStringList({u"events"_s, u"gala-events"_s}));
+    // A menu file carries each category's kind to the other store.
+    const QVariantMap file = pos.menuExport();
+    bool allKinds = true;
+    for (const QVariant &c : file[u"categories"_s].toList())
+        allKinds = allKinds && core::validScope(c.toMap()[u"scope"_s].toString().toStdString());
+    CHECK(allKinds);
+    PosService other(test::seedPosData(), nullptr);
+    REQUIRE(other.loginWithPin(u"1234"_s));
+    other.importMenuFile(file);
+    CHECK(idsOfScope(other, u"retail"_s) == QStringList{u"accessories"_s});
+    CHECK(idsOfScope(other, u"event"_s) == QStringList({u"events"_s, u"gala-events"_s}));
+}

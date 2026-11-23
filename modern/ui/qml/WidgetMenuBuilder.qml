@@ -56,7 +56,7 @@ Item {
             const existing = w.findExistingItemByBarcode(code)
             if (existing) {
                 w.choosingScope = false
-                w.builderScope = existing.isRetail ? "retail" : "hospitality"
+                w.builderScope = w.scopeOfItem(existing)
                 w.categoryId = existing.family
                 w.editItem(existing)
                 return
@@ -109,7 +109,34 @@ Item {
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 340 : 1180) : 1
 
-    readonly property var categories: pos ? pos.menuCategories : []
+    // Every category, and this mode's (owner, 2026-11-23): Retail shows the price book's departments,
+    // Hospitality the food and drink, Event the tickets. Each category's kind is on its card.
+    readonly property var allCategories: pos ? pos.menuCategories : []
+    readonly property var categories: allCategories.filter(c => (c.scope || "hospitality") === builderScope)
+    // Its kind (Retail, Hospitality, Event): its category's, else its own marks.
+    function scopeOfItem(i) {
+        const c = allCategories.find(x => x.id === i.family)
+        return c && c.scope ? c.scope : i.isEvent ? "event" : i.isRetail ? "retail" : "hospitality"
+    }
+    // The category list (the right-hand panel when no card is open; on a phone, the first page),
+    // narrowed by its filter box.
+    property string categoryFilter: ""
+    readonly property var listedCategories: {
+        const t = categoryFilter.trim().toLowerCase()
+        return t === "" ? categories : categories.filter(c => c.name.toLowerCase().includes(t))
+    }
+    // Moved before or after another of this mode's categories (its place among all of them).
+    function moveCategoryNextTo(id, otherId) {
+        const to = allCategories.findIndex(c => c.id === otherId)
+        if (to >= 0 && otherId !== id) pos.moveCategoryTo(id, to)
+    }
+    readonly property bool cardOpen: editingItem || editingCategory || editingGroup
+    readonly property bool categoriesRight: !narrow && mode === "menu" && !cardOpen
+    onBuilderScopeChanged: {
+        categoryFilter = ""
+        if (!categories.some(c => c.id === categoryId))
+            categoryId = categories.length ? categories[0].id : ""
+    }
     readonly property var groups: pos ? pos.choiceGroups.filter(g => !g.own) : []
     readonly property var periods: pos ? pos.mealPeriods : []
     readonly property var stations: pos ? pos.kitchenStations.filter(s => !s.printer) : []
@@ -119,12 +146,12 @@ Item {
 
     // What's chosen, and the card being edited.
     property string categoryId: ""
-    readonly property var category: categories.find(c => c.id === categoryId) ?? null
+    readonly property var category: allCategories.find(c => c.id === categoryId) ?? null
     property bool choosingScope: true
     property string builderScope: "hospitality"
     readonly property bool eventMode: builderScope === "event"   // "hospitality" | "retail"
     readonly property bool retailMode: builderScope === "retail"
-    readonly property var items: allItems.filter(i => i.family === categoryId && Boolean(i.isRetail) === retailMode)
+    readonly property var items: allItems.filter(i => i.family === categoryId)
     property string itemId: ""        // "" + editingItem: a new one
     property bool editingItem: false
     property bool editingCategory: false
@@ -167,7 +194,7 @@ Item {
                 // From the profit coach (Change the Price…, Open It): straight to the item, in its mode.
                 if (zone.controller.take("menuBuilderFromCoach") === true) {
                     choosingScope = false
-                    builderScope = i.isRetail ? "retail" : "hospitality"
+                    builderScope = scopeOfItem(i)
                 }
                 categoryId = i.family
                 editItem(i)
@@ -208,9 +235,9 @@ Item {
         if (added) {
             waitingForCategory = ""
             pickCategory(added.id)
-            Qt.callLater(() => categoryList.positionViewAtIndex(categories.findIndex(c => c.id === added.id), ListView.Contain))
-        } else if (!category && categories.length) {
-            categoryId = categories[0].id
+            Qt.callLater(() => categoryList.positionViewAtIndex(listedCategories.findIndex(c => c.id === added.id), ListView.Contain))
+        } else if ((!category || !categories.some(c => c.id === categoryId)) && !editingItem && categories.length) {
+            categoryId = categories[0].id   // gone, or moved to another mode
         }
     }
 
@@ -234,7 +261,7 @@ Item {
         return i ? { id: i.id, name: i.name, price: i.priceValue.toFixed(2), family: i.family, image: i.image,
                      groups: i.groups.slice(), onIt: i.onIt.join(", "), available: i.availableSet,
                      kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
-                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode,
+                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode, isEvent: i.isEvent ?? w.eventMode,
                      length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
                      abv: i.abv ?? "", pourOz: i.pourOz ?? "",
                      scanMaker: i.scanMaker ?? "", scanCategory: i.scanCategory ?? "", scanUom: i.scanUom ?? "", scanUnits: i.scanUnits ?? "",
@@ -245,7 +272,7 @@ Item {
                  : { id: "", name: "", price: "", family: categoryId, image: "", groups: [], onIt: "",
                      available: true, kioskHide: false, description: "", favorite: false, allergens: [],
                      noDiscount: category ? category.noDiscount === true : false,
-                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode,
+                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode, isEvent: w.eventMode,
                      length: "", ringGauge: "", ringGauge2: "", abv: "", pourOz: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
                      scanMaker: "", scanCategory: "", scanUom: "", scanUnits: "",
                      section: "", breakBefore: "",
@@ -257,10 +284,11 @@ Item {
         return c ? { id: c.id, name: c.name, color: c.color, periods: c.periods.slice(), printer: c.printer,
                      station: c.station, taxClass: c.taxClass, buttonSize: c.buttonSize ?? "", photos: c.photos === true,
                      hidePrice: c.hidePrice === true, shades: c.shades === true, noDiscount: c.noDiscount === true,
-                     retailOnly: c.retailOnly === true }
+                     retailOnly: c.retailOnly === true, scope: c.scope || "hospitality" }
                  : { id: "", name: "", color: StoreColors.starters[categories.length % StoreColors.starters.length], periods: [],
-                     printer: "kitchen", station: "", taxClass: "food", buttonSize: "", photos: false, hidePrice: false, shades: false,
-                     noDiscount: false, retailOnly: false }
+                     printer: w.retailMode ? "" : "kitchen", station: "", taxClass: w.retailMode ? "merchandise" : "food",
+                     buttonSize: "", photos: false, hidePrice: false, shades: false,
+                     noDiscount: false, retailOnly: w.retailMode, scope: w.builderScope }
     }
     function groupDraft(g) {
         const kind = !g ? "one" : g.max === 1 ? "one" : g.max === 0 ? "any" : "upTo"
@@ -302,7 +330,7 @@ Item {
         // A new one already saved: it's there by its name now.
         const named = list => !draft.id && (draft.name ?? "").trim() !== ""
                               && list.some(x => x.name.toLowerCase() === draft.name.trim().toLowerCase())
-        if ((editingItem && named(allItems)) || (editingCategory && named(categories)) || (editingGroup && named(allGroups)))
+        if ((editingItem && named(allItems)) || (editingCategory && named(allCategories)) || (editingGroup && named(allGroups)))
             return false
         if (editingItem) {
             const saved = draft.id ? allItems.find(i => i.id === draft.id) : null
@@ -313,7 +341,7 @@ Item {
             return !same(fresh, draft)
         }
         if (editingCategory) {
-            const saved = draft.id ? categories.find(c => c.id === draft.id) : null
+            const saved = draft.id ? allCategories.find(c => c.id === draft.id) : null
             if (draft.id && !saved) return false
             const fresh = categoryDraft(saved)
             if (!draft.id) fresh.color = draft.color
@@ -339,13 +367,13 @@ Item {
     function openProblem(p) {
         if (p.item) {
             const i = w.allItems.find(x => x.id === p.item)
-            if (i) { w.mode = "menu"; w.categoryId = i.family; w.editItem(i) }
+            if (i) { w.mode = "menu"; w.builderScope = w.scopeOfItem(i); w.choosingScope = false; w.categoryId = i.family; w.editItem(i) }
         } else if (p.group) {
             const g = w.allGroups.find(x => x.id === p.group)
             if (g) w.editGroup(g)
         } else if (p.category) {
-            const c = w.categories.find(x => x.id === p.category)
-            if (c) { w.mode = "menu"; w.categoryId = c.id; w.editCategory(c) }
+            const c = w.allCategories.find(x => x.id === p.category)
+            if (c) { w.mode = "menu"; w.builderScope = c.scope || "hospitality"; w.choosingScope = false; w.categoryId = c.id; w.editCategory(c) }
         }
     }
     function saveCard() {
@@ -354,12 +382,21 @@ Item {
         else if (editingGroup) saveGroupCard()
     }
     function saveCategoryCard() {
+        // Moved to another kind: its items go with it, asked first ("Move 1,830 items to Retail?").
+        const saved = draft.id ? allCategories.find(x => x.id === draft.id) : null
+        if (saved && (saved.scope || "hospitality") !== draft.scope && saved.count > 0 && !moveKindDialog.asked) {
+            moveKindDialog.count = saved.count
+            moveKindDialog.open()
+            return
+        }
+        const moved = moveKindDialog.asked
+        moveKindDialog.asked = false
         const c = copy(draft)
         if (!c.id)
             waitingForCategory = c.name.trim()
         pos.saveCategory(c)
-        if (!c.id)
-            editingCategory = false
+        if (!c.id || moved)
+            editingCategory = false   // (moved: it's in the other mode now)
     }
     function saveGroupCard() {
         const g = groupRecord()
@@ -461,7 +498,8 @@ Item {
     readonly property var found: {
         const t = search.trim().toLowerCase()
         if (t === "") return []
-        return allItems.filter(i => i.name.toLowerCase().includes(t) || (i.number !== "" && i.number === t)).slice(0, 30)
+        const mine = new Set(categories.map(c => c.id))   // this mode's categories only
+        return allItems.filter(i => mine.has(i.family) && (i.name.toLowerCase().includes(t) || (i.number !== "" && i.number === t))).slice(0, 30)
     }
     // Like…: another item's choices, what's on it, allergens, kitchen and
     // tax, kitchen time and color (not its name, price, number or photo).
@@ -587,8 +625,9 @@ Item {
                     objectName: "builderScopeToggle"
                     Layout.fillWidth: true
                     implicitHeight: 44
-                    palette.button: w.retailMode ? "#1f4e5f" : "#3a2e5f"
-                    text: w.retailMode ? qsTr("🏷️ Retail Inventory Mode (Switch…)") : qsTr("🍽️ Hospitality F&B Mode (Switch…)")
+                    palette.button: w.retailMode ? "#1f4e5f" : w.eventMode ? "#461b57" : "#3a2e5f"
+                    text: w.retailMode ? qsTr("🏷️ Retail Inventory Mode (Switch…)")
+                        : w.eventMode ? qsTr("🎟️ Events Mode (Switch…)") : qsTr("🍽️ Hospitality F&B Mode (Switch…)")
                     onClicked: w.leave(() => { w.editingItem = false; w.editingCategory = false; w.choosingScope = true })
                 }
                 RowLayout {
@@ -757,127 +796,188 @@ Item {
                     text: qsTr("+ Choice Group")
                     onClicked: w.leave(() => { w.returnToItem = null; w.editGroup(null) })
                 }
-                ListView {
-                    id: categoryList
-                    visible: w.mode === "menu" && w.search.trim() === ""
-                    interactive: w.dragId === ""
+                // The categories: here on a phone (and beside a category's card); on a wide screen with no
+                // card open, the whole right-hand panel (owner, 2026-11-23: more than two at a time).
+                Item {
+                    id: leftCategorySlot
+                    visible: w.mode === "menu" && w.search.trim() === "" && !w.categoriesRight
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    clip: true
-                    spacing: 6
-                    model: w.categories
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        objectName: "builderCategory-" + modelData.id
-                        width: categoryList.width
-                        height: 64
-                        radius: 8
-                        color: modelData.id === w.categoryId ? "#2b3a52" : "#232933"
-                        border.color: modelData.id === w.categoryId ? "#4c8dff" : "transparent"
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 10
-                            spacing: 10
-                            Rectangle { width: 18; height: 40; radius: 4; color: modelData.color || "#4a5260" }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
-                                Label { text: modelData.name; font.pixelSize: 18; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-                                Label {
-                                    text: qsTr("%n item(s)", "", modelData.count) + "  ·  "
-                                          + (modelData.periods.length === 0 ? qsTr("all day")
-                                             : modelData.periods.map(p => (w.periods.find(x => x.id === p) ?? { name: p }).name).join(", "))
-                                    font.pixelSize: 13
-                                    opacity: 0.7
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
+                    ColumnLayout {
+                        id: categoryPanel
+                        objectName: "builderCategoryPanel"
+                        parent: w.categoriesRight ? rightCategorySlot : leftCategorySlot
+                        anchors.fill: parent
+                        spacing: 8
+                        Label {
+                            objectName: "builderCategoryPanelTitle"
+                            visible: w.categoriesRight
+                            Layout.fillWidth: true
+                            text: (w.retailMode ? qsTr("Retail categories") : w.eventMode ? qsTr("Event categories")
+                                                                           : qsTr("Hospitality categories"))
+                                  + "  ·  " + w.categories.length
+                            font.pixelSize: 20
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+                        TextField {
+                            objectName: "builderCategoryFilter"
+                            Layout.fillWidth: true
+                            implicitHeight: 44
+                            font.pixelSize: 15
+                            placeholderText: qsTr("Filter categories")
+                            text: w.categoryFilter
+                            onTextEdited: w.categoryFilter = text
+                            inputMethodHints: Qt.ImhNoPredictiveText
+                        }
+                        Label {
+                            visible: w.listedCategories.length === 0
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            opacity: 0.6
+                            text: w.categories.length === 0 ? qsTr("No categories in this mode yet: + Category.")
+                                                            : qsTr("No category by that name.")
+                        }
+                        ListView {
+                            id: categoryList
+                            interactive: w.dragId === ""
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            spacing: 6
+                            model: w.listedCategories
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                objectName: "builderCategory-" + modelData.id
+                                width: categoryList.width
+                                height: 64
+                                radius: 8
+                                color: modelData.id === w.categoryId ? "#2b3a52" : "#232933"
+                                border.color: modelData.id === w.categoryId ? "#4c8dff" : "transparent"
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 10
+                                    Rectangle { width: 18; height: 40; radius: 4; color: modelData.color || "#4a5260" }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 0
+                                        Label { text: modelData.name; font.pixelSize: 18; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+                                        Label {
+                                            text: qsTr("%n item(s)", "", modelData.count) + "  ·  "
+                                                  + (modelData.periods.length === 0 ? qsTr("all day")
+                                                     : modelData.periods.map(p => (w.periods.find(x => x.id === p) ?? { name: p }).name).join(", "))
+                                            font.pixelSize: 13
+                                            opacity: 0.7
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                    }
+                                }
+                                // An item dragged onto it.
+                                Rectangle {
+                                    objectName: "builderDropOn-" + modelData.id
+                                    anchors.fill: parent
+                                    visible: w.dropCategory === modelData.id
+                                    color: "#33f5b940"
+                                    radius: parent.radius
+                                    border.color: "#f5b940"
+                                    border.width: 4
+                                }
+                                Rectangle {
+                                    anchors.fill: parent
+                                    visible: w.dragId !== "" && w.dropIndex === index && w.dragId !== modelData.id && w.mode === "menu"
+                                    color: "transparent"
+                                    radius: parent.radius
+                                    border.color: "#f5b940"
+                                    border.width: 4
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    pressAndHoldInterval: 350
+                                    property bool dragging: false
+                                    preventStealing: dragging
+                                    onClicked: {
+                                        const id = modelData.id, b = w
+                                        b.leave(() => b.pickCategory(id))
+                                    }
+                                    onPressAndHold: m => {
+                                        dragging = true
+                                        w.dragId = modelData.id
+                                        ghost.text = modelData.name
+                                        ghost.color = modelData.color || "#4a5260"
+                                        moved(m)
+                                    }
+                                    function moved(m) {
+                                        const p = mapToItem(categoryList, m.x, m.y)
+                                        w.dropIndex = categoryList.indexAt(p.x + categoryList.contentX, p.y + categoryList.contentY)
+                                        const g = mapToItem(ghost.parent, m.x, m.y)
+                                        ghost.x = g.x - ghost.width / 2
+                                        ghost.y = g.y - ghost.height / 2
+                                    }
+                                    onPositionChanged: m => { if (dragging) moved(m) }
+                                    onReleased: {
+                                        if (!dragging) return
+                                        dragging = false
+                                        const to = w.dropIndex
+                                        const id = w.dragId
+                                        w.dragId = ""
+                                        w.dropIndex = -1
+                                        if (to >= 0 && w.listedCategories[to] && w.listedCategories[to].id !== id)
+                                            w.moveCategoryNextTo(id, w.listedCategories[to].id)
+                                    }
+                                    onCanceled: { dragging = false; w.dragId = ""; w.dropIndex = -1 }
                                 }
                             }
                         }
-                        // An item dragged onto it.
-                        Rectangle {
-                            objectName: "builderDropOn-" + modelData.id
-                            anchors.fill: parent
-                            visible: w.dropCategory === modelData.id
-                            color: "#33f5b940"
-                            radius: parent.radius
-                            border.color: "#f5b940"
-                            border.width: 4
-                        }
-                        Rectangle {
-                            anchors.fill: parent
-                            visible: w.dragId !== "" && w.dropIndex === index && w.dragId !== modelData.id && w.mode === "menu"
-                            color: "transparent"
-                            radius: parent.radius
-                            border.color: "#f5b940"
-                            border.width: 4
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            pressAndHoldInterval: 350
-                            property bool dragging: false
-                            preventStealing: dragging
-                            onClicked: {
-                                const id = modelData.id, b = w
-                                b.leave(() => b.pickCategory(id))
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            TouchButton {
+                                objectName: "builderAddCategory"
+                                Layout.fillWidth: true
+                                text: qsTr("+ Category")
+                                // Open: a new category's card; touched again (that card still open): closed.
+                                onClicked: {
+                                    if (w.editingCategory && w.draft && !w.draft.id) {
+                                        w.leave(() => { w.editingCategory = false; w.stage = "items" })
+                                        return
+                                    }
+                                    w.leave(() => w.editCategory(null))
+                                }
                             }
-                            onPressAndHold: m => {
-                                dragging = true
-                                w.dragId = modelData.id
-                                ghost.text = modelData.name
-                                ghost.color = modelData.color || "#4a5260"
-                                moved(m)
+                            TouchButton {
+                                objectName: "builderThemes"
+                                Layout.preferredWidth: 44
+                                text: "🎨"
+                                ToolTip.visible: hovered
+                                ToolTip.text: qsTr("Colors for every category at once")
+                                onClicked: themeDialog.open()
                             }
-                            function moved(m) {
-                                const p = mapToItem(categoryList, m.x, m.y)
-                                w.dropIndex = categoryList.indexAt(p.x + categoryList.contentX, p.y + categoryList.contentY)
-                                const g = mapToItem(ghost.parent, m.x, m.y)
-                                ghost.x = g.x - ghost.width / 2
-                                ghost.y = g.y - ghost.height / 2
+                            // Up or down among this mode's categories.
+                            TouchButton {
+                                objectName: "builderCategoryUp"
+                                Layout.preferredWidth: 44
+                                text: "▲"
+                                readonly property int at: w.categories.findIndex(c => c.id === w.categoryId)
+                                enabled: at > 0
+                                onClicked: w.moveCategoryNextTo(w.categoryId, w.categories[at - 1].id)
                             }
-                            onPositionChanged: m => { if (dragging) moved(m) }
-                            onReleased: {
-                                if (!dragging) return
-                                dragging = false
-                                const to = w.dropIndex
-                                const id = w.dragId
-                                w.dragId = ""
-                                w.dropIndex = -1
-                                if (to >= 0 && w.categories[to] && w.categories[to].id !== id)
-                                    w.pos.moveCategoryTo(id, to)
+                            TouchButton {
+                                objectName: "builderCategoryDown"
+                                Layout.preferredWidth: 44
+                                text: "▼"
+                                readonly property int at: w.categories.findIndex(c => c.id === w.categoryId)
+                                enabled: at >= 0 && at < w.categories.length - 1
+                                onClicked: w.moveCategoryNextTo(w.categoryId, w.categories[at + 1].id)
                             }
-                            onCanceled: { dragging = false; w.dragId = ""; w.dropIndex = -1 }
                         }
                     }
                 }
-                RowLayout {
-                    visible: w.mode === "menu"
-                    Layout.fillWidth: true
-                    spacing: 6
-                    TouchButton {
-                        objectName: "builderAddCategory"
-                        Layout.fillWidth: true
-                        text: qsTr("+ Category")
-                        // Open: a new category's card; touched again (that card still open): closed.
-                        onClicked: {
-                            if (w.editingCategory && w.draft && !w.draft.id) {
-                                w.leave(() => { w.editingCategory = false; w.stage = "items" })
-                                return
-                            }
-                            w.leave(() => w.editCategory(null))
-                        }
-                    }
-                    TouchButton {
-                        objectName: "builderThemes"
-                        Layout.preferredWidth: 44
-                        text: "🎨"
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Colors for every category at once")
-                        onClicked: themeDialog.open()
-                    }
-                    TouchButton { Layout.preferredWidth: 44; text: "▲"; enabled: !!w.category; onClicked: w.pos.moveCategory(w.categoryId, -1) }
-                    TouchButton { Layout.preferredWidth: 44; text: "▼"; enabled: !!w.category; onClicked: w.pos.moveCategory(w.categoryId, 1) }
+                Item {   // (the list is on the right: the keys below stay at the bottom)
+                    visible: w.mode === "menu" && w.search.trim() === "" && w.categoriesRight
+                    Layout.fillHeight: true
                 }
                 // Many at once: from a spreadsheet, or a starter menu; the
                 // printed menu. One row, or two when the words are longer
@@ -1251,7 +1351,7 @@ Item {
                                     const overColumn = categoryList.visible && c.x >= 0 && c.x < categoryList.width
                                     w.listScroll = !overColumn ? 0 : c.y < 48 ? -1 : c.y > categoryList.height - 48 ? 1 : 0
                                     const at = onList ? categoryList.indexAt(c.x + categoryList.contentX, c.y + categoryList.contentY) : -1
-                                    w.dropCategory = at >= 0 && w.categories[at].id !== w.categoryId ? w.categories[at].id : ""
+                                    w.dropCategory = at >= 0 && w.listedCategories[at].id !== w.categoryId ? w.listedCategories[at].id : ""
                                     if (w.dropCategory !== "") w.dropIndex = -1
                                     const g = mapToItem(ghost.parent, m.x, m.y)
                                     ghost.x = g.x - ghost.width / 2
@@ -1297,9 +1397,16 @@ Item {
                 Layout.fillHeight: true
                 radius: 10
                 color: "#1c2129"
+                // The categories, when no card is open (a wide screen).
+                Item {
+                    id: rightCategorySlot
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    visible: w.categoriesRight
+                }
                 Label {
                     anchors.centerIn: parent
-                    visible: !w.editingItem && !w.editingCategory && !w.editingGroup
+                    visible: !w.cardOpen && !w.categoriesRight
                     width: parent.width - 40
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
@@ -1332,6 +1439,13 @@ Item {
                         spacing: 10
 
                         TouchButton { visible: w.narrow; text: qsTr("‹ Back"); onClicked: w.stage = w.mode === "choices" ? "categories" : "items" }
+                        // A wide screen: this panel shows the categories again once the card is closed.
+                        TouchButton {
+                            objectName: "builderCardCategories"
+                            visible: !w.narrow && w.mode === "menu" && w.editingCategory
+                            text: qsTr("‹ Categories")
+                            onClicked: w.leave(() => { w.editingCategory = false; w.stage = "items" })
+                        }
 
                         // --- an item ---
                         ColumnLayout {
@@ -2374,6 +2488,33 @@ Item {
                                     placeholderText: qsTr("e.g. Tacos")
                                     onTextEdited: w.set("name", text)
                                 }
+                                // Its kind: the Menu Builder mode it's in. Moved, its items go with it.
+                                Label { text: qsTr("Kind") }
+                                RowLayout {
+                                    objectName: "builderCategoryKind"
+                                    Layout.fillWidth: true
+                                    spacing: 6
+                                    Repeater {
+                                        model: [{ id: "retail", name: qsTr("🏷️ Retail"), color: "#1f5f3a" },
+                                                { id: "hospitality", name: qsTr("🍽️ Hospitality"), color: "#3a2e5f" },
+                                                { id: "event", name: qsTr("🎟️ Event"), color: "#5e2b6b" }]
+                                        delegate: TouchButton {
+                                            required property var modelData
+                                            objectName: "builderCategoryKind-" + modelData.id
+                                            Layout.fillWidth: true
+                                            font.bold: (w.draft.scope ?? "") === modelData.id
+                                            palette.button: (w.draft.scope ?? "") === modelData.id ? modelData.color : "#222933"
+                                            text: modelData.name
+                                            onClicked: {
+                                                const d = w.copy(w.draft)
+                                                d.scope = modelData.id
+                                                // Retail is the Retail screen's only; hospitality is on the menus.
+                                                if (modelData.id !== "event") d.retailOnly = modelData.id === "retail"
+                                                w.draft = d
+                                            }
+                                        }
+                                    }
+                                }
                                 Label { text: qsTr("Color"); Layout.columnSpan: 2 }
                                 ColorPicker {
                                     objectName: "builderCategoryColor"
@@ -2472,9 +2613,11 @@ Item {
                                     ToolTip.visible: hovered
                                     ToolTip.text: qsTr("None of its items can be discounted or comped (cigarettes): set on all of them when saved.")
                                 }
-                                Label { text: qsTr("🏷 Retail screen only") }
+                                // (Retail categories always are, hospitality ones never: an event's either.)
+                                Label { text: qsTr("🏷 Retail screen only"); visible: w.draft.scope === "event" }
                                 Switch {
                                     objectName: "builderCategoryRetailOnly"
+                                    visible: w.draft.scope === "event"
                                     checked: w.draft.retailOnly === true
                                     onToggled: w.set("retailOnly", checked)
                                     ToolTip.visible: hovered
@@ -2758,6 +2901,31 @@ Item {
             for (const id of ids)
                 w.zone.controller.removeItemButtons(id)
             w.selected = []
+        }
+    }
+
+    // A category moved to another kind (Retail, Hospitality, Event): its items' marks change with it.
+    Dialog {
+        id: moveKindDialog
+        objectName: "builderMoveKind"
+        property int count: 0
+        property bool asked: false
+        readonly property string kind: w.draft.scope === "retail" ? qsTr("Retail")
+                                     : w.draft.scope === "event" ? qsTr("Event") : qsTr("Hospitality")
+        title: qsTr("Move %1 items to %2?").arg(Number(count).toLocaleString(Qt.locale(), "f", 0)).arg(kind)
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Yes | Dialog.Cancel
+        onAboutToShow: DialogWords.apply(this)
+        Label {
+            width: 460
+            wrapMode: Text.WordWrap
+            text: qsTr("%1 and its items show in the %2 mode of Menu Builder from now on.").arg(w.draft.name ?? "").arg(moveKindDialog.kind)
+        }
+        onAccepted: {
+            asked = true
+            w.saveCategoryCard()
         }
     }
 

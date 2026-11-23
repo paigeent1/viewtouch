@@ -1223,6 +1223,8 @@ QJsonObject toJson(const PosSettings &s)
                      x.insert(u"group"_s, qs(c.group));
                  if (c.retailOnly)
                      x.insert(u"retailOnly"_s, true);
+                 if (!c.scope.empty())
+                     x.insert(u"scope"_s, qs(c.scope));
                  out.append(x);
              }
              return out;
@@ -1856,6 +1858,14 @@ PosSettings settingsFromJson(const QJsonObject &o)
         cat.noDiscount = c.value(u"noDiscount").toBool();
         cat.group = ss(c.value(u"group").toString().trimmed());
         cat.retailOnly = c.value(u"retailOnly").toBool();
+        // Its kind (older settings: none, worked out from the rest; see core::categoryScope).
+        if (const std::string scope = ss(c.value(u"scope").toString().trimmed().toLower()); validScope(scope)) {
+            cat.scope = scope;
+            if (scope == kScopeRetail)
+                cat.retailOnly = true;
+            else if (scope == kScopeHospitality)
+                cat.retailOnly = false;
+        }
         if (!cat.id.empty())
             s.menuCategories.push_back(std::move(cat));
     }

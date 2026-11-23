@@ -76,7 +76,9 @@ Dialog {
                     if (importDialog.read.menuFile)
                         menu.pos.importMenuFile(importDialog.read.menuFile)
                     else
-                        menu.pos.importMenuRows(importDialog.items, menu.categoryId, updatePrices.checked)
+                        // New categories it makes: this mode's kind (Retail, Hospitality, Event).
+                        menu.pos.importMenuRows(importDialog.items.map(i => Object.assign({ scope: menu.builderScope }, i)),
+                                                menu.categoryId, updatePrices.checked)
                     importDialog.close()
                 }
             }

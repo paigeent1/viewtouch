@@ -696,7 +696,10 @@ QVariantList PosService::menuCategoriesNow() const
         else
             ++it->second;
     }
-    for (const MenuCategory &c : s_->categories()) {
+    const std::vector<MenuCategory> categories = s_->categories();
+    // Its kind (Menu Builder's mode: retail, hospitality, event): chosen, or worked out (core/menu.hh).
+    const std::map<std::string, std::string> scopes = categoryScopes(categories, s_->menu);
+    for (const MenuCategory &c : categories) {
         const auto count = std::ranges::count_if(s_->menu, [&](const MenuItem &m) { return m.family == c.id && !m.isModifier; });
         const bool isBar = bar.contains(c.id) || QString::fromStdString(c.printer).compare(u"bar"_s, Qt::CaseInsensitive) == 0;
         QVariantList barGroups;
@@ -714,6 +717,7 @@ QVariantList PosService::menuCategoriesNow() const
                                {u"taxClass"_s, qs(c.taxClass)}, {u"buttonSize"_s, qs(c.buttonSize)},
                                {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
                                {u"noDiscount"_s, c.noDiscount}, {u"retailOnly"_s, c.retailOnly},
+                               {u"scope"_s, qs(scopes.at(c.id))}, {u"scopeChosen"_s, validScope(c.scope)},
                                {u"bar"_s, isBar}, {u"barGroups"_s, barGroups}});
     }
     return out;
@@ -825,22 +829,8 @@ QVariantList PosService::menuItemsNow() const
                                    const core::scandata::ItemInfo i = scanIndex.info(m);
                                    return u"%1 x%2"_s.arg(qs(i.uom)).arg(i.units);
                                }()},
-                               {u"isEvent"_s, [&m] {
-                                   for (const RecipeLine &rl : m.recipe) {
-                                       if (rl.ingredientId == "__event__")
-                                           return rl.quantity > 0.5;
-                                   }
-                                   return m.family == "events";
-                               }()},
-                               {u"isRetail"_s, [&m] {
-                                   for (const RecipeLine &rl : m.recipe) {
-                                       if (rl.ingredientId == "__retail__")
-                                           return rl.quantity > 0.5;
-                                       if (rl.ingredientId.starts_with("__parent__:"))
-                                           return true;
-                                   }
-                                   return m.taxClass == TaxClass::Merchandise;
-                               }()},
+                               {u"isEvent"_s, itemIsEvent(m)},
+                               {u"isRetail"_s, itemIsRetail(m)},
                                {u"cost"_s, [&m] {
                                    for (const RecipeLine &rl : m.recipe)
                                        if (rl.ingredientId == "__cost__")

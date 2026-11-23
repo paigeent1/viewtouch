@@ -1443,13 +1443,7 @@ namespace {
 // A retail item (cigars, merchandise): marked retail, a single of a box, or taxed as merchandise.
 bool isRetailItem(const MenuItem &m)
 {
-    for (const RecipeLine &rl : m.recipe) {
-        if (rl.ingredientId == "__retail__")
-            return rl.quantity > 0.5;
-        if (rl.ingredientId.starts_with("__parent__:"))
-            return true;
-    }
-    return m.taxClass == TaxClass::Merchandise;
+    return itemIsRetail(m);   // core/menu.hh
 }
 } // namespace
 

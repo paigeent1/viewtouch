@@ -278,6 +278,27 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.group = ss(record.value(u"group"_s).toString().trimmed());
     if (record.contains(u"retailOnly"_s))
         c.retailOnly = record.value(u"retailOnly"_s).toBool();
+    // Its kind (Menu Builder's modes, owner 2026-11-23): retail is sold on the Retail screen only,
+    // hospitality on the menus; an event category either way. Moved to another kind, its items' marks
+    // (isRetail / isEvent) change with it (Menu Builder asks first).
+    std::string movedTo;
+    if (record.contains(u"scope"_s)) {
+        const std::string scope = ss(record.value(u"scope"_s).toString().trimmed().toLower());
+        if (!scope.empty() && !validScope(scope))
+            return fail(tr("A category is Retail, Hospitality or Event."));
+        const auto scopes = categoryScopes(list, s_->menu);   // as it was (a new one: none)
+        const auto known = scopes.find(c.id);
+        const std::string was = known != scopes.end() ? known->second : std::string();
+        c.scope = scope;
+        if (!scope.empty() && !was.empty() && scope != was)
+            movedTo = scope;
+    } else if (record.contains(u"retailOnly"_s) && (c.scope == kScopeRetail || c.scope == kScopeHospitality)) {
+        c.scope = c.retailOnly ? kScopeRetail : kScopeHospitality;   // the switch, from older screens
+    }
+    if (c.scope == kScopeRetail)
+        c.retailOnly = true;
+    else if (c.scope == kScopeHospitality)
+        c.retailOnly = false;
     if (record.contains(u"buttonSize"_s)) {
         const QString size = record.value(u"buttonSize"_s).toString();
         if (!QStringList{QString(), u"small"_s, u"medium"_s, u"large"_s}.contains(size))
@@ -308,10 +329,22 @@ bool PosService::saveCategory(const QVariantMap &record)
         *it = c;
     else
         list.push_back(c);
+    // (Last: nothing above can still refuse the save.)
+    int moved = 0;
+    if (!movedTo.empty()) {
+        for (int i = 0; i < int(s_->menu.size()); ++i) {
+            MenuItem &m = s_->menu[i];
+            if (m.family != c.id || m.isModifier || !applyScope(m, movedTo))
+                continue;
+            ++moved;
+            if (s_->sink)
+                s_->sink->saveMenuItem(m, i);
+        }
+    }
     s_->settings.menuCategories = list;
     settingsChanged();
     menuChanged();
-    emit notice(tr("Saved"));
+    emit notice(moved ? tr("Saved; %n item(s) moved with it", "", moved) : tr("Saved"));
     return true;
 }
 
@@ -1237,6 +1270,14 @@ int PosService::addMenuItemsFromText(const QString &categoryId, const QString &t
     const MenuStep step(this, tr("Add several"));
     static const QRegularExpression priced(uR"(^(.*?)[\s\-–:]*\$?\s*(\d+(?:[.,]\d{1,2})?)\s*$)"_s);
     QString category = categoryId;
+    // New categories here take the kind of the one chosen (the Menu Builder mode it was typed in).
+    std::string scope;
+    {
+        const auto cats = s_->categories();
+        const auto scopes = categoryScopes(cats, s_->menu);
+        if (const auto it = scopes.find(ss(categoryId)); it != scopes.end())
+            scope = it->second;
+    }
     struct Entry { QString category, name; double price; };
     std::vector<Entry> entries;
     QStringList problems;
@@ -1255,7 +1296,10 @@ int PosService::addMenuItemsFromText(const QString &categoryId, const QString &t
             if (c != cats.end()) {
                 category = qs(c->id);
             } else {
-                if (!saveCategory({{u"name"_s, name}}))
+                QVariantMap made{{u"name"_s, name}};
+                if (!scope.empty())
+                    made.insert(u"scope"_s, qs(scope));
+                if (!saveCategory(made))
                     return 0;
                 for (const MenuCategory &x : s_->categories())
                     if (qs(x.name) == name)
@@ -1368,7 +1412,11 @@ int PosService::importMenuRows(const QVariantList &rows, const QString &category
                 return QString::compare(qs(x.name), wanted, Qt::CaseInsensitive) == 0 || qs(x.id) == wanted;
             });
             if (c == cats.end()) {
-                if (!saveCategory({{u"name"_s, wanted}}))
+                // A new one: the kind of the Menu Builder mode it was imported in (none: worked out).
+                QVariantMap made{{u"name"_s, wanted}};
+                if (const QString scope = r.value(u"scope"_s).toString(); validScope(ss(scope)))
+                    made.insert(u"scope"_s, scope);
+                if (!saveCategory(made))
                     return added;
                 for (const MenuCategory &x : s_->categories())
                     if (qs(x.name) == wanted)
@@ -1463,6 +1511,10 @@ QVariantMap PosService::menuExport()
         return {};
     PosSettings only;
     only.menuCategories = s_->categories();
+    // Each with its kind (retail, hospitality, event), chosen or worked out: the same at the other store.
+    const std::map<std::string, std::string> scopes = categoryScopes(only.menuCategories, s_->menu);
+    for (MenuCategory &c : only.menuCategories)
+        c.scope = scopes.at(c.id);
     QJsonArray items;
     QVariantMap pictures;
     for (const MenuItem &m : s_->menu) {
@@ -1520,7 +1572,9 @@ int PosService::importMenuFile(const QVariantMap &file)
         if (!saveCategory({{u"name"_s, qs(c.name)}, {u"color"_s, qs(c.color)}, {u"periods"_s, periods},
                            {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)}, {u"taxClass"_s, qs(c.taxClass)},
                            {u"buttonSize"_s, qs(c.buttonSize)}, {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                           {u"group"_s, qs(c.group)}, {u"retailOnly"_s, c.retailOnly || !c.group.empty()}}))
+                           {u"group"_s, qs(c.group)}, {u"retailOnly"_s, c.retailOnly || !c.group.empty()},
+                           // Its kind from the file (none in older files: worked out here).
+                           {u"scope"_s, qs(c.scope)}}))
             return 0;
         for (const MenuCategory &x : s_->categories())
             if (sameName(x.name, qs(c.name)))

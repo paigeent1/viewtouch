@@ -9,8 +9,11 @@
 #include "core/money.hh"
 #include "core/tax.hh"
 
+#include <algorithm>
+#include <cctype>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace vt::core {
@@ -218,9 +221,117 @@ struct MenuCategory {
     // Its items can't be discounted or comped (cigarettes at the state minimum):
     // set on all of them when saved, and new items in it start that way.
     bool noDiscount = false;
+    // Its kind, the Menu Builder mode it's in: "retail" (the price book's departments), "hospitality"
+    // (food and drink) or "event" (tickets). Empty: not chosen yet, worked out by categoryScope().
+    // Retail is always retailOnly; hospitality never; an event category either (BH sells its tickets
+    // at the Retail counter, HCA on the bar's screens).
+    std::string scope;
 
     bool operator==(const MenuCategory &) const = default;
 };
+
+// --- a category's kind (owner, 2026-11-23: each Menu Builder mode shows its own categories only) ---
+inline constexpr const char *kScopeRetail = "retail";
+inline constexpr const char *kScopeHospitality = "hospitality";
+inline constexpr const char *kScopeEvent = "event";
+inline bool validScope(std::string_view s) { return s == kScopeRetail || s == kScopeHospitality || s == kScopeEvent; }
+
+// An event ticket: marked so (__event__), else in the "events" category.
+inline bool itemIsEvent(const MenuItem &m)
+{
+    for (const RecipeLine &rl : m.recipe)
+        if (rl.ingredientId == "__event__")
+            return rl.quantity > 0.5;
+    return m.family == "events";
+}
+// A retail item: marked so (__retail__), a single of a box (__parent__:), or taxed as merchandise.
+inline bool itemIsRetail(const MenuItem &m)
+{
+    for (const RecipeLine &rl : m.recipe) {
+        if (rl.ingredientId == "__retail__")
+            return rl.quantity > 0.5;
+        if (rl.ingredientId.starts_with("__parent__:"))
+            return true;
+    }
+    return m.taxClass == TaxClass::Merchandise;
+}
+
+// A word of the text starting with "event" ("Events", "event-tickets", "EVENT TICKETS"; not "Prevention").
+inline bool namesEvent(std::string_view text)
+{
+    std::string word;
+    const auto check = [&] { return word.starts_with("event"); };
+    for (const char ch : text) {
+        const auto c = static_cast<unsigned char>(ch);
+        if (std::isalnum(c)) {
+            word += char(std::tolower(c));
+            continue;
+        }
+        if (check())
+            return true;
+        word.clear();
+    }
+    return check();
+}
+
+// A category's kind: the one chosen; else event (a word of its name or id starts with "event", or most of
+// its items are tickets), retail (sold on the Retail screen only, or a price book department), hospitality.
+// `items`: its items (not modifiers); `events`: how many of them are event tickets.
+inline std::string categoryScope(const MenuCategory &c, int items = 0, int events = 0)
+{
+    if (validScope(c.scope))
+        return c.scope;
+    if (namesEvent(c.name) || namesEvent(c.id) || (items > 0 && 2 * events > items))
+        return kScopeEvent;
+    if (c.retailOnly || !c.group.empty())
+        return kScopeRetail;
+    return kScopeHospitality;
+}
+// Every category's kind, by id (one pass over the items).
+inline std::map<std::string, std::string> categoryScopes(const std::vector<MenuCategory> &categories,
+                                                         const std::vector<MenuItem> &menu)
+{
+    std::map<std::string, std::pair<int, int>> counts;   // family -> items, tickets
+    for (const MenuItem &m : menu) {
+        if (m.isModifier)
+            continue;
+        auto &[n, e] = counts[m.family];
+        ++n;
+        e += itemIsEvent(m) ? 1 : 0;
+    }
+    std::map<std::string, std::string> out;
+    for (const MenuCategory &c : categories) {
+        const auto it = counts.find(c.id);
+        out[c.id] = it == counts.end() ? categoryScope(c) : categoryScope(c, it->second.first, it->second.second);
+    }
+    return out;
+}
+// The categories of one kind, in the menu's order.
+inline std::vector<MenuCategory> categoriesOfScope(const std::vector<MenuCategory> &categories,
+                                                   const std::vector<MenuItem> &menu, std::string_view scope)
+{
+    const auto scopes = categoryScopes(categories, menu);
+    std::vector<MenuCategory> out;
+    for (const MenuCategory &c : categories)
+        if (scopes.at(c.id) == scope)
+            out.push_back(c);
+    return out;
+}
+// An item moved to a category of this kind: its marks to match (retail: retail, not a ticket; hospitality:
+// neither; event: a ticket, retail as it was, so a ticket rung at the Retail counter still goes nowhere
+// near the kitchen). The marks go first in its recipe, so they win over a box's single (__parent__:).
+// True: changed.
+inline bool applyScope(MenuItem &m, std::string_view scope)
+{
+    const bool wasRetail = itemIsRetail(m), wasEvent = itemIsEvent(m);
+    const bool retail = scope == kScopeRetail || (scope == kScopeEvent && wasRetail);
+    const bool event = scope == kScopeEvent;
+    if (!validScope(scope) || (retail == wasRetail && event == wasEvent))
+        return false;
+    std::erase_if(m.recipe, [](const RecipeLine &rl) { return rl.ingredientId == "__retail__" || rl.ingredientId == "__event__"; });
+    m.recipe.insert(m.recipe.begin(), {{"__retail__", retail ? 1.0 : 0.0}, {"__event__", event ? 1.0 : 0.0}});
+    return true;
+}
 
 // Choices asked for when an item is ordered: "Temperature" (exactly one),
 // "Toppings" (up to three)... `min` choices are required; `max` is the most

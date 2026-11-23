@@ -255,6 +255,10 @@
   "one": "Save %n change",
   "other": "Save %n changes"
  },
+ "Saved; %n item(s) moved with it": {
+  "one": "Saved; %n item moved with it",
+  "other": "Saved; %n items moved with it"
+ },
  "Tips start after two weeks of sales (%n day(s) so far).": {
   "one": "Tips start after two weeks of sales (%n day so far).",
   "other": "Tips start after two weeks of sales (%n days so far)."

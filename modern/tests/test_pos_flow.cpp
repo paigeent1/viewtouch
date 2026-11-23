@@ -7461,7 +7461,7 @@ TEST_CASE("UI: Menu Builder: find an item, its More settings, prices up for a ca
     s.tapItem(by(u"builderSearch"_s));
     type("212");
     CHECK(shown(u"builderFound-cheeseburger"_s));
-    CHECK_FALSE(shown(u"builderCategory-burgers"_s));
+    CHECK(shown(u"builderCategory-burgers"_s));   // the categories stay in the right-hand panel (owner, 2026-11-23)
     s.tapItem(by(u"builderFound-cheeseburger"_s));
     QTest::qWait(60);
     REQUIRE(by(u"builderName"_s));
