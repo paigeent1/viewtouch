@@ -100,11 +100,11 @@ bool onRequest(const QString &key)
     // scans and typed numbers ask the main computer (itemForCode), so only the screens that list the
     // items (Menu Builder, the menu grid, Sold Out) ask for it.
     // The Labels screen and Item Look Up (retailLabels) likewise: only to a screen showing one.
-    // Menu Builder's own list (builderItems) too.
+    // Menu Builder's own list (builderItems) and its tree (builderTree) too.
     // Find's answer (itemSearch) too.
     // Find a Tablet's list (tablets) too.
     // Quick Label's (quickLabel, with its picture) too.
-    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"itemSearch"
+    return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"builderTree" || key == u"itemSearch"
            || key == u"tablets" || key == u"exceptionSearch";
 }
 

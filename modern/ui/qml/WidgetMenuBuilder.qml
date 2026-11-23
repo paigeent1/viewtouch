@@ -83,28 +83,64 @@ Item {
         property var asked: null
         function ask() {
             if (asked === p) return
-            if (asked) asked.want("builderItems", false)
+            if (asked) { asked.want("builderItems", false); asked.want("builderTree", false) }
             asked = p
-            if (p) p.want("builderItems", true)
+            if (p) { p.want("builderItems", true); p.want("builderTree", true) }
             w.refreshItems()
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) asked.want("builderItems", false)
+        Component.onDestruction: if (asked) { asked.want("builderItems", false); asked.want("builderTree", false) }
     }
     property var allItems: []
     function refreshItems() { allItems = pos ? pos.builderItems.filter(i => !i.modifier) : [] }
     readonly property string builderRevision: pos ? pos.builderRevision : ""
     onBuilderRevisionChanged: refreshItems()
+    // The items by id (made once per list, so nothing below walks the whole list for one item).
+    readonly property var itemById: {
+        const o = {}
+        for (const i of allItems) o[i.id] = i
+        return o
+    }
+    // A big price book department opens as a tree (owner, 2026-11-23), like the Labels screen: one level at a
+    // time (brand, product group, sub group), its items only on Show Items or at the bottom, at most 300 of
+    // them. The main computer sends only that level (builderTree; builderItems has its items).
+    readonly property var builderTree: pos && pos.builderTree ? pos.builderTree : ({})
+    property var treePath: []          // the level open: [brand, product group, sub group]
+    property bool treeShowItems: false // Show Items on it
+    readonly property bool treeHere: builderTree.tree === true && builderTree.category === categoryId
+    readonly property bool treeLevels: treeHere && builderTree.showingItems !== true   // its next level listed
+    readonly property bool treePartial: builderTree.partial === true && builderTree.category === categoryId
+    readonly property var treeChildren: treeHere ? (builderTree.children ?? []) : []
+    readonly property bool treeCanGoBack: treeHere && (treePath.length > 0 || (treeShowItems && treeChildren.length > 0))
+    function treeOpen(name) { treePath = treePath.concat([name]); treeShowItems = false }
+    function treeBack() {
+        if (treeShowItems && treeChildren.length > 0) { treeShowItems = false; return }
+        treePath = treePath.slice(0, -1)
+        treeShowItems = false
+    }
+    onCategoryIdChanged: { treePath = []; treeShowItems = false }
+    // A level that's gone meanwhile (a brand renamed): the main computer opened as much of it as is there.
+    onBuilderTreeChanged: {
+        const t = builderTree
+        if (t.tree === true && t.category === categoryId && t.path && t.asked
+            && JSON.stringify(t.asked) === JSON.stringify(treePath) && t.path.length < treePath.length)
+            treePath = t.path.slice()
+    }
     // What this screen shows, told to the main computer (the search a moment after the last key).
     readonly property var builderView: [categoryId, editingItem ? (draft.id ?? "") : "",
-                                        editingItem ? (draft.parentUpc ?? "") : ""]
+                                        editingItem ? (draft.parentUpc ?? "") : "", treePath, treeShowItems, builderScope]
     onBuilderViewChanged: tellView.restart()
     onSearchChanged: tellView.restart()
+    function tell() {
+        if (w.pos)
+            w.pos.setBuilderView(w.builderView[0], w.search, w.builderView[1], w.builderView[2],
+                                 { path: w.treePath, showItems: w.treeShowItems, scope: w.builderScope })
+    }
     Timer {
         id: tellView
         interval: 250
-        onTriggered: if (w.pos) w.pos.setBuilderView(w.builderView[0], w.search, w.builderView[1], w.builderView[2])
+        onTriggered: w.tell()
     }
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 340 : 1180) : 1
@@ -151,7 +187,16 @@ Item {
     property string builderScope: "hospitality"
     readonly property bool eventMode: builderScope === "event"   // "hospitality" | "retail"
     readonly property bool retailMode: builderScope === "retail"
-    readonly property var items: allItems.filter(i => i.family === categoryId)
+    // The open category's items (a big department's: the ones of the level shown only, not what the
+    // search or the card brought along).
+    readonly property var items: {
+        if (treePartial) {
+            if (treeLevels) return []
+            const shown = new Set(builderTree.shownIds ?? [])
+            return allItems.filter(i => i.family === categoryId && shown.has(i.id))
+        }
+        return allItems.filter(i => i.family === categoryId)
+    }
     property string itemId: ""        // "" + editingItem: a new one
     property bool editingItem: false
     property bool editingCategory: false
@@ -495,9 +540,14 @@ Item {
     property bool moreOpen: false
     // Find an item anywhere on the menu (its name, or its number).
     property string search: ""
+    // The main computer searches (its index: this mode's categories, a UPC looked up, at most 200);
+    // until its answer comes, what this screen has.
+    readonly property bool foundByServer: builderTree.found !== undefined && builderTree.search === search.trim()
     readonly property var found: {
         const t = search.trim().toLowerCase()
         if (t === "") return []
+        if (foundByServer)
+            return builderTree.found.map(id => itemById[id]).filter(i => i !== undefined)
         const mine = new Set(categories.map(c => c.id))   // this mode's categories only
         return allItems.filter(i => mine.has(i.family) && (i.name.toLowerCase().includes(t) || (i.number !== "" && i.number === t))).slice(0, 30)
     }
@@ -747,6 +797,18 @@ Item {
                         visible: w.found.length === 0
                         text: qsTr("Nothing on the menu by that name.")
                         opacity: 0.6
+                    }
+                    // At most 200 found: the first ones, and a word to type more.
+                    footer: Label {
+                        objectName: "builderFoundNote"
+                        width: foundList.width
+                        visible: w.foundByServer && text !== ""
+                        height: visible ? implicitHeight + 8 : 0
+                        topPadding: 8
+                        wrapMode: Text.WordWrap
+                        text: w.builderTree.foundNote ?? ""
+                        color: "#f5b940"
+                        font.pixelSize: 14
                     }
                 }
                 // Choice groups: every one, its rule and who uses it.
@@ -1080,7 +1142,17 @@ Item {
                         <= width - (backKey.visible ? backKey.implicitWidth + spacing : 0)
                            - pricesKey.implicitWidth - severalKey.implicitWidth - editCategoryKey.implicitWidth - 3 * spacing
                     Layout.fillWidth: true
-                    TouchButton { id: backKey; visible: w.narrow; text: qsTr("‹ Categories"); onClicked: w.stage = "categories" }
+                    // (In a big department's tree: up one level first.)
+                    TouchButton {
+                        id: backKey
+                        objectName: "builderBack"
+                        visible: w.narrow || w.treeCanGoBack
+                        text: w.treeCanGoBack ? qsTr("‹ Back") : qsTr("‹ Categories")
+                        onClicked: {
+                            if (w.treeCanGoBack) w.treeBack()
+                            else w.stage = "categories"
+                        }
+                    }
                     Label {
                         Layout.fillWidth: true
                         text: categoryHeader.nameFits ? categoryName.text : ""
@@ -1117,6 +1189,7 @@ Item {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                         text: w.selecting ? qsTr("Touch the items to change together.")
+                            : w.treePartial ? (w.items.length > 0 && !w.narrow ? qsTr("Hold one and drag it onto a category to move it.") : "")
                             : w.items.length > 1 ? (w.narrow ? qsTr("Hold one and drag it to move it (the order screen follows).")
                                                              : qsTr("Hold one and drag it to move it, or onto a category."))
                             : ""
@@ -1231,10 +1304,87 @@ Item {
                         onClicked: removeSeveral.open()
                     }
                 }
+                // A big department: where in its tree (Category › Brand › …), and what's shown.
+                Label {
+                    objectName: "builderTreePath"
+                    visible: w.treeHere && w.treePath.length > 0
+                    Layout.fillWidth: true
+                    text: w.treePath.join("  ›  ")
+                    font.pixelSize: 16
+                    font.bold: true
+                    elide: Text.ElideMiddle
+                }
+                Label {
+                    objectName: "builderTreeNote"
+                    visible: w.treeHere && text !== ""
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: w.builderTree.note ?? ""
+                    color: "#f5b940"
+                    font.pixelSize: 14
+                }
+                // Its next level (brands, then product groups, sub groups), each with how many items,
+                // and Show Items for everything on this level.
+                ListView {
+                    id: treeList
+                    objectName: "builderTreeLevels"
+                    visible: w.treeLevels
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 6
+                    model: w.treeLevels ? w.treeChildren : []
+                    header: Column {
+                        width: treeList.width
+                        spacing: 6
+                        bottomPadding: 6
+                        TouchButton {
+                            objectName: "builderTreeShowItems"
+                            width: parent.width
+                            text: qsTr("Show Items (%1)").arg(Number(w.builderTree.count ?? 0).toLocaleString(Qt.locale(), "f", 0))
+                            onClicked: w.treeShowItems = true
+                        }
+                        Label {
+                            text: w.builderTree.levelTitle ?? ""
+                            visible: text !== ""
+                            font.pixelSize: 15
+                            opacity: 0.7
+                        }
+                    }
+                    delegate: Rectangle {
+                        required property var modelData
+                        objectName: "builderTreeLevel-" + modelData.name
+                        width: treeList.width
+                        height: 56
+                        radius: 8
+                        color: "#232933"
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 10
+                            Label {
+                                Layout.fillWidth: true
+                                text: modelData.name
+                                font.pixelSize: 18
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+                            Label {
+                                text: Number(modelData.count).toLocaleString(Qt.locale(), "f", 0) + "  ›"
+                                font.pixelSize: 15
+                                opacity: 0.7
+                            }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: w.treeOpen(modelData.name)
+                        }
+                    }
+                }
                 // Preview: this category on the order screen (its menu area, scaled down).
                 Rectangle {
                     objectName: "builderPreviewPane"
-                    visible: w.preview && !w.selecting
+                    visible: w.preview && !w.selecting && !w.treeLevels
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: "#14171c"
@@ -1258,10 +1408,12 @@ Item {
                 }
                 GridView {
                     id: itemGrid
-                    visible: !w.preview || w.selecting
+                    visible: !w.preview || w.selecting || w.treeLevels
                     interactive: w.dragId === ""
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    // (Under a tree's level list: just + Add Item.)
+                    Layout.fillHeight: !w.treeLevels
+                    Layout.preferredHeight: w.treeLevels ? cellHeight : -1
                     clip: true
                     cellWidth: width / 2
                     cellHeight: 96
@@ -1370,7 +1522,7 @@ Item {
                                     w.listScroll = 0
                                     if (onto !== "")
                                         w.pos.saveMenuItemCard({ id: id, name: name, family: onto })
-                                    else if (to >= 0 && to < w.items.length && w.items[to].id !== id)
+                                    else if (!w.treePartial && to >= 0 && to < w.items.length && w.items[to].id !== id)   // (not among some of a big department's)
                                         w.pos.moveMenuItemTo(id, to)
                                 }
                                 onCanceled: { dragging = false; w.dragId = ""; w.dropIndex = -1; w.dropCategory = ""; w.listScroll = 0 }

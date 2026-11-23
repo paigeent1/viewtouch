@@ -5,6 +5,7 @@
 #include "storage/pos_store.hh"
 #include "qt_catch.hh"
 #include <QJsonArray>
+#include <algorithm>
 #include <cmath>
 #include <random>
 
@@ -1237,4 +1238,192 @@ TEST_CASE("Category kinds: imported categories", "[menubuilder][scope]")
     other.importMenuFile(file);
     CHECK(idsOfScope(other, u"retail"_s) == QStringList{u"accessories"_s});
     CHECK(idsOfScope(other, u"event"_s) == QStringList({u"events"_s, u"gala-events"_s}));
+}
+
+// --- a big price book department opens as a tree (owner, 2026-11-23: "pressing premium cigars on the
+// menu builder is taking forever": 21,585 items were sent to the screen at once) ---
+
+namespace {
+
+// 20,000 items in one Retail department over four brands: ALPHA (9,000, in two product groups), BRAVO
+// (9,000), CHARLIE (1,880) and DELTA (120).
+app::PosData bigDepartment()
+{
+    app::PosData data = test::seedPosData();
+    core::MenuCategory dept;
+    dept.id = "big-dept";
+    dept.name = "BIG DEPARTMENT";
+    dept.retailOnly = true;
+    dept.scope = "retail";
+    data.settings.menuCategories.push_back(dept);
+    for (int i = 0; i < 20000; ++i) {
+        core::MenuItem m;
+        m.id = "pb-" + std::to_string(i);
+        const char *brand = i < 9000 ? "ALPHA" : i < 18000 ? "BRAVO" : i < 19880 ? "CHARLIE" : "DELTA";
+        m.manufacturer = brand;
+        m.name = std::string(brand) + " STICK " + std::to_string(i);
+        m.family = "big-dept";
+        m.taxClass = core::TaxClass::Merchandise;
+        if (i < 9000)
+            m.productGroup = i % 2 ? "TORO" : "ROBUSTO";
+        m.barcodes = {std::to_string(800000000000LL + i)};
+        m.price = Money::fromCents(1000);
+        data.menu.push_back(m);
+    }
+    return data;
+}
+
+QVariantMap treeView(const QStringList &path, bool showItems, const QString &scope = u"retail"_s)
+{
+    return {{u"path"_s, path}, {u"showItems"_s, showItems}, {u"scope"_s, scope}};
+}
+
+QVariantList inFamily(const QVariantList &items, const QString &family)
+{
+    QVariantList out;
+    for (const QVariant &v : items)
+        if (v.toMap()[u"family"_s] == family)
+            out << v;
+    return out;
+}
+
+QStringList names(const QVariantList &items)
+{
+    QStringList out;
+    for (const QVariant &v : items)
+        out << v.toMap()[u"name"_s].toString();
+    return out;
+}
+
+bool allNamed(const QVariantList &items, const QString &start)
+{
+    return std::ranges::all_of(items, [&](const QVariant &v) { return v.toMap()[u"name"_s].toString().startsWith(start); });
+}
+
+} // namespace
+
+TEST_CASE("Menu Builder: a big department opens as a tree, and sends one level at a time", "[menubuilder][buildertree]")
+{
+    PosService pos(bigDepartment(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    const QString dept = u"big-dept"_s;
+    // Closed: none of its items.
+    CHECK(inFamily(pos.builderItems(), dept).isEmpty());
+
+    // Opened: its brands with how many items each, no items yet.
+    const QString before = pos.builderRevision();
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({}, false)));
+    QVariantMap tree = pos.builderTree();
+    CHECK(tree[u"tree"_s].toBool());
+    CHECK(tree[u"category"_s] == dept);
+    CHECK(tree[u"count"_s].toInt() == 20000);
+    QVariantList children = tree[u"children"_s].toList();
+    REQUIRE(children.size() == 4);
+    CHECK(children[0].toMap()[u"name"_s] == u"ALPHA"_s);
+    CHECK(children[0].toMap()[u"count"_s].toInt() == 9000);
+    CHECK(children[3].toMap()[u"name"_s] == u"DELTA"_s);
+    CHECK(children[3].toMap()[u"count"_s].toInt() == 120);
+    CHECK_FALSE(tree[u"showingItems"_s].toBool());
+    CHECK(inFamily(pos.builderItems(), dept).isEmpty());
+
+    // Show Items on the whole department: at most 300, and a plain word about the rest.
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({}, true)));
+    CHECK(pos.builderRevision() != before);
+    tree = pos.builderTree();
+    CHECK(tree[u"showingItems"_s].toBool());
+    CHECK(inFamily(pos.builderItems(), dept).size() == PosService::kBuilderShowCap);
+    CHECK(tree[u"shownIds"_s].toStringList().size() == PosService::kBuilderShowCap);
+    CHECK(tree[u"note"_s].toString().contains(u"300"_s));
+    CHECK(tree[u"note"_s].toString().contains(u"brand"_s));
+
+    // A small brand: all of its items, only its, straight away (the bottom of the tree).
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({u"DELTA"_s}, false)));
+    tree = pos.builderTree();
+    QVariantList shown = inFamily(pos.builderItems(), dept);
+    CHECK(shown.size() == 120);
+    CHECK(allNamed(shown, u"DELTA "_s));
+    CHECK(tree[u"showingItems"_s].toBool());
+    CHECK(tree[u"note"_s].toString().isEmpty());
+    // A big brand with no more levels: its first 300, only its.
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({u"BRAVO"_s}, false)));
+    shown = inFamily(pos.builderItems(), dept);
+    CHECK(shown.size() == PosService::kBuilderShowCap);
+    CHECK(allNamed(shown, u"BRAVO "_s));
+    // A brand with product groups: those next, then a product group's items.
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({u"ALPHA"_s}, false)));
+    tree = pos.builderTree();
+    CHECK(tree[u"children"_s].toList().size() == 2);
+    CHECK(tree[u"levelTitle"_s] == u"Product groups"_s);
+    CHECK(inFamily(pos.builderItems(), dept).isEmpty());
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({u"ALPHA"_s, u"TORO"_s}, false)));
+    shown = inFamily(pos.builderItems(), dept);
+    CHECK(shown.size() == PosService::kBuilderShowCap);
+    CHECK(allNamed(shown, u"ALPHA "_s));
+    // A level that's gone: as much of it as is there.
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString(), treeView({u"ALPHA"_s, u"GONE"_s}, false)));
+    tree = pos.builderTree();
+    CHECK(tree[u"path"_s].toStringList() == QStringList{u"ALPHA"_s});
+    CHECK(tree[u"asked"_s].toStringList() == QStringList({u"ALPHA"_s, u"GONE"_s}));
+
+    // The item on the card comes along, wherever it is.
+    REQUIRE(pos.setBuilderView(dept, QString(), u"pb-5"_s, QString(), treeView({u"DELTA"_s}, false)));
+    CHECK(names(inFamily(pos.builderItems(), dept)).contains(u"ALPHA STICK 5"_s));
+    CHECK_FALSE(pos.builderTree()[u"shownIds"_s].toStringList().contains(u"pb-5"_s));   // (not shown among DELTA's)
+}
+
+TEST_CASE("Menu Builder: the search uses the index - a UPC exactly, names capped, this mode only", "[menubuilder][buildertree]")
+{
+    PosService pos(bigDepartment(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    const QString dept = u"big-dept"_s;
+    // A UPC: the one item.
+    REQUIRE(pos.setBuilderView(QString(), u"800000012345"_s, QString(), QString(), treeView({}, false)));
+    QVariantMap tree = pos.builderTree();
+    CHECK(tree[u"found"_s].toStringList() == QStringList{u"pb-12345"_s});
+    CHECK(names(inFamily(pos.builderItems(), dept)) == QStringList{u"BRAVO STICK 12345"_s});
+    // (as an EAN-13, a 0 in front)
+    REQUIRE(pos.setBuilderView(QString(), u"0800000012345"_s, QString(), QString(), treeView({}, false)));
+    CHECK(pos.builderTree()[u"found"_s].toStringList() == QStringList{u"pb-12345"_s});
+    // A name: the first 200, and a word to type more.
+    REQUIRE(pos.setBuilderView(QString(), u"stick"_s, QString(), QString(), treeView({}, false)));
+    tree = pos.builderTree();
+    CHECK(tree[u"found"_s].toStringList().size() == PosService::kBuilderFindCap);
+    CHECK(tree[u"foundMore"_s].toBool());
+    CHECK_FALSE(tree[u"foundNote"_s].toString().isEmpty());
+    CHECK(inFamily(pos.builderItems(), dept).size() == PosService::kBuilderFindCap);
+    REQUIRE(pos.setBuilderView(QString(), u"delta stick 1999"_s, QString(), QString(), treeView({}, false)));
+    CHECK(pos.builderTree()[u"found"_s].toStringList().size() == 10);   // 19990..19999
+    CHECK_FALSE(pos.builderTree()[u"foundMore"_s].toBool());
+    // In Hospitality: the department isn't looked in.
+    REQUIRE(pos.setBuilderView(QString(), u"800000012345"_s, QString(), QString(), treeView({}, false, u"hospitality"_s)));
+    CHECK(pos.builderTree()[u"found"_s].toStringList().isEmpty());
+    CHECK(inFamily(pos.builderItems(), dept).isEmpty());
+}
+
+TEST_CASE("Menu Builder: small and hospitality categories as before; an older screen still gets a big one's first items", "[menubuilder][buildertree]")
+{
+    PosService pos(bigDepartment(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    const QString dept = u"big-dept"_s;
+    // A hospitality category: all its items straight away, no tree.
+    const QString food = idsOfScope(pos, u"hospitality"_s).value(0);
+    REQUIRE_FALSE(food.isEmpty());
+    REQUIRE(pos.setBuilderView(food, QString(), QString(), QString(), treeView({}, false, u"hospitality"_s)));
+    CHECK(inFamily(pos.builderItems(), food).size() == inFamily(pos.menuItems(), food).size());
+    CHECK_FALSE(pos.builderTree()[u"tree"_s].toBool());
+    CHECK_FALSE(pos.builderTree()[u"partial"_s].toBool());
+    // The whole menu less the department: every other item still there.
+    CHECK(pos.builderItems().size() == pos.menuItems().size() - 20000);
+    // A small Retail category: all of it, no tree.
+    REQUIRE(pos.saveCategory({{u"name"_s, u"LIGHTERS"_s}, {u"scope"_s, u"retail"_s}}));
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Zippo"_s}, {u"price"_s, u"22.50"_s}, {u"family"_s, u"lighters"_s}}));
+    REQUIRE(pos.setBuilderView(u"lighters"_s, QString(), QString(), QString(), treeView({}, false)));
+    CHECK(names(inFamily(pos.builderItems(), u"lighters"_s)) == QStringList{u"Zippo"_s});
+    CHECK_FALSE(pos.builderTree()[u"tree"_s].toBool());
+    // An older screen (no tree): the big department's first 300, and its search as before.
+    REQUIRE(pos.setBuilderView(dept, QString(), QString(), QString()));
+    CHECK(inFamily(pos.builderItems(), dept).size() == PosService::kBuilderShowCap);
+    CHECK_FALSE(pos.builderTree()[u"tree"_s].toBool());
+    REQUIRE(pos.setBuilderView(QString(), u"800000012345"_s, QString(), QString()));
+    CHECK(names(inFamily(pos.builderItems(), dept)) == QStringList{u"BRAVO STICK 12345"_s});
 }

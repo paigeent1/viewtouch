@@ -1,4 +1,5 @@
-set(VTM_TEST_SOURCES test_money.cpp test_check.cpp test_scan_data.cpp test_price_check.cpp)
+set(VTM_TEST_SOURCES test_money.cpp test_check.cpp test_scan_data.cpp test_price_check.cpp
+    test_builder_index.cpp)   # Menu Builder's quick index (core/builder_index.hh)
 if(TARGET vtm_layout)
     list(APPEND VTM_TEST_SOURCES
         main.cpp   # QCoreApplication for Qt plugins

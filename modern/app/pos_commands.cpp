@@ -85,7 +85,8 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"findRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findRetailLabels(a.value(0).toString())); }},
         {u"findItems"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.findItems(a.value(0).toString(), a.size() > 1 ? a.value(1).toInt() : 50)); }},
         {u"setBuilderView"_s, [](PosService &p, const QVariantList &a) {
-             return QVariant(p.setBuilderView(a.value(0).toString(), a.value(1).toString(), a.value(2).toString(), a.value(3).toString()));
+             return QVariant(p.setBuilderView(a.value(0).toString(), a.value(1).toString(), a.value(2).toString(), a.value(3).toString(),
+                                              a.value(4).toMap()));
          }},
         {u"browseRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.browseRetailLabels(a.value(0).toStringList())); }},
         {u"printRetailLabels"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.printRetailLabels(a.value(0).toMap())); }},

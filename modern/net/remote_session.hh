@@ -226,6 +226,7 @@ public:
     QVariantList orderItems() const override { return v(u"orderItems").toList(); }
     QVariantList builderItems() const override { return v(u"builderItems").toList(); }
     QString builderRevision() const override { return v(u"builderRevision").toString(); }
+    QVariantMap builderTree() const override { return v(u"builderTree").toMap(); }
     QVariantList menuCategories() const override { return v(u"menuCategories").toList(); }
     QVariantList choiceGroups() const override { return v(u"choiceGroups").toList(); }
     QVariantList menuTemplates() const override { return v(u"menuTemplates").toList(); }

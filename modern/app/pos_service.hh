@@ -631,6 +631,9 @@ public:
     // another way (13 digits with a 0 in front: a scanner reading it as an
     // EAN-13; 11 digits: the check digit left off).
     static bool sameBarcode(const std::string &stored, const std::string &scanned);
+    // An item's place in the label tree below its category: brand, then product group, sub group (when it
+    // has them). The Labels screen's tree and Menu Builder's tree of a price book department.
+    static QStringList labelPathBelowCategory(const core::MenuItem &m);
     QString format(Money amount) const;
 
     // --- session -----------------------------------------------------------
@@ -1275,7 +1278,15 @@ public:
     QVariantList orderItems() const override;
     QVariantList builderItems() const override;
     QString builderRevision() const override;
-    bool setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc);
+    QVariantMap builderTree() const override;
+    // `view` (newer screens): {path: the level open below a price book department, showItems, scope: the
+    // Menu Builder mode}. None (an older screen): a big department's first items, its search as before.
+    bool setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc,
+                        const QVariantMap &view = {});
+    // Menu Builder shows at most this many items of a big price book department at once (a level's
+    // Show Items), and finds at most kBuilderFindCap with its search.
+    static constexpr int kBuilderShowCap = 300;
+    static constexpr int kBuilderFindCap = 200;
     QVariantList menuCategories() const override;
     QVariantList choiceGroups() const override;
     // The Menu Builder (pos_menu_builder.cpp).
@@ -1353,6 +1364,18 @@ public:
     mutable int menuItemsCacheRevision_ = -1;
     // Menu Builder's view (setBuilderView): what builderItems adds to the menu less the price book.
     QString builderCategory_, builderSearch_, builderItem_, builderParent_;
+    QStringList builderPath_;            // the level open below a big department ([brand, product group...])
+    QString builderScope_;               // the screen's mode (retail, hospitality, event): its search looks there
+    bool builderShowItems_ = false;      // Show Items on that level
+    bool builderTreeAware_ = false;      // the screen shows the tree (an older one: never told so)
+    // Menu Builder's quick index (core/builder_index.hh), once per menu change, and what this screen's
+    // view picks from it (pos_menu.cpp).
+    struct BuilderCache;
+    mutable std::shared_ptr<BuilderCache> builderCache_;
+    const BuilderCache &builderCache() const;
+    struct BuilderPick;
+    mutable std::shared_ptr<BuilderPick> builderPick_;
+    const BuilderPick &builderPick() const;
     bool builderViewChanging_ = false;   // its adminChanged leaves the item list's cache alone
     int adminTicks_ = 0;                 // menu changes seen here (sold out, availability...): in builderRevision
     mutable std::size_t menuItemsCacheSize_ = 0;

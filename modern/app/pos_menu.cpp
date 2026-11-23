@@ -3,13 +3,16 @@
 
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
+#include "core/builder_index.hh"
 
 #include <QPointer>
 #include <QRegularExpression>
 #include <QThreadPool>
 
 #include <QDateTime>
+#include <QLocale>
 
+#include <algorithm>
 #include <unordered_set>
 
 using namespace Qt::StringLiterals;
@@ -742,17 +745,28 @@ QVariantList PosService::orderItemsNow() const
     return out;
 }
 
-bool PosService::setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc)
+bool PosService::setBuilderView(const QString &categoryId, const QString &search, const QString &itemId, const QString &parentUpc,
+                                const QVariantMap &view)
 {
     const QString s = search.trimmed();
-    if (categoryId == builderCategory_ && s == builderSearch_ && itemId == builderItem_ && parentUpc.trimmed() == builderParent_)
+    // A newer screen says where it is in a big department's tree; an older one says nothing (view empty).
+    const bool aware = !view.isEmpty();
+    const QStringList path = view.value(u"path"_s).toStringList().mid(0, 3);
+    const bool showItems = view.value(u"showItems"_s).toBool();
+    const QString scope = view.value(u"scope"_s).toString().trimmed().toLower();
+    if (categoryId == builderCategory_ && s == builderSearch_ && itemId == builderItem_ && parentUpc.trimmed() == builderParent_
+        && aware == builderTreeAware_ && path == builderPath_ && showItems == builderShowItems_ && scope == builderScope_)
         return true;
     builderCategory_ = categoryId;
     builderSearch_ = s;
     builderItem_ = itemId;
     builderParent_ = parentUpc.trimmed();
+    builderTreeAware_ = aware;
+    builderPath_ = path;
+    builderShowItems_ = showItems;
+    builderScope_ = scope;
     builderViewChanging_ = true;
-    emit adminChanged();   // this screen's builderItems / builderRevision (this session only)
+    emit adminChanged();   // this screen's builderItems / builderTree / builderRevision (this session only)
     builderViewChanging_ = false;
     return true;
 }
@@ -762,7 +776,187 @@ QString PosService::builderRevision() const
     if (!user())
         return {};
     return u"%1:%2:%3:%4:%5|%6|%7|%8|%9"_s.arg(s_->serial).arg(s_->adminRevision).arg(s_->menu.size()).arg(adminTicks_)
-        .arg(language(), builderCategory_, builderSearch_, builderItem_, builderParent_);
+        .arg(language(), builderCategory_, builderSearch_, builderItem_, builderParent_)
+        + u"|"_s + builderPath_.join(QChar(0x1f)) + u"|"_s + builderScope_
+        + (builderShowItems_ ? u"|items"_s : u"|"_s) + (builderTreeAware_ ? u"|tree"_s : u"|"_s);
+}
+
+// Menu Builder's quick index (owner, 2026-11-23: opening a 21,000-item price book department took ages):
+// made once per menu change. Which categories are held back from the list (the Retail-screen-only ones,
+// and any Retail department too big to show at once) and which of those open as a tree.
+struct PosService::BuilderCache {
+    std::uint64_t shared = 0;
+    int revision = -1;
+    std::size_t size = 0;
+    std::string categoriesKey;
+    std::uint64_t generation = 0;
+    core::BuilderIndex index;
+    std::map<std::string, std::string> scopes;      // category id -> its kind (Menu Builder's mode)
+    std::vector<std::string> order;                 // the categories, in the menu's order
+    std::unordered_set<std::string> heldBack;       // sent only when open, searched for, or on the card
+    std::unordered_set<std::string> big;            // a big Retail department: opens as a tree
+    std::vector<std::uint32_t> always;              // every other item, in menu order
+};
+
+const PosService::BuilderCache &PosService::builderCache() const
+{
+    if (!builderCache_)
+        builderCache_ = std::make_shared<BuilderCache>();
+    BuilderCache &x = *builderCache_;
+    // (The categories the menu's items make up themselves change only with the menu.)
+    std::string key;
+    for (const MenuCategory &c : s_->settings.menuCategories) {
+        for (const std::string *part : {&c.id, &c.name, &c.scope, &c.group}) {
+            key += *part;
+            key += '\x1f';
+        }
+        key += c.retailOnly ? "1\x1e" : "0\x1e";
+    }
+    if (x.shared == s_->serial && x.revision == s_->adminRevision && x.size == s_->menu.size() && x.categoriesKey == key)
+        return x;
+    x.shared = s_->serial;
+    x.revision = s_->adminRevision;
+    x.size = s_->menu.size();
+    x.categoriesKey = std::move(key);
+    ++x.generation;
+    const std::vector<MenuCategory> cats = s_->categories();
+    x.scopes = categoryScopes(cats, s_->menu);
+    x.order.clear();
+    std::unordered_set<std::string> retail;
+    for (const MenuCategory &c : cats) {
+        x.order.push_back(c.id);
+        if (x.scopes.at(c.id) == kScopeRetail)
+            retail.insert(c.id);
+    }
+    // The tree below a Retail department: the Labels screen's (brand, product group, sub group).
+    x.index.build(
+        s_->menu, retail,
+        [](const MenuItem &m) {
+            std::vector<std::string> path;
+            for (const QString &p : labelPathBelowCategory(m))
+                path.push_back(ss(p));
+            return path;
+        },
+        [](const MenuItem &m) { return ss(qs(m.name).toLower()); });
+    x.heldBack.clear();
+    x.big.clear();
+    for (const MenuCategory &c : cats) {
+        if (c.retailOnly)
+            x.heldBack.insert(c.id);
+        if (retail.contains(c.id) && x.index.count(c.id) > kBuilderShowCap) {
+            x.big.insert(c.id);
+            x.heldBack.insert(c.id);
+        }
+    }
+    x.always.clear();
+    if (!x.heldBack.empty())
+        for (std::size_t i = 0; i < s_->menu.size(); ++i)
+            if (!x.heldBack.contains(s_->menu[i].family))
+                x.always.push_back(std::uint32_t(i));
+    return x;
+}
+
+// What this screen's Menu Builder is sent: the items (places in the menu) and the tree.
+struct PosService::BuilderPick {
+    QString key;
+    bool all = false;                    // every item (nothing held back)
+    std::vector<std::uint32_t> items;    // else these, in menu order
+    QVariantMap tree;
+};
+
+const PosService::BuilderPick &PosService::builderPick() const
+{
+    if (!builderPick_)
+        builderPick_ = std::make_shared<BuilderPick>();
+    BuilderPick &pick = *builderPick_;
+    const BuilderCache &x = builderCache();
+    const QString key = builderRevision() + u"|"_s + QString::number(x.generation);
+    if (pick.key == key && !key.isEmpty())
+        return pick;
+    pick.key = key;
+    pick.all = x.heldBack.empty();
+    pick.items = pick.all ? std::vector<std::uint32_t>{} : x.always;
+    const std::string open = ss(builderCategory_);
+    QVariantMap tree{{u"category"_s, builderCategory_}, {u"search"_s, builderSearch_}, {u"tree"_s, false},
+                     {u"partial"_s, false}, {u"path"_s, QStringList()}, {u"asked"_s, builderPath_}};
+
+    if (x.big.contains(open)) {
+        // A big department: one level of its tree. Its items only for Show Items or at the bottom of the
+        // tree, and at most kBuilderShowCap of them. (An older screen has no tree: its first items.)
+        std::vector<std::string> asked;
+        for (const QString &p : builderPath_)
+            asked.push_back(ss(p));
+        const std::size_t reach = builderTreeAware_ ? x.index.reach(open, asked) : 0;
+        const std::vector<std::string> path(asked.begin(), asked.begin() + std::ptrdiff_t(reach));
+        const core::BuilderIndex::Node *n = x.index.node(open, path);
+        static const core::BuilderIndex::Node none;
+        if (!n)
+            n = &none;
+        QVariantList children;
+        for (const auto &[name, count] : n->children)
+            children.append(QVariantMap{{u"name"_s, qs(name)}, {u"count"_s, count}});
+        const bool showing = !builderTreeAware_ || builderShowItems_ || n->children.empty();
+        const std::size_t shown = showing ? std::min<std::size_t>(n->items.size(), kBuilderShowCap) : 0;
+        pick.items.insert(pick.items.end(), n->items.begin(), n->items.begin() + std::ptrdiff_t(shown));
+        QStringList shownIds;   // (the screen shows these, not what the search or the card brought along)
+        for (std::size_t k = 0; k < shown; ++k)
+            shownIds << qs(s_->menu[n->items[k]].id);
+        QStringList usedPath;
+        for (const std::string &p : path)
+            usedPath << qs(p);
+        const QStringList titles{tr("Brands"), tr("Product groups"), tr("Sub groups")};
+        const qsizetype depth = qsizetype(path.size());
+        QString note;
+        if (showing && std::size_t(n->count) > shown) {
+            const QString many = QLocale().toString(n->count), few = QLocale().toString(qint64(shown));
+            note = n->children.empty() ? tr("Showing %1 of %2: search to find the others.").arg(few, many)
+                 : depth == 0          ? tr("Showing %1 of %2: pick a brand or search.").arg(few, many)
+                 : depth == 1          ? tr("Showing %1 of %2: pick a product group or search.").arg(few, many)
+                                       : tr("Showing %1 of %2: pick a sub group or search.").arg(few, many);
+        }
+        tree.insert(u"tree"_s, builderTreeAware_);
+        tree.insert(u"partial"_s, true);   // (its items can't be put in order from here)
+        tree.insert(u"path"_s, usedPath);
+        tree.insert(u"children"_s, children);
+        tree.insert(u"count"_s, n->count);
+        tree.insert(u"total"_s, x.index.count(open));
+        tree.insert(u"shown"_s, qint64(shown));
+        tree.insert(u"shownIds"_s, shownIds);
+        tree.insert(u"showingItems"_s, showing);
+        tree.insert(u"levelTitle"_s, depth < titles.size() ? titles.at(depth) : QString());
+        tree.insert(u"note"_s, note);
+    } else if (x.heldBack.contains(open)) {
+        const std::vector<std::uint32_t> &all = x.index.family(open);   // a small one: all of it
+        pick.items.insert(pick.items.end(), all.begin(), all.end());
+    }
+    // The item on the card, and its box or carton.
+    for (const QString &wanted : {builderItem_, builderParent_})
+        if (!wanted.isEmpty())
+            if (const MenuItem *m = findItem(wanted); m && m >= s_->menu.data() && m < s_->menu.data() + s_->menu.size())
+                pick.items.push_back(std::uint32_t(m - s_->menu.data()));
+    // The search: the screen's mode's categories (an older screen: the held-back ones, as before).
+    if (!builderSearch_.isEmpty()) {
+        std::vector<std::string> families;
+        const std::string scope = ss(builderScope_);
+        for (const std::string &id : x.order)
+            if (validScope(scope) ? x.scopes.at(id) == scope : x.heldBack.contains(id))
+                families.push_back(id);
+        const core::BuilderIndex::Found f = x.index.search(ss(builderSearch_.toLower()), families, kBuilderFindCap);
+        QStringList ids;
+        for (std::uint32_t i : f.items) {
+            pick.items.push_back(i);
+            ids << qs(s_->menu[i].id);
+        }
+        tree.insert(u"found"_s, ids);
+        tree.insert(u"foundMore"_s, f.more);
+        tree.insert(u"foundNote"_s, f.more ? tr("Showing the first %1 found: type more of the name.").arg(kBuilderFindCap) : QString());
+    }
+    if (!pick.all) {
+        std::ranges::sort(pick.items);
+        pick.items.erase(std::unique(pick.items.begin(), pick.items.end()), pick.items.end());
+    }
+    pick.tree = tree;
+    return pick;
 }
 
 QVariantList PosService::builderItems() const
@@ -770,30 +964,22 @@ QVariantList PosService::builderItems() const
     const QVariantList all = menuItems();
     if (all.size() != qsizetype(s_->menu.size()))
         return all;
-    std::unordered_set<std::string> retail;
-    for (const MenuCategory &c : s_->categories())
-        if (c.retailOnly)
-            retail.insert(c.id);
-    if (retail.empty())
+    const BuilderPick &pick = builderPick();
+    if (pick.all)
         return all;
-    const std::string open = ss(builderCategory_), item = ss(builderItem_), parent = ss(builderParent_);
-    const QString search = builderSearch_.toLower();
     QVariantList out;
-    int found = 0;
-    for (qsizetype i = 0; i < all.size(); ++i) {
-        const MenuItem &m = s_->menu[std::size_t(i)];
-        bool in = !retail.contains(m.family) || m.family == open || (!item.empty() && m.id == item)
-                  || (!parent.empty() && std::ranges::find(m.barcodes, parent) != m.barcodes.end());
-        if (!in && !search.isEmpty() && found < 200) {   // the search: name, number or a UPC
-            const std::string q = ss(builderSearch_);
-            in = qs(m.name).toLower().contains(search) || m.number == q
-                 || std::ranges::any_of(m.barcodes, [&](const std::string &b) { return sameBarcode(b, q); });
-            found += in ? 1 : 0;
-        }
-        if (in)
-            out.append(all[i]);
-    }
+    out.reserve(qsizetype(pick.items.size()));
+    for (std::uint32_t i : pick.items)
+        if (qsizetype(i) < all.size())
+            out.append(all[qsizetype(i)]);
     return out;
+}
+
+QVariantMap PosService::builderTree() const
+{
+    if (!user())
+        return {};
+    return builderPick().tree;
 }
 
 QVariantList PosService::menuItemsNow() const

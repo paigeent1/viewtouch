@@ -1106,6 +1106,20 @@ struct PosService::LabelLookup {
     std::size_t scanned = 0;
 };
 
+// Below its category, an item's place in the label tree: its maker (brand), then the price book's product
+// group and sub group when it has them (a sub group only under a product group). Menu Builder's tree of a
+// price book department is the same (pos_menu.cpp builderItems).
+QStringList PosService::labelPathBelowCategory(const MenuItem &m)
+{
+    QStringList at{labelBrand(m)};
+    if (const QString p = qs(m.productGroup).trimmed().toUpper(); !p.isEmpty()) {
+        at << p;
+        if (const QString s = qs(m.subGroup).trimmed().toUpper(); !s.isEmpty())
+            at << s;
+    }
+    return at;
+}
+
 QVariantMap PosService::retailLabels() const
 {
     static const QStringList productFields{u"name"_s, u"upc"_s, u"barcode_img"_s, u"barcode_upca"_s, u"barcode_upce"_s,
@@ -1162,12 +1176,7 @@ QVariantMap PosService::retailLabels() const
             // The department group (the price book's, else Cigars / Retail / Food & drink), category, maker,
             // then the price book's product group and sub group when it has them (a sub group only under one).
             const QString group = categoryGroups[qs(m.family)];
-            it.at = {group.isEmpty() ? labelGroup(m, category) : group, category, labelBrand(m)};
-            if (const QString p = qs(m.productGroup).trimmed().toUpper(); !p.isEmpty()) {
-                it.at << p;
-                if (const QString s = qs(m.subGroup).trimmed().toUpper(); !s.isEmpty())
-                    it.at << s;
-            }
+            it.at = QStringList{group.isEmpty() ? labelGroup(m, category) : group, category} + labelPathBelowCategory(m);
             finishLabelItem(it);
             fromMenu.push_back(std::move(it));
         }
