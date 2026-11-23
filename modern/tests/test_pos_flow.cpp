@@ -1500,6 +1500,22 @@ TEST_CASE("UI: Menu Builder: an item's Price check, with tax and back", "[flow][
     root = s.window->contentItem();
     QQuickItem *panel = find(u"builderPriceCheck"_s);
     REQUIRE(panel);
+    // The card's scroll bar, when it's needed, sits on the card's right edge, not where the panel had it
+    // before it widened for the card (owner 2026-11-23: drawn in the middle of the card).
+    {
+        QTest::qWait(250);
+        QQuickItem *card = find(u"builderCard"_s), *bar = find(u"builderCardBar"_s);
+        REQUIRE(card);
+        REQUIRE(bar);
+        if (card->property("contentHeight").toReal() > card->height() + 1) {
+            CHECK(bar->isVisible());
+            const qreal barRight = bar->mapToScene(QPointF(bar->width(), 0)).x();
+            const qreal cardRight = card->mapToScene(QPointF(card->width(), 0)).x();
+            CHECK(std::abs(barRight - cardRight) < 1.0);
+        } else {
+            CHECK_FALSE(bar->isVisible());
+        }
+    }
     CHECK(text(u"priceCheckRate"_s).contains(u"7.35%"_s));
     CHECK(text(u"priceCheckIncluded"_s) == u"Guest pays $11.50 = $10.71 before tax + $0.79 tax"_s);
 
@@ -1980,14 +1996,6 @@ TEST_CASE("UI: Menu Builder: a choice priced by size", "[flow][ui][sizeprices]")
     QQuickItem *large = by(u"builderSizePrice-0-Large"_s);
     REQUIRE(large);
     QQuickItem *card = by(u"builderCard"_s);
-    // The card's scroll bar sits on its right edge, not where the narrower panel had it (owner 2026-11-23).
-    QTest::qWait(250);
-    QQuickItem *bar = by(u"builderCardBar"_s);
-    REQUIRE(bar);
-    CHECK(bar->isVisible());
-    const QPointF barRight = bar->mapToScene(QPointF(bar->width(), 0));
-    const QPointF cardRight = card->mapToScene(QPointF(card->width(), 0));
-    CHECK(std::abs(barRight.x() - cardRight.x()) < 1.0);
     card->setProperty("contentY", card->property("contentHeight").toReal() - card->height());
     QTest::qWait(30);
     s.tapItem(large);

@@ -143,8 +143,13 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-23 18:31 ET — Bob (Claude) — Card scroll bar test moved to a case that runs in CI
+- **What:** Tablet app: no change. Server: no change. The scroll bar check is in 'UI: Menu Builder: an item's Price check, with tax and back' (passes in CI) instead of 'a choice priced by size' (one of main's known CI failures, which stops before the check): when the item card needs scrolling, builderCardBar is shown with its right edge on the card's; otherwise it's hidden.
+- **Why:** The check has to run to guard the fix.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-23 18:13 ET — Bob (Claude) — Menu Builder card: scroll bar back on the card's right edge
-- **What:** Tablet app: changed. Server: no change. The item / category / choice group card's scroll bar (WidgetMenuBuilder.qml cardFlick) is now a sibling TouchScrollBar anchored to the card's right, top and bottom (objectName builderCardBar, shown with the card and only when needed) and given to the card with ScrollBar.vertical: cardBar, instead of being attached as the card's child. Test: the 'choice size prices' UI case checks the bar is shown and its right edge is the card's.
+- **What:** Tablet app: changed. Server: no change. The item / category / choice group card's scroll bar (WidgetMenuBuilder.qml cardFlick) is now a sibling TouchScrollBar anchored to the card's right, top and bottom (objectName builderCardBar, shown with the card and only when needed) and given to the card with ScrollBar.vertical: cardBar, instead of being attached as the card's child. Test: the 'Price check' UI case checks the bar, when the card needs it, is shown with its right edge on the card's.
 - **Why:** Owner 2026-11-23 18:12 (photo, BHDAN, build 634): the scroll bar was drawn in the middle of the item card. Attached as the Flickable's child, Qt placed it at the width the panel had before it widened for the open card and didn't move it.
 - **Files:** (none)
 
