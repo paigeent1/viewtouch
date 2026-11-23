@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-23 18:50 ET — Bob (Claude) — Menu Builder Retail: one item to a row
+- **What:** Tablet app: changed. Server: no change. In Retail mode the item grid (itemGrid) shows one item per row, 64 px high: name on the left (elided only at the row's end), price (and section) on the right; + Add Item is a full-width row. Hospitality and Event keep two tiles to a row. Drag, Select and the tree are unchanged (indexAt works with any cell size).
+- **Why:** Owner 2026-11-23 18:44 (BHDAN photo, CIGAR ACCES): two tiles to a row cut the price book's long names ('MONTE SIG LIGH...'); one line per item shows more of each description.
+- **Files:** (none)
+
 ### 2026-11-23 18:42 ET — Bob (Claude) — Menu Builder Select: + Add Item greyed, hint says touch Done
 - **What:** Tablet app: changed. Server: no change. While Select is on, the + Add Item tile is drawn faded (0.35) and the hint reads 'Touch the items to change together. To change one item or add one, touch Done.' (es, fr, pt, zh added). Touches still only tick items while selecting, as before.
 - **Why:** Owner 2026-11-23 18:38-18:41 (BHDAN photos): in Select, + Add Item looked live but did nothing and he couldn't see how to edit the chosen item.

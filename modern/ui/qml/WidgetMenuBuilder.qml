@@ -1415,8 +1415,11 @@ Item {
                     Layout.fillHeight: !w.treeLevels
                     Layout.preferredHeight: w.treeLevels ? cellHeight : -1
                     clip: true
-                    cellWidth: width / 2
-                    cellHeight: 96
+                    // Retail: one item to a row, name on the left and price on the right, so the price
+                    // book's long names show (owner 2026-11-23). Food and drink keep two tiles to a row.
+                    readonly property bool rows: w.retailMode
+                    cellWidth: rows ? width : width / 2
+                    cellHeight: rows ? 64 : 96
                     model: [{ add: true }].concat(w.items)
                     delegate: Item {
                         required property var modelData
@@ -1436,7 +1439,30 @@ Item {
                                                                                            : w.editingItem && w.itemId === modelData.id)
                             border.color: marked ? "#f5b940" : Qt.darker(tint, 1.3)
                             border.width: marked ? 4 : 1
+                            RowLayout {
+                                visible: itemGrid.rows
+                                anchors { fill: parent; leftMargin: 14; rightMargin: 14 }
+                                spacing: 12
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: modelData.add ? qsTr("+ Add Item") : modelData.name
+                                    horizontalAlignment: modelData.add ? Text.AlignHCenter : Text.AlignLeft
+                                    color: StoreColors.ink(parent.parent.tint)
+                                    font.pixelSize: 18
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+                                Label {
+                                    visible: !modelData.add
+                                    text: modelData.add ? "" : (modelData.section ? modelData.section + "  ·  " : "")
+                                                               + (modelData.availableSet ? modelData.price : qsTr("sold out"))
+                                    color: StoreColors.ink(parent.parent.tint)
+                                    opacity: 0.85
+                                    font.pixelSize: 17
+                                }
+                            }
                             Column {
+                                visible: !itemGrid.rows
                                 anchors.centerIn: parent
                                 width: parent.width - 16
                                 Label {
