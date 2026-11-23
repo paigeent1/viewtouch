@@ -73,6 +73,10 @@ Page Page::fromJson(const QJsonObject &o)
     p.mealPeriod = o.value(u"mealPeriod").toString();
     p.permission = o.value(u"permission").toString();
     p.variantOf = o.value(u"variantOf").toString();
+    // A page saved as the phone version of itself (HCA 2026-11-22: its edited floor plans "main" and
+    // "floor-bar") counted as no floor plan at all, so Seating left them out: it is no one's version.
+    if (!p.variantOf.isEmpty() && p.variantOf == p.id)
+        p.variantOf.clear();
     p.formFactor = o.value(u"formFactor").toString();
     for (const QJsonValue &v : o.value(u"hiddenZones").toArray())
         p.hiddenZones.append(v.toString());

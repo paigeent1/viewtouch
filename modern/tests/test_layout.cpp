@@ -318,3 +318,15 @@ TEST_CASE("Starter pages: new ones added, unedited ones updated, edits kept", "[
     CHECK(again.added.isEmpty());
     CHECK(again.updated.isEmpty());
 }
+
+TEST_CASE("A page saved as the phone version of itself is read as no one's version", "[layout]")
+{
+    // HCA 2026-11-22: the edited floor plans "main" and "floor-bar" said variantOf: themselves, so
+    // Seating (floorPlans) left them out as phone versions.
+    const vt::layout::Page p = vt::layout::Page::fromJson(QJsonObject{
+        {u"id"_s, u"main"_s}, {u"name"_s, u"Layout - Main"_s}, {u"kind"_s, u"tables"_s}, {u"variantOf"_s, u"main"_s}});
+    CHECK(p.variantOf.isEmpty());
+    const vt::layout::Page phone = vt::layout::Page::fromJson(QJsonObject{
+        {u"id"_s, u"main-phone"_s}, {u"kind"_s, u"tables"_s}, {u"variantOf"_s, u"main"_s}, {u"formFactor"_s, u"phone"_s}});
+    CHECK(phone.variantOf == u"main"_s);   // a real phone version stays one
+}

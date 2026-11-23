@@ -982,6 +982,8 @@ bool LayoutEditor::setPageField(const QString &pageId, const QString &path, cons
         });
     }
 
+    if (path == u"variantOf" && value.toString() == pageId)
+        return fail(u"A page can't be the phone version of itself."_s);
     if (path == u"role" && !value.toString().isEmpty()) {
         const Page *holder = layout_.pageByRole(value.toString());
         if (holder && holder->id != pageId)
