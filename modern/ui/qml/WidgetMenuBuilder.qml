@@ -1583,7 +1583,10 @@ Item {
                     clip: true
                     contentHeight: cardColumn.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
-                    ScrollBar.vertical: TouchScrollBar { id: cardBar }
+                    // The bar is the card's sibling, held to its right edge: attached to the card
+                    // (its child), Qt left it where it first was when this panel widened as the card
+                    // opened (owner 2026-11-23: a scroll bar drawn in the middle of the card).
+                    ScrollBar.vertical: cardBar
 
                     ColumnLayout {
                         id: cardColumn
@@ -2808,6 +2811,12 @@ Item {
 
                         }
                     }
+                }
+                TouchScrollBar {
+                    id: cardBar
+                    objectName: "builderCardBar"
+                    visible: cardFlick.visible && policy !== ScrollBar.AlwaysOff
+                    anchors { right: cardFlick.right; top: cardFlick.top; bottom: cardFlick.bottom }
                 }
                 // Save and the rest: always in view, under the card.
                 ColumnLayout {

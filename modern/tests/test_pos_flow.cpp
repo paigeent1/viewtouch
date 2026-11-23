@@ -1980,6 +1980,14 @@ TEST_CASE("UI: Menu Builder: a choice priced by size", "[flow][ui][sizeprices]")
     QQuickItem *large = by(u"builderSizePrice-0-Large"_s);
     REQUIRE(large);
     QQuickItem *card = by(u"builderCard"_s);
+    // The card's scroll bar sits on its right edge, not where the narrower panel had it (owner 2026-11-23).
+    QTest::qWait(250);
+    QQuickItem *bar = by(u"builderCardBar"_s);
+    REQUIRE(bar);
+    CHECK(bar->isVisible());
+    const QPointF barRight = bar->mapToScene(QPointF(bar->width(), 0));
+    const QPointF cardRight = card->mapToScene(QPointF(card->width(), 0));
+    CHECK(std::abs(barRight.x() - cardRight.x()) < 1.0);
     card->setProperty("contentY", card->property("contentHeight").toReal() - card->height());
     QTest::qWait(30);
     s.tapItem(large);
