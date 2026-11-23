@@ -143,6 +143,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-23 07:01 ET — Bob (Claude) — Older Samsung TVs (2013 or so) worked from ViewTouch
+- **What:** vt-directv: a samsung TV with no Tizen remote (ports 8001/8002) but port 55000 open is worked with Samsung's older network remote (the protocol samsungctl calls legacy): off (KEY_POWEROFF), volume, mute, channels, input, arrows, Home (KEY_CONTENTS). vt-directv pair on one waits 35 s for the TV's Allow and remembers proto: legacy in tvs.json. TV on can't be done over the network on these: it says to let its DIRECTV box wake it (HDMI-CEC, Anynet+). Same TV type in the button editor (Samsung TV). Self-tested against a stand-in TV on port 55000. Server: no change. Tablet app: no change.
+- **Why:** Owner 2026-11-23: HCA's Bar 2 is getting a 2013 Samsung UN65F7100; owner chose to add older-Samsung support (off, volume, keys) with power on through the DIRECTV box.
+- **Files:** `scripts/bin/vt-directv`
+- **Next person must know:** On the TV: Menu > Network > AllShare Settings (or Device Manager) must allow ViewTouch if it was ever Denied. Power on needs a direct HDMI from the BAR 2 box or a CEC-passing splitter.
+
 ### 2026-11-23 06:39 ET — Bob (Claude) — Seating shows floor plans saved as their own phone version
 - **What:** layout/page.cpp: a page whose variantOf (Phone version of) is its own id is read as no one's version. app/layout_editor.cpp: setting a page as the phone version of itself is refused. Test in test_layout. Server: changed. Tablet app: changed.
 - **Why:** Owner at HCA 2026-11-23: Seating showed only the sample plans (Dining Area, Patio), not his drawing 'Layout - Main'. HCA's pages main and floor-bar were saved with variantOf = themselves, so floorPlans() treated them as phone versions and skipped them.
