@@ -408,6 +408,22 @@ Report serverSales(const std::vector<Check> &closed, const ReportContext &ctx)
         r.note("No sales yet.");
     else
         r.total({"All servers", count(all.checks), count(all.guests), ctx.money(all.net)});
+
+    // The same checks by the terminal each was paid out on (Check::closedOn): which station made the sale.
+    // Checks from before terminals were kept: "(unknown)".
+    std::map<std::string, Tally> terminals;
+    for (const Check &c : closed) {
+        Tally &t = terminals[c.closedOn.empty() ? "(unknown)" : c.closedOn];
+        ++t.checks;
+        t.guests += c.guests;
+        t.net += c.totals(ctx.settings.tax).subtotal;
+    }
+    if (!terminals.empty()) {
+        r.section("By terminal (where it was paid)");
+        for (const auto &[name, t] : terminals)
+            r.line({name, count(t.checks), count(t.guests), ctx.money(t.net)});
+        r.total({"All terminals", count(all.checks), count(all.guests), ctx.money(all.net)});
+    }
     return r;
 }
 

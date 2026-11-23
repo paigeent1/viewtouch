@@ -276,7 +276,12 @@ Item {
                         }
                         Label {
                             Layout.fillWidth: true
-                            text: w.check ? qsTr("Opened %1").arg(w.check.opened) + (w.check.closed ? "  ·  " + qsTr("closed %1").arg(w.check.closed) : "") : ""
+                            // Where it was opened and closed (the terminal's name); older checks didn't keep it.
+                            text: w.check ? qsTr("Opened %1").arg(w.check.opened)
+                                            + (w.check.openedOn ? " " + qsTr("on %1").arg(w.check.openedOn) : "")
+                                            + (w.check.closed ? "  ·  " + qsTr("closed %1").arg(w.check.closed)
+                                                                + (w.check.closedOn ? " " + qsTr("on %1").arg(w.check.closedOn) : "") : "")
+                                            + (!w.check.openedOn && !w.check.closedOn ? "  ·  " + qsTr("Terminal: unknown") : "") : ""
                             opacity: 0.6
                             font.pixelSize: 12
                             elide: Text.ElideRight
@@ -356,15 +361,18 @@ Item {
                                     // Who rang each line and who took each payment (older checks: not kept).
                                     text: detailRow.type === "line"
                                           ? [detailRow.modelData.modifiers ?? "",
-                                             detailRow.modelData.by ? qsTr("rung by %1 %2").arg(detailRow.modelData.by).arg(detailRow.modelData.byWhen ?? "") : ""]
+                                             detailRow.modelData.by ? qsTr("rung by %1 %2").arg(detailRow.modelData.by).arg(detailRow.modelData.byWhen ?? "") : "",
+                                             detailRow.modelData.on ? qsTr("Rang on %1").arg(detailRow.modelData.on) : ""]
                                                 .filter(x => x).join("  ·  ")
                                         : detailRow.type === "payment"
                                           ? [detailRow.modelData.by ? qsTr("taken by %1 %2").arg(detailRow.modelData.by).arg(detailRow.modelData.byWhen ?? "") : "",
+                                             detailRow.modelData.on ? qsTr("Paid on %1").arg(detailRow.modelData.on) : "",
                                              detailRow.modelData.tip ? qsTr("tip %1").arg(detailRow.modelData.tip) : "",
                                              detailRow.modelData.change ? qsTr("change given %1").arg(detailRow.modelData.change) : "",
                                              detailRow.modelData.refunded ? qsTr("%1 refunded").arg(detailRow.modelData.refunded) : ""]
                                                 .filter(x => x).join("  ·  ")
                                         : detailRow.type === "refund" ? qsTr("by %1").arg(detailRow.modelData.by)
+                                                                         + (detailRow.modelData.on ? "  ·  " + qsTr("Refunded on %1").arg(detailRow.modelData.on) : "")
                                                                          + (detailRow.modelData.reference ? "  ·  " + detailRow.modelData.reference : "")
                                         : ""
                                     opacity: 0.6

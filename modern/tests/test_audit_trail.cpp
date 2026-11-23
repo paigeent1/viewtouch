@@ -4,9 +4,13 @@
 #include "core/report.hh"
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
+#include "storage/async_writer.hh"
+#include "storage/pos_store.hh"
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QTemporaryDir>
+#include <QTest>
 
 using namespace Qt::StringLiterals;
 using namespace vt;
@@ -312,4 +316,222 @@ TEST_CASE("An old check read back has no cost, no ringer, no taker: and writes n
     REQUIRE(z);
     CHECK(z->lines[0].costKnown);
     CHECK(z->lines[0].costAtSale() == Money());
+}
+
+// --- which terminal (station) rang, paid, refunded, opened and closed it (owner 2026-11-23) ----------
+
+TEST_CASE("Rung on one terminal, paid on another, refunded on a third: all three kept", "[audit][terminal]")
+{
+    PosShared shared(test::seedPosData(), nullptr);
+    PosService front(&shared, u"Front"_s);    // terminal A
+    PosService bar(&shared, u"Bar"_s);        // terminal B
+    PosService office(&shared, u"Office"_s);  // terminal C
+    REQUIRE(bar.loginWithPin(u"1234"_s));
+    bar.entryKey(u"10000"_s);
+    REQUIRE(bar.openDrawerSession());
+
+    REQUIRE(front.loginWithPin(u"1111"_s));
+    REQUIRE(front.selectTable(u"T1"_s) == PosService::TableNeedsGuests);
+    REQUIRE(front.startCheck(core::CheckType::DineIn));
+    REQUIRE(front.addItem(u"tea"_s));
+    const qint64 id = front.checkInfo()[u"id"_s].toLongLong();
+    CHECK(shared.open.at(id).openedOn == "Front");
+    front.releaseCheck();
+
+    REQUIRE(bar.openCheck(id));
+    REQUIRE(bar.tender(u"credit"_s));
+    REQUIRE(bar.closeCheck());
+    REQUIRE(shared.closedToday.size() == 1);
+    {
+        const core::Check &c = shared.closedToday.back();
+        CHECK(lineFor(c, "tea")->addedOn == "Front");
+        REQUIRE(c.payments.size() == 1);
+        CHECK(c.payments[0].takenOn == "Bar");
+        CHECK(c.openedOn == "Front");
+        CHECK(c.closedOn == "Bar");
+    }
+
+    REQUIRE(office.loginWithPin(u"1234"_s));
+    const qint64 paymentId = shared.closedToday.back().payments[0].id;
+    REQUIRE(office.refundPayment(id, paymentId, 0, u"Wrong item"_s));
+    const core::Check &c = shared.closedToday.back();
+    REQUIRE(c.refunds.size() == 1);
+    CHECK(c.refunds[0].givenOn == "Office");
+    REQUIRE(shared.refundsToday.size() == 1);
+    CHECK(shared.refundsToday[0].givenOn == "Office");
+    // Still the other two.
+    CHECK(lineFor(c, "tea")->addedOn == "Front");
+    CHECK(c.payments[0].takenOn == "Bar");
+
+    // Saved and read back: all of them.
+    const auto back = app::checkFromJson(app::toJson(c));
+    REQUIRE(back);
+    CHECK(lineFor(*back, "tea")->addedOn == "Front");
+    CHECK(back->payments[0].takenOn == "Bar");
+    CHECK(back->refunds[0].givenOn == "Office");
+    CHECK(back->openedOn == "Front");
+    CHECK(back->closedOn == "Bar");
+    CHECK(app::refundFromJson(app::toJson(c.refunds[0])).givenOn == "Office");
+
+    // Find a Check shows them: rang on, paid on, refunded on, opened and closed on.
+    const core::Check copy = c;
+    shared.findChecks = [&](const PosShared::CheckFind &) { return std::vector<core::Check>{copy}; };
+    REQUIRE(office.searchChecks(u"#%1"_s.arg(id), 0));
+    for (int i = 0; i < 300 && office.checkSearch()[u"loading"_s].toBool(); ++i)
+        QTest::qWait(10);
+    office.selectFoundCheck(id);
+    const QVariantMap seen = office.checkSearch()[u"selected"_s].toMap();
+    CHECK(seen[u"openedOn"_s] == u"Front"_s);
+    CHECK(seen[u"closedOn"_s] == u"Bar"_s);
+    CHECK(seen[u"lines"_s].toList().value(0).toMap()[u"on"_s] == u"Front"_s);
+    CHECK(seen[u"payments"_s].toList().value(0).toMap()[u"on"_s] == u"Bar"_s);
+    CHECK(seen[u"refunds"_s].toList().value(0).toMap()[u"on"_s] == u"Office"_s);
+
+    // Reopened: where it was closed is forgotten until it closes again; the rest stays.
+    REQUIRE(bar.reopenCheck(id));
+    const core::Check &again = shared.open.at(id);
+    CHECK(again.closedOn.empty());
+    CHECK(again.openedOn == "Front");
+    CHECK(lineFor(again, "tea")->addedOn == "Front");
+    CHECK(again.payments[0].takenOn == "Bar");
+}
+
+TEST_CASE("Where a line was rung stays through split, transfer and void", "[audit][terminal]")
+{
+    PosShared shared(test::seedPosData(), nullptr);
+    PosService front(&shared, u"Front"_s);
+    PosService bar(&shared, u"Bar"_s);
+    REQUIRE(front.loginWithPin(u"1111"_s));
+    REQUIRE(front.selectTable(u"T1"_s) == PosService::TableNeedsGuests);
+    REQUIRE(front.startCheck(core::CheckType::DineIn));
+    REQUIRE(front.addItem(u"tea"_s));
+    REQUIRE(front.addItem(u"water"_s));
+    const qint64 first = front.checkInfo()[u"id"_s].toLongLong();
+    front.releaseCheck();
+
+    // On the bar terminal, the water goes onto a check of its own.
+    REQUIRE(bar.loginWithPin(u"1234"_s));
+    REQUIRE(bar.openCheck(first));
+    bar.selectLine(lineFor(shared.open.at(first), "water")->id);
+    REQUIRE(bar.splitLine(0));
+    qint64 second = 0;
+    for (const auto &[cid, c] : shared.open)
+        if (cid != first && lineFor(c, "water"))
+            second = cid;
+    REQUIRE(second != 0);
+    CHECK(lineFor(shared.open.at(second), "water")->addedOn == "Front");   // rung there, not here
+    CHECK(shared.open.at(second).openedOn == "Bar");                       // the new check was made here
+    CHECK(lineFor(shared.open.at(first), "tea")->addedOn == "Front");
+
+    // Transferred to another server: unchanged.
+    REQUIRE(bar.openCheck(first));
+    REQUIRE(bar.transferCheck(u"casey"_s));
+    CHECK(shared.open.at(first).serverId == "casey");
+    CHECK(shared.open.at(first).openedOn == "Front");
+    CHECK(lineFor(shared.open.at(first), "tea")->addedOn == "Front");
+
+    // Saved and read back.
+    const auto back = app::checkFromJson(app::toJson(shared.open.at(second)));
+    REQUIRE(back);
+    CHECK(lineFor(*back, "water")->addedOn == "Front");
+    CHECK(back->openedOn == "Bar");
+}
+
+TEST_CASE("Terminals survive the database, and an old check has none", "[audit][terminal][posstore]")
+{
+    QTemporaryDir dir;
+    const QString path = dir.filePath(u"vt.db"_s);
+    const auto seed = test::seedPosData();
+    {
+        storage::PosStore store(path);
+        REQUIRE(store.open());
+        REQUIRE(store.seed(seed.settings, seed.menu, seed.employees));
+    }
+    qint64 id = 0;
+    {
+        storage::PosStore store(path);
+        REQUIRE(store.open());
+        storage::AsyncWriter writer(path);
+        storage::SqlPosSink sink(writer);
+        PosShared shared(*store.load(), &sink);
+        PosService reg(&shared, u"Register 2"_s);
+        REQUIRE(reg.loginWithPin(u"1234"_s));
+        reg.entryKey(u"10000"_s);
+        REQUIRE(reg.openDrawerSession());
+        REQUIRE(reg.startCheck(core::CheckType::Takeout));
+        REQUIRE(reg.addItem(u"tea"_s));
+        id = reg.checkInfo()[u"id"_s].toLongLong();
+        REQUIRE(reg.tender(u"cash"_s));
+        REQUIRE(reg.closeCheck());
+        // the writer's destructor flushes
+    }
+    storage::PosStore store(path);
+    REQUIRE(store.open());
+    const auto closed = store.checks(core::CheckStatus::Closed);
+    REQUIRE(closed.size() == 1);
+    CHECK(closed[0].id == id);
+    CHECK(closed[0].openedOn == "Register 2");
+    CHECK(closed[0].closedOn == "Register 2");
+    REQUIRE(closed[0].lines.size() == 1);
+    CHECK(closed[0].lines[0].addedOn == "Register 2");
+    REQUIRE(closed[0].payments.size() == 1);
+    CHECK(closed[0].payments[0].takenOn == "Register 2");
+
+    // A check saved before terminals were kept: empty (unknown), and none written back.
+    const QJsonObject line{{u"id"_s, 1}, {u"itemId"_s, u"coffee"_s}, {u"name"_s, u"Coffee"_s}, {u"unitPrice"_s, 275},
+                           {u"quantity"_s, 1}, {u"sent"_s, true}, {u"addedById"_s, u"sam"_s}};
+    const QJsonObject payment{{u"id"_s, 1}, {u"tenderId"_s, u"cash"_s}, {u"kind"_s, u"cash"_s}, {u"amount"_s, 275}};
+    const QJsonObject refund{{u"id"_s, 1}, {u"paymentId"_s, 1}, {u"amount"_s, 100}, {u"method"_s, u"cash"_s}};
+    const QJsonObject old{{u"id"_s, 8}, {u"type"_s, u"quick"_s}, {u"status"_s, u"closed"_s}, {u"lines"_s, QJsonArray{line}},
+                          {u"payments"_s, QJsonArray{payment}}, {u"refunds"_s, QJsonArray{refund}}};
+    const auto c = app::checkFromJson(old);
+    REQUIRE(c);
+    CHECK(c->openedOn.empty());
+    CHECK(c->closedOn.empty());
+    CHECK(c->lines[0].addedOn.empty());
+    CHECK(c->payments[0].takenOn.empty());
+    CHECK(c->refunds[0].givenOn.empty());
+    const QJsonObject again = app::toJson(*c);
+    CHECK_FALSE(again.contains(u"openedOn"_s));
+    CHECK_FALSE(again.contains(u"closedOn"_s));
+    CHECK_FALSE(again[u"lines"_s].toArray()[0].toObject().contains(u"addedOn"_s));
+    CHECK_FALSE(again[u"payments"_s].toArray()[0].toObject().contains(u"takenOn"_s));
+    CHECK_FALSE(again[u"refunds"_s].toArray()[0].toObject().contains(u"givenOn"_s));
+}
+
+TEST_CASE("Server Sales: the same checks by terminal", "[audit][terminal][reports]")
+{
+    core::PosSettings settings;
+    const core::ReportContext ctx{settings, "Today", [](std::int64_t) { return std::string("9:00 PM"); }};
+    const auto check = [](std::int64_t id, const char *server, const char *closedOn, std::int64_t cents) {
+        core::Check c;
+        c.id = id;
+        c.status = core::CheckStatus::Closed;
+        c.serverId = server;
+        c.serverName = server;
+        c.closedOn = closedOn;
+        core::OrderLine l;
+        l.id = 1;
+        l.itemId = "x";
+        l.name = "X";
+        l.taxClass = core::TaxClass::Merchandise;
+        l.unitPrice = Money::fromCents(cents);
+        l.sent = true;
+        c.lines.push_back(l);
+        return c;
+    };
+    const core::Report r = core::serverSales(
+        {check(1, "Sam", "Bar 1", 1000), check(2, "Rosa", "Bar 1", 500), check(3, "Sam", "Front", 250), check(4, "Sam", "", 100)},
+        ctx);
+    CHECK(r.find("Sam") == std::vector<std::string>{"Sam", "3", "3", "$13.50"});
+    CHECK(r.find("Bar 1") == std::vector<std::string>{"Bar 1", "2", "2", "$15.00"});
+    CHECK(r.find("Front") == std::vector<std::string>{"Front", "1", "1", "$2.50"});
+    CHECK(r.find("(unknown)") == std::vector<std::string>{"(unknown)", "1", "1", "$1.00"});
+    bool section = false, total = false;
+    for (const core::ReportRow &row : r.rows) {
+        section = section || (row.kind == core::ReportRow::Kind::Section && row.cells[0].starts_with("By terminal"));
+        total = total || (row.kind == core::ReportRow::Kind::Total && row.cells == std::vector<std::string>{"All terminals", "4", "4", "$18.50"});
+    }
+    CHECK(section);
+    CHECK(total);
 }

@@ -116,6 +116,7 @@ bool PosService::refundPayment(qint64 checkId, qint64 paymentId, qint64 cents, c
     r.day = s_->day.id;
     r.checkId = checkId;
     r.checkLabel = c->label;
+    r.givenOn = terminalHere();
     const Check found = *c;   // as it was read: the record is kept from this, whoever is still here
     PosShared *shared = s_;
     const auto what = [this, r](const QString &reference) {

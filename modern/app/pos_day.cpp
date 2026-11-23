@@ -194,6 +194,7 @@ Check &PosService::splitOff(qint64 fromId)
     n.serverId = from.serverId;
     n.serverName = from.serverName;
     n.openedAt = now();
+    n.openedOn = terminalHere();   // split off here (its lines keep where they were rung)
     n.training = from.training;
     const auto id = n.id;
     return s_->open.emplace(id, std::move(n)).first->second;
@@ -458,6 +459,7 @@ bool PosService::splitBySeat()
         n.serverId = c->serverId;
         n.serverName = c->serverName;
         n.openedAt = now();
+        n.openedOn = terminalHere();
         n.training = c->training;
         const auto id = n.id;
         s_->open.emplace(id, std::move(n));
@@ -1334,6 +1336,7 @@ bool PosService::endOfDay()
         if (it->second.training && !s_->lockedBy.contains(it->first)) {
             it->second.status = CheckStatus::Discarded;
             it->second.closedAt = now();
+            it->second.closedOn = terminalHere();
             if (s_->sink)
                 s_->sink->saveCheck(it->second);
             it = s_->open.erase(it);

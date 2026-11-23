@@ -89,6 +89,8 @@ std::map<std::string, TipShare> tipShares(const std::vector<Check> &closed, cons
 Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx,
                     const std::vector<Refund> *refunds = nullptr);
 Report itemSales(const std::vector<Check> &closed, const std::vector<MenuItem> &menu, const ReportContext &ctx);
+// Checks, guests and net sales per server, then the same per terminal it was paid on (Check::closedOn;
+// older checks: "(unknown)").
 Report serverSales(const std::vector<Check> &closed, const ReportContext &ctx);
 // Sales by employee and item (spiffs): each line counted for whoever rang it in (OrderLine::addedBy; the
 // kiosk as "Kiosk"; lines from before that was kept: the check's server, marked "(server)"). Qty and gross

@@ -259,6 +259,7 @@ void PosService::stampPayment(Payment &p) const
 {
     std::tie(p.takenById, p.takenByName) = ringer();
     p.at = now();
+    p.takenOn = terminalHere();
 }
 
 void PosService::stampNewLine(OrderLine &l) const
@@ -266,6 +267,7 @@ void PosService::stampNewLine(OrderLine &l) const
     // Who rang it, and when.
     std::tie(l.addedById, l.addedByName) = ringer();
     l.addedAt = now();
+    l.addedOn = terminalHere();   // and on which terminal
     // Its cost now, frozen: later cost changes never alter this sale.
     l.costKnown = false;
     l.unitCost = Money();

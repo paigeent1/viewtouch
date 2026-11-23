@@ -1666,6 +1666,9 @@ public:
     void stampPayment(core::Payment &p) const;
     // Who is ringing on this terminal: {id, name}; the self-order kiosk: {"", "Kiosk"}.
     std::pair<std::string, std::string> ringer() const;
+    // This screen's terminal name ("Bar 1"; the self-order kiosk: its own screen's name), recorded on
+    // what is rung, paid, refunded, opened and closed here (OrderLine::addedOn, Payment::takenOn...).
+    std::string terminalHere() const { return terminal_.toStdString(); }
     // A menu item's recipe at today's costs, and the items over the store's
     // food cost target: {name, price, cost, percent, suggested} (most over first).
     Money recipeCost(const core::MenuItem &m) const;

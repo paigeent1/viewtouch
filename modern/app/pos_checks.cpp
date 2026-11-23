@@ -108,6 +108,7 @@ bool PosService::mergeCheck(qint64 otherId)
     noteEvent(other, what, "merge");
     other.status = CheckStatus::Merged;
     other.closedAt = now();
+    other.closedOn = terminalHere();
     if (s_->sink)
         s_->sink->saveCheck(other);
     const bool otherTable = other.type == CheckType::DineIn && !other.training && other.label != c->label;
@@ -135,6 +136,7 @@ bool PosService::reopenCheck(qint64 checkId)
     s_->closedToday.erase(it);
     c.status = CheckStatus::Open;
     c.closedAt = 0;
+    c.closedOn.clear();   // closed again later: where it is closed then
     c.businessDay = 0;
     c.drawerSession = 0;
     c.closedRates.reset();   // today's rates again, until it closes again

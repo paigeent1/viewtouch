@@ -1175,6 +1175,7 @@ bool PosService::startCheck(CheckType type)
     c.serverId = user()->id;
     c.serverName = user()->name;
     c.openedAt = now();
+    c.openedOn = terminalHere();
     c.training = training();
     switch (type) {
     case CheckType::DineIn:
@@ -1359,6 +1360,7 @@ bool PosService::cancelSale()
     noteEvent(*c, tr("Cancel #%1: %2").arg(c->cancelNumber).arg(format(worth)), "cancel", worth, why);
     c->status = CheckStatus::Discarded;
     c->closedAt = now();
+    c->closedOn = terminalHere();
     c->businessDay = s_->day.id;
     if (s_->sink)
         s_->sink->saveCheck(*c);
@@ -1389,6 +1391,7 @@ void PosService::releaseCheck()
                               && c->payments.empty()) {
         c->status = CheckStatus::Discarded;
         c->closedAt = now();
+        c->closedOn = terminalHere();
         if (s_->sink)
             s_->sink->saveCheck(*c);
         s_->open.erase(c->id);
@@ -2491,6 +2494,7 @@ bool PosService::closeCheck()
     if (c->outAt && !c->deliveredAt)
         c->deliveredAt = now();   // paid: the driver is back
     c->closedAt = now();
+    c->closedOn = terminalHere();   // the terminal it was paid out on
     c->businessDay = s_->day.id;
     c->closedRates = s_->settings.tax;   // its totals from now on, whatever the rates become
     applyCloseEffects(*c);
@@ -2537,6 +2541,7 @@ bool PosService::closePractice(Check &c)
     c.sendAll(now(), true);
     c.status = CheckStatus::Discarded;
     c.closedAt = now();
+    c.closedOn = terminalHere();
     if (s_->sink)
         s_->sink->saveCheck(c);
     const qint64 id = c.id;

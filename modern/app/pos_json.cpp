@@ -52,10 +52,13 @@ qint64 fraction(const QJsonValue &v, qint64 whole) { return std::clamp<qint64>(v
 
 QJsonObject toJson(const Refund &r)
 {
-    return {{u"id"_s, qint64(r.id)}, {u"at"_s, qint64(r.at)}, {u"paymentId"_s, qint64(r.paymentId)},
-            {u"amount"_s, qint64(r.amount.cents())}, {u"reason"_s, qs(r.reason)}, {u"by"_s, qs(r.by)},
-            {u"reference"_s, qs(r.reference)}, {u"tenderName"_s, qs(r.tenderName)}, {u"day"_s, qint64(r.day)},
-            {u"checkId"_s, qint64(r.checkId)}, {u"checkLabel"_s, qs(r.checkLabel)}, {u"method"_s, qs(r.method)}};
+    QJsonObject o{{u"id"_s, qint64(r.id)}, {u"at"_s, qint64(r.at)}, {u"paymentId"_s, qint64(r.paymentId)},
+                  {u"amount"_s, qint64(r.amount.cents())}, {u"reason"_s, qs(r.reason)}, {u"by"_s, qs(r.by)},
+                  {u"reference"_s, qs(r.reference)}, {u"tenderName"_s, qs(r.tenderName)}, {u"day"_s, qint64(r.day)},
+                  {u"checkId"_s, qint64(r.checkId)}, {u"checkLabel"_s, qs(r.checkLabel)}, {u"method"_s, qs(r.method)}};
+    if (!r.givenOn.empty())   // the terminal it was given back on; absent on old refunds
+        o.insert(u"givenOn"_s, qs(r.givenOn));
+    return o;
 }
 
 Refund refundFromJson(const QJsonObject &o)
@@ -73,6 +76,7 @@ Refund refundFromJson(const QJsonObject &o)
     r.checkId = i64(o.value(u"checkId"));
     r.checkLabel = ss(o.value(u"checkLabel").toString());
     r.method = ss(o.value(u"method").toString());
+    r.givenOn = ss(o.value(u"givenOn").toString());
     return r;
 }
 
@@ -166,6 +170,8 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"addedByName"_s, qs(l.addedByName));
         if (l.addedAt != 0)
             lo.insert(u"addedAt"_s, qint64(l.addedAt));
+        if (!l.addedOn.empty())   // the terminal it was rung on
+            lo.insert(u"addedOn"_s, qs(l.addedOn));
         // Responsible service: standard drinks in one, and the seats it is shared across.
         if (l.stdDrinks > 0)
             lo.insert(u"stdDrinks"_s, l.stdDrinks);
@@ -193,6 +199,8 @@ QJsonObject toJson(const Check &c)
             po.insert(u"takenByName"_s, qs(p.takenByName));
         if (p.at != 0)
             po.insert(u"at"_s, qint64(p.at));
+        if (!p.takenOn.empty())   // the terminal it was taken on
+            po.insert(u"takenOn"_s, qs(p.takenOn));
         payments.append(po);
     }
     QJsonArray events;
@@ -204,7 +212,7 @@ QJsonObject toJson(const Check &c)
             eo.insert(u"reason"_s, qs(e.reason));
         events.append(eo);
     }
-    return {
+    QJsonObject out{
         {u"schemaVersion"_s, PosSchemaVersion},
         {u"id"_s, qint64(c.id)}, {u"type"_s, qs(toString(c.type))}, {u"status"_s, qs(toString(c.status))},
         {u"label"_s, qs(c.label)}, {u"guests"_s, c.guests},
@@ -260,6 +268,12 @@ QJsonObject toJson(const Check &c)
                                            {u"included"_s, r.pricesIncludeTax}});
          }()},
     };
+    // The terminals it was opened and closed on: absent on old checks (unknown).
+    if (!c.openedOn.empty())
+        out.insert(u"openedOn"_s, qs(c.openedOn));
+    if (!c.closedOn.empty())
+        out.insert(u"closedOn"_s, qs(c.closedOn));
+    return out;
 }
 
 std::optional<Check> checkFromJson(const QJsonObject &o)
@@ -276,6 +290,8 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
     c.serverName = ss(o.value(u"serverName").toString());
     c.openedAt = i64(o.value(u"openedAt"));
     c.closedAt = i64(o.value(u"closedAt"));
+    c.openedOn = ss(o.value(u"openedOn").toString());
+    c.closedOn = ss(o.value(u"closedOn").toString());
     for (const QJsonValue &v : o.value(u"lines").toArray()) {
         const QJsonObject lo = v.toObject();
         OrderLine l;
@@ -317,6 +333,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.addedById = ss(lo.value(u"addedById").toString());
         l.addedByName = ss(lo.value(u"addedByName").toString());
         l.addedAt = i64(lo.value(u"addedAt"));
+        l.addedOn = ss(lo.value(u"addedOn").toString());
         l.stdDrinks = std::clamp(lo.value(u"stdDrinks").toDouble(0), 0.0, 1000.0);
         for (const QJsonValue &sv : lo.value(u"drinkSeats").toArray())
             l.drinkSeats.push_back(std::clamp(sv.toInt(), 0, 99));
@@ -355,6 +372,7 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         p.takenById = ss(po.value(u"takenById").toString());
         p.takenByName = ss(po.value(u"takenByName").toString());
         p.at = i64(po.value(u"at"));
+        p.takenOn = ss(po.value(u"takenOn").toString());
         c.payments.push_back(p);
     }
     c.nextLineId = std::max<std::int64_t>(i64(o.value(u"nextLineId")), 1);

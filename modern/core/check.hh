@@ -107,6 +107,10 @@ struct OrderLine {
     // agreed (the price book's, or as changed), taxed in its item's class so the tax comes back too;
     // why it came back (Defective, Wrong item...). Never discounted; stock goes back up when it's sent.
     std::string returnReason;
+    // The terminal it was rung on (the screen's terminal name, as in Manager > Terminals: "Bar 1"; the
+    // self-order kiosk: its own screen's name). Kept like addedBy through transfer, move, merge, split,
+    // reopen and void. Old lines: empty (unknown). Not printed on receipts.
+    std::string addedOn;
 
     bool isComment() const { return itemId.empty(); }
     bool isReturn() const { return quantity < 0 && !isComment(); }
@@ -189,6 +193,8 @@ struct Payment {
     std::string takenById;
     std::string takenByName;
     std::int64_t at = 0;
+    // The terminal it was taken on (its screen's terminal name). Old payments: empty (unknown).
+    std::string takenOn;
 
     bool operator==(const Payment &) const = default;
 };
@@ -209,6 +215,7 @@ struct Refund {
     std::int64_t day = 0;         // the business day it happened on (its reports)
     std::int64_t checkId = 0;     // the check it was on, and its name then
     std::string checkLabel;
+    std::string givenOn;          // the terminal it was given back on (old refunds: empty)
 
     bool operator==(const Refund &) const = default;
 };
@@ -380,6 +387,10 @@ struct Check {
     std::string driverName;
     std::int64_t outAt = 0;
     std::int64_t deliveredAt = 0;
+    // The terminal it was opened on and the one it was closed (paid, cancelled, put away, merged) on:
+    // the screen's terminal name. Reopening clears closedOn until it closes again. Old checks: empty.
+    std::string openedOn;
+    std::string closedOn;
 
     void note(std::int64_t at, const std::string &who, const std::string &what, const std::string &kind = {},
               Money amount = {}, const std::string &reason = {})

@@ -252,7 +252,8 @@ QVariantMap PosService::checkSearch() const
                                      {u"price"_s, l.isComment() ? QString() : format(l.voided ? Money() : l.total())},
                                      {u"voided"_s, l.voided}, {u"modifiers"_s, mods.join(u", "_s)},
                                      // who rang it in, and when (empty on old lines)
-                                     {u"by"_s, qs(l.addedByName)}, {u"byWhen"_s, l.addedAt ? when(l.addedAt) : QString()}});
+                                     {u"by"_s, qs(l.addedByName)}, {u"byWhen"_s, l.addedAt ? when(l.addedAt) : QString()},
+                                     {u"on"_s, qs(l.addedOn)}});   // the terminal it was rung on (empty: unknown)
         }
         QVariantList payments;
         for (const Payment &p : c.payments) {
@@ -277,7 +278,8 @@ QVariantMap PosService::checkSearch() const
                                         {u"how"_s, p.processor == "stripe" ? u"stripe"_s
                                                    : p.kind == TenderKind::Cash ? u"cash"_s : u"record"_s},
                                         // who took it, and when (empty on old payments)
-                                        {u"by"_s, qs(p.takenByName)}, {u"byWhen"_s, p.at ? when(p.at) : QString()}});
+                                        {u"by"_s, qs(p.takenByName)}, {u"byWhen"_s, p.at ? when(p.at) : QString()},
+                                        {u"on"_s, qs(p.takenOn)}});   // the terminal it was taken on (empty: unknown)
         }
         // Everything that happened to it, oldest first: the audit trail.
         QVariantList events;
@@ -288,10 +290,11 @@ QVariantMap PosService::checkSearch() const
         for (const Refund &r : c.refunds)
             refunds.append(QVariantMap{{u"when"_s, when(r.at)}, {u"amount"_s, format(r.amount)}, {u"by"_s, qs(r.by)},
                                        {u"reason"_s, qs(r.reason)}, {u"tender"_s, qs(r.tenderName)},
-                                       {u"reference"_s, qs(r.reference)}});
+                                       {u"reference"_s, qs(r.reference)}, {u"on"_s, qs(r.givenOn)}});
         out.insert(u"selected"_s, QVariantMap{
             {u"id"_s, qint64(c.id)}, {u"label"_s, qs(c.label)}, {u"server"_s, qs(c.serverName)},
             {u"opened"_s, when(c.openedAt)}, {u"closed"_s, when(c.closedAt)}, {u"status"_s, statusText(c)},
+            {u"openedOn"_s, qs(c.openedOn)}, {u"closedOn"_s, qs(c.closedOn)},   // terminals (empty: unknown, older checks)
             {u"customer"_s, qs(c.customer.name)}, {u"guests"_s, c.guests},
             {u"lines"_s, lines}, {u"payments"_s, payments}, {u"events"_s, events}, {u"refunds"_s, refunds},
             {u"subtotal"_s, format(t.subtotal)}, {u"tax"_s, format(t.tax)}, {u"total"_s, format(t.total)},
