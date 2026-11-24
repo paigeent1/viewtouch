@@ -40,6 +40,12 @@ inline app::PosData seedPosData(bool requiredChoices = false)
         m.periodPrices.clear();
     d.settings.promotions.clear();   // they depend on the day and time: their own tests set a clock
     d.settings.setupDone = true;     // the setup guide has tests of its own
+    // The retail price book became an admin's (perm "pricebook", 2026-11-24). The tests were written with
+    // the starter manager running the store's menu, retail too: Morgan keeps it here. The price book's own
+    // tests (test_menu_builder.cpp, [pricebook]) take it away again.
+    for (core::Employee &e : d.employees)
+        if (e.role == "manager")
+            e.allow.insert(core::perm::PriceBook);
     if (!requiredChoices) {
         for (core::ModifierGroup &g : d.settings.modifierGroups)
             g.min = 0;

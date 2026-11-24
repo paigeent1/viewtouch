@@ -359,7 +359,7 @@ QVariantMap PosService::adminNewRecord(const QString &panel)
                 {u"payRate"_s, 0.0}, {u"otherJobs"_s, QString()}, {u"language"_s, QString()},
                 {u"textSize"_s, u"100"_s}, {u"leftHanded"_s, false}, {u"startPage"_s, QString()},
                 {u"perm:order"_s, QString()}, {u"perm:check.settle"_s, QString()}, {u"perm:check.others"_s, QString()}, {u"perm:check.discount"_s, QString()},
-                {u"perm:order.void"_s, QString()}, {u"perm:manager"_s, QString()}, {u"perm:layout.edit"_s, QString()}};
+                {u"perm:order.void"_s, QString()}, {u"perm:manager"_s, QString()}, {u"perm:pricebook"_s, QString()}, {u"perm:layout.edit"_s, QString()}};
     if (panel == u"tenders")
         return {{u"id"_s, QString()}, {u"name"_s, QString()}, {u"kind"_s, u"card"_s}, {u"percent"_s, 0.0},
                 {u"staffMeal"_s, false}};

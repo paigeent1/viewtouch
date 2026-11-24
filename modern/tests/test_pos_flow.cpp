@@ -34,6 +34,7 @@
 #include <QSignalSpy>
 #include <QDir>
 #include <QQmlProperty>
+#include <QJSValue>
 #include <QTest>
 #include <QFile>
 #include <QUrl>
@@ -9389,4 +9390,216 @@ TEST_CASE("UI: a keyboard-mode scanner types a license: spaces, Ctrl line breaks
     QTest::qWait(600);   // the license is sent once the scanner goes quiet
     CHECK(s.pos.ageAsk().isEmpty());
     CHECK(s.pos.lines().size() == 1);
+}
+
+// --- Menu Builder, Retail: + Add Item asks box, single in a box, or single (owner 2026-11-24) -----------
+
+namespace {
+
+struct RetailBuilder {
+    Screen s{false, 1280, 800};
+    QQuickItem *root = nullptr;
+    QQuickItem *w = nullptr;
+
+    explicit RetailBuilder(const QString &scope = u"retail"_s)
+    {
+        REQUIRE(s.pos.loginWithPin(u"1234"_s));
+        REQUIRE(s.pos.saveCategory({{u"name"_s, u"PREMIUM CIGARS"_s}, {u"scope"_s, u"retail"_s}}));
+        REQUIRE(s.pos.saveMenuItemCard({{u"name"_s, u"Robusto Box of 20"_s}, {u"price"_s, u"180.00"_s},
+                                        {u"family"_s, u"premium-cigars"_s}, {u"isRetail"_s, true},
+                                        {u"upc"_s, u"036000291452"_s}, {u"cost"_s, u"120.00"_s}}));
+        REQUIRE(s.c.jumpTo(u"menu-builder"_s));
+        QTest::qWait(100);
+        root = s.window->contentItem();
+        w = Screen::findBy(root, "objectName", u"builderScopeChooser"_s);
+        while (w && !w->property("choosingScope").isValid())
+            w = w->parentItem();
+        REQUIRE(w);
+        w->setProperty("builderScope", scope);
+        w->setProperty("choosingScope", false);
+        QTest::qWait(100);
+        tap(scope == u"retail"_s ? u"builderCategory-premium-cigars"_s : u"builderCategory-burgers"_s);
+    }
+    QQuickItem *by(const QString &name) { return Screen::findBy(root, "objectName", name); }
+    void tap(const QString &name)
+    {
+        QQuickItem *it = by(name);
+        REQUIRE(it);
+        s.tapItem(it);
+        QTest::qWait(80);
+    }
+    void typeText(const char *text)
+    {
+        for (const char *ch = text; *ch; ++ch)
+            QTest::sendKeyEvent(QTest::Click, s.window, Qt::Key_unknown, *ch, Qt::NoModifier);
+        QTest::qWait(30);
+    }
+    void typeInto(const QString &field, const char *text)
+    {
+        QQuickItem *f = by(field);
+        REQUIRE(f);
+        scrollTo(f);
+        s.tapItem(f);
+        QTest::keyClick(s.window, Qt::Key_A, Qt::ControlModifier);
+        typeText(text);
+    }
+    QVariantMap draft() const
+    {
+        QVariant v = w->property("draft");
+        if (v.metaType() == QMetaType::fromType<QJSValue>())
+            v = v.value<QJSValue>().toVariant();
+        return v.toMap();
+    }
+};
+
+} // namespace
+
+TEST_CASE("UI: Menu Builder Retail: + Add Item asks box, single in a box or single", "[flow][ui][menubuild][parentchild]")
+{
+    RetailBuilder b;
+    b.tap(u"builderAddItem"_s);
+    CHECK(b.by(u"builderAddKind-parent"_s));
+    CHECK(b.by(u"builderAddKind-child"_s));
+    CHECK(b.by(u"builderAddKind-single"_s));
+    CHECK_FALSE(b.by(u"builderName"_s));   // not opened yet
+    b.s.shot("91-builder-add-kind");
+
+    // A box or carton: its card, the cursor in its UPC field.
+    b.tap(u"builderAddKind-parent"_s);
+    QTest::qWait(250);
+    REQUIRE(b.by(u"builderUpc"_s));
+    CHECK(b.by(u"builderUpc"_s)->hasActiveFocus());
+    CHECK(b.w->property("addKind").toString() == u"parent"_s);
+    b.typeText("012345678905");
+    CHECK(b.draft()[u"upc"_s] == u"012345678905"_s);
+}
+
+TEST_CASE("UI: Menu Builder Hospitality: + Add Item opens the card", "[flow][ui][menubuild][parentchild]")
+{
+    RetailBuilder b(u"hospitality"_s);
+    b.tap(u"builderAddItem"_s);
+    CHECK_FALSE(b.by(u"builderAddKind-parent"_s));
+    CHECK(b.by(u"builderName"_s));
+}
+
+TEST_CASE("UI: Menu Builder Retail: a single in a box, its box found by UPC", "[flow][ui][menubuild][parentchild]")
+{
+    RetailBuilder b;
+    b.tap(u"builderAddItem"_s);
+    b.tap(u"builderAddKind-child"_s);
+    QTest::qWait(100);
+    REQUIRE(b.by(u"builderBoxFind"_s));
+    CHECK(b.by(u"builderBoxFind"_s)->hasActiveFocus());
+    b.typeText("036000291452");
+    QTest::keyClick(b.s.window, Qt::Key_Return);   // (a scanner's Enter)
+    QTest::qWait(250);
+    CHECK_FALSE(b.by(u"builderBoxFind"_s));
+    CHECK(b.w->property("addKind").toString() == u"child"_s);
+    CHECK(b.draft()[u"parentUpc"_s] == u"036000291452"_s);
+    REQUIRE(b.by(u"builderParentInfo"_s));
+    CHECK(b.by(u"builderParentInfo"_s)->property("text").toString().contains(u"Robusto Box of 20"_s));
+    // Its own UPC (the cursor is there), Enter, then how many in the box: the cost is worked out.
+    REQUIRE(b.by(u"builderUpc"_s));
+    CHECK(b.by(u"builderUpc"_s)->hasActiveFocus());
+    b.typeText("012345678905");
+    QTest::keyClick(b.s.window, Qt::Key_Return);
+    QTest::qWait(30);
+    CHECK(b.by(u"builderPackSize"_s)->hasActiveFocus());
+    b.typeText("20");
+    CHECK(b.draft()[u"cost"_s] == u"6.00"_s);   // 120.00 / 20
+    b.s.shot("92-builder-child");
+    b.typeInto(u"builderName"_s, "Robusto Single");
+    b.typeInto(u"builderPrice"_s, "11.00");
+    b.tap(u"builderSave"_s);
+    QTest::qWait(150);
+    const core::MenuItem *single = b.s.pos.findItem(u"Robusto Single"_s);
+    REQUIRE(single);
+    CHECK(std::ranges::any_of(single->recipe, [](const core::RecipeLine &rl) {
+        return rl.ingredientId == "__parent__:036000291452" && rl.quantity == 20.0;
+    }));
+}
+
+TEST_CASE("UI: Menu Builder Retail: a single saved without its box is refused", "[flow][ui][menubuild][parentchild]")
+{
+    RetailBuilder b;
+    b.tap(u"builderAddItem"_s);
+    b.tap(u"builderAddKind-child"_s);
+    b.typeText("036000291452");
+    QTest::keyClick(b.s.window, Qt::Key_Return);
+    QTest::qWait(250);
+    REQUIRE(b.draft()[u"child"_s].toBool());
+    b.typeInto(u"builderParentUpc"_s, "");   // the box taken away
+    QTest::keyClick(b.s.window, Qt::Key_Backspace);
+    QTest::qWait(30);
+    REQUIRE(b.draft()[u"parentUpc"_s].toString().isEmpty());
+    b.typeInto(u"builderName"_s, "Loose Robusto");
+    b.typeInto(u"builderPrice"_s, "11.00");
+    b.tap(u"builderSave"_s);
+    QTest::qWait(150);
+    CHECK_FALSE(b.s.pos.findItem(u"Loose Robusto"_s));
+}
+
+TEST_CASE("UI: Menu Builder Retail: Add the box first, then back to the single", "[flow][ui][menubuild][parentchild]")
+{
+    RetailBuilder b;
+    b.tap(u"builderAddItem"_s);
+    b.tap(u"builderAddKind-child"_s);
+    b.typeText("036000291469");   // no item has it
+    QTest::keyClick(b.s.window, Qt::Key_Return);
+    QTest::qWait(250);
+    CHECK(b.by(u"builderBoxProblem"_s));
+    b.tap(u"builderAddBoxFirst"_s);
+    QTest::qWait(250);
+    CHECK(b.w->property("addKind").toString() == u"parent"_s);
+    CHECK(b.draft()[u"upc"_s] == u"036000291469"_s);
+    b.typeInto(u"builderName"_s, "Toro Box of 25");
+    b.typeInto(u"builderPrice"_s, "200.00");
+    b.tap(u"builderSave"_s);
+    QTest::qWait(400);
+    REQUIRE(b.s.pos.findItem(u"Toro Box of 25"_s));
+    // Back to the single, its box filled in.
+    CHECK(b.w->property("addKind").toString() == u"child"_s);
+    CHECK(b.draft()[u"parentUpc"_s] == u"036000291469"_s);
+    CHECK(b.draft()[u"id"_s].toString().isEmpty());
+}
+
+TEST_CASE("UI: Menu Builder Retail: a manager's price change asks for an admin's PIN", "[flow][ui][menubuild][pricebook]")
+{
+    RetailBuilder b;
+    // Morgan without the price book (the tests' starter manager has it), and an admin.
+    for (core::Employee &e : b.s.pos.shared()->employees)
+        e.allow.erase(core::perm::PriceBook);
+    core::Employee admin;
+    admin.id = "admin-test";
+    admin.name = "Alex";
+    admin.role = "admin";
+    admin.pinSalt = app::newSalt();
+    admin.pinHash = app::hashPin(u"246810"_s, admin.pinSalt);
+    b.s.pos.shared()->employees.push_back(admin);
+    b.s.pos.logout();
+    REQUIRE(b.s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(b.s.c.jumpTo(u"menu-builder"_s));
+    QTest::qWait(150);
+    b.root = b.s.window->contentItem();
+    b.w = Screen::findBy(b.root, "objectName", u"builderScopeChooser"_s);
+    while (b.w && !b.w->property("choosingScope").isValid())
+        b.w = b.w->parentItem();
+    REQUIRE(b.w);
+    b.w->setProperty("builderScope", u"retail"_s);
+    b.w->setProperty("choosingScope", false);
+    QTest::qWait(100);
+    b.tap(u"builderCategory-premium-cigars"_s);
+    CHECK(b.by(u"builderPriceBookNote"_s));
+    const core::MenuItem *box = b.s.pos.findItem(u"Robusto Box of 20"_s);
+    REQUIRE(box);
+    b.tap(u"builderItem-"_s + QString::fromStdString(box->id));
+    b.typeInto(u"builderPrice"_s, "175.00");
+    b.tap(u"builderSave"_s);
+    QTest::qWait(100);
+    CHECK(b.s.pos.findItem(u"Robusto Box of 20"_s)->price.cents() == 18000);   // not yet
+    REQUIRE(b.s.pos.approvalInfo()[u"needed"_s].toBool());
+    CHECK(b.s.pos.approvalInfo()[u"permission"_s] == u"pricebook"_s);
+    b.s.shot("93-builder-admin-pin");
+    REQUIRE(b.s.pos.approve(u"246810"_s));
+    CHECK(b.s.pos.findItem(u"Robusto Box of 20"_s)->price.cents() == 17500);
 }

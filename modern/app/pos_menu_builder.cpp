@@ -84,6 +84,41 @@ QStringList strings(const QVariant &v)
     return out;
 }
 
+// Whether going from one menu to the other changes the price book: a retail item (on either side) or a
+// Retail category added, changed or removed.
+bool priceBookDiffers(const PosShared::MenuState &a, const PosShared::MenuState &b)
+{
+    const auto sa = categoryScopes(a.categories, a.menu), sb = categoryScopes(b.categories, b.menu);
+    std::unordered_map<std::string, const MenuItem *> inB;
+    for (const MenuItem &m : b.menu)
+        inB.emplace(m.id, &m);
+    std::unordered_set<std::string> seen;
+    for (const MenuItem &m : a.menu) {
+        seen.insert(m.id);
+        const auto o = inB.find(m.id);
+        const MenuItem *other = o == inB.end() ? nullptr : o->second;
+        if ((other && *other == m) || !(inPriceBook(m, sa) || (other && inPriceBook(*other, sb))))
+            continue;
+        return true;
+    }
+    for (const MenuItem &m : b.menu)
+        if (!seen.contains(m.id) && inPriceBook(m, sb))
+            return true;
+    const auto retail = [](const std::map<std::string, std::string> &sc, const std::string &id) {
+        const auto it = sc.find(id);
+        return it != sc.end() && it->second == kScopeRetail;
+    };
+    for (const MenuCategory &c : a.categories) {
+        const auto o = std::ranges::find_if(b.categories, [&](const MenuCategory &x) { return x.id == c.id; });
+        if ((o == b.categories.end() || !(*o == c)) && (retail(sa, c.id) || (o != b.categories.end() && retail(sb, c.id))))
+            return true;
+    }
+    for (const MenuCategory &c : b.categories)
+        if (std::ranges::none_of(a.categories, [&](const MenuCategory &x) { return x.id == c.id; }) && retail(sb, c.id))
+            return true;
+    return false;
+}
+
 } // namespace
 
 // "11.50", "$11.50", "11,50": a price in cents; -1 if it isn't one.
@@ -151,6 +186,8 @@ bool PosService::undoMenuChange()
         emit s_->adminChanged();
         return fail(tr("The menu has changed since, so that can't be undone."));
     }
+    if (!requirePriceBook([&] { return priceBookDiffers(undo.back().before, undo.back().after); }))
+        return false;
     PosShared::MenuUndo step = std::move(undo.back());
     undo.pop_back();
     logMenuChanges(step.after, step.before, tr("Undone: %1").arg(step.label));
@@ -299,6 +336,11 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.retailOnly = true;
     else if (c.scope == kScopeHospitality)
         c.retailOnly = false;
+    // A Retail category (before or after): the price book's.
+    if (!requirePriceBook([&] {
+            return (it != list.end() && priceBookCategory(c.id)) || categoryScope(c) == kScopeRetail;
+        }))
+        return false;
     if (record.contains(u"buttonSize"_s)) {
         const QString size = record.value(u"buttonSize"_s).toString();
         if (!QStringList{QString(), u"small"_s, u"medium"_s, u"large"_s}.contains(size))
@@ -361,6 +403,15 @@ bool PosService::setCategoryColors(const QVariantMap &colors)
         if (std::ranges::none_of(list, [&](const MenuCategory &x) { return qs(x.id) == c.key(); }))
             return fail(tr("There is no category '%1'.").arg(c.key()));
     }
+    if (!requirePriceBook([&] {
+            const auto scopes = scopesNow();
+            return std::ranges::any_of(list, [&](const MenuCategory &c) {
+                const auto sc = scopes.find(c.id);
+                return colors.contains(qs(c.id)) && sc != scopes.end() && sc->second == kScopeRetail
+                       && colors.value(qs(c.id)).toString().toLower() != qs(c.color);
+            });
+        }))
+        return false;
     const MenuStep step(this, tr("Category colors"));
     for (MenuCategory &c : list)
         if (colors.contains(qs(c.id)))
@@ -421,6 +472,8 @@ bool PosService::moveMenuItemTo(const QString &id, int position)
     const auto it = std::ranges::find_if(menu, [&](const MenuItem &m) { return qs(m.id) == id; });
     if (it == menu.end())
         return fail(tr("'%1' is not on the menu.").arg(id));
+    if (!requirePriceBook([&] { return priceBookItem(*it); }))
+        return false;
     const std::string family = it->family;
     std::vector<int> places;
     std::vector<MenuItem> items;
@@ -454,6 +507,8 @@ bool PosService::deleteCategory(const QString &id)
     const auto items = std::ranges::count_if(s_->menu, [&](const MenuItem &m) { return qs(m.family) == id && !m.isModifier; });
     if (items > 0)
         return fail(tr("Move or remove its %n item(s) first.", nullptr, int(items)));
+    if (!requirePriceBook([&] { return priceBookCategory(ss(id)); }))
+        return false;
     std::vector<MenuCategory> list = s_->categories();
     std::erase_if(list, [&](const MenuCategory &c) { return qs(c.id) == id; });
     s_->settings.menuCategories = list;
@@ -686,6 +741,57 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
     const auto category = std::ranges::find_if(categories, [&](const MenuCategory &c) { return c.id == family; });
     if (category == categories.end())
         return fail(tr("There is no category '%1'.").arg(qs(family)));
+    // The retail price book (an admin's): a retail item before or after this change, unless all it
+    // changes is Sold Out / For Sale (a store's daily business, a manager's as before).
+    {
+        static const QSet<QString> dailyOnly{u"id"_s, u"name"_s, u"available"_s};
+        bool onlyAvailable = !adding && qs(it->name) == name;
+        for (auto k = card.begin(); onlyAvailable && k != card.end(); ++k)
+            onlyAvailable = dailyOnly.contains(k.key());
+        if (!onlyAvailable && !requirePriceBook([&] {
+                if (!adding && priceBookItem(*it))
+                    return true;
+                const bool event = card.contains(u"isEvent"_s) ? card.value(u"isEvent"_s).toBool() : !adding && itemIsEvent(*it);
+                if (event)
+                    return false;
+                if (card.contains(u"isRetail"_s) ? card.value(u"isRetail"_s).toBool()
+                                                 : (!adding && itemIsRetail(*it)))
+                    return true;
+                if (!card.value(u"parentUpc"_s).toString().trimmed().isEmpty()
+                    || card.value(u"taxClass"_s).toString() == u"merchandise"_s)
+                    return true;
+                return priceBookCategory(family);
+            }))
+            return false;
+    }
+    const PriceBookGrant priceBookAsked(this);   // (its sizes, below, don't ask again)
+    // A single in a box or carton (Add Item -> Single in a box, owner 2026-11-24): its box is an item here,
+    // and how many come in the box is 1 or more.
+    {
+        const QString parentUpc = card.value(u"parentUpc"_s).toString().trimmed();
+        const bool child = card.value(u"child"_s).toBool();
+        QString had;
+        if (!adding)
+            for (const RecipeLine &rl : it->recipe)
+                if (rl.ingredientId.starts_with("__parent__:"))
+                    had = qs(rl.ingredientId.substr(11));
+        if (child && parentUpc.isEmpty())
+            return fail(tr("A single needs its box: scan or type the box's UPC."));
+        if (!parentUpc.isEmpty() && (child || parentUpc != had)) {
+            const bool found = std::ranges::any_of(menu, [&](const MenuItem &m) {
+                return m.id != id && std::ranges::find(m.barcodes, ss(parentUpc)) != m.barcodes.end();
+            });
+            if (!found)
+                return fail(tr("No item has the box's UPC %1. Add the box first.").arg(parentUpc));
+        }
+        if (!parentUpc.isEmpty() && card.contains(u"packSize"_s)) {
+            const QString t = card.value(u"packSize"_s).toString().trimmed();
+            bool ok = false;
+            const int n = t.toInt(&ok);
+            if ((child || !t.isEmpty()) && (!ok || n < 1))
+                return fail(tr("Type how many singles come in the box (1 or more)."));
+        }
+    }
 
     MenuItem item = adding ? MenuItem{} : *it;
     if (adding) {
@@ -1042,6 +1148,8 @@ bool PosService::setItemSizes(const QString &itemId, const QVariantList &sizes)
     const auto it = std::ranges::find_if(s_->menu, [&](const MenuItem &m) { return qs(m.id) == itemId; });
     if (it == s_->menu.end())
         return fail(tr("'%1' is not on the menu.").arg(itemId));
+    if (!requirePriceBook([&] { return priceBookItem(*it); }))
+        return false;
     const auto checked = sizeList(sizes);
     if (!checked)
         return false;
@@ -1078,9 +1186,21 @@ bool PosService::setItemSizes(const QString &itemId, const QVariantList &sizes)
 
 // Many prices at once (Prices…): [{id, price, takeoutPrice?, deliveryPrice?,
 // periodPrices?}], exactly as previewed; one Undo step.
+// Whether a list of prices ([{id, price...}]) changes a price book item's.
+static bool pricesTouchPriceBook(const std::vector<MenuItem> &menu, const QVariantList &prices,
+                                 const std::map<std::string, std::string> &scopes)
+{
+    std::unordered_set<std::string> ids;
+    for (const QVariant &v : prices)
+        ids.insert(v.toMap().value(u"id"_s).toString().toStdString());
+    return std::ranges::any_of(menu, [&](const MenuItem &m) { return ids.contains(m.id) && inPriceBook(m, scopes); });
+}
+
 bool PosService::setMenuPrices(const QVariantList &prices)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
+        return false;
+    if (!requirePriceBook([&] { return pricesTouchPriceBook(s_->menu, prices, scopesNow()); }))
         return false;
     return applyPrices(prices, {});
 }
@@ -1143,6 +1263,8 @@ bool PosService::schedulePrices(const QVariantList &prices, qint64 at, const QSt
         return fail(tr("Choose a time still to come."));
     if (prices.isEmpty())
         return fail(tr("No prices to change."));
+    if (!requirePriceBook([&] { return pricesTouchPriceBook(s_->menu, prices, scopesNow()); }))
+        return false;
     const QString symbol = qs(s_->settings.currencySymbol);
     for (const QVariant &v : prices) {
         const QVariantMap p = v.toMap();
@@ -1168,6 +1290,15 @@ bool PosService::schedulePrices(const QVariantList &prices, qint64 at, const QSt
 bool PosService::cancelPriceChange(qint64 id)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
+        return false;
+    if (!requirePriceBook([&] {
+            for (const PosSettings::PriceChange &c : s_->settings.priceChanges)
+                if (c.id == id)
+                    return pricesTouchPriceBook(s_->menu,
+                                                QJsonDocument::fromJson(QByteArray::fromStdString(c.prices)).array().toVariantList(),
+                                                scopesNow());
+            return false;
+        }))
         return false;
     if (std::erase_if(s_->settings.priceChanges, [&](const PosSettings::PriceChange &c) { return c.id == id; }) == 0)
         return fail(tr("That price change is gone."));
@@ -1216,6 +1347,8 @@ bool PosService::duplicateMenuItem(const QString &id)
     const auto it = std::ranges::find_if(menu, [&](const MenuItem &m) { return qs(m.id) == id; });
     if (it == menu.end())
         return fail(tr("'%1' is not on the menu.").arg(id));
+    if (!requirePriceBook([&] { return priceBookItem(*it); }))
+        return false;
     MenuItem copy = *it;
     // "Fish Tacos 2": a name of its own, to change.
     QString name;
@@ -1278,6 +1411,9 @@ int PosService::addMenuItemsFromText(const QString &categoryId, const QString &t
         if (const auto it = scopes.find(ss(categoryId)); it != scopes.end())
             scope = it->second;
     }
+    if (!requirePriceBook([&] { return scope == kScopeRetail; }))
+        return 0;
+    const PriceBookGrant priceBookAsked(this);
     struct Entry { QString category, name; double price; };
     std::vector<Entry> entries;
     QStringList problems;
@@ -1398,6 +1534,32 @@ int PosService::importMenuRows(const QVariantList &rows, const QString &category
 {
     if (!require(perm::Manager, tr("Changing the menu")))
         return 0;
+    // A sheet for a Retail category (or with retail rows, or rows for items of the price book): an admin's.
+    if (!requirePriceBook([&] {
+            const auto scopes = scopesNow();
+            const auto retail = [&](const QString &c) {
+                for (const MenuCategory &x : s_->categories())
+                    if (qs(x.id) == c || QString::compare(qs(x.name), c, Qt::CaseInsensitive) == 0) {
+                        const auto sc = scopes.find(x.id);
+                        return sc != scopes.end() && sc->second == kScopeRetail;
+                    }
+                return false;
+            };
+            if (retail(categoryId))
+                return true;
+            QSet<QString> names;
+            for (const QVariant &v : rows) {
+                const QVariantMap r = v.toMap();
+                if (r.value(u"scope"_s).toString() == u"retail"_s || retail(r.value(u"category"_s).toString().trimmed()))
+                    return true;
+                names.insert(r.value(u"name"_s).toString().trimmed().toCaseFolded());
+            }
+            return std::ranges::any_of(s_->menu, [&](const MenuItem &m) {
+                return names.contains(qs(m.name).toCaseFolded()) && inPriceBook(m, scopes);
+            });
+        }))
+        return 0;
+    const PriceBookGrant priceBookAsked(this);
     const MenuStep step(this, tr("Import"));
     int added = 0, updated = 0;
     QStringList skipped;
@@ -1546,6 +1708,21 @@ int PosService::importMenuFile(const QVariantMap &file)
         fail(tr("That isn't a ViewTouch menu file."));
         return 0;
     }
+    // A file with Retail categories or retail items in it: an admin's.
+    if (!requirePriceBook([&] {
+            const PosSettings cats = settingsFromJson(QJsonObject{
+                {u"menuCategories"_s, QJsonArray::fromVariantList(file.value(u"categories"_s).toList())}});
+            if (std::ranges::any_of(cats.menuCategories, [](const MenuCategory &c) { return categoryScope(c) == kScopeRetail; }))
+                return true;
+            for (const QVariant &v : file.value(u"items"_s).toList()) {
+                const QVariantMap o = v.toMap();
+                if (o.value(u"taxClass"_s).toString() == u"merchandise"_s)
+                    return true;
+            }
+            return false;
+        }))
+        return 0;
+    const PriceBookGrant priceBookAsked(this);
     const auto sameName = [](const std::string &a, const QString &b) { return QString::compare(qs(a), b, Qt::CaseInsensitive) == 0; };
 
     // Categories: the one by that name, or a new one.
@@ -2016,6 +2193,17 @@ bool PosService::changeMenuItems(const QStringList &ids, const QVariantMap &chan
     for (const QString &id : ids)
         if (!findItem(id))
             return fail(tr("'%1' is not on the menu.").arg(id));
+    // Sold Out / For Sale only: the store's daily business (a manager's). Anything else to a retail item, or
+    // a move into a Retail category: the price book's.
+    const bool onlyAvailable = changes.size() == 1 && changes.contains(u"available"_s);
+    if (!onlyAvailable && !requirePriceBook([&] {
+            if (changes.contains(u"family"_s) && priceBookCategory(ss(changes.value(u"family"_s).toString())))
+                return true;
+            const auto scopes = scopesNow();
+            return std::ranges::any_of(ids, [&](const QString &id) { return inPriceBook(*findItem(id), scopes); });
+        }))
+        return false;
+    const PriceBookGrant priceBookAsked(this);
     const MenuStep step(this, tr("Change %n item(s)", "", int(ids.size())));
     for (const QString &id : ids) {
         QVariantMap card = changes;
@@ -2035,6 +2223,12 @@ bool PosService::removeMenuItems(const QStringList &ids)
     for (const QString &id : ids)
         if (!findItem(id))
             return fail(tr("'%1' is not on the menu.").arg(id));
+    if (!requirePriceBook([&] {
+            const auto scopes = scopesNow();
+            return std::ranges::any_of(ids, [&](const QString &id) { return inPriceBook(*findItem(id), scopes); });
+        }))
+        return false;
+    const PriceBookGrant priceBookAsked(this);
     const MenuStep step(this, tr("Remove %n item(s)", "", int(ids.size())));
     for (const QString &id : ids)
         if (!deleteMenuItemCard(id))
@@ -2052,6 +2246,8 @@ bool PosService::deleteMenuItemCard(const QString &id)
     const auto it = std::ranges::find_if(menu, [&](const MenuItem &m) { return qs(m.id) == id; });
     if (it == menu.end())
         return fail(tr("'%1' is not on the menu.").arg(id));
+    if (!requirePriceBook([&] { return priceBookItem(*it); }))
+        return false;
     const QString name = qs(it->name);
     const std::string onIt = onItGroupId(it->id), sizes = sizeGroupId(it->id);
     menu.erase(it);

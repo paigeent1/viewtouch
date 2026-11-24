@@ -333,6 +333,19 @@ inline bool applyScope(MenuItem &m, std::string_view scope)
     return true;
 }
 
+// The retail price book (permission "pricebook", owner 2026-11-24): a retail item, or any item in a Retail
+// category, but not an event ticket. Its card, price and cost are an admin's to change (later the corporate
+// office's, for every store); food, drink and tickets stay a manager's. `scopes`: categoryScopes().
+inline bool inPriceBook(const MenuItem &m, const std::map<std::string, std::string> &scopes)
+{
+    if (m.isModifier || itemIsEvent(m))
+        return false;
+    if (itemIsRetail(m))
+        return true;
+    const auto s = scopes.find(m.family);
+    return s != scopes.end() && s->second == kScopeRetail;
+}
+
 // Choices asked for when an item is ordered: "Temperature" (exactly one),
 // "Toppings" (up to three)... `min` choices are required; `max` is the most
 // allowed (0 = any number; 1 = choosing another replaces the choice).

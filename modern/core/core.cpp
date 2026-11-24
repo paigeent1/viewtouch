@@ -99,7 +99,7 @@ Money qualifiedPrice(Money unit, Qualifier q)
 std::set<std::string> permissionsForRole(const std::string &role)
 {
     if (role == "admin")
-        return {perm::Order, perm::Settle, perm::OthersChecks, perm::Discount, perm::Void, perm::Manager, perm::Admin, perm::EditLayout};
+        return {perm::Order, perm::Settle, perm::OthersChecks, perm::Discount, perm::Void, perm::Manager, perm::Admin, perm::PriceBook, perm::EditLayout};
     if (role == "manager")
         return {perm::Order, perm::Settle, perm::OthersChecks, perm::Discount, perm::Void, perm::Manager, perm::EditLayout};
     // Discounts, comps and staff meals need a manager (or their PIN on the spot).

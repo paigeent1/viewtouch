@@ -40,7 +40,8 @@ Rectangle {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 text: pad.takingOver ? qsTr("Take over the store")
-                    : pad.leavingKiosk ? qsTr("Staff only") : qsTr("Manager approval")
+                    : pad.leavingKiosk ? qsTr("Staff only")
+                    : (pad.info.permission ?? "") === "pricebook" ? qsTr("Admin approval") : qsTr("Manager approval")
                 color: "#f5b940"
                 font.pixelSize: 24
                 font.bold: true
@@ -58,7 +59,7 @@ Rectangle {
             }
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: pad.pin.length ? "●".repeat(pad.pin.length) : qsTr("Manager PIN")
+                text: pad.pin.length ? "●".repeat(pad.pin.length) : ((pad.info.permission ?? "") === "pricebook" ? qsTr("Admin PIN") : qsTr("Manager PIN"))
                 color: pad.pin.length ? "white" : "#8a94a6"
                 font.pixelSize: 26
             }

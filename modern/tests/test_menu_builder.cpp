@@ -1427,3 +1427,134 @@ TEST_CASE("Menu Builder: small and hospitality categories as before; an older sc
     REQUIRE(pos.setBuilderView(QString(), u"800000012345"_s, QString(), QString()));
     CHECK(names(inFamily(pos.builderItems(), dept)) == QStringList{u"BRAVO STICK 12345"_s});
 }
+
+// --- the retail price book: an admin's (perm "pricebook", owner 2026-11-24) ----------------------------
+
+namespace {
+
+// The starter store with Morgan (manager) as the role has it (no price book) and Alex, an admin (PIN 246810).
+app::PosData priceBookStore()
+{
+    app::PosData d = test::seedPosData();
+    for (core::Employee &e : d.employees)
+        e.allow.erase(core::perm::PriceBook);
+    core::Employee admin;
+    admin.id = "admin-test";
+    admin.name = "Alex";
+    admin.role = "admin";
+    admin.pinSalt = app::newSalt();
+    admin.pinHash = app::hashPin(u"246810"_s, admin.pinSalt);
+    d.employees.push_back(admin);
+    return d;
+}
+
+} // namespace
+
+TEST_CASE("Price book: the permission is an admin's, not a manager's", "[menubuilder][pricebook]")
+{
+    CHECK(core::permissionsForRole("admin").contains(core::perm::PriceBook));
+    CHECK_FALSE(core::permissionsForRole("manager").contains(core::perm::PriceBook));
+    CHECK(std::ranges::any_of(core::AllPermissions, [](const char *p) { return std::string_view(p) == "pricebook"; }));
+}
+
+TEST_CASE("Price book: a manager can't change a retail item's price; an admin can; food is a manager's", "[menubuilder][pricebook]")
+{
+    PosService pos(priceBookStore(), nullptr);
+    REQUIRE(pos.loginWithPin(u"246810"_s));   // the admin sets up the price book
+    REQUIRE(pos.saveCategory({{u"name"_s, u"PREMIUM CIGARS"_s}, {u"scope"_s, u"retail"_s}}));
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Robusto"_s}, {u"price"_s, u"12.00"_s}, {u"family"_s, u"premium-cigars"_s},
+                                  {u"isRetail"_s, true}, {u"upc"_s, u"036000291452"_s}}));
+    const QString robusto = item(pos, u"Robusto"_s)[u"id"_s].toString();
+    REQUIRE_FALSE(robusto.isEmpty());
+    REQUIRE(pos.saveMenuItemCard({{u"id"_s, robusto}, {u"name"_s, u"Robusto"_s}, {u"price"_s, u"13.00"_s}}));
+    CHECK(pos.findItem(robusto)->price.cents() == 1300);
+    pos.logout();
+
+    // Morgan (a manager) on her own: refused, in plain words.
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK_FALSE(pos.can(u"pricebook"_s));
+    QStringList said;
+    QObject::connect(&pos, &PosService::notice, [&](const QString &m) { said << m; });
+    CHECK_FALSE(pos.saveMenuItemCard({{u"id"_s, robusto}, {u"name"_s, u"Robusto"_s}, {u"price"_s, u"9.00"_s}}));
+    REQUIRE_FALSE(said.isEmpty());
+    CHECK(said.last() == u"Price book changes need an admin."_s);
+    CHECK(pos.findItem(robusto)->price.cents() == 1300);
+    CHECK_FALSE(pos.setMenuPrices({QVariantMap{{u"id"_s, robusto}, {u"price"_s, u"9.00"_s}}}));
+    CHECK_FALSE(pos.changeMenuItems({robusto}, {{u"buttonColor"_s, u"#2b62b0"_s}}));
+    CHECK_FALSE(pos.removeMenuItems({robusto}));
+    CHECK_FALSE(pos.deleteMenuItemCard(robusto));
+    CHECK_FALSE(pos.duplicateMenuItem(robusto));
+    CHECK_FALSE(pos.saveCategory({{u"name"_s, u"LIGHTERS"_s}, {u"scope"_s, u"retail"_s}}));
+    CHECK(pos.addMenuItemsFromText(u"premium-cigars"_s, u"Toro 14.00"_s) == 0);
+    CHECK(pos.findItem(robusto)->price.cents() == 1300);
+    CHECK(pos.findItem(robusto));
+
+    // Sold Out / For Sale stays hers: the store's daily business.
+    REQUIRE(pos.changeMenuItems({robusto}, {{u"available"_s, false}}));
+    CHECK_FALSE(pos.findItem(robusto)->available);
+    REQUIRE(pos.saveMenuItemCard({{u"id"_s, robusto}, {u"name"_s, u"Robusto"_s}, {u"available"_s, true}}));
+    CHECK(pos.findItem(robusto)->available);
+
+    // Food and drink: hers, as before.
+    REQUIRE(pos.saveMenuItemCard({{u"id"_s, u"classic-burger"_s}, {u"name"_s, u"Classic Burger"_s}, {u"price"_s, u"11.75"_s}}));
+    CHECK(pos.findItem(u"classic-burger"_s)->price.cents() == 1175);
+    REQUIRE(pos.setMenuPrices({QVariantMap{{u"id"_s, u"classic-burger"_s}, {u"price"_s, u"11.95"_s}}}));
+    CHECK(pos.findItem(u"classic-burger"_s)->price.cents() == 1195);
+
+    // On a screen, an admin's PIN lets her change go through, once.
+    pos.invoke(u"saveMenuItemCard"_s, {QVariantMap{{u"id"_s, robusto}, {u"name"_s, u"Robusto"_s}, {u"price"_s, u"12.50"_s}}});
+    REQUIRE(pos.approvalInfo()[u"needed"_s].toBool());
+    CHECK(pos.approvalInfo()[u"permission"_s] == u"pricebook"_s);
+    CHECK_FALSE(pos.approve(u"1234"_s));   // a manager's PIN doesn't do
+    REQUIRE(pos.approve(u"246810"_s));
+    CHECK(pos.findItem(robusto)->price.cents() == 1250);
+    CHECK_FALSE(pos.saveMenuItemCard({{u"id"_s, robusto}, {u"name"_s, u"Robusto"_s}, {u"price"_s, u"8.00"_s}}));   // once
+    // Select's change to several retail items: one admin PIN for all of them.
+    pos.invoke(u"changeMenuItems"_s, {QStringList{robusto}, QVariantMap{{u"buttonColor"_s, u"#2b62b0"_s}}});
+    REQUIRE(pos.approvalInfo()[u"needed"_s].toBool());
+    REQUIRE(pos.approve(u"246810"_s));
+    CHECK(pos.findItem(robusto)->buttonColor == "#2b62b0");
+}
+
+TEST_CASE("Price book: the price book sync (a script) still works with nobody logged in", "[menubuilder][pricebook]")
+{
+    PosService pos(priceBookStore(), nullptr);
+    const QVariantMap file{
+        {u"format"_s, u"viewtouch-menu"_s}, {u"version"_s, 1}, {u"store"_s, u"price book"_s}, {u"exported"_s, u"2026-11-24 10:00"_s},
+        {u"categories"_s, QVariantList{QVariantMap{{u"id"_s, u"ilsa-cigars"_s}, {u"name"_s, u"CIGARS"_s},
+                                                   {u"taxClass"_s, u"merchandise"_s}, {u"group"_s, u"CIGARS"_s}}}},
+        {u"choiceGroups"_s, QVariantList{}}, {u"pictures"_s, QVariantMap{}},
+        {u"items"_s, QVariantList{QVariantMap{{u"id"_s, u"ilsa-1"_s}, {u"name"_s, u"CORONA"_s}, {u"price"_s, 7.5},
+                                              {u"taxClass"_s, u"merchandise"_s}, {u"family"_s, u"ilsa-cigars"_s},
+                                              {u"barcodes"_s, QStringList{u"012345678905"_s}}}}}};
+    const QVariantMap r = pos.syncPriceBook(file);
+    CHECK(r[u"ok"_s].toBool());
+    CHECK(r[u"added"_s].toInt() == 1);
+    CHECK(pos.findItem(u"CORONA"_s));
+}
+
+TEST_CASE("Single in a box: its box must be an item, and how many come in it", "[menubuilder][pricebook][parentchild]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    QStringList said;
+    QObject::connect(&pos, &PosService::notice, [&](const QString &m) { said << m; });
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.saveCategory({{u"name"_s, u"PREMIUM CIGARS"_s}, {u"scope"_s, u"retail"_s}}));
+    const auto card = [](const QString &name, const QString &parent, const QString &count) {
+        return QVariantMap{{u"name"_s, name}, {u"price"_s, u"9.00"_s}, {u"family"_s, u"premium-cigars"_s}, {u"isRetail"_s, true},
+                           {u"child"_s, true}, {u"upc"_s, QString()}, {u"parentUpc"_s, parent}, {u"packSize"_s, count}, {u"cost"_s, QString()}};
+    };
+    CHECK_FALSE(pos.saveMenuItemCard(card(u"Robusto Single"_s, QString(), u"20"_s)));          // no box
+    CHECK_FALSE(pos.saveMenuItemCard(card(u"Robusto Single"_s, u"036000291452"_s, u"20"_s)));  // no such box yet
+    REQUIRE_FALSE(said.isEmpty());
+    CHECK(said.last().contains(u"Add the box first"_s));
+    REQUIRE(pos.saveMenuItemCard({{u"name"_s, u"Robusto Box of 20"_s}, {u"price"_s, u"180.00"_s}, {u"family"_s, u"premium-cigars"_s},
+                                  {u"isRetail"_s, true}, {u"upc"_s, u"036000291452"_s}, {u"cost"_s, u"120.00"_s}}));
+    CHECK_FALSE(pos.saveMenuItemCard(card(u"Robusto Single"_s, u"036000291452"_s, u"0"_s)));   // none in the box
+    CHECK_FALSE(pos.saveMenuItemCard(card(u"Robusto Single"_s, u"036000291452"_s, QString())));
+    REQUIRE(pos.saveMenuItemCard(card(u"Robusto Single"_s, u"036000291452"_s, u"20"_s)));
+    const QVariantMap single = item(pos, u"Robusto Single"_s);
+    CHECK(single[u"parentUpc"_s] == u"036000291452"_s);
+    CHECK(single[u"packSize"_s] == u"20"_s);
+    CHECK(single[u"cost"_s] == u"6.00"_s);   // the box's 120.00 / 20
+}

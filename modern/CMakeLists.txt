@@ -255,6 +255,7 @@ if(Qt6_FOUND)
             ui/qml/MenuBuilderPrices.qml
             ui/qml/MenuBuilderPriceCheck.qml
             ui/qml/MenuBuilderLike.qml
+            ui/qml/MenuBuilderAddItem.qml
             ui/qml/MenuBuilderPrint.qml
             ui/qml/MenuBuilderTheme.qml
             ui/qml/MenuBuilderSizes.qml

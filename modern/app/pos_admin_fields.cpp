@@ -231,6 +231,7 @@ QVariantList PosService::adminFields(const QString &panel)
             permField(perm::Discount, tr("Give discounts and comps")),
             permField(perm::Void, tr("Void items already sent")),
             permField(perm::Manager, tr("Manager screens (reports, settings, staff…)")),
+            permField(perm::PriceBook, tr("Change the retail price book (items, prices, costs)")),
             permField(perm::EditLayout, tr("Edit pages")),
             with(field(u"requireName"_s, tr("Phone orders need a name before Send"), u"enum"_s,
                        tr("Store setting: %1.").arg(s_->settings.requireOrderName ? tr("yes") : tr("no"))),

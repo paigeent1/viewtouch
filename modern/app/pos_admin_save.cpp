@@ -78,6 +78,14 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         return false;
     bool ok = false;
     if (panel == u"menu") {
+        // A retail item (as it is, or as saved): the price book's, an admin's (owner 2026-11-24).
+        if (!requirePriceBook([&] {
+                if (index >= 0 && index < int(s_->menu.size()) && priceBookItem(s_->menu[index]))
+                    return true;
+                return record.value(u"taxClass"_s).toString() == u"merchandise"_s
+                       || priceBookCategory(ss(record.value(u"family"_s).toString()));
+            }))
+            return false;
         ok = saveMenuRecord(index, record);
         if (ok)
             refreshSoldOut();
@@ -1241,6 +1249,8 @@ bool PosService::deleteAdminRecord(const QString &panel, int index)
     if (!require(perm::Manager, tr("Changing settings")))
         return false;
     if (panel == u"menu" && index >= 0 && index < int(s_->menu.size())) {
+        if (!requirePriceBook([&] { return priceBookItem(s_->menu[index]); }))
+            return false;
         const std::string id = s_->menu[index].id;
         s_->menu.erase(s_->menu.begin() + index);
         if (s_->sink) {

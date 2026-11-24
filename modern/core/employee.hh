@@ -23,6 +23,7 @@ inline constexpr const char *Settle = "check.settle";    // take payments, close
 inline constexpr const char *Void = "order.void";        // void items already sent
 inline constexpr const char *Manager = "manager";
 inline constexpr const char *Admin = "admin";        // manager pages
+inline constexpr const char *PriceBook = "pricebook";   // the retail price book: items, prices, costs (admin; later the corporate office)
 inline constexpr const char *EditLayout = "layout.edit"; // edit pages
 inline constexpr const char *Discount = "check.discount"; // discounts and comps
 inline constexpr const char *OthersChecks = "check.others"; // open checks that are someone else's
@@ -30,7 +31,7 @@ inline constexpr const char *OthersChecks = "check.others"; // open checks that 
 
 // Every permission, for the per-person settings.
 inline constexpr const char *AllPermissions[] = {perm::Order, perm::Settle, perm::OthersChecks, perm::Discount,
-                                                 perm::Void, perm::Manager, perm::EditLayout};
+                                                 perm::Void, perm::Manager, perm::PriceBook, perm::EditLayout};
 
 // Built-in roles. M4 makes these editable.
 std::set<std::string> permissionsForRole(const std::string &role);

@@ -438,15 +438,43 @@ bool PosService::require(const char *permission, const QString &action, Check *n
     // Voids, discounts and manager actions can be approved on the spot.
     const std::string p = permission;
     if (running_ && !selfOrder_
-        && (p == perm::Void || p == perm::Discount || p == perm::Manager || p == perm::Settle || p == perm::OthersChecks)) {
+        && (p == perm::Void || p == perm::Discount || p == perm::Manager || p == perm::Settle || p == perm::OthersChecks || p == perm::PriceBook)) {
         approval_ = {{u"needed"_s, true}, {u"action"_s, action}, {u"permission"_s, QString::fromLatin1(permission)},
                      {u"who"_s, qs(user()->name)}};
         approvalMethod_ = running_->method;
         approvalArgs_ = running_->args;
         emit sessionChanged();
-        return fail(tr("%1 needs a manager's approval.").arg(action));
+        return fail(p == perm::PriceBook ? tr("Price book changes need an admin.")
+                                         : tr("%1 needs a manager's approval.").arg(action));
     }
+    if (p == perm::PriceBook)
+        return fail(tr("Price book changes need an admin."));
     return fail(tr("%1 is not allowed for %2.").arg(action, qs(user()->name)));
+}
+
+bool PosService::mayChangePriceBook() const
+{
+    return user() && permissionsOf(*user()).contains(perm::PriceBook);
+}
+
+bool PosService::requirePriceBook(const std::function<bool()> &touches)
+{
+    // (Already allowed, or allowed for this person: the price book isn't looked through.)
+    if (priceBookGrant_ > 0 || mayChangePriceBook() || !touches())
+        return true;
+    return require(perm::PriceBook, tr("Changing the price book"));
+}
+
+std::map<std::string, std::string> PosService::scopesNow() const
+{
+    return categoryScopes(s_->categories(), s_->menu);
+}
+
+bool PosService::priceBookCategory(const std::string &id) const
+{
+    const auto scopes = scopesNow();
+    const auto it = scopes.find(id);
+    return it != scopes.end() && it->second == kScopeRetail;
 }
 
 bool PosService::approve(const QString &pin)

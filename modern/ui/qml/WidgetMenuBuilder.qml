@@ -26,6 +26,7 @@ Item {
     focus: true
     // Unitech MS912+ Hands-Free Scanner: Jump to existing item if barcode exists, else fill empty UPC
     property string scanBuf: ""
+    readonly property Item focusedItem: Window.activeFocusItem   // where a scan goes (scanKey) while the card is open
     property double lastScanKeyMs: 0
     function findExistingItemByBarcode(raw) {
         const c = String(raw ?? "").trim()
@@ -55,6 +56,12 @@ Item {
             if (!scanned) return
             const code = String(scanned).trim()
             if (code === "") return
+            // Add Item -> Single in a box: the box's UPC.
+            if (addKindDialog.opened && addKindDialog.stage === "box") { addKindDialog.scanned(code); return }
+            // A field with the cursor in it on the card (its scanKey: Parent Master UPC): the scan goes there.
+            // (The UPC field keeps its way: filled when it's empty, else the item scanned is opened.)
+            const f = w.focusedItem
+            if (w.editingItem && f && f.scanKey) { w.set(f.scanKey, code); return }
             const existing = w.findExistingItemByBarcode(code)
             if (existing) {
                 w.choosingScope = false
@@ -508,10 +515,84 @@ Item {
         returnToItem = null
         draft = itemDraft(i)
         itemId = i ? i.id : ""
+        addKind = ""
+        costTyped = false
         editingItem = true
         editingCategory = false
         stage = "card"
     }
+    // + Add Item (owner 2026-11-24). Retail asks first: a box or carton (parent), a single that comes in a
+    // box (child: its box is asked for next), or a single with no box. Hospitality and Event don't ask.
+    // The new card opens with the cursor in its UPC field, for a scan.
+    property string addKind: ""        // the new card's: parent | child | single ("": not asked)
+    property bool boxFirst: false      // Add the box first: once the box is saved, back to the single
+    property bool costTyped: false     // the cost typed by hand: not worked out from the box any more
+    onEditingItemChanged: if (!editingItem) boxFirst = false
+    function startAdd() {
+        if (retailMode) addKindDialog.ask()
+        else editItem(null)
+    }
+    function startNewItem() { editItem(null) }   // (a scan of an unknown code, from the order screens)
+    function startNew(kind, upc) {
+        editItem(null)
+        addKind = kind
+        if (upc) { set("upc", upc); set("barcodes", upc) }
+        focusUpc()
+    }
+    // A single in a box: Parent Master UPC filled in; its own UPC next, then how many come in the box.
+    function startChild(box) {
+        editItem(null)
+        addKind = "child"
+        const d = copy(draft)
+        d.child = true
+        d.parentUpc = box.upc
+        d.packSize = ""
+        draft = d
+        focusUpc()
+    }
+    // The box isn't an item yet: its card first (with the UPC typed or scanned), then back to the single.
+    function addBoxFirst(typed) {
+        const code = /^[0-9]{4,}$/.test(typed)
+        startNew("parent", code ? typed : "")
+        if (!code && typed !== "") set("name", typed)
+        boxFirst = true
+    }
+    function focusUpc() {
+        moreOpen = true
+        focusUpcSoon.restart()
+    }
+    Timer {
+        id: focusUpcSoon
+        interval: 80
+        onTriggered: {
+            if (!w.editingItem) return
+            const p = upcField.mapToItem(cardColumn, 0, 0)
+            cardFlick.contentY = Math.max(0, Math.min(cardFlick.contentHeight - cardFlick.height, p.y - 80))
+            upcField.forceActiveFocus()
+        }
+    }
+    // The box this single comes in (by Parent Master UPC), when it's an item here.
+    readonly property var parentItem: editingItem && String(draft.parentUpc ?? "").trim() !== ""
+                                      ? findExistingItemByBarcode(draft.parentUpc) : null
+    onParentItemChanged: childCost()
+    // A single's cost: the box's cost / how many come in it, once both are known (still changeable).
+    function childCost() {
+        if (!editingItem || costTyped || !parentItem) return
+        if (addKind !== "child" && String(draft.cost ?? "").trim() !== "") return
+        const count = parseInt(draft.packSize ?? "")
+        const boxCost = Number(parentItem.cost || 0)
+        if (!(count >= 1) || !(boxCost > 0)) return
+        const cost = (boxCost / count).toFixed(2)
+        if (cost === String(draft.cost ?? "")) return
+        set("cost", cost)
+        const m = parseFloat(targetMarginInput.text)
+        if (targetMarginInput.text.trim() !== "" && m >= 0 && m < 100)
+            set("price", (Number(cost) / (1.0 - m / 100.0)).toFixed(2))
+    }
+    // The retail price book is an admin's (owner 2026-11-24): everything can be looked at; a change asks for
+    // an admin's PIN (the main computer's approval, as for voids). Sold Out / For Sale stays a manager's.
+    readonly property bool mayPriceBook: pos ? pos.permissions.includes("pricebook") : false
+    readonly property bool priceBookLocked: retailMode && !mayPriceBook
     // A choice group: its rule in words (how many; required), its options as rows.
     function editGroup(g) {
         draft = groupDraft(g)
@@ -635,7 +716,14 @@ Item {
         if (added) {
             waitingFor = ""
             categoryId = added.family
+            const backToSingle = boxFirst
             editItem(added)
+            // Add the box first: the box is saved, so on to the single in it.
+            if (backToSingle) {
+                boxFirst = false
+                addKindDialog.askBox()
+                addKindDialog.use(added)
+            }
         }
     }
     // Import…, Starter… and + Category open and close with each touch (a second touch closes what the
@@ -650,6 +738,15 @@ Item {
         return true
     }
     function saveItem() {
+        // Only Sold Out / For Sale changed (a manager without the price book): only that is sent.
+        if (priceBookLocked && savedItem) {
+            const fresh = itemDraft(savedItem)
+            fresh.available = draft.available
+            if (same(fresh, draft)) {
+                pos.saveMenuItemCard({ id: savedItem.id, name: savedItem.name, available: draft.available })
+                return
+            }
+        }
         const card = copy(draft)
         if (card.id === "") {
             waitingFor = card.name.trim()
@@ -1220,6 +1317,15 @@ Item {
                         onClicked: w.leave(() => w.editCategory(w.category))
                     }
                 }
+                Label {
+                    objectName: "builderPriceBookNote"
+                    visible: w.priceBookLocked
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Price book changes need an admin. You can look at everything; a change asks for an admin's PIN. Sold Out and For Sale are yours.")
+                    color: "#f5b940"
+                    font.pixelSize: 13
+                }
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -1546,7 +1652,7 @@ Item {
                                     // Taken now: after a Save in the prompt this tile (and
                                     // what it can see) may be gone.
                                     const item = modelData.add ? null : modelData, b = w
-                                    b.leave(() => b.editItem(item))
+                                    b.leave(() => item ? b.editItem(item) : b.startAdd())
                                 }
                                 // Held: dragged to another place in the category, or onto another.
                                 onPressAndHold: m => {
@@ -1772,11 +1878,13 @@ Item {
                                         Label { text: qsTr("Unit Cost ($)") }
                                         TextField {
                                             id: costInput
+                                            objectName: "builderCost"
                                             Layout.fillWidth: true
                                             text: w.draft.cost ?? ""
                                             placeholderText: "0.00"
                                             inputMethodHints: Qt.ImhFormattedNumbersOnly
                                             onTextEdited: {
+                                                w.costTyped = true
                                                 w.set("cost", text)
                                                 if (targetMarginInput.text.trim() !== "") {
                                                     const c = parseFloat(text) || 0
@@ -1866,9 +1974,13 @@ Item {
 
                                             Label { text: qsTr("Parent Master UPC:") }
                                             TextField {
+                                                objectName: "builderParentUpc"
+                                                property string scanKey: "parentUpc"   // a scan with the cursor here fills it
                                                 Layout.preferredWidth: 180
                                                 text: w.draft.parentUpc ?? ""
                                                 placeholderText: qsTr("Box/Carton UPC")
+                                                inputMethodHints: Qt.ImhNoPredictiveText
+                                                onActiveFocusChanged: if (activeFocus) selectAll()
                                                 onTextEdited: w.set("parentUpc", text)
                                             }
 
@@ -1884,11 +1996,15 @@ Item {
                                             Label { text: qsTr("Subunit Count in Parent:") }
                                             TextField {
                                                 id: subCountField
+                                                objectName: "builderPackSize"
                                                 Layout.preferredWidth: 80
                                                 text: w.draft.packSize ?? "1"
                                                 placeholderText: qsTr("e.g. 25")
                                                 inputMethodHints: Qt.ImhDigitsOnly
-                                                onTextEdited: w.set("packSize", text)
+                                                onTextEdited: {
+                                                    w.set("packSize", text)
+                                                    w.childCost()
+                                                }
                                             }
 
                                             TouchButton {
@@ -1912,6 +2028,26 @@ Item {
                                                     }
                                                 }
                                             }
+                                        }
+                                        // What it's linked to: the box's name and price (or that no item has that UPC).
+                                        Label {
+                                            objectName: "builderParentInfo"
+                                            Layout.fillWidth: true
+                                            visible: text !== ""
+                                            wrapMode: Text.WordWrap
+                                            readonly property string upc: String(w.draft.parentUpc ?? "").trim()
+                                            text: w.parentItem ? qsTr("In the box: %1  ·  %2").arg(w.parentItem.name).arg(w.parentItem.price)
+                                                : upc !== "" ? qsTr("No item has this UPC yet: add the box first.") : ""
+                                            color: w.parentItem ? "#7ee2a8" : "#f5b940"
+                                            font.pixelSize: 14
+                                        }
+                                        Label {
+                                            visible: w.addKind === "child"
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            text: qsTr("A single: its own UPC, then how many come in the box. Its cost is the box's cost divided by that; you can change it.")
+                                            opacity: 0.7
+                                            font.pixelSize: 13
                                         }
                                     }
                                 }
@@ -2360,6 +2496,8 @@ Item {
                                         text: w.draft.upc ?? ""
                                         placeholderText: qsTr("Primary UPC barcode (12/13 digits)")
                                         inputMethodHints: Qt.ImhNoPredictiveText
+                                        // A single's UPC scanned (the scanner's Enter): how many come in the box, next.
+                                        onAccepted: if (w.addKind === "child") subCountField.forceActiveFocus()
                                         onTextEdited: {
                                             w.set("upc", text)
                                             const combined = [text.trim(), (w.draft.altupc ?? "").trim()].filter(Boolean).join(", ")
@@ -2889,6 +3027,15 @@ Item {
                     visible: w.editingItem || w.editingCategory || w.editingGroup
                     height: visible ? implicitHeight : 0
                     Label {
+                        objectName: "builderCardPriceBookNote"
+                        visible: w.editingItem && w.priceBookLocked
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Price book changes need an admin: Save asks for an admin's PIN (Sold Out alone doesn't).")
+                        color: "#f5b940"
+                        font.pixelSize: 13
+                    }
+                    Label {
                         objectName: "builderNotSaved"
                         visible: w.unsaved()
                         text: qsTr("● Not saved yet")
@@ -3044,6 +3191,10 @@ Item {
     }
     MenuBuilderLike {
         id: likeDialog
+        menu: w
+    }
+    MenuBuilderAddItem {
+        id: addKindDialog
         menu: w
     }
     MenuBuilderPrint {

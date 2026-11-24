@@ -1996,6 +1996,26 @@ private:
     core::Check &splitOff(qint64 fromId);
     // `noteOn`: the check the approval is noted on (else the open one).
     bool require(const char *permission, const QString &action, core::Check *noteOn = nullptr);
+    // The retail price book (perm::PriceBook, owner 2026-11-24): an admin's to change, or a manager's
+    // with an admin's PIN (require()). `touches` says whether the change reaches the price book (retail
+    // items and Retail categories; worked out only when it matters). Hospitality and event items: true,
+    // as before. Scripts (syncPriceBook) don't come through here.
+    bool requirePriceBook(const std::function<bool()> &touches);
+    bool mayChangePriceBook() const;
+    // Every category's kind now, and whether an item or a category is the price book's.
+    std::map<std::string, std::string> scopesNow() const;
+    bool priceBookItem(const core::MenuItem &m) const { return core::inPriceBook(m, scopesNow()); }
+    bool priceBookCategory(const std::string &id) const;
+    // Allowed once for an operation that does several (Select's changes, an import): the steps inside
+    // don't ask again.
+    int priceBookGrant_ = 0;
+    struct PriceBookGrant {
+        PosService *pos;
+        explicit PriceBookGrant(PosService *p) : pos(p) { ++pos->priceBookGrant_; }
+        ~PriceBookGrant() { --pos->priceBookGrant_; }
+        PriceBookGrant(const PriceBookGrant &) = delete;
+        PriceBookGrant &operator=(const PriceBookGrant &) = delete;
+    };
     // The operation running through invoke(), to try again once approved.
     struct Running { QString method; QVariantList args; };
     std::optional<Running> running_;
