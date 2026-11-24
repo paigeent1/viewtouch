@@ -3,9 +3,12 @@
 #include "app/pos_json.hh"
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
+#include "storage/backup.hh"
 
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 
 #include <algorithm>
@@ -341,4 +344,31 @@ TEST_CASE("Mass updates: New items and No category", "[massupdates]")
     CHECK(s[u"rows"_s].toList()[0].toMap()[u"name"_s] == u"NEW PACK"_s);
     REQUIRE(pos.massView({{u"noCategory"_s, true}}));
     CHECK(state(pos)[u"count"_s].toInt() == 0);
+}
+
+TEST_CASE("Mass updates: backups take the mass-updates folder too", "[massupdates][backup]")
+{
+    QTemporaryDir data, backups;
+    REQUIRE(data.isValid());
+    REQUIRE(backups.isValid());
+    const QString mass = QDir(data.path()).filePath(u"mass-updates"_s);
+    REQUIRE(QDir().mkpath(mass + u"/change-sets"_s));
+    auto write = [](const QString &path, const QByteArray &bytes) {
+        QFile f(path);
+        REQUIRE(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write(bytes);
+    };
+    write(mass + u"/first-seen.json"_s, "{}");
+    write(mass + u"/change-sets/a.vtchanges.json"_s, "{\"id\":\"a\"}");
+
+    const QString dest = QDir(backups.path()).filePath(u"mass-updates"_s);
+    CHECK(storage::mirrorFolder(mass, dest) == 2);
+    CHECK(QFileInfo::exists(dest + u"/change-sets/a.vtchanges.json"_s));
+    CHECK(storage::mirrorFolder(mass, dest) == 0);   // nothing new
+
+    write(mass + u"/first-seen.json"_s, "{\"item-1\":1}");   // changed: copied again
+    CHECK(storage::mirrorFolder(mass, dest) == 1);
+    QFile copy(dest + u"/first-seen.json"_s);
+    REQUIRE(copy.open(QIODevice::ReadOnly));
+    CHECK(copy.readAll() == "{\"item-1\":1}");
 }

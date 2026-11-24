@@ -304,6 +304,40 @@ void BackupScheduler::check()
         backupNow();
 }
 
+int mirrorFolder(const QString &srcDir, const QString &dest, QString *error)
+{
+    if (srcDir.isEmpty() || !QFileInfo(srcDir).isDir())
+        return 0;
+    int copied = 0;
+    QDirIterator it(srcDir, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString from = it.next();
+        if (from.endsWith(u".part"_s))
+            continue;
+        const QString to = QDir(dest).filePath(QDir(srcDir).relativeFilePath(from));
+        const QFileInfo a(from), b(to);
+        if (b.exists() && b.size() == a.size() && b.lastModified() >= a.lastModified())
+            continue;   // already there and the same
+        const QString part = to + u".part"_s;
+        QFile::remove(part);
+        if (!QDir().mkpath(QFileInfo(to).absolutePath()) || !QFile::copy(from, part)) {
+            QFile::remove(part);
+            if (error)
+                *error = u"Could not copy %1 to %2."_s.arg(from, to);
+            continue;
+        }
+        QFile::remove(to);
+        if (!QFile::rename(part, to)) {
+            QFile::remove(part);
+            if (error)
+                *error = u"Could not copy %1 to %2."_s.arg(from, to);
+            continue;
+        }
+        ++copied;
+    }
+    return copied;
+}
+
 int mirrorArchive(const QString &archiveDir, const QString &dest, QString *error)
 {
     if (archiveDir.isEmpty() || !QFileInfo(archiveDir).isDir())
@@ -335,7 +369,7 @@ void BackupScheduler::backupNow()
         return;
     running_ = true;
     pool_.start([this, db = db_, dir = dir_, copyDir = copyDir_, keep = keep_, key = sealKey_, salt = sealSalt_,
-                 archive = archiveDir_] {
+                 archive = archiveDir_, mass = massDir_] {
         QString error;
         QString target;
         bool ok = QDir().mkpath(dir);
@@ -379,6 +413,15 @@ void BackupScheduler::backupNow()
                 mirrorArchive(archive, QDir(copyDir).filePath(u"eod-archive"_s), &why);
             if (!why.isEmpty())
                 qCWarning(lcBackup).noquote() << "End of Day archive:" << why;
+        }
+        // Mass Updates' change sets (its Undo and Store Updating list) and first-seen list.
+        if (ok && !mass.isEmpty()) {
+            QString why;
+            mirrorFolder(mass, QDir(dir).filePath(u"mass-updates"_s), &why);
+            if (!copyDir.isEmpty())
+                mirrorFolder(mass, QDir(copyDir).filePath(u"mass-updates"_s), &why);
+            if (!why.isEmpty())
+                qCWarning(lcBackup).noquote() << "Mass updates:" << why;
         }
         QMetaObject::invokeMethod(this, [this, ok, target, error, copy, copyOk] {
             running_ = false;

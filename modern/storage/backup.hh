@@ -39,6 +39,10 @@ QStringList pruneBackups(const QString &dir, int keep);
 // copied (written aside, then renamed) and made read-only; nothing there is replaced or removed.
 // Returns how many were copied; `error` says what couldn't be.
 int mirrorArchive(const QString &archiveDir, const QString &dest, QString *error = nullptr);
+// Every file under `srcDir` copied into `dest` (written aside, then renamed) when it isn't there yet or
+// differs in size or time; nothing there is removed. For <data>/mass-updates (its change sets and
+// first-seen list). Returns how many were copied; `error` says what couldn't be.
+int mirrorFolder(const QString &srcDir, const QString &dest, QString *error = nullptr);
 
 // The store's backup key and salt from the database at `db` (read only);
 // both empty when its backups aren't encrypted.
@@ -63,6 +67,8 @@ public:
     // The End of Day archive folder: mirrored into <backups>/eod-archive (and the second copy's) with
     // each backup, so the archived PDFs are backed up with the database that records them.
     void setArchiveDirectory(const QString &dir) { archiveDir_ = dir; }
+    // Mass Updates' folder (<data>/mass-updates): mirrored into <backups>/mass-updates (and the second copy's).
+    void setMassUpdateDirectory(const QString &dir) { massDir_ = dir; }
     // Encrypt backups with this key (see sealed.hh); empty: plain copies.
     // Encrypted backups are named viewtouch-<time>.vtbak.
     void setSealing(const QByteArray &key, const QByteArray &salt)
@@ -87,6 +93,7 @@ private:
     QString dir_;
     QString copyDir_;
     QString archiveDir_;
+    QString massDir_;
     QByteArray sealKey_;
     QByteArray sealSalt_;
     int keep_;

@@ -159,6 +159,13 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/MenuBuilderAddItem.qml`
 - **Next person must know:** In QML, never empty or swap a Repeater/ListView model from inside a click of one of its own delegates: hide them, or Qt.callLater the change.
 
+### 2026-11-24 10:47 ET — Bob (Claude) helper — Backups take the mass-updates folder too
+- **What:** Tablet app: no change. Server: changed. Each backup also mirrors <data>/mass-updates (the change sets applied here, which Undo and Store Updating's list read, and first-seen.json for New items) into <backups>/mass-updates and the second backup folder's (storage::mirrorFolder: copies files that are new or differ in size or time, written aside then renamed; removes nothing). BackupScheduler::setMassUpdateDirectory, set from main.cpp. Test: 'Mass updates: backups take the mass-updates folder too'.
+- **Why:** The Mass Updates commit's notes: 'Backups don't copy <data>/mass-updates yet'; Bob asked for it.
+- **Files:** `modern/main.cpp`, `modern/storage/backup.cpp`, `modern/storage/backup.hh`, `modern/tests/test_mass_updates.cpp`
+- **Next person must know:** Restoring a backup doesn't put mass-updates back by itself: copy <backups>/mass-updates beside viewtouch.db by hand if it's ever needed.
+
+
 ### 2026-11-24 10:45 ET — Bob (Claude) helper — Mass Updates screen: finger-sized controls; brand / group lists shown; UI test item is retail
 - **What:** Tablet app: changed (WidgetMassUpdates.qml). Server: no change. Every button, field, choice, tab, sort heading and grid row of Mass Updates is at least 44 px high (w.touch: max(44, unit x 2.6)), the tick column 44 wide, so 'Touch: every control on every page is big enough for a finger' passes on the new page. The grid's ListView id was 'list', which shadowed the brand / product group / sub group choices' own 'list' property (TypeError: indexOf is not a function): renamed rowList. The UI test's item is marked retail (__retail__), since the grid shows the retail scope.
 - **Why:** First CI run of the Mass Updates branch (run 45424838136): it compiled; two new failures, the touch-size check on mass-updates and the Mass Updates UI test (its drinks item isn't retail, so no row).

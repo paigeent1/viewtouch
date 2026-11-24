@@ -1614,6 +1614,7 @@ int runStore(const Args &cli, const Options &o)
         };
         applyBackupSettings();
         backups->setArchiveDirectory(shared->archiveDir);
+        backups->setMassUpdateDirectory(shared->massUpdateDir);
         QObject::connect(shared, &vt::app::PosShared::adminChanged, backups.get(), applyBackupSettings);
         QObject::connect(backups.get(), &vt::storage::BackupScheduler::finished, &pos,
                          [&pos, shared](bool ok, const QString &, const QString &error, const QString &copy, bool copyOk) {
