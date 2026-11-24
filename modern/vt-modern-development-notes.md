@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 12:09 ET — Bob (Claude) — Tests: a tap whose list was rebuilt while it scrolled finds the item again
+- **What:** Tablet app: no change. Server: no change. tests/test_pos_flow.cpp Screen::tapItem keeps a QPointer to the item; if scrolling it into view (a 30 ms wait) let its list be rebuilt, it finds the item with the same objectName again instead of using a deleted one.
+- **Why:** Main 5cb4db3 crashed (SIGSEGV in tapItem) in a random one of the new Retail Add Item UI tests in CI runs 45436336110, 45438498907, 45442595184: the item grid's model is reassigned when the server's builderItems arrives, destroying the + Add Item tile found a moment before. On a store screen that's a missed touch at most, not a crash.
+- **Files:** (none)
+
 ### 2026-11-24 10:51 ET — Bob (Claude) helper — Menu Builder Add Item: the crash was the touched button destroyed under its own touch
 - **What:** Tablet app: changed. Server: no change. Touching Single in a box (child) switched the popup to its box step, which emptied the Repeater's model and destroyed the button still handling its touch (SIGSEGV in CI, in whichever UI test took that path first: runs 45418136053, 45424711224). The three choices now stay and are only hidden on the box step; the popup's other touches (a box in the list, Add the box first, Box or carton, Single item) act after the touch is done (Qt.callLater). A box found on the screen by its UPC is taken once (it was taken twice). The test's step logging (previous commit) is taken out again.
 - **Why:** CI log of run 45427301662 crashed in 'a single in a box, its box found by UPC', the other test that touches Single in a box.

@@ -307,6 +307,10 @@ struct Screen : Session {
     void tapItem(QQuickItem *item)
     {
         REQUIRE(item);
+        // A list can be rebuilt while it scrolls (its model reassigned when the server's answer arrives):
+        // then the item found is gone and the one with its name is tapped (CI 2026-11-24: a SIGSEGV here).
+        QPointer<QQuickItem> guard(item);
+        const QString name = item->objectName();
         // In a list scrolled past it: scrolled to it first, as a person would.
         for (QQuickItem *p = item->parentItem(); p; p = p->parentItem()) {
             if (!p->inherits("QQuickFlickable"))
@@ -324,6 +328,12 @@ struct Screen : Session {
                 p->setProperty("contentX", std::clamp(r.center().x() - p->width() / 2, 0.0, maxX));
             QTest::qWait(30);
             break;
+        }
+        if (!guard) {
+            INFO("the item to tap was rebuilt while its list scrolled: " << name.toStdString());
+            REQUIRE_FALSE(name.isEmpty());
+            item = findBy(window->contentItem(), "objectName", name);
+            REQUIRE(item);
         }
         const QPointF centre = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
         QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
