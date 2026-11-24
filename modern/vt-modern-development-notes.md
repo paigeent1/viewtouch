@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 10:35 ET — Bob (Claude) helper — Test: steps of 'Add the box first' written to the log (find CI's crash)
+- **What:** Tablet app: no change. Server: no change. The Add the box first UI test writes each step to stderr, so the CI log shows where it crashes (SIGSEGV again in run 45424711224). To come out once fixed.
+- **Why:** No Qt on the helper's machine: CI is the only place the UI tests run.
+- **Files:** `modern/tests/test_pos_flow.cpp`
+
 ### 2026-11-24 10:21 ET — Bob (Claude) helper — Menu Builder Add Item: card changes after the popup and the list are done (CI crash)
 - **What:** Tablet app: changed. Server: no change. Add the box first went back to the single from inside the item list's rebuild (opening and closing the Add Item popup there): CI crashed (SIGSEGV) in that test. Now the single's card opens a moment later (Qt.callLater, backToSingle()), and the popup's choices (box, single, Add the box first, a box found by its UPC) change the card after the popup has closed.
 - **Why:** CI run 45418136053 on helper/parent-child: SIGSEGV in 'UI: Menu Builder Retail: Add the box first, then back to the single'. The other failures in that run are main's known ones (modern/tools/ci/main.fails).
