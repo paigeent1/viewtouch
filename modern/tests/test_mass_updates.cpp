@@ -183,7 +183,10 @@ TEST_CASE("Mass updates: a preview changes nothing; a margin price skips and lis
 
 TEST_CASE("Mass updates: a manager without the price book can't apply; an admin can", "[massupdates][pricebook]")
 {
-    PosService pos(retailStore(30), nullptr);
+    app::PosData data = retailStore(30);
+    for (core::Employee &e : data.employees)
+        e.allow.erase(core::perm::PriceBook);           // (the test fixture gives the starter manager the price book)
+    PosService pos(std::move(data), nullptr);
     REQUIRE(pos.loginWithPin(u"1234"_s));               // Morgan: a manager
     REQUIRE(pos.massView({}));
     REQUIRE(pos.massChoose({u"pb-0"_s}, true));

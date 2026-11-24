@@ -9,7 +9,7 @@ a change set straight to another store over the network.
 
 - Changing items, prices or costs from Mass Updates needs the `pricebook` permission (`perm::PriceBook`,
   `core/employee.hh`). Admins have it. A manager can open the screen, find items and preview a change, but
-  Apply, Undo, cost previews and importing a change set ask for an admin's PIN (`PosService::require`, the
+  Apply, Undo, cost previews and importing a change set ask for an admin's PIN (`PosService::requirePriceBook`, the
   usual approval pad).
 - The owner (2026-11-24): "Eventually this will be a corp function managing the entire organization."
   This permission is the hook for that later **corporate office**. A head office would hold `pricebook` for

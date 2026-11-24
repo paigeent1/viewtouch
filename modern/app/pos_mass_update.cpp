@@ -623,7 +623,7 @@ struct MassImpl {
         PosService::MassView &v = view(p);
         const Shared::Rows &x = rows(p, v.scope);
         Shared &m = shared(p);
-        const bool canApply = p.permissionsOf(*p.user()).contains(perm::PriceBook);
+        const bool canApply = p.mayChangePriceBook();
         const std::vector<std::uint32_t> picked = mass::pick(x.rows, filterOf(p, v), sortOf(v), v.desc);
         const int count = int(picked.size());
         const int pages = std::max(1, (count + kPage - 1) / kPage);
@@ -827,7 +827,7 @@ bool PosService::massPreview(const QVariantMap &action)
     MassView &v = MassImpl::view(*this);
     const std::string kind = ss(action.value(u"kind"_s).toString());
     // Costs are the price book's to see changed too (an admin, or an admin's PIN).
-    if (kind == "cost" && !require(perm::PriceBook, tr("Changing costs")))
+    if (kind == "cost" && !requirePriceBook([] { return true; }))
         return false;
     const std::vector<std::uint32_t> chosen = MassImpl::chosenRows(*this);
     if (chosen.empty())
@@ -946,7 +946,7 @@ bool PosService::massApply()
     MassView &v = MassImpl::view(*this);
     if (!v.preview || v.preview->changes.empty())
         return fail(tr("Preview a change first."));
-    if (!require(perm::PriceBook, tr("Changing the price book")))
+    if (!requirePriceBook([] { return true; }))
         return false;
     MassView::Preview pv = std::move(*v.preview);
     v.preview.reset();
@@ -967,7 +967,7 @@ bool PosService::massUndo()
     auto &m = MassImpl::shared(*this);
     if (m.lastId.isEmpty() || m.lastUndone)
         return fail(tr("Nothing to undo."));
-    if (!require(perm::PriceBook, tr("Changing the price book")))
+    if (!requirePriceBook([] { return true; }))
         return false;
     MassView &v = MassImpl::view(*this);
     std::vector<mass::Skip> skipped;
@@ -988,7 +988,7 @@ bool PosService::massImport(const QVariantMap &file)
         return false;
     if (file.value(u"format"_s).toString() != QLatin1String(kFormat))
         return fail(tr("That isn't a ViewTouch change set file."));
-    if (!require(perm::PriceBook, tr("Changing the price book")))
+    if (!requirePriceBook([] { return true; }))
         return false;
     MassView &v = MassImpl::view(*this);
     const auto &x = MassImpl::rows(*this, v.scope);
