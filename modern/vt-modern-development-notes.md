@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 11:54 ET — Bob (Claude) helper — Mass Updates screen: the grid gets its height (it had none)
+- **What:** Tablet app: changed (WidgetMassUpdates.qml). Server: no change. The item grid, its list, the change sets list and the preview list have preferred heights (the grid at least 3 rows), and the tabs' StackLayout no longer fills: a Qt Quick layout shares spare height by preferred height, so the grid (preferred 0) was drawn 0 high and showed no rows.
+- **Why:** CI run 45438498907: the Mass Updates UI test's diagnostics said the server sent 1 row and the ListView had it (count 1) at height 0.
+- **Files:** `modern/ui/qml/WidgetMassUpdates.qml`
+
 ### 2026-11-24 11:33 ET — Bob (Claude) helper — Mass Updates on main's price book guard (rebased onto 5cb4db3)
 - **What:** Tablet app: no change. Server: changed. Rebased onto main 5cb4db3 (helper/parent-child merged). Dropped this branch's own 'Price book permission' commit: main already has perm::PriceBook (the same line), its require() ('Price book changes need an admin.'), the employee form's 'Change the retail price book' field and the fixture's starter manager with pricebook; its notes entry is removed too. Mass Updates now uses main's guard: Apply, Undo, cost previews and imports call requirePriceBook (an admin, or an admin's PIN), and canApply is mayChangePriceBook(). The manager test in tests/test_mass_updates.cpp takes the fixture's pricebook away from Morgan first. The UI test's diagnostics are WARN (always printed). docs/MASS_UPDATES_STORES.md names requirePriceBook.
 - **Why:** Bob 2026-11-24: main has its own pricebook permission now; keep one version of each piece and make Mass Updates use main's guard.

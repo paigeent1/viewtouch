@@ -238,6 +238,9 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                // (A layout shares its spare height by preferred heights: with none, the grid got none at all.)
+                Layout.preferredHeight: w.touch * 8
+                Layout.minimumHeight: w.touch * 3
                 color: "#f4f6fa"
                 radius: 4
                 readonly property var columns: [["", qsTr("✓"), 2.8], ["upc", qsTr("UPC"), 8], ["name", qsTr("Description"), 0],
@@ -276,6 +279,7 @@ Item {
                         objectName: "massList"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.preferredHeight: w.touch * 6
                         clip: true
                         spacing: 1
                         model: w.rows
@@ -353,6 +357,7 @@ Item {
             }
             StackLayout {
                 Layout.fillWidth: true
+                Layout.fillHeight: false   // (a layout fills by default: the grid takes the spare height)
                 Layout.preferredHeight: Math.max(w.unit * 6.2, w.touch * 2 + 12)
                 currentIndex: tabs.currentIndex
                 // Prices: by margin, or by hand.
@@ -489,6 +494,7 @@ Item {
                         objectName: "massSets"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.preferredHeight: w.touch * 2
                         clip: true
                         spacing: 2
                         model: w.info.sets ?? []
@@ -582,6 +588,7 @@ Item {
                 objectName: "massPreviewList"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.preferredHeight: w.touch * 6
                 clip: true
                 spacing: 1
                 model: w.preview ? w.preview.lines : []
