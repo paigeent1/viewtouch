@@ -17,6 +17,7 @@ Item {
     property ZoneItem zone
     readonly property PosService pos: zone ? zone.pos : null
     readonly property real unit: Math.max(14, Math.min(width / 80, height / 36))
+    readonly property real touch: Math.max(44, unit * 2.6)   // a finger's height for every control
     readonly property real wide: unit * 84          // the grid's columns: narrower than that scrolls sideways
     readonly property var info: pos ? pos.massUpdate : ({})
     readonly property var rows: info.rows ?? []
@@ -71,24 +72,26 @@ Item {
     // (Inline components don't see the ids around them: each is given the size, u.)
     component Small: Button {
         property real u: 16
-        implicitHeight: u * 2.3
+        implicitHeight: Math.max(44, u * 2.6)
+        implicitWidth: Math.max(44, implicitContentWidth + leftPadding + rightPadding)
         font.pixelSize: u * 0.8
     }
     component Pick: Button {
         property real u: 16
-        implicitHeight: u * 2.3
+        implicitHeight: Math.max(44, u * 2.6)
+        implicitWidth: Math.max(44, implicitContentWidth + leftPadding + rightPadding)
         font.pixelSize: u * 0.75
         checkable: true
         highlighted: checked
     }
     component Field: TextField {
         property real u: 16
-        implicitHeight: u * 2.3
+        implicitHeight: Math.max(44, u * 2.6)
         font.pixelSize: u * 0.8
     }
     component Choice: ComboBox {
         property real u: 16
-        implicitHeight: u * 2.3
+        implicitHeight: Math.max(44, u * 2.6)
         font.pixelSize: u * 0.75
     }
 
@@ -237,7 +240,7 @@ Item {
                 Layout.fillHeight: true
                 color: "#f4f6fa"
                 radius: 4
-                readonly property var columns: [["", qsTr("✓"), 2.4], ["upc", qsTr("UPC"), 8], ["name", qsTr("Description"), 0],
+                readonly property var columns: [["", qsTr("✓"), 2.8], ["upc", qsTr("UPC"), 8], ["name", qsTr("Description"), 0],
                                                 ["category", qsTr("Category"), 9], ["brand", qsTr("Brand"), 9],
                                                 ["group", qsTr("Product group"), 7], ["cost", qsTr("Cost"), 5],
                                                 ["price", qsTr("Price"), 5], ["margin", qsTr("Margin %"), 5],
@@ -258,6 +261,8 @@ Item {
                                 text: modelData[1] + (modelData[0] !== "" && w.view.sort === modelData[0] ? (w.view.desc ? " ▼" : " ▲") : "")
                                 Layout.preferredWidth: modelData[2] > 0 ? w.unit * modelData[2] : -1
                                 Layout.fillWidth: modelData[2] === 0
+                                Layout.preferredHeight: w.touch
+                                verticalAlignment: Text.AlignVCenter
                                 font.pixelSize: w.unit * 0.72
                                 font.bold: true
                                 color: "#1d3fb8"
@@ -267,7 +272,7 @@ Item {
                         }
                     }
                     ListView {
-                        id: list
+                        id: rowList
                         objectName: "massList"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -280,7 +285,7 @@ Item {
                             required property int index
                             objectName: "massRow-" + modelData.id
                             width: ListView.view.width
-                            height: w.unit * 2
+                            height: w.touch
                             color: modelData.chosen ? "#c7d2fe" : row.index % 2 ? "#ffffff" : "#e9edf5"
                             RowLayout {
                                 anchors.fill: parent
@@ -289,7 +294,9 @@ Item {
                                 spacing: 4
                                 CheckBox {
                                     objectName: "massTick-" + row.modelData.id
-                                    Layout.preferredWidth: w.unit * 2.4
+                                    Layout.preferredWidth: w.unit * 2.8
+                                    Layout.minimumWidth: 44
+                                    Layout.fillHeight: true
                                     checked: row.modelData.chosen
                                     onClicked: w.pos.massChoose([row.modelData.id], checked)
                                 }
@@ -338,15 +345,15 @@ Item {
                 id: tabs
                 Layout.fillWidth: true
                 font.pixelSize: w.unit * 0.8
-                TabButton { objectName: "massTabPrices"; text: qsTr("Standard Prices") }
-                TabButton { objectName: "massTabCopy"; text: qsTr("Copy Prices") }
-                TabButton { objectName: "massTabCost"; text: qsTr("Cost Updates") }
-                TabButton { objectName: "massTabFields"; text: qsTr("Field Updates") }
-                TabButton { objectName: "massTabStores"; text: qsTr("Store Updating") }
+                TabButton { implicitHeight: w.touch; objectName: "massTabPrices"; text: qsTr("Standard Prices") }
+                TabButton { implicitHeight: w.touch; objectName: "massTabCopy"; text: qsTr("Copy Prices") }
+                TabButton { implicitHeight: w.touch; objectName: "massTabCost"; text: qsTr("Cost Updates") }
+                TabButton { implicitHeight: w.touch; objectName: "massTabFields"; text: qsTr("Field Updates") }
+                TabButton { implicitHeight: w.touch; objectName: "massTabStores"; text: qsTr("Store Updating") }
             }
             StackLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: w.unit * 6.2
+                Layout.preferredHeight: Math.max(w.unit * 6.2, w.touch * 2 + 12)
                 currentIndex: tabs.currentIndex
                 // Prices: by margin, or by hand.
                 ColumnLayout {

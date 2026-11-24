@@ -1667,6 +1667,7 @@ TEST_CASE("UI: Mass Updates: find by UPC, tick it, preview a Set price, apply it
     pack.taxClass = core::TaxClass::Merchandise;
     pack.barcodes = {"012345678905"};
     pack.price = Money::fromCents(1000);
+    pack.recipe.push_back({"__retail__", 1.0});   // a retail item (the grid shows the retail scope)
     s.pos.shared()->menu.push_back(pack);
     REQUIRE(s.pos.loginWithPin(u"1234"_s));
     REQUIRE(s.c.jumpTo(u"mass-updates"_s));
