@@ -9433,7 +9433,13 @@ struct RetailBuilder {
     QQuickItem *by(const QString &name) { return Screen::findBy(root, "objectName", name); }
     void tap(const QString &name)
     {
+        // What the server sends (a category's items, the box search) can take a moment on a busy machine.
         QQuickItem *it = by(name);
+        for (int i = 0; !it && i < 40; ++i) {
+            QTest::qWait(50);
+            it = by(name);
+        }
+        INFO("tapping " << name.toStdString());
         REQUIRE(it);
         s.tapItem(it);
         QTest::qWait(80);

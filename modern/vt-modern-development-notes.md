@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 13:24 ET — Bob (Claude) — Tests: Retail Add Item UI steps wait for what they tap
+- **What:** Tablet app: no change. Server: no change. tests/test_pos_flow.cpp RetailBuilder::tap waits up to 2 s for the thing it taps (a category's items and the box search come from the server) and names it in the failure.
+- **Why:** CI run 45445413295 (after the tapItem fix: no crash, 801 cases) had one flaky failure: 'a manager's price change asks for an admin's PIN' found no item to tap right after opening the category.
+- **Files:** (none)
+
 ### 2026-11-24 12:09 ET — Bob (Claude) — Tests: a tap whose list was rebuilt while it scrolled finds the item again
 - **What:** Tablet app: no change. Server: no change. tests/test_pos_flow.cpp Screen::tapItem keeps a QPointer to the item; if scrolling it into view (a 30 ms wait) let its list be rebuilt, it finds the item with the same objectName again instead of using a deleted one.
 - **Why:** Main 5cb4db3 crashed (SIGSEGV in tapItem) in a random one of the new Retail Add Item UI tests in CI runs 45436336110, 45438498907, 45442595184: the item grid's model is reassigned when the server's builderItems arrives, destroying the + Add Item tile found a moment before. On a store screen that's a missed touch at most, not a crash.
