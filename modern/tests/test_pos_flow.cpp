@@ -9542,41 +9542,19 @@ TEST_CASE("UI: Menu Builder Retail: a single saved without its box is refused", 
 TEST_CASE("UI: Menu Builder Retail: Add the box first, then back to the single", "[flow][ui][menubuild][parentchild]")
 {
     RetailBuilder b;
-    std::fprintf(stderr, "box-first step 1: b.tap(u\"builderAddItem\"_s);\n");
-    std::fflush(stderr);
     b.tap(u"builderAddItem"_s);
-    std::fprintf(stderr, "box-first step 2: b.tap(u\"builderAddKind-child\"_s);\n");
-    std::fflush(stderr);
     b.tap(u"builderAddKind-child"_s);
-    std::fprintf(stderr, "box-first step 3: b.typeText(\"036000291469\");   // no item has it\n");
-    std::fflush(stderr);
     b.typeText("036000291469");   // no item has it
-    std::fprintf(stderr, "box-first step 4: QTest::keyClick(b.s.window, Qt::Key_Return);\n");
-    std::fflush(stderr);
     QTest::keyClick(b.s.window, Qt::Key_Return);
-    std::fprintf(stderr, "box-first step 5: QTest::qWait(250);\n");
-    std::fflush(stderr);
     QTest::qWait(250);
     CHECK(b.by(u"builderBoxProblem"_s));
-    std::fprintf(stderr, "box-first step 6: b.tap(u\"builderAddBoxFirst\"_s);\n");
-    std::fflush(stderr);
     b.tap(u"builderAddBoxFirst"_s);
-    std::fprintf(stderr, "box-first step 7: QTest::qWait(250);\n");
-    std::fflush(stderr);
     QTest::qWait(250);
     CHECK(b.w->property("addKind").toString() == u"parent"_s);
     CHECK(b.draft()[u"upc"_s] == u"036000291469"_s);
-    std::fprintf(stderr, "box-first step 8: b.typeInto(u\"builderName\"_s, \"Toro Box of 25\");\n");
-    std::fflush(stderr);
     b.typeInto(u"builderName"_s, "Toro Box of 25");
-    std::fprintf(stderr, "box-first step 9: b.typeInto(u\"builderPrice\"_s, \"200.00\");\n");
-    std::fflush(stderr);
     b.typeInto(u"builderPrice"_s, "200.00");
-    std::fprintf(stderr, "box-first step 10: b.tap(u\"builderSave\"_s);\n");
-    std::fflush(stderr);
     b.tap(u"builderSave"_s);
-    std::fprintf(stderr, "box-first step 11: QTest::qWait(400);\n");
-    std::fflush(stderr);
     QTest::qWait(400);
     REQUIRE(b.s.pos.findItem(u"Toro Box of 25"_s));
     // Back to the single, its box filled in.

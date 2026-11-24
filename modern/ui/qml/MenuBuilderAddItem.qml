@@ -68,12 +68,13 @@ Popup {
         find = text
         boxProblem = ""
         if (now) {
-            pickWhenFound = /^[0-9]{4,}$/.test(text.trim())
+            const code = /^[0-9]{4,}$/.test(text.trim())
             searchSoon.stop()
+            // Already on this screen: taken straight away; else the main computer's search finds it.
+            const here = code ? menu.findExistingItemByBarcode(text.trim()) : null
+            pickWhenFound = code && !here
+            if (here) { Qt.callLater(() => addItem.use(here)); return }
             if (pos) pos.findItems(text.trim(), 20)
-            // Already on this screen: taken straight away.
-            const here = pickWhenFound ? menu.findExistingItemByBarcode(text.trim()) : null
-            if (here) { pickWhenFound = false; use(here) }
         } else {
             searchSoon.restart()
         }
@@ -105,17 +106,20 @@ Popup {
             font.pixelSize: 20
             font.bold: true
         }
+        // (The same three buttons always, only hidden on the box step: emptying the model would destroy the
+        // button being touched while its touch is still being handled, a crash in CI 2026-11-24.)
         Repeater {
-            model: addItem.stage === "kind" ? [
+            model: [
                 { kind: "parent", title: qsTr("Box or carton (parent)"),
                   example: qsTr("e.g. a box of 20 cigars, a carton of 10 packs") },
                 { kind: "child", title: qsTr("Single in a box (child)"),
                   example: qsTr("e.g. one cigar from that box, one pack from the carton") },
                 { kind: "single", title: qsTr("Single item (no box)"),
-                  example: qsTr("e.g. a lighter, a cutter, a T-shirt") }] : []
+                  example: qsTr("e.g. a lighter, a cutter, a T-shirt") }]
             delegate: MenuTouchButton {
                 required property var modelData
                 objectName: "builderAddKind-" + modelData.kind
+                visible: addItem.stage === "kind"
                 Layout.fillWidth: true
                 implicitHeight: 72
                 contentItem: ColumnLayout {
@@ -125,7 +129,7 @@ Popup {
                 }
                 onClicked: {
                     const kind = modelData.kind, b = addItem.menu
-                    if (kind === "child") { addItem.askBox(); return }
+                    if (kind === "child") { Qt.callLater(addItem.askBox); return }
                     addItem.close()
                     Qt.callLater(() => b.startNew(kind, ""))
                 }
@@ -180,7 +184,7 @@ Popup {
                 objectName: "builderBox-" + modelData.id
                 width: ListView.view.width
                 text: modelData.name + "  ·  " + modelData.price + (modelData.upc ? "  ·  " + modelData.upc : "")
-                onClicked: addItem.use(modelData)
+                onClicked: { const box = modelData; Qt.callLater(() => addItem.use(box)) }
             }
         }
         RowLayout {

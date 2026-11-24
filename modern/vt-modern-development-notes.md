@@ -143,6 +143,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 10:51 ET — Bob (Claude) helper — Menu Builder Add Item: the crash was the touched button destroyed under its own touch
+- **What:** Tablet app: changed. Server: no change. Touching Single in a box (child) switched the popup to its box step, which emptied the Repeater's model and destroyed the button still handling its touch (SIGSEGV in CI, in whichever UI test took that path first: runs 45418136053, 45424711224). The three choices now stay and are only hidden on the box step; the popup's other touches (a box in the list, Add the box first, Box or carton, Single item) act after the touch is done (Qt.callLater). A box found on the screen by its UPC is taken once (it was taken twice). The test's step logging (previous commit) is taken out again.
+- **Why:** CI log of run 45427301662 crashed in 'a single in a box, its box found by UPC', the other test that touches Single in a box.
+- **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/MenuBuilderAddItem.qml`
+- **Next person must know:** In QML, never empty or swap a Repeater/ListView model from inside a click of one of its own delegates: hide them, or Qt.callLater the change.
+
 ### 2026-11-24 10:35 ET — Bob (Claude) helper — Test: steps of 'Add the box first' written to the log (find CI's crash)
 - **What:** Tablet app: no change. Server: no change. The Add the box first UI test writes each step to stderr, so the CI log shows where it crashes (SIGSEGV again in run 45424711224). To come out once fixed.
 - **Why:** No Qt on the helper's machine: CI is the only place the UI tests run.
