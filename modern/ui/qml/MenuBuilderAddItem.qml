@@ -62,7 +62,7 @@ Popup {
     onFoundChanged: {
         if (!pickWhenFound || find.trim() === "") return
         const exact = found.find(i => i.upc && plain(i.upc) === plain(find.trim()))
-        if (exact) { pickWhenFound = false; use(exact) }
+        if (exact) { pickWhenFound = false; Qt.callLater(() => addItem.use(exact)) }
     }
     function look(text, now) {
         find = text
@@ -90,7 +90,8 @@ Popup {
             return
         }
         close()
-        menu.startChild({ id: box.id, name: box.name, upc: upc, price: box.price })
+        const b = menu
+        Qt.callLater(() => b.startChild({ id: box.id, name: box.name, upc: upc, price: box.price }))
     }
 
     contentItem: ColumnLayout {
@@ -126,7 +127,7 @@ Popup {
                     const kind = modelData.kind, b = addItem.menu
                     if (kind === "child") { addItem.askBox(); return }
                     addItem.close()
-                    b.startNew(kind, "")
+                    Qt.callLater(() => b.startNew(kind, ""))
                 }
             }
         }
@@ -193,7 +194,7 @@ Popup {
                 onClicked: {
                     const typed = addItem.find.trim(), b = addItem.menu
                     addItem.close()
-                    b.addBoxFirst(typed)
+                    Qt.callLater(() => b.addBoxFirst(typed))
                 }
             }
             MenuTouchButton {

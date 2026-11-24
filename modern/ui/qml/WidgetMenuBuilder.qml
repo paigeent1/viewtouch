@@ -557,6 +557,14 @@ Item {
         if (!code && typed !== "") set("name", typed)
         boxFirst = true
     }
+    function backToSingle(box) {
+        const upc = String(box.upc ?? (String(box.barcodes ?? "").split(",")[0] ?? "")).trim()
+        if (upc !== "") {
+            startChild({ id: box.id, name: box.name, upc: upc, price: box.price })
+        } else {
+            addKindDialog.askBox()   // (its UPC wasn't kept: the box asked for again)
+        }
+    }
     function focusUpc() {
         moreOpen = true
         focusUpcSoon.restart()
@@ -718,11 +726,12 @@ Item {
             categoryId = added.family
             const backToSingle = boxFirst
             editItem(added)
-            // Add the box first: the box is saved, so on to the single in it.
+            // Add the box first: the box is saved, so on to the single in it (after this change is
+            // through: the list is still being rebuilt here).
             if (backToSingle) {
                 boxFirst = false
-                addKindDialog.askBox()
-                addKindDialog.use(added)
+                const box = added
+                Qt.callLater(() => w.backToSingle(box))
             }
         }
     }
