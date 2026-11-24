@@ -341,6 +341,10 @@ public:
     // The whole menu as a file (Exports, or the folder set for them), for
     // Import... at another store.
     Q_INVOKABLE void exportMenu();
+    // Mass Updates: a change set applied here as a file (Exports, or the folder set for them), for another
+    // store's Store Updating > Import; and such a file read on this device ({error} or the file's contents).
+    Q_INVOKABLE void exportChangeSet(const QString &id);
+    Q_INVOKABLE QVariantMap readChangeSetFile(const QUrl &file) const;
     // A ready-made picture for an item: the emoji drawn big into a PNG the
     // store keeps ("store:emoji-1f32e.png"); "" if it can't be.
     Q_INVOKABLE QString emojiPicture(const QString &emoji);

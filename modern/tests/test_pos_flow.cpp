@@ -1654,6 +1654,56 @@ TEST_CASE("UI: Menu Builder: several items at once; an item dragged onto another
     CHECK_FALSE(by(u"builderGhost"_s));
 }
 
+TEST_CASE("UI: Mass Updates: find by UPC, tick it, preview a Set price, apply it", "[flow][ui][massupdates]")
+{
+    Screen s(false, 1600, 900);
+    // The manager gets the price book permission (an admin's), and the menu a retail item.
+    for (core::Employee &e : s.pos.shared()->employees)
+        e.allow.insert("pricebook");
+    core::MenuItem pack;
+    pack.id = "mass-pack";
+    pack.name = "MASS TEST PACK";
+    pack.family = "drinks";
+    pack.taxClass = core::TaxClass::Merchandise;
+    pack.barcodes = {"012345678905"};
+    pack.price = Money::fromCents(1000);
+    s.pos.shared()->menu.push_back(pack);
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"mass-updates"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    const auto by = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    const auto tap = [&](const QString &name) {
+        QQuickItem *it = by(name);
+        REQUIRE(it);
+        s.tapItem(it);
+        QTest::qWait(80);
+    };
+    QQuickItem *find = by(u"massFind"_s);
+    REQUIRE(find);
+    find->setProperty("text", u"012345678905"_s);
+    QMetaObject::invokeMethod(find, "accepted");
+    QTest::qWait(150);
+    REQUIRE(by(u"massRow-mass-pack"_s));
+    CHECK(s.pos.massUpdate()[u"count"_s].toInt() == 1);
+    tap(u"massTick-mass-pack"_s);
+    CHECK(s.pos.massUpdate()[u"chosen"_s].toInt() == 1);
+    QQuickItem *how = by(u"massPriceHow"_s);
+    REQUIRE(how);
+    how->setProperty("currentIndex", 2);   // Set price
+    QQuickItem *amount = by(u"massPriceAmount"_s);
+    REQUIRE(amount);
+    amount->setProperty("text", u"12.49"_s);
+    tap(u"massPricePreview"_s);
+    REQUIRE(by(u"massPreview"_s));
+    CHECK(s.pos.findItem(u"mass-pack"_s)->price.cents() == 1000);   // a preview changes nothing
+    s.shot("90-mass-updates-preview");
+    tap(u"massApply"_s);
+    CHECK(s.pos.findItem(u"mass-pack"_s)->price.cents() == 1249);
+    CHECK_FALSE(by(u"massPreview"_s));
+    REQUIRE(by(u"massUndo"_s));
+}
+
 TEST_CASE("UI: Menu Builder: a new item like another", "[flow][ui][menubuild][like]")
 {
     Screen s(false, 1280, 800);

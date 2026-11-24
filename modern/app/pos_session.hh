@@ -196,6 +196,10 @@ class PosSession : public QObject {
     // Manager > Reports > Exceptions search (PosService::searchExceptions): {loading, filter, totals,
     // results (200 at a time), shown, count, more}. Sent to a tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap exceptionSearch READ exceptionSearch NOTIFY sessionChanged)
+    // Menu Builder > Mass Updates (PosService::massView): {active, canApply, total, count, chosen, page, pages,
+    // rows (200 at a time), categories, brands, groups, subs, view, preview, last, sets, message}. Sent to a
+    // tablet only while it shows the screen.
+    Q_PROPERTY(QVariantMap massUpdate READ massUpdate NOTIFY adminChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -464,6 +468,7 @@ public:
     virtual QVariantMap quickLabel() const = 0;
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap exceptionSearch() const = 0;
+    virtual QVariantMap massUpdate() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -761,6 +766,19 @@ public:
     Q_INVOKABLE void moreExceptions() { invoke(QStringLiteral("moreExceptions")); }
     Q_INVOKABLE void printExceptionSearch() { invoke(QStringLiteral("printExceptionSearch")); }
     Q_INVOKABLE void checkEodArchive() { invoke(QStringLiteral("checkEodArchive")); }
+    // Mass Updates (answers in massUpdate).
+    Q_INVOKABLE void massView(const QVariantMap &view) { invoke(QStringLiteral("massView"), {view}); }
+    Q_INVOKABLE void massClose() { invoke(QStringLiteral("massClose")); }
+    Q_INVOKABLE void massChoose(const QStringList &ids, bool on) { invoke(QStringLiteral("massChoose"), {ids, on}); }
+    Q_INVOKABLE void massChooseAll() { invoke(QStringLiteral("massChooseAll")); }
+    Q_INVOKABLE void massChooseNone() { invoke(QStringLiteral("massChooseNone")); }
+    Q_INVOKABLE void massChooseOnly(const QStringList &ids) { invoke(QStringLiteral("massChooseOnly"), {ids}); }
+    Q_INVOKABLE void massPreview(const QVariantMap &action) { invoke(QStringLiteral("massPreview"), {action}); }
+    Q_INVOKABLE void massPreviewPage(int page) { invoke(QStringLiteral("massPreviewPage"), {page}); }
+    Q_INVOKABLE void massCancel() { invoke(QStringLiteral("massCancel")); }
+    Q_INVOKABLE void massApply() { invoke(QStringLiteral("massApply")); }
+    Q_INVOKABLE void massUndo() { invoke(QStringLiteral("massUndo")); }
+    Q_INVOKABLE void massImport(const QVariantMap &file) { invoke(QStringLiteral("massImport"), {file}); }
     Q_INVOKABLE void printEodArchive(qint64 seq) { invoke(QStringLiteral("printEodArchive"), {seq}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

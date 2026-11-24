@@ -319,6 +319,7 @@ QString EditorController::kindName(const QString &kind) const
         {u"checkSearch"_s, QT_TR_NOOP("Find a check")},
         {u"eodArchive"_s, QT_TR_NOOP("End of Day archive")},
         {u"exceptionSearch"_s, QT_TR_NOOP("Exceptions search")},
+        {u"massUpdates"_s, QT_TR_NOOP("Mass Updates (many items at once)")},
         {u"orderLater"_s, QT_TR_NOOP("Order for later")},
         {u"menuGrid"_s, QT_TR_NOOP("Menu (self-filling)")},
         {u"menuCategories"_s, QT_TR_NOOP("Menu categories (self-filling)")},

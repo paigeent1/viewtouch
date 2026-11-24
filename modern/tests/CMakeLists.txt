@@ -15,6 +15,7 @@ if(TARGET vtm_layout)
     test_wipe.cpp     # the cutover step (scripts/bin/vt-wipe-transactions)
     test_eod_archive.cpp   # the End of Day archive: write-once PDFs, the hash chain, the long-term folder
     test_exceptions_search.cpp   # Manager > Reports > Exceptions search: filters, totals match the report
+    test_mass_updates.cpp   # Menu Builder > Mass Updates: paging, previews, Apply/Undo, change sets by UPC, price book
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
     )
 endif()

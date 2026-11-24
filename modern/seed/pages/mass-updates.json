@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "mass-updates",
+  "name": "Mass Updates",
+  "kind": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "manager",
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1632,
+        "h": 64
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Mass Updates"
+    },
+    {
+      "id": "close",
+      "kind": "button",
+      "rect": {
+        "x": 1664,
+        "y": 16,
+        "w": 240,
+        "h": 64
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "‹ Menu Builder",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "mass-updates-view",
+      "kind": "massUpdates",
+      "rect": {
+        "x": 16,
+        "y": 96,
+        "w": 1888,
+        "h": 968
+      },
+      "shape": "rect",
+      "behavior": "none"
+    }
+  ]
+}

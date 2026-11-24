@@ -1108,6 +1108,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"reports", u"ilsa-history"},           // ILSA History (the imported ILSA sales history)
                 {u"reports", u"eod-archive"},            // End of Day archive (the day's PDFs, write-once)
                 {u"reports", u"exceptions-search"},      // Exceptions search (from the database)
+                {u"menu-builder", u"mass-updates"},      // Mass Updates… (many items at once, owner 2026-11-24)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
                 {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
@@ -1489,6 +1490,8 @@ int runStore(const Args &cli, const Options &o)
     if (havePosStore) {
         shared->archiveDb = dbPath;
         shared->archiveDir = QFileInfo(dbPath).absoluteDir().filePath(u"eod-archive"_s);
+        // Mass Updates: the change sets applied here, and when each item was first had (New items).
+        shared->massUpdateDir = QFileInfo(dbPath).absoluteDir().filePath(u"mass-updates"_s);
         QString archiveError;
         if (!vt::app::eod::ensureTable(dbPath, &archiveError))
             qWarning().noquote() << "End of Day archive: can't set up its table:" << archiveError;

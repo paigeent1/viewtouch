@@ -1270,6 +1270,42 @@ void LayoutController::exportMenu()
     });
 }
 
+void LayoutController::exportChangeSet(const QString &id)
+{
+    if (!pos_)
+        return;
+    call(u"massChangeSetFile"_s, {id}, [this](const QVariant &result) {
+        const QVariantMap set = result.toMap();
+        if (set.isEmpty())
+            return;   // not allowed, or gone: already said
+        const QString dir = exportDir_.isEmpty() ? QDir::home().filePath(u"ViewTouch Exports"_s) : exportDir_;
+        QString name = set.value(u"store"_s).toString() + u" - "_s + set.value(u"label"_s).toString();
+        name.replace(QRegularExpression(u"[\\/:*?\"<>|%]"_s), u"-"_s);
+        const QString path = QDir(dir).filePath(u"Changes - %1 - %2.vtchanges.json"_s
+                                                    .arg(name.left(80).trimmed(), set.value(u"id"_s).toString()));
+        QSaveFile f(path);
+        if (!QDir().mkpath(dir) || !f.open(QIODevice::WriteOnly)
+            || f.write(QJsonDocument(QJsonObject::fromVariantMap(set)).toJson()) < 0 || !f.commit()) {
+            setStatus(tr("Could not save the changes: %1").arg(f.errorString()));
+            return;
+        }
+        setStatus(tr("Saved to %1").arg(path));
+    });
+}
+
+QVariantMap LayoutController::readChangeSetFile(const QUrl &file) const
+{
+    QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());
+    if (f.size() > 64 * 1024 * 1024)
+        return {{u"error"_s, tr("That file is too big for a change set.")}};
+    if (!f.open(QIODevice::ReadOnly))
+        return {{u"error"_s, tr("Can't open it: %1").arg(f.errorString())}};
+    const QVariantMap set = QJsonDocument::fromJson(f.readAll()).object().toVariantMap();
+    if (set.value(u"format"_s) != u"viewtouch-change-set"_s)
+        return {{u"error"_s, tr("That isn't a ViewTouch change set file.")}};
+    return set;
+}
+
 namespace {
 
 QString orders(const vt::layout::Zone &z)

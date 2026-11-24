@@ -414,6 +414,11 @@ public:
     // (tests, a new folder): the entries are kept in memory only (serviceAuditMemory).
     QString serviceAuditFile;
     std::vector<QJsonObject> serviceAuditMemory;
+    // Mass Updates (pos_mass_update.cpp): its folder, <data>/mass-updates (set by main: the change sets applied
+    // here and when each item was first had, for New items). Empty (tests): kept in memory only.
+    QString massUpdateDir;
+    struct MassShared;
+    std::shared_ptr<MassShared> mass;
 
     // The terminal's open drawer / its most recent one today.
     core::DrawerSession *openDrawerFor(const std::string &terminal);
@@ -678,6 +683,31 @@ public:
     // Everything the last search found, as a report (Print, PDF).
     core::Report exceptionSearchReport() const;
     QVariantMap exceptionSearchVariant();   // managers: the same, for the screen's PDF
+    // --- Mass Updates (pos_mass_update.cpp; Menu Builder > Mass Updates, managers) -----------------
+    // The retail items as a grid, narrowed, sorted and paged here (a page of 200 is sent): `view` {scope
+    // (retail), find, category, path [brand, product group, sub group], noCategory, newDays, field, from,
+    // to (a range), chosenOnly, sort, desc, page}. Opening the screen starts it; massClose stops it.
+    bool massView(const QVariantMap &view);
+    bool massClose();
+    bool massChoose(const QStringList &ids, bool on);   // ticked or not
+    bool massChooseAll();                               // every item the grid is narrowed to (every page)
+    bool massChooseNone();
+    bool massChooseOnly(const QStringList &ids);        // these (Menu Builder's Select), shown alone
+    // What an action would do to the chosen items, old -> new, changing nothing: {kind: margin | price | cost
+    // | copy | field, how: add | percent | set, amount, round: none | 5up | 9up | 9near | 5or9up, from (copy:
+    // a UPC, item number or id), field + value (field), why}. Cost needs the price book permission.
+    bool massPreview(const QVariantMap &action);
+    bool massPreviewPage(int page);
+    bool massCancel();
+    // The preview applied as one change set (the price book permission: an admin, or an admin's PIN);
+    // massUndo puts the last one back.
+    bool massApply();
+    bool massUndo();
+    // A change set file from another store (or this one): matched by UPC, shown as a preview.
+    bool massImport(const QVariantMap &file);
+    // A change set applied here, as its file ({format: viewtouch-change-set, ...}); empty: none such.
+    QVariantMap massChangeSetFile(const QString &id);
+    QVariantMap massUpdate() const override;
     bool printExceptionSearch();
     QVariantMap printerSearch() const override;
     bool findPrinters();
@@ -1846,6 +1876,11 @@ private:
     // "timeclock|<employee id>" (only theirs); `paper`: for the receipt printer.
     core::Report timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
                                  const std::vector<core::TimePunch> &punches, bool paper) const;
+    // Mass Updates' screen here (pos_mass_update.cpp).
+    friend struct MassImpl;
+    struct MassView;
+    mutable std::shared_ptr<MassView> mass_;
+    void massRememberItems();   // new items get today as when they were first had (New items)
     QVariantMap checkSearch_;
     QVariantMap exceptionSearch_;
     std::vector<core::ExceptionEntry> exceptionHits_;

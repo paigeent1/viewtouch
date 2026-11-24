@@ -1448,6 +1448,17 @@ Item {
                         text: qsTr("For Sale")
                         onClicked: w.changeSelected({ available: true })
                     }
+                    TouchButton {   // Mass Updates with these ticked (prices, costs, fields; shown first)
+                        objectName: "builderSelectMass"
+                        implicitHeight: 44
+                        font.pixelSize: 14
+                        enabled: w.selected.length > 0
+                        text: qsTr("Mass update…")
+                        onClicked: {
+                            w.zone.controller.keep("massUpdates", { ids: w.selected, scope: w.builderScope || "retail" })
+                            w.zone.controller.jumpTo("mass-updates")
+                        }
+                    }
                     TouchButton {
                         objectName: "builderSelectRemove"
                         implicitHeight: 44

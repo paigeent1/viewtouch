@@ -263,6 +263,7 @@ void PosService::logMenuChanges(const PosShared::MenuState &before, const PosSha
 
 void PosService::menuChanged()
 {
+    massRememberItems();   // (Mass Updates' New items: only when the menu has more items than before)
     refreshSoldOut();
     ++s_->adminRevision;
     emit s_->adminChanged();
