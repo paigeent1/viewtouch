@@ -3580,25 +3580,21 @@ TEST_CASE("UI: the menu with many categories shows them, or one category's items
     s.c.setMenuCategory(QString());
     QTest::qWait(60);
     // Nothing chosen: the categories only.
+    // (find() sees only what's shown.)
     REQUIRE(find(u"menuFamily-salads"_s));
-    CHECK(find(u"menuFamily-salads"_s)->isVisible());
-    CHECK_FALSE(find(u"menuFamilyBar"_s)->isVisible());
-    {
-        QQuickItem *cobb = find(u"menuItem-cobb"_s);
-        CHECK((!cobb || !cobb->isVisible()));
-    }
+    CHECK(find(u"menuFamilyBar"_s) == nullptr);
+    CHECK(find(u"menuItem-cobb"_s) == nullptr);
     // One chosen: its items, its name, the way back; no categories.
     s.tapItem(find(u"menuFamily-salads"_s));
     QTest::qWait(80);
     REQUIRE(find(u"menuItem-cobb"_s));
-    CHECK(find(u"menuItem-cobb"_s)->isVisible());
-    CHECK(find(u"menuFamilyBar"_s)->isVisible());
-    CHECK_FALSE(find(u"menuFamily-salads"_s)->isVisible());
+    CHECK(find(u"menuFamilyBar"_s) != nullptr);
+    CHECK(find(u"menuFamily-salads"_s) == nullptr);
     s.shot("94-menu-one-category");
     s.tapItem(find(u"menuBackToFamilies"_s));
     QTest::qWait(80);
-    CHECK(find(u"menuFamily-burgers"_s)->isVisible());
-    CHECK_FALSE(find(u"menuFamilyBar"_s)->isVisible());
+    CHECK(find(u"menuFamily-burgers"_s) != nullptr);
+    CHECK(find(u"menuFamilyBar"_s) == nullptr);
 }
 
 TEST_CASE("UI: the store's pictures: a logo on the login page and screen saver, on buttons and backgrounds",

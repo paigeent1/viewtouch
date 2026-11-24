@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 18:56 ET — Bob (Claude) — Many-categories menu test: find() sees only what's shown
+- **What:** Tablet app: no change. Server: no change. The new test checks shown or not by whether Screen::findBy (visible items only) finds it, instead of dereferencing a null.
+- **Why:** CI run 45512316818 crashed in the new test (SIGSEGV): findBy skips hidden items, so the hidden bar came back null.
+- **Files:** (none)
+
 ### 2026-11-24 18:43 ET — Bob (Claude) — Order menu with many categories: the categories, or one category's items
 - **What:** Tablet app: changed. Server: no change. WidgetMenuGrid.qml: when a self-filling menu has more than 12 category buttons (more than two rows), it shows either the categories (nothing chosen) or the chosen category's items with a '‹ Categories' key and the category's name (menuFamilyBar) - never both, so the items get the whole space. Twelve or fewer: as before (categories across the top, items under). Test: 'UI: the menu with many categories shows them, or one category's items, not both'.
 - **Why:** Owner 2026-11-24 18:41 (photo, HCA Bar 3 with 23 categories): 'When draft is selected, only drafts should display' - the categories filled the screen and the draft taps were squeezed into a strip under them.
