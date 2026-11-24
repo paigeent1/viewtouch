@@ -97,6 +97,11 @@ Item {
                                     : families.includes(chosen) ? chosen
                                     : ((categories.find(c => c.now) ?? categories[0] ?? {}).id ?? "")
     function categoryOf(id) { return categories.find(c => c.id === id) ?? ({}) }
+    // Many categories (more than two rows of them): the menu shows either the categories or one
+    // category's items, never both, so the items get the whole space (owner 2026-11-24, HCA Bar 3:
+    // "When draft is selected, only drafts should display"). "‹ Categories" goes back to them.
+    readonly property bool manyFamilies: fixedFamily === "" && !search && !popular && families.length > 12
+    readonly property bool pickingFamily: manyFamilies && !families.includes(chosen)
     // The category shown: its own button size, photos, prices (Menu Builder).
     readonly property var shownCategory: !search && !popular && family !== "★" ? categoryOf(family) : ({})
     // The bar menu's tile: only this product group of the category ("": those without one).
@@ -184,6 +189,7 @@ Item {
         Flow {
             Layout.fillWidth: true
             visible: !w.search && !w.popular && w.fixedFamily === "" && w.families.length > 1
+                     && (!w.manyFamilies || w.pickingFamily)
             spacing: w.gap * 0.6
             Repeater {
                 model: w.families
@@ -208,6 +214,32 @@ Item {
                 onClicked: w.setArranging(true)
             }
         }
+
+        // One category of many shown: its name, and the way back to all of them.
+        RowLayout {
+            objectName: "menuFamilyBar"
+            visible: w.manyFamilies && !w.pickingFamily
+            Layout.fillWidth: true
+            spacing: w.gap
+            WidgetKey {
+                objectName: "menuBackToFamilies"
+                Layout.preferredWidth: Math.max(200, w.width / 5)
+                Layout.preferredHeight: Math.max(56, w.zone ? w.zone.touch(52) : 56)
+                text: qsTr("‹ Categories")
+                fontScale: 0.38
+                onClicked: w.zone.controller.menuCategory = ""
+            }
+            Label {
+                Layout.fillWidth: true
+                text: w.title(w.family)
+                color: w.zone && w.zone.st.textColor ? w.zone.st.textColor : "white"
+                font.family: w.face
+                font.pixelSize: Math.max(20, w.zone ? w.zone.touch(26) : 26)
+                font.bold: true
+                elide: Text.ElideRight
+            }
+        }
+        Item { visible: w.pickingFamily; Layout.fillHeight: true }   // the categories at the top, as before
 
         // Find: one row per item (name; its UPC and number under it; the price on the right), best first,
         // about six to a screen, with ▲ PG UP / ▼ PG DN on the right to page through them.
@@ -325,7 +357,7 @@ Item {
 
         MenuButtons {
             id: grid
-            visible: !w.search
+            visible: !w.search && !w.pickingFamily
             Layout.fillWidth: true
             Layout.fillHeight: true
             items: w.search ? [] : w.shown   // Find shows bars instead

@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 18:43 ET — Bob (Claude) — Order menu with many categories: the categories, or one category's items
+- **What:** Tablet app: changed. Server: no change. WidgetMenuGrid.qml: when a self-filling menu has more than 12 category buttons (more than two rows), it shows either the categories (nothing chosen) or the chosen category's items with a '‹ Categories' key and the category's name (menuFamilyBar) - never both, so the items get the whole space. Twelve or fewer: as before (categories across the top, items under). Test: 'UI: the menu with many categories shows them, or one category's items, not both'.
+- **Why:** Owner 2026-11-24 18:41 (photo, HCA Bar 3 with 23 categories): 'When draft is selected, only drafts should display' - the categories filled the screen and the draft taps were squeezed into a strip under them.
+- **Files:** (none)
+
 ### 2026-11-24 11:54 ET — Bob (Claude) helper — Mass Updates screen: the grid gets its height (it had none)
 - **What:** Tablet app: changed (WidgetMassUpdates.qml). Server: no change. The item grid, its list, the change sets list and the preview list have preferred heights (the grid at least 3 rows), and the tabs' StackLayout no longer fills: a Qt Quick layout shares spare height by preferred height, so the grid (preferred 0) was drawn 0 high and showed no rows.
 - **Why:** CI run 45438498907: the Mass Updates UI test's diagnostics said the server sent 1 row and the ListView had it (count 1) at height 0.

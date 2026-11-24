@@ -3555,6 +3555,52 @@ TEST_CASE("UI: the menu laid out by itself: families, items, new items with no e
     CHECK(s.c.pageId() == u"modifiers"_s);
 }
 
+TEST_CASE("UI: the menu with many categories shows them, or one category's items, not both", "[flow][ui][menugrid]")
+{
+    // Owner 2026-11-24 (HCA Bar 3, 23 categories): "When draft is selected, only drafts should display".
+    Screen s;
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    for (int i = 1; i <= 12; ++i) {
+        core::MenuCategory c;
+        c.id = "extra-" + std::to_string(i);
+        c.name = "Extra " + std::to_string(i);
+        s.pos.shared()->settings.menuCategories.push_back(c);
+        QVariantMap item = s.pos.adminNewRecord(u"menu"_s);
+        item[u"name"_s] = u"Extra Thing %1"_s.arg(i);
+        item[u"price"_s] = 5.0;
+        item[u"family"_s] = QString::fromStdString(c.id);
+        REQUIRE(s.pos.adminSave(u"menu"_s, -1, item));
+    }
+    REQUIRE(s.pos.startCheck(core::CheckType::Takeout));
+    REQUIRE(s.c.jumpTo(u"index-lunch"_s));
+    s.c.activate(u"cat-menu-all"_s);
+    QTest::qWait(100);
+    REQUIRE(s.c.pageId() == u"menu-all"_s);
+    const auto find = [&](const QString &name) { return Screen::findBy(s.window->contentItem(), "objectName", name); };
+    s.c.setMenuCategory(QString());
+    QTest::qWait(60);
+    // Nothing chosen: the categories only.
+    REQUIRE(find(u"menuFamily-salads"_s));
+    CHECK(find(u"menuFamily-salads"_s)->isVisible());
+    CHECK_FALSE(find(u"menuFamilyBar"_s)->isVisible());
+    {
+        QQuickItem *cobb = find(u"menuItem-cobb"_s);
+        CHECK((!cobb || !cobb->isVisible()));
+    }
+    // One chosen: its items, its name, the way back; no categories.
+    s.tapItem(find(u"menuFamily-salads"_s));
+    QTest::qWait(80);
+    REQUIRE(find(u"menuItem-cobb"_s));
+    CHECK(find(u"menuItem-cobb"_s)->isVisible());
+    CHECK(find(u"menuFamilyBar"_s)->isVisible());
+    CHECK_FALSE(find(u"menuFamily-salads"_s)->isVisible());
+    s.shot("94-menu-one-category");
+    s.tapItem(find(u"menuBackToFamilies"_s));
+    QTest::qWait(80);
+    CHECK(find(u"menuFamily-burgers"_s)->isVisible());
+    CHECK_FALSE(find(u"menuFamilyBar"_s)->isVisible());
+}
+
 TEST_CASE("UI: the store's pictures: a logo on the login page and screen saver, on buttons and backgrounds",
           "[flow][ui][pictures]")
 {
