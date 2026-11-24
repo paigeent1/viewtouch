@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 11:12 ET — Bob (Claude) helper — Mass Updates screen: short buttons a finger wide; sort headings ignore keyboard touches; UI test says what it got
+- **What:** Tablet app: changed (WidgetMassUpdates.qml). Server: no change. Mass Updates' buttons are at least 48 px wide again (All, None, the Round to choices were 29-39 px after the last change set their width to their text); the sort headings' TapHandler checks TouchGuard.covered like every other page's. The Mass Updates UI test reports what the screen was given (active, total, count, rows, find; the grid's height and count) when its row isn't there.
+- **Why:** CI run 45429511995: the touch check still found 5 narrow buttons on mass-updates, the TouchGuard lint listed WidgetMassUpdates.qml, and the UI test still found no row for its item (cause not known yet).
+- **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/WidgetMassUpdates.qml`
+
 ### 2026-11-24 13:24 ET — Bob (Claude) — Tests: Retail Add Item UI steps wait for what they tap
 - **What:** Tablet app: no change. Server: no change. tests/test_pos_flow.cpp RetailBuilder::tap waits up to 2 s for the thing it taps (a category's items and the box search come from the server) and names it in the failure.
 - **Why:** CI run 45445413295 (after the tapItem fix: no crash, 801 cases) had one flaky failure: 'a manager's price change asks for an admin's PIN' found no item to tap right after opening the category.
@@ -158,6 +163,7 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 - **Why:** CI log of run 45427301662 crashed in 'a single in a box, its box found by UPC', the other test that touches Single in a box.
 - **Files:** `modern/tests/test_pos_flow.cpp`, `modern/ui/qml/MenuBuilderAddItem.qml`
 - **Next person must know:** In QML, never empty or swap a Repeater/ListView model from inside a click of one of its own delegates: hide them, or Qt.callLater the change.
+
 
 ### 2026-11-24 10:47 ET — Bob (Claude) helper — Backups take the mass-updates folder too
 - **What:** Tablet app: no change. Server: changed. Each backup also mirrors <data>/mass-updates (the change sets applied here, which Undo and Store Updating's list read, and first-seen.json for New items) into <backups>/mass-updates and the second backup folder's (storage::mirrorFolder: copies files that are new or differ in size or time, written aside then renamed; removes nothing). BackupScheduler::setMassUpdateDirectory, set from main.cpp. Test: 'Mass updates: backups take the mass-updates folder too'.

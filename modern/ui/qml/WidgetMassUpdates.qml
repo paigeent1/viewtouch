@@ -73,13 +73,13 @@ Item {
     component Small: Button {
         property real u: 16
         implicitHeight: Math.max(44, u * 2.6)
-        implicitWidth: Math.max(44, implicitContentWidth + leftPadding + rightPadding)
+        Layout.minimumWidth: 48   // a finger's width, however short its text
         font.pixelSize: u * 0.8
     }
     component Pick: Button {
         property real u: 16
         implicitHeight: Math.max(44, u * 2.6)
-        implicitWidth: Math.max(44, implicitContentWidth + leftPadding + rightPadding)
+        Layout.minimumWidth: 48   // a finger's width, however short its text
         font.pixelSize: u * 0.75
         checkable: true
         highlighted: checked
@@ -267,7 +267,7 @@ Item {
                                 font.bold: true
                                 color: "#1d3fb8"
                                 padding: w.unit * 0.3
-                                TapHandler { enabled: modelData[0] !== ""; onTapped: w.sortBy(modelData[0]) }
+                                TapHandler { enabled: modelData[0] !== ""; onTapped: { if (TouchGuard.covered(point.scenePressPosition, parent)) return; w.sortBy(modelData[0]) } }
                             }
                         }
                     }

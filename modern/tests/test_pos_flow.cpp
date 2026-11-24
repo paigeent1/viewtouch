@@ -1685,6 +1685,15 @@ TEST_CASE("UI: Mass Updates: find by UPC, tick it, preview a Set price, apply it
     find->setProperty("text", u"012345678905"_s);
     QMetaObject::invokeMethod(find, "accepted");
     QTest::qWait(150);
+    {   // what the screen was given, should the row not be there
+        const QVariantMap st = s.pos.massUpdate();
+        QQuickItem *grid = by(u"massList"_s);
+        UNSCOPED_INFO("massUpdate: active " << st.value(u"active"_s).toBool() << ", total " << st.value(u"total"_s).toInt()
+                      << ", count " << st.value(u"count"_s).toInt() << ", rows " << st.value(u"rows"_s).toList().size()
+                      << ", find '" << st.value(u"view"_s).toMap().value(u"find"_s).toString().toStdString() << "'");
+        UNSCOPED_INFO("massList: " << (grid ? "shown" : "not shown") << ", height " << (grid ? grid->height() : -1.0)
+                      << ", count " << (grid ? grid->property("count").toInt() : -1));
+    }
     REQUIRE(by(u"massRow-mass-pack"_s));
     CHECK(s.pos.massUpdate()[u"count"_s].toInt() == 1);
     tap(u"massTick-mass-pack"_s);
