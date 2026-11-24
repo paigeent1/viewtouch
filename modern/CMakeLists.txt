@@ -23,6 +23,7 @@ add_library(vtm_core STATIC
     core/day.hh core/report.hh core/customer.hh core/waitlist.hh core/inventory.hh core/receipt_ref.hh
     core/price_check.hh                          # Menu Builder -> Price check: with tax, cash vs card
     core/builder_index.hh                        # Menu Builder's quick index: a department's tree, the search
+    core/mass_update.hh                          # Mass Updates: rounding, margin prices, the grid's narrowing, change sets
     core/core.cpp core/report.cpp
     core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
     core/scan_data.hh core/scan_data.cpp         # tobacco scan data for Altria (weekly file)
