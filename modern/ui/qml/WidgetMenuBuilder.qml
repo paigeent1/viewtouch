@@ -49,6 +49,8 @@ Item {
         repeat: true
         onTriggered: {
             if (!w.zone || !w.zone.controller) return
+            const typedText = w.zone.controller.take("builderType")
+            if (typedText) w.typed(String(typedText))
             const scanned = w.zone.controller.take("adminScan")
             if (!scanned) return
             const code = String(scanned).trim()
@@ -154,6 +156,42 @@ Item {
         const c = allCategories.find(x => x.id === i.family)
         return c && c.scope ? c.scope : i.isEvent ? "event" : i.isRetail ? "retail" : "hospitality"
     }
+    // Typed on a keyboard with nothing to type into (Main.qml passes letters as "builderType"): the
+    // letters so far go to the first of this mode's categories whose name starts with them, a moment
+    // after the typing stops (owner 2026-11-24: "type a letter to go to a category like PREMIUM CIGARS").
+    // A pause of more than a second starts over. Not while a card is open (its changes would be lost).
+    property string typeAhead: ""
+    property double typeAheadAt: 0
+    function typeAheadMatch(t) {
+        const u = t.toUpperCase()
+        const cs = categories
+        return cs.find(c => c.name.toUpperCase().startsWith(u))
+            ?? cs.find(c => c.name.toUpperCase().split(/\s+/).some(word => word.startsWith(u)))
+            ?? null
+    }
+    function typed(text) {
+        if (choosingScope || cardOpen || mode !== "menu") return
+        const now = Date.now()
+        typeAhead = (now - typeAheadAt > 1000 ? "" : typeAhead) + text
+        typeAheadAt = now
+        const c = typeAheadMatch(typeAhead)
+        if (c) {
+            categoryFilter = ""
+            const at = listedCategories.findIndex(x => x.id === c.id)
+            if (at >= 0) categoryList.positionViewAtIndex(at, ListView.Contain)
+            typeAheadOpen.target = c.id
+            typeAheadOpen.restart()
+        }
+        typeAheadClear.restart()
+    }
+    Timer {
+        id: typeAheadOpen
+        property string target: ""
+        interval: 350
+        onTriggered: if (target !== "" && !w.cardOpen && target !== w.categoryId) w.pickCategory(target)
+    }
+    Timer { id: typeAheadClear; interval: 1500; onTriggered: w.typeAhead = "" }
+
     // The category list (the right-hand panel when no card is open; on a phone, the first page),
     // narrowed by its filter box.
     property string categoryFilter: ""
@@ -877,7 +915,7 @@ Item {
                             Layout.fillWidth: true
                             text: (w.retailMode ? qsTr("Retail categories") : w.eventMode ? qsTr("Event categories")
                                                                            : qsTr("Hospitality categories"))
-                                  + "  ·  " + w.categories.length
+                                  + "  ·  " + w.categories.length + (w.typeAhead !== "" ? "   ⌨ " + w.typeAhead.toUpperCase() : "")
                             font.pixelSize: 20
                             font.bold: true
                             elide: Text.ElideRight

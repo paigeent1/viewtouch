@@ -1543,6 +1543,53 @@ TEST_CASE("UI: Menu Builder: an item's Price check, with tax and back", "[flow][
     CHECK(s.pos.findItem(u"classic-burger"_s)->price.cents() == 1150);
 }
 
+TEST_CASE("UI: Menu Builder: letters typed on a keyboard go to a category", "[flow][ui][menubuild][typeahead]")
+{
+    // Owner 2026-11-24: "type a letter from keyboard to go to a category like premium cigars".
+    Screen s(false, 1280, 800);
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"menu-builder"_s));
+    QTest::qWait(100);
+    QQuickItem *root = s.window->contentItem();
+    QQuickItem *w = Screen::findBy(root, "objectName", u"builderScopeChooser"_s);
+    while (w && !w->property("choosingScope").isValid())
+        w = w->parentItem();
+    REQUIRE(w);
+    w->setProperty("builderScope", u"hospitality"_s);
+    w->setProperty("choosingScope", false);
+    QTest::qWait(100);
+    const QVariantList cats = w->property("categories").toList();
+    REQUIRE(cats.size() >= 2);
+    // The last category, by its first three letters (the first whose name starts with them).
+    const QString name = cats.last().toMap().value(u"name"_s).toString().toUpper();
+    QString prefix;
+    for (const QChar ch : name) {
+        if (ch.isLetter()) prefix += ch;
+        if (prefix.size() == 3) break;
+    }
+    REQUIRE(prefix.size() == 3);
+    REQUIRE(name.startsWith(prefix));
+    QString expected;
+    for (const QVariant &c : cats)
+        if (c.toMap().value(u"name"_s).toString().toUpper().startsWith(prefix)) {
+            expected = c.toMap().value(u"id"_s).toString();
+            break;
+        }
+    REQUIRE_FALSE(expected.isEmpty());
+    for (const QChar ch : prefix)
+        QTest::keyClick(s.window, ch.toLower().toLatin1());
+    QTest::qWait(600);
+    CHECK(w->property("categoryId").toString() == expected);
+    CHECK(Screen::findBy(root, "objectName", u"builderCategoryPanelTitle"_s)->property("text").toString().contains(prefix));
+    // Touching a category still opens it.
+    QTest::qWait(1600);
+    QQuickItem *first = Screen::findBy(root, "objectName", u"builderCategory-"_s + cats.first().toMap().value(u"id"_s).toString());
+    REQUIRE(first);
+    s.tapItem(first);
+    QTest::qWait(100);
+    REQUIRE(w->property("categoryId").toString() == cats.first().toMap().value(u"id"_s).toString());
+}
+
 TEST_CASE("UI: Menu Builder: several items at once; an item dragged onto another category", "[flow][ui][menubuild][several]")
 {
     Screen s(false, 1280, 800);

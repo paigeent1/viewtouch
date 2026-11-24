@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-24 09:10 ET — Bob (Claude) — Menu Builder: type letters to go to a category
+- **What:** Tablet app: changed. Server: no change. On the Menu Builder page, letters typed on a keyboard with nothing to type into (Main.qml, not part of a scanner burst) are passed as 'builderType'; the builder adds them to what was typed in the last second, scrolls the category list to the first of this mode's categories whose name (or a word in it) starts with them, shows them in the panel title (⌨ PRE) and opens that category 0.35 s after typing stops. Not while a card is open or the mode chooser shows. Letters only, so a scanned UPC's first digit is untouched. Test: 'UI: Menu Builder: letters typed on a keyboard go to a category'.
+- **Why:** Owner 2026-11-24 09:08 (BHDAN photo): 'I want to be able to type a letter from keyboard to go to a category like premium cigars'.
+- **Files:** (none)
+
 ### 2026-11-23 18:50 ET — Bob (Claude) — Menu Builder Retail: one item to a row
 - **What:** Tablet app: changed. Server: no change. In Retail mode the item grid (itemGrid) shows one item per row, 64 px high: name on the left (elided only at the row's end), price (and section) on the right; + Add Item is a full-width row. Hospitality and Event keep two tiles to a row. Drag, Select and the tree are unchanged (indexAt works with any cell size).
 - **Why:** Owner 2026-11-23 18:44 (BHDAN photo, CIGAR ACCES): two tiles to a row cut the price book's long names ('MONTE SIG LIGH...'); one line per item shows more of each description.

@@ -283,6 +283,17 @@ ApplicationWindow {
                             return
                         }
                     }
+                    // Menu Builder: letters typed on a keyboard (nothing to type into) go to the category whose
+                    // name starts with them (owner 2026-11-24). Letters only: a scanner's first digit isn't a burst yet.
+                    if (!burst && root.controller.pageId === "menu-builder") {
+                        const t = event.text
+                        if (t.length === 1 && t.toLowerCase() !== t.toUpperCase()) {
+                            const before = root.controller.take("builderType")
+                            root.controller.keep("builderType", (before ? String(before) : "") + t)
+                            event.accepted = true
+                            return
+                        }
+                    }
                     // Item Look Up (Retail: ALPHA LOOK UP, PRICE CHECK): what's typed on a keyboard goes into
                     // its search line without touching the line first: letters, digits, space, Backspace, and
                     // Enter to look it up now (BHDAN 2026-11-15). A scan still arrives whole (lookupScan).
