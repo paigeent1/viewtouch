@@ -284,8 +284,10 @@ ApplicationWindow {
                         }
                     }
                     // Menu Builder: letters typed on a keyboard (nothing to type into) go to the category whose
-                    // name starts with them (owner 2026-11-24). Letters only: a scanner's first digit isn't a burst yet.
-                    if (!burst && root.controller.pageId === "menu-builder") {
+                    // name starts with them (owner 2026-11-24). Letters only, so a UPC scan never moves the list;
+                    // quick typing counts too (a fast typist's keys can be under the scanner's 60 ms), and a scan
+                    // with letters still arrives whole: it was added to scanBuffer above.
+                    if (root.controller.pageId === "menu-builder") {
                         const t = event.text
                         if (t.length === 1 && t.toLowerCase() !== t.toUpperCase()) {
                             const before = root.controller.take("builderType")
