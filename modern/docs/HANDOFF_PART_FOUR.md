@@ -79,5 +79,5 @@ search; Altria scan data export; HCA bar features and drink menu import; tablet 
 ## Next up (owner's list)
 Cigarette cash discount (`cashDiscountPercent` exists); the Home-goes-to-sign-in bug the floor-plan helper noted;
 Retail start page per person/job (offered for the HCA humidor attendant); Roku TV network access / Samsung pairing;
-HCA beep3 one-time `vt-install` fix; BHDAN to Qt 6.12 and the go-live wipe (check 100001); RJR scan data;
+HCA beep3 one-time `vt-install` fix; ~~BHDAN to Qt 6.12~~ (done: both Pis on Qt 6.12.0, confirmed 2026-11-25) and the go-live wipe (check 100001); RJR scan data;
 twice-monthly upstream review (scheduled).
