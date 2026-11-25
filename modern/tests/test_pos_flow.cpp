@@ -9318,7 +9318,9 @@ TEST_CASE("UI: Find and price check with a 31,700-item price book", "[flow][ui][
     QCoreApplication::processEvents();
     const double scanMs = ms();
     CHECK(s.pos.priceCheck()[u"item"_s].toMap()[u"name"_s].toString().endsWith(u" 31698"_s));
-    s.pos.closePriceCheck();
+    s.pos.closePriceCheck();                 // the window closed: PRICE CHECK off with it
+    CHECK(s.pos.priceCheck().isEmpty());
+    REQUIRE(s.pos.togglePriceCheck());
     t.start();
     s.c.scanned(u"799999999999"_s);
     QCoreApplication::processEvents();
@@ -9328,8 +9330,8 @@ TEST_CASE("UI: Find and price check with a 31,700-item price book", "[flow][ui][
     REQUIRE(s.pos.priceCheckCode(u"08%1"_s.arg(31698, 11, 10, QChar(u'0'))));   // read as an EAN-13 (a 0 in front)
     const double scanShortMs = ms();
     CHECK(s.pos.priceCheck()[u"item"_s].toMap()[u"name"_s].toString().endsWith(u" 31698"_s));
-    s.pos.closePriceCheck();
-    REQUIRE(s.pos.togglePriceCheck());   // off
+    s.pos.closePriceCheck();             // off with its window
+    CHECK(s.pos.priceCheck().isEmpty());
     QTest::qWait(30);
 
     // Retail Mode, on the order screen: back to the Retail screen.

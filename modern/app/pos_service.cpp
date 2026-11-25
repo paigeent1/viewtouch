@@ -1298,11 +1298,14 @@ bool PosService::togglePriceCheck()
     return true;
 }
 
+// The window touched: it closes and PRICE CHECK goes off with it, since one price is checked at a time
+// (owner 2026-11-25: "We rarely need to check more than one price"). PRICE CHECK again for the next.
 void PosService::closePriceCheck()
 {
-    if (!priceCheck_.contains(u"item"_s))
+    if (priceCheck_.isEmpty())
         return;
-    priceCheck_.remove(u"item"_s);
+    priceCheck_.clear();
+    emit notice(tr("Price check off"));
     emit sessionChanged();
 }
 

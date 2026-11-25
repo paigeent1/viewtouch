@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 // PRICE CHECK mode: "*PRICE CHECK*" flashing across the top while it's on, and
 // the item scanned in a floating window (its box or its singles too). Touch the
-// window to close it; the mode stays on until PRICE CHECK is touched again.
+// window to close it, which turns PRICE CHECK off too (one price at a time; owner 2026-11-25).
 // `guest`: the customer display's copy (bigger, no buttons).
 Item {
     id: o

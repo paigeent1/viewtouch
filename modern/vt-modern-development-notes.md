@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-25 11:56 ET — Bob (Claude) — Price check off when its window is touched; button commands listed A-Z
+- **What:** Tablet app: changed. Server: changed. PosService::closePriceCheck (touching the price window or the dim behind it) now turns PRICE CHECK off as well ('Price check off'); PRICE CHECK again for the next one. The button editor's Command list (layout/schema.cpp actionTypes) is sorted A-Z by its words; a new Command action still starts as Send order. Tests updated (test_pos_m4 price check, the UI scan-speed case).
+- **Why:** Owner 2026-11-25 11:51-11:55 at BHDAN: couldn't find the Price check command in the unsorted list of ~70; then 'make price check turn off when touching floating window. We rarely need to check more than one price'.
+- **Files:** (none)
+
 ### 2026-11-24 18:56 ET — Bob (Claude) — Many-categories menu test: find() sees only what's shown
 - **What:** Tablet app: no change. Server: no change. The new test checks shown or not by whether Screen::findBy (visible items only) finds it, instead of dereferencing a null.
 - **Why:** CI run 45512316818 crashed in the new test (SIGSEGV): findBy skips hidden items, so the hidden bar came back null.

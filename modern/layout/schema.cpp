@@ -1,6 +1,7 @@
 #include "layout/schema.hh"
 
 #include <QHash>
+#include <algorithm>
 #include <QJsonObject>
 #include <QList>
 
@@ -614,6 +615,25 @@ QJsonArray actionTypes()
     };
     // A command's own settings (kept in the action's "args"), shown under the command when it's chosen.
     QJsonObject command = out.last().toObject();
+    // Its list A-Z, to be found where one looks for it (owner 2026-11-25 couldn't find "Price check").
+    {
+        QJsonArray fields = command.value(u"fields"_s).toArray();
+        QJsonObject name = fields.at(0).toObject();
+        const QJsonArray choices = name.value(u"options"_s).toArray();
+        QList<QJsonValue> list;
+        for (const QJsonValue &v : choices)
+            list.append(v);
+        std::stable_sort(list.begin(), list.end(), [](const QJsonValue &a, const QJsonValue &b) {
+            return a.toObject().value(u"text"_s).toString().compare(b.toObject().value(u"text"_s).toString(),
+                                                                      Qt::CaseInsensitive) < 0;
+        });
+        QJsonArray sorted;
+        for (const QJsonValue &v : list)
+            sorted.append(v);
+        name.insert(u"options"_s, sorted);
+        fields.replace(0, name);
+        command.insert(u"fields"_s, fields);
+    }
     command.insert(u"commandArgs"_s, commandArgs());
     out.replace(out.size() - 1, command);
     return out;

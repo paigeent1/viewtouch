@@ -873,8 +873,10 @@ TEST_CASE("Price check: on and off, a scan shows the item and its box or singles
     REQUIRE(related.size() == 1);
     CHECK(related[0].toMap()[u"relation"_s].toString().startsWith(u"Box"_s));
     CHECK(p.pos.shared()->open.empty());                       // nothing rung in
-    p.pos.closePriceCheck();
-    CHECK_FALSE(p.pos.priceCheck().contains(u"item"_s));
+    p.pos.closePriceCheck();                                   // the window closed: PRICE CHECK off too
+    CHECK(p.pos.priceCheck().isEmpty());
+    REQUIRE(p.pos.togglePriceCheck());                         // on again, then off by its button
+    CHECK(p.pos.priceCheck()[u"on"_s].toBool());
     REQUIRE(p.pos.togglePriceCheck());
     CHECK(p.pos.priceCheck().isEmpty());
 }
