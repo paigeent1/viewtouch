@@ -137,9 +137,9 @@ TEST_CASE("Buydowns at the register: not before the start, not after the end; ru
     clock = at(2027, 1, 1, 0, 5);   // paid after the end: the line stays
     REQUIRE(pos.addItem(u"sonoma-pk"_s));
     CHECK(pos.lines()[2].toMap()[u"buydown"_s].toString().isEmpty());
-    REQUIRE(pos.tender(u"cash"_s));
-    const core::Check &closed = pos.shared()->closedToday.back();
-    CHECK(closed.totals(pos.shared()->settings.tax).buydowns.cents() == 41);
+    // The second, rung before the end, keeps its line now it's after.
+    CHECK(pos.lines()[1].toMap()[u"buydown"_s] == u"SONOMA SAVINGS!"_s);
+    CHECK(current(pos).totals(pos.shared()->settings.tax).buydowns.cents() == 41);
 }
 
 TEST_CASE("Buydowns at the register: quantity, error correct and a return carry the line", "[buydowns]")
@@ -193,6 +193,7 @@ TEST_CASE("Buydowns: two at once, the larger; a capped style stops when its quan
     CHECK(c.lines[2].buydownId == "bd-1");   // the 2 of SONOMA EXTRA are used: the other one
     CHECK(c.lines[2].buydownEach.cents() == 41);
     REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
     CHECK(pos.shared()->settings.buydowns[1].used == 2);
     // The list says so.
     REQUIRE(pos.buydownsOpen(true));
@@ -317,6 +318,7 @@ TEST_CASE("Buydowns: saved checks keep the line; the reports, scan data and Pric
     CHECK(back->lines[0].buydownEach.cents() == 41);
     CHECK(back->lines[0].buydownText == "SONOMA SAVINGS!");
     REQUIRE(pos.tender(u"cash"_s));
+    REQUIRE(pos.closeCheck());
 
     const core::Report sales = pos.buildReport(u"sales"_s);
     CHECK(sales.find("Buydowns") == std::vector<std::string>{"Buydowns", "-$4.92"});

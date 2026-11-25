@@ -29,9 +29,11 @@ Item {
     property string roundTo: "none"
     property string fileError: ""   // a change set file that couldn't be read
     readonly property var buydownDraft: pos && pos.buydowns ? (pos.buydowns.draft ?? null) : null
+    property bool buydownsWanted: false   // asked of the main computer (a tablet is sent it only then)
     function openBuydowns() {
         if (!pos) return
-        pos.want("buydowns", true)
+        if (!buydownsWanted) pos.want("buydowns", true)
+        buydownsWanted = true
         pos.buydownsOpen(true)
         buydowns.visible = true
     }
@@ -59,7 +61,7 @@ Item {
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); asked.want("buydowns", false); asked.buydownsOpen(false) }
+        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); if (w.buydownsWanted) asked.want("buydowns", false); asked.buydownsOpen(false) }
     }
     Component.onCompleted: {
         if (!pos || !pos.loggedIn) return
@@ -704,7 +706,8 @@ Item {
         onPickItems: visible = false
         onClosed: {
             visible = false
-            if (w.pos) { w.pos.buydownsOpen(false); w.pos.want("buydowns", false) }
+            if (w.pos) { w.pos.buydownsOpen(false); if (w.buydownsWanted) w.pos.want("buydowns", false) }
+            w.buydownsWanted = false
         }
     }
 }

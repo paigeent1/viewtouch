@@ -21,8 +21,8 @@ Rectangle {
     readonly property var draft: info.draft ?? null
     readonly property var report: info.report ?? null
     property string selectedId: ""
-    property var ticked: []            // definitions ticked for printing several
-    property var tickedItems: []       // items ticked in the editor (to take out)
+    property var markedDefs: []            // definitions ticked for printing several
+    property var markedItems: []       // items ticked in the editor (to take out)
     property string fileError: ""
     signal pickItems()                 // back to Mass Updates' grid to tick items
     signal closed()
@@ -30,7 +30,7 @@ Rectangle {
 
     function selected() { return list.find(d => d.id === selectedId) ?? null }
     function toggle(arr, v) { return arr.indexOf(v) >= 0 ? arr.filter(x => x !== v) : arr.concat([v]) }
-    function printIds() { return ticked.length > 0 ? ticked : (selectedId !== "" ? [selectedId] : []) }
+    function printIds() { return markedDefs.length > 0 ? markedDefs : (selectedId !== "" ? [selectedId] : []) }
     function set(k, v) { const o = {}; o[k] = v; if (pos) pos.buydownSet(o) }
 
     component Small: Button {
@@ -149,8 +149,8 @@ Rectangle {
                         CheckBox {
                             objectName: "buydownTick-" + row.modelData.id
                             Layout.preferredWidth: p.unit * 2
-                            checked: p.ticked.indexOf(row.modelData.id) >= 0
-                            onClicked: p.ticked = p.toggle(p.ticked, row.modelData.id)
+                            checked: p.markedDefs.indexOf(row.modelData.id) >= 0
+                            onClicked: p.markedDefs = p.toggle(p.markedDefs, row.modelData.id)
                         }
                         Cell { u: p.unit; text: row.modelData.number; Layout.preferredWidth: p.unit * 3 }
                         Cell { u: p.unit; text: row.modelData.typeLabel; Layout.preferredWidth: p.unit * 4 }
@@ -207,7 +207,7 @@ Rectangle {
                     u: p.unit
                     objectName: "buydownPrint"
                     // The chosen one (or the ticked ones), never everything by default.
-                    text: p.ticked.length > 1 ? qsTr("Print %1 ticked").arg(p.ticked.length) : qsTr("Print")
+                    text: p.markedDefs.length > 1 ? qsTr("Print %1 ticked").arg(p.markedDefs.length) : qsTr("Print")
                     enabled: p.printIds().length > 0
                     onClicked: p.pos.buydownShowReport("definition", p.printIds())
                 }
@@ -402,9 +402,9 @@ Rectangle {
                     Small {
                         u: p.unit
                         objectName: "buydownRemoveItems"
-                        text: qsTr("Take out ticked (%1)").arg(p.tickedItems.length)
-                        enabled: p.tickedItems.length > 0
-                        onClicked: { p.pos.buydownRemoveItems(p.tickedItems); p.tickedItems = [] }
+                        text: qsTr("Take out ticked (%1)").arg(p.markedItems.length)
+                        enabled: p.markedItems.length > 0
+                        onClicked: { p.pos.buydownRemoveItems(p.markedItems); p.markedItems = [] }
                     }
                 }
                 RowLayout {
@@ -436,8 +436,8 @@ Rectangle {
                             spacing: 4
                             CheckBox {
                                 Layout.preferredWidth: p.unit * 2
-                                checked: p.tickedItems.indexOf(it.modelData.key) >= 0
-                                onClicked: p.tickedItems = p.toggle(p.tickedItems, it.modelData.key)
+                                checked: p.markedItems.indexOf(it.modelData.key) >= 0
+                                onClicked: p.markedItems = p.toggle(p.markedItems, it.modelData.key)
                             }
                             Cell { u: p.unit; text: it.modelData.upc; Layout.preferredWidth: p.unit * 8 }
                             Cell { u: p.unit; text: it.modelData.name + (it.modelData.found ? "" : "  " + qsTr("(not in this store)")); Layout.fillWidth: true }
