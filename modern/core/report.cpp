@@ -92,7 +92,7 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx, 
     r.subtitle = ctx.period;
     r.columns = {"", "Amount"};
 
-    Money items, discounts, net, tax, total, change, rounding, gratuity, tips, staffMeals;
+    Money items, discounts, net, tax, total, change, rounding, gratuity, tips, staffMeals, buydowns;
     std::int64_t staffMealChecks = 0;
     std::map<TaxClass, Money> taxByClass;
     std::map<std::string, Money> byTender;           // tender name -> amount
@@ -104,6 +104,7 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx, 
         const Totals t = c.totals(rates);
         items += t.itemsExTax;   // sales never include tax (prices including tax: taken out)
         discounts += t.discountsExTax;
+        buydowns += t.buydownsExTax;
         net += t.subtotal;
         tax += t.tax;
         total += t.total;
@@ -141,6 +142,8 @@ Report salesSummary(const std::vector<Check> &closed, const ReportContext &ctx, 
     r.line({"Discounts & comps", ctx.money(-discounts)});
     if (staffMeals.cents() > 0)
         r.line({"  of which staff meals (" + count(staffMealChecks) + ")", ctx.money(-staffMeals)});
+    if (buydowns.cents() != 0)   // manufacturer buydowns and promotions on the lines (core/buydown.hh)
+        r.line({"Buydowns", ctx.money(-buydowns)});
     r.total({"Net sales", ctx.money(net)});
     for (const auto &[cls, amount] : taxByClass)
         r.line({capitalized(toString(cls)) + " tax", ctx.money(amount)});
@@ -2122,7 +2125,7 @@ Report royaltyReport(const std::vector<Check> &closed, const ReportContext &ctx)
     r.title = "Royalty";
     r.subtitle = ctx.period;
     r.columns = {"", "Amount"};
-    Money gross, discounts, net;
+    Money gross, discounts, net, buydowns;
     std::int64_t checks = 0;
     for (const Check &c : closed) {
         if (c.training)
@@ -2130,6 +2133,7 @@ Report royaltyReport(const std::vector<Check> &closed, const ReportContext &ctx)
         const Totals t = c.totals(ctx.settings.tax);
         gross += t.itemsExTax;
         discounts += t.discountsExTax;
+        buydowns += t.buydownsExTax;
         net += t.subtotal;
         ++checks;
         for (const OrderLine &l : c.lines)   // gift cards sold aren't sales yet
@@ -2143,6 +2147,8 @@ Report royaltyReport(const std::vector<Check> &closed, const ReportContext &ctx)
     r.line({"Checks", count(checks)});
     r.line({"Item sales", ctx.money(gross)});
     r.line({"Discounts & comps", ctx.money(-discounts)});
+    if (buydowns.cents() != 0)
+        r.line({"Buydowns", ctx.money(-buydowns)});
     r.total({"Net sales (no tax, no gift cards sold)", ctx.money(net)});
     r.section("Owed to the franchise");
     const Money royalty = net.percent(ctx.settings.royaltyBp), adFund = net.percent(ctx.settings.adFundBp);
@@ -2190,6 +2196,7 @@ Report accountingReport(const std::vector<Check> &closed, const std::map<std::st
                                   : Money();
         debit["discounts"] += t.discountsExTax - staffEx;
         debit["staffMeals"] += staffEx;
+        debit["buydowns"] += t.buydownsExTax;   // manufacturer buydowns: claimed back from the maker
         bool cashBooked = false;
         for (const Payment &p : c.payments) {
             tenderNames[p.tenderId] = p.tenderName;
@@ -2380,6 +2387,197 @@ Report lossWatchReport(const std::vector<const Check *> &checks, const std::vect
         }
     }
     r.note("Voids, comps, taken back and reopened: per $1,000 each person sold. No sales: per day they worked.");
+    return r;
+}
+
+// --- Buydowns (core/buydown.hh) ----------------------------------------------------------------------------
+
+namespace {
+
+// "2026-10-01 00:00" -> "10/01/2026 12:00AM" (as ILSA printed it); empty: "(none)".
+std::string buydownWhen(const std::string &w)
+{
+    if (!buydown::validWhen(w))
+        return w.empty() ? std::string("(none)") : w;
+    const int h = std::stoi(w.substr(11, 2));
+    char buf[40];
+    std::snprintf(buf, sizeof buf, "%s/%s/%s %02d:%s%s", w.substr(5, 2).c_str(), w.substr(8, 2).c_str(),
+                  w.substr(0, 4).c_str(), h % 12 == 0 ? 12 : h % 12, w.substr(14, 2).c_str(), h < 12 ? "AM" : "PM");
+    return buf;
+}
+
+// 0.1 -> "0.1", 0.05 -> "0.05"; a carton (0 or 1): "1", as ILSA printed it.
+std::string partText(double p)
+{
+    if (p <= 0.0 || p >= 1.0)
+        return "1";
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "%.4f", p);
+    std::string t = buf;
+    while (!t.empty() && t.back() == '0')
+        t.pop_back();
+    return t;
+}
+
+std::string cartonsText(double c)
+{
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.1f", c);
+    return buf;
+}
+
+void storeHeading(Report &r, const ReportContext &ctx)
+{
+    const PosSettings &s = ctx.settings;
+    std::vector<std::string> address = textLines(s.storeAddress);
+    if (address.empty() && s.storePhone.empty())
+        address = textLines(s.receiptHeader);
+    r.line({"Store: " + s.storeName});
+    for (std::size_t i = 0; i < address.size(); ++i)
+        r.line({(i == 0 ? "Address: " : "         ") + address[i]});
+    if (!s.storePhone.empty())
+        r.line({"Phone: " + s.storePhone});
+    r.line({"Rpt Printed: " + printedStamp(ctx.now)});
+}
+
+} // namespace
+
+Report buydownDefinitionReport(const std::vector<const Buydown *> &defs, const std::vector<MenuItem> &menu,
+                               const ReportContext &ctx)
+{
+    Report r;
+    r.id = "buydown_definitions";
+    r.title = "Buydown Definition Report";
+    r.subtitle = defs.size() == 1 ? defs.front()->name : std::to_string(defs.size()) + " buydowns";
+    r.columns = {"UPC Number", "Description", "Part/Ctn", "Price", "Buydown Amount", "Sale Price"};
+    storeHeading(r, ctx);
+    std::map<std::string, const MenuItem *> byId;
+    for (const MenuItem &m : menu)
+        byId[m.id] = &m;
+    for (const Buydown *b : defs) {
+        r.section((b->isPromo() ? "PROMO: " : "BUYDOWN: ") + b->name + "   Amount: " + ctx.money(b->amount) + "   ID: "
+                  + std::to_string(b->number));
+        r.line({"Style: " + std::string(buydown::styleName(b->style)) + "   Qty: " + std::to_string(b->qty)
+                + (b->capped() ? "   (" + std::to_string(b->used) + " of " + std::to_string(b->qty) + " used)" : std::string())});
+        r.line({"Start Date: " + buydownWhen(b->start) + "   End Date: " + buydownWhen(b->end)});
+        r.line({"Receipt: " + b->receiptText + "   Manufacturer: " + b->manufacturer});
+        r.line({"Rpt Code: " + b->rptCode + "   Sale Acct: " + b->account});
+        const bool before = buydown::taxBeforeFor(*b, ctx.settings.buydownTaxBefore);
+        r.line({std::string("Taxes: ") + (before ? "Apply Taxes BEFORE Discount" : "Apply Taxes AFTER Discount")
+                + "   Subunits: " + (b->usePartCtn ? "Use \"Part of Carton\" Field" : "Apply Full Discount Amount")});
+        for (const BuydownItem &i : b->items) {
+            const auto it = byId.find(i.itemId);
+            const MenuItem *m = it == byId.end() ? nullptr : it->second;
+            const Money off = buydown::amountFor(*b, i);
+            if (!m) {
+                r.line({i.upc, i.name + " (not in this store)", partText(i.partCtn), "", ctx.money(off), ""});
+                continue;
+            }
+            r.line({i.upc, m->name, partText(i.partCtn), ctx.money(m->price), ctx.money(off), ctx.money(m->price - off)});
+        }
+        if (b->items.empty())
+            r.note("No items in it yet.");
+    }
+    if (defs.empty())
+        r.note("No buydowns chosen.");
+    return r;
+}
+
+Report buydownsReport(const std::vector<Check> &closed, const std::vector<Buydown> &defs, const std::vector<MenuItem> &menu,
+                      const ReportContext &ctx, const std::string &only)
+{
+    Report r;
+    r.id = "buydowns";
+    r.title = "Buydowns";
+    r.subtitle = ctx.period;
+    r.columns = {"", "Units", "Packs", "Cartons", "Carton equiv.", "Amount"};
+    const std::map<std::string, buydown::Sold> sold = buydown::sold(closed, defs, menu);
+    // Upper case, any spacing: "sonoma" finds "SONOMA 2026Q4" (by its name, ID or id).
+    const auto lower = [](std::string t) {
+        for (char &c : t)
+            c = char(std::tolower(static_cast<unsigned char>(c)));
+        return t;
+    };
+    const std::string want = lower(only);
+    const auto chosen = [&](const Buydown &b) {
+        return want.empty() || lower(b.id) == want || std::to_string(b.number) == want || lower(b.name).find(want) != std::string::npos;
+    };
+    Money all;
+    std::int64_t units = 0;
+    double cartons = 0.0;
+    std::map<std::string, std::pair<Money, double>> byMaker;
+    int shown = 0;
+    // Buydowns (the maker lowers the store's cost) first, then promotional sales (the store lowers its price).
+    std::vector<const Buydown *> order;
+    for (const Buydown &b : defs)
+        if (!b.isPromo())
+            order.push_back(&b);
+    for (const Buydown &b : defs)
+        if (b.isPromo())
+            order.push_back(&b);
+    Money typeTotal;
+    double typeCartons = 0.0;
+    int typeShown = 0;
+    bool promos = false;
+    const auto typeLine = [&] {
+        if (typeShown > 1)
+            r.total({promos ? "All promotional sales" : "All buydowns (manufacturer)", "", "", "", cartonsText(typeCartons),
+                     ctx.money(typeTotal)});
+        typeTotal = Money();
+        typeCartons = 0.0;
+        typeShown = 0;
+    };
+    for (const Buydown *bp : order) {
+        const Buydown &b = *bp;
+        if (!chosen(b))
+            continue;
+        if (b.isPromo() && !promos) {
+            typeLine();
+            promos = true;
+        }
+        const auto it = sold.find(b.id);
+        if (it == sold.end() && want.empty())
+            continue;   // the overview: only those that gave something
+        ++shown;
+        r.section((b.isPromo() ? "PROMO: " : "BUYDOWN: ") + b.name + "  (ID " + std::to_string(b.number) + ")");
+        r.line({"Dates: " + buydownWhen(b.start) + " to " + buydownWhen(b.end)});
+        r.line({"Manufacturer: " + (b.manufacturer.empty() ? std::string("(none)") : b.manufacturer) + "   Rpt Code: " + b.rptCode
+                + "   Acct #: " + b.account});
+        r.line({"Amount per carton: " + ctx.money(b.amount)});
+        if (it == sold.end()) {
+            r.note("Nothing sold with this buydown in these dates.");
+            continue;
+        }
+        const buydown::Sold &s = it->second;
+        for (const buydown::SoldLine &l : s.lines) {
+            const bool pack = l.partCtn > 0.0;
+            r.line({l.upc + "  " + l.name, count(l.units), pack ? count(l.units) : "", pack ? "" : count(l.units),
+                    cartonsText(pack ? double(l.units) * l.partCtn : double(l.units)), ctx.money(l.amount)});
+        }
+        r.total({"Total " + b.name, count(s.units), count(s.packs), count(s.cartons), cartonsText(s.cartonEquivalents),
+                 ctx.money(s.amount)});
+        all += s.amount;
+        units += s.units;
+        cartons += s.cartonEquivalents;
+        typeTotal += s.amount;
+        typeCartons += s.cartonEquivalents;
+        ++typeShown;
+        auto &mk = byMaker[b.manufacturer.empty() ? std::string("(no manufacturer)") : b.manufacturer];
+        mk.first += s.amount;
+        mk.second += s.cartonEquivalents;
+    }
+    typeLine();
+    if (shown == 0) {
+        r.note(want.empty() ? "No buydowns given in these dates." : "No buydown by that name.");
+        return r;
+    }
+    if (byMaker.size() > 1 || want.empty()) {
+        r.section("By manufacturer");
+        for (const auto &[maker, v] : byMaker)
+            r.line({maker, "", "", "", cartonsText(v.second), ctx.money(v.first)});
+    }
+    r.total({want.empty() ? "All buydowns and promotions" : "Summary", count(units), "", "", cartonsText(cartons), ctx.money(all)});
+    r.note("Sold at the register with the buydown line. Check it against what your distributor reports.");
     return r;
 }
 

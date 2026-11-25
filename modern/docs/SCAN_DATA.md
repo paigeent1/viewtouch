@@ -166,8 +166,13 @@ Code: `modern/core/scan_data.{hh,cpp}` (plain C++: the file, its checks, the fil
 - **Final price (31)**: the line's total less its share of every discount, **before sales tax**. In a
   store whose prices include tax (Store Settings → Taxes), the tax is backed out of each line's final
   price and discounts at its class's rate (a cent may differ from the check's own tax split).
-- **Per-pack buydowns** (the Menu Builder's *Buydown*): already in the shelf price, so they show only as
-  that lower price. Multi-unit indicator *N*, no discount fields.
+- **Manufacturer buydowns and promotions** (Menu Builder → Mass Updates → *Buydowns / Promotions*, 2026-11-25):
+  the item is rung at its regular price and the buydown is its own line under it ("SONOMA SAVINGS! −$0.41").
+  In the file a sale's buydown is an *other manufacturer discount*: field 27 is the receipt text, field 28 the
+  amount (the line's whole buydown: $0.41 a pack, $4.10 a carton, times the quantity), and the final price (31)
+  is after it. A returned item's buydown stays in its negative final price (returns get no discount fields).
+  The old Menu Builder *Buydown* field (the buydown inside the shelf price) is gone; its values were made into
+  definitions. Multi-unit indicator *N* unless a multi-unit deal also applies.
 - **Discounts**, sorted by who pays, by their names in Store Settings (a manual discount's name, or a
   promotion's name, id or coupon code):
   - *Manufacturer multi-unit deals* → fields 20–22. 20 = Y on each line in the deal, 21 = the consumer

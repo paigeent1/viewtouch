@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "core/buydown.hh"
 #include "core/scan_data.hh"
 
 using namespace vt::core;
@@ -81,10 +82,9 @@ std::vector<MenuItem> menu()
         tobacco("lcwg", "Copenhagen LC Wintergreen", 499, "073100000119", "usstc", "mst"),
         tobacco("camel", "Other Brand Filters", 649, "012300000017", "other", "cig"),
         tobacco("cbd", "CBD Gummies", 1999, "098700000011", "other", "cbd"),
-        tobacco("bd", "Marlboro Red Box (buydown)", 589, "028200003201", "pmusa", "cig"),
+        tobacco("bd", "Marlboro Red Box (buydown)", 629, "028200003201", "pmusa", "cig"),
     };
     m[0].recipe.push_back({"__parent__:028200003850", 10});   // a pack of the carton
-    m[6].recipe.push_back({"__buydown__", 0.10});              // per-pack buydown, already in the price
     MenuItem lighter;
     lighter.id = "lighter";
     lighter.name = "Lighter";
@@ -308,18 +308,41 @@ TEST_CASE("Scan data: a manufacturer coupon goes in 25 and 26", "[scandata]")
     CHECK(r.records[0].f[30] == "4.49");
 }
 
-TEST_CASE("Scan data: a per-pack buydown shows only in the price", "[scandata]")
+TEST_CASE("Scan data: a buydown line is an other manufacturer discount, out of the final price", "[scandata][buydowns]")
 {
     const auto m = menu();
+    Buydown b;
+    b.id = "bd-1";
+    b.number = 1;
+    b.name = "MARLBORO Q1";
+    b.receiptText = "MARLBORO SAVINGS!";
+    b.amount = usd(400);
+    b.items = {{"028200003201", "bd", 0.1, "Marlboro Red Box"}};
     Check c = sale(1009, kWed);
-    c.addItem(find(m, "bd"));
+    OrderLine &l = c.addItem(find(m, "bd"));
+    l.quantity = 2;
+    buydown::apply(l, *buydown::hitFor({b}, find(m, "bd"), "2026-01-07 14:00"), false);
+    REQUIRE(l.buydownEach == usd(40));
     const Result r = run({c});
     REQUIRE(r.records.size() == 1);
     const auto &f = r.records[0].f;
+    CHECK(f[17] == "2");
     CHECK(f[19] == "N");
-    for (std::size_t i = 20; i < 30; ++i)
-        CHECK(f[i].empty());
-    CHECK(f[30] == "5.89");
+    CHECK(f[26] == "MARLBORO SAVINGS!");
+    CHECK(f[27] == "0.80");
+    CHECK(f[30] == "11.78");   // 2 x 6.29 less 0.80
+    CHECK_FALSE(r.hasErrors());
+
+    // A return gives back what was paid: the buydown stays in its (negative) price, no discount fields.
+    Check back = sale(1010, kWed + 60000);
+    OrderLine &rl = back.addItem(find(m, "bd"));
+    rl.quantity = -1;
+    buydown::apply(rl, *buydown::hitFor({b}, find(m, "bd"), "2026-01-07 14:00"), false);
+    const Result rr = run({back});
+    REQUIRE(rr.records.size() == 1);
+    CHECK(rr.records[0].f[17] == "-1");
+    CHECK(rr.records[0].f[27].empty());
+    CHECK(rr.records[0].f[30] == "-5.89");
 }
 
 TEST_CASE("Scan data: other makers only when their type is on; CBD never", "[scandata]")

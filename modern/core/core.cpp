@@ -259,6 +259,20 @@ Money OrderLine::wholeTotal() const
     return each * quantity;
 }
 
+Money OrderLine::buydownTotal() const
+{
+    if (voided || buydownId.empty())
+        return Money();
+    const Money whole = buydownEach * quantity;
+    if (!isShare())
+        return whole;
+    const std::int64_t cents = whole.cents();
+    const std::int64_t base = cents / shareOf;
+    const std::int64_t left = cents - base * shareOf;
+    const std::int64_t extra = share <= std::abs(left) ? (left > 0 ? 1 : -1) : 0;
+    return Money::fromCents(base + extra);
+}
+
 std::optional<Money> OrderLine::costAtSale() const
 {
     bool known = costKnown;
@@ -587,7 +601,18 @@ Totals Check::totals(const TaxRates &now) const
         else
             shared += off;
     }
-    t.subtotal = t.items - t.discounts;
+    // Buydowns (manufacturer money off a line, core/buydown.hh): off the line's own class; taxed on the
+    // reduced price unless the line says tax is on the price before it.
+    std::map<TaxClass, Money> buydownOff;
+    for (const OrderLine &l : lines) {
+        const Money b = l.buydownTotal();
+        if (b.cents() == 0)
+            continue;
+        t.buydowns += b;
+        if (!l.buydownTaxBefore)
+            buydownOff[l.taxClass] += b;
+    }
+    t.subtotal = t.items - t.discounts - t.buydowns;
 
     // The tax classes' share of the discount: an item discount on its own
     // item's class; the check's discounts spread over what may be discounted
@@ -618,6 +643,8 @@ Totals Check::totals(const TaxRates &now) const
     }
     if (any)
         discountShare[largest] += shared - allocated;
+    for (const auto &[cls, off] : buydownOff)
+        discountShare[cls] += off;
 
     // Prices include tax: each class's tax is backed out of its own part of the total (its lines
     // less its share of the discounts), never line by line, so the cents add up to what the guest
@@ -645,8 +672,18 @@ Totals Check::totals(const TaxRates &now) const
         t.tax += tax;
     }
     if (rates.pricesIncludeTax)
-        t.subtotal = t.items - t.discounts - t.tax;
-    t.discountsExTax = t.itemsExTax - t.subtotal;
+        t.subtotal = t.items - t.discounts - t.buydowns - t.tax;
+    // Buydowns without tax: prices including tax, each line's backed out at its class's rate.
+    t.buydownsExTax = t.buydowns;
+    if (rates.pricesIncludeTax && t.buydowns.cents() != 0) {
+        t.buydownsExTax = Money();
+        for (const OrderLine &l : lines) {
+            const Money b = l.buydownTotal();
+            const std::int64_t ppm = l.taxClass == TaxClass::None ? 0 : rates.ratePpmFor(l.taxClass, takeout);
+            t.buydownsExTax += ppm == 0 ? b : b.withoutTaxPpm(ppm);
+        }
+    }
+    t.discountsExTax = t.itemsExTax - t.subtotal - t.buydownsExTax;
 
     // Gratuity: on the (discounted, pre-tax) subtotal, not taxed, added after tax.
     t.gratuity = t.subtotal.cents() > 0 ? t.subtotal.percent(gratuityBp) : Money();   // (none on a refund)

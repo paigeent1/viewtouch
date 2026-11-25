@@ -785,6 +785,23 @@ Result build(const std::vector<Check> &checks, const std::vector<MenuItem> &menu
             }
         }
 
+        // Manufacturer buydowns and promotions on the lines (core/buydown.hh, owner 2026-11-25): no longer in
+        // the shelf price. A sale's buydown is an other manufacturer discount (27/28, named by its receipt
+        // text); a return's (negative) stays in its final price, as returns get no discount fields.
+        for (Work &w : work) {
+            if (!w.line || !w.report)
+                continue;
+            const Money b = w.line->buydownTotal();
+            if (b.cents() == 0)
+                continue;
+            if (w.returned || b.cents() < 0) {
+                w.extended -= b;
+                continue;
+            }
+            w.other += b;
+            addName(w.otherNames, w.line->buydownText.empty() ? std::string("Buydown") : w.line->buydownText);
+        }
+
         // The records, identical ones merged (same UPC, price, discounts per unit, deals).
         std::vector<Record> out;
         std::vector<std::string> keys;

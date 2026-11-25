@@ -111,6 +111,13 @@ struct OrderLine {
     // self-order kiosk: its own screen's name). Kept like addedBy through transfer, move, merge, split,
     // reopen and void. Old lines: empty (unknown). Not printed on receipts.
     std::string addedOn;
+    // A manufacturer buydown or promotion running when it was rung (core/buydown.hh): its definition, the
+    // receipt text ("SONOMA SAVINGS!"), the amount off one (frozen then) and whether tax is on the price before
+    // it. Shown as its own line under the item; the item keeps its regular price. Old lines: none.
+    std::string buydownId;
+    std::string buydownText;
+    Money buydownEach;
+    bool buydownTaxBefore = false;
 
     bool isComment() const { return itemId.empty(); }
     bool isReturn() const { return quantity < 0 && !isComment(); }
@@ -146,6 +153,10 @@ struct OrderLine {
     Money total() const;
     // The whole item, before it was shared.
     Money wholeTotal() const;
+    // The buydown on it: buydownEach x quantity (a return: negative, so less comes back); zero once voided.
+    // A piece of a shared item: its part.
+    Money buydownTotal() const;
+    bool hasBuydown() const { return !buydownId.empty() && buydownEach.cents() != 0; }
     // Cost at the time of sale for what this line counts (counted() x weight, modifiers included,
     // "No" on the item leaves its own cost out); nullopt when neither it nor a modifier had a cost.
     std::optional<Money> costAtSale() const;
@@ -275,6 +286,11 @@ struct Totals {
     Money tips;          // card tips, on top of the total
     Money cashPaid;      // cash tendered
     Money staffMeals;    // the part of `discounts` that is staff meals
+    // Manufacturer buydowns and promotions on the lines (OrderLine::buydownTotal): apart from `discounts`
+    // (payments), never limited by "No discounts". subtotal = items - discounts - buydowns (prices including
+    // tax: less the tax too); itemsExTax - discountsExTax - buydownsExTax == subtotal.
+    Money buydowns;
+    Money buydownsExTax;
     Money discountable;  // what discounts may come off: items not marked No discounts, no gift cards
     std::map<std::int64_t, Money> discountBy;   // each discount payment's id -> what it took off
     Money rounding;      // cash rounding (TaxRates::cashRoundingCents): -2 to +2 cents...

@@ -6,6 +6,7 @@
 #endif
 
 
+#include "core/buydown.hh"
 #include "core/check.hh"
 #include "core/inventory.hh"
 #include "core/over_service.hh"
@@ -532,6 +533,14 @@ struct PosSettings {
         bool operator==(const Promotion &) const = default;
     };
     std::vector<Promotion> promotions;
+    // Manufacturer buydowns and promotions (core/buydown.hh; Menu Builder > Mass Updates > Buydowns /
+    // Promotions): definitions with dates, an amount per carton and their items by UPC.
+    std::vector<Buydown> buydowns;
+    // Buydowns: tax on the price before the buydown (off: on the reduced price): what a new definition starts
+    // with; each definition keeps its own Taxes choice (ILSA: "Apply Taxes AFTER Discount").
+    bool buydownTaxBefore = false;
+    // The old per-item buydown fields were made into definitions (once).
+    bool buydownTagsMigrated = false;
     int waitMinutesPerParty = 10;
     // Hosts take payments (and open the servers' checks to): Pay This Table on
     // the host stand, when a server is busy. A person's own permissions still win.

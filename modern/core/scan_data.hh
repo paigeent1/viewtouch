@@ -11,7 +11,8 @@
 // checks it. See modern/docs/SCAN_DATA.md for what each setting is and the weekly routine.
 //
 // How the store's data is reported (the owner's decisions are in the docs):
-// - Per-pack manufacturer buydowns are already in the item's price: only the lowered price shows.
+// - Manufacturer buydowns (core/buydown.hh: a line's own amount off, the item at its regular price) are
+//   other manufacturer discounts (fields 27/28, named by the receipt text); the final price is after them.
 // - A discount named in Settings::multiNames is a manufacturer multi-unit deal (fields 20-22): its whole
 //   amount is on every line it covers and each line's final price carries its share.
 // - couponNames: a manufacturer coupon (25/26); otherMfrNames: another manufacturer discount (27/28);

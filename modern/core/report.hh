@@ -226,6 +226,18 @@ Report royaltyReport(const std::vector<Check> &closed, const ReportContext &ctx)
 // goes to QuickBooks or an accountant. `familyOf`: menu item id -> family.
 Report accountingReport(const std::vector<Check> &closed, const std::map<std::string, std::string> &familyOf,
                         const ReportContext &ctx);
+// Buydowns (core/buydown.hh). The Buydown Definition report, as ILSA printed it: the store's name, address
+// and phone, when it was printed, then each chosen definition as a block (name, amount, ID; style and qty;
+// dates; receipt text, manufacturer, rpt code, sale acct; taxes; subunits) and its items (UPC, description,
+// Part/Ctn, price, buydown amount, sale price).
+Report buydownDefinitionReport(const std::vector<const Buydown *> &defs, const std::vector<MenuItem> &menu,
+                               const ReportContext &ctx);
+// What the buydowns gave at the register on these checks: per definition (its dates, manufacturer, rpt code,
+// acct #), each UPC's units, packs, cartons, carton equivalents and amount, then by manufacturer and in all.
+// `only`: one definition (its id, ID number or part of its name; shown even with nothing sold); empty: every
+// definition that gave something.
+Report buydownsReport(const std::vector<Check> &closed, const std::vector<Buydown> &defs, const std::vector<MenuItem> &menu,
+                      const ReportContext &ctx, const std::string &only = {});
 // `now` with two more columns: the same row's last value in `before`, and
 // the change in percent (rows matched by kind and first cell).
 Report compareReports(const Report &now, const Report &before, const std::string &beforeLabel);
