@@ -255,7 +255,9 @@ ApplicationWindow {
                         event.accepted = true
                         return
                     } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && burst
-                               && root.scanBuffer.length >= 4) {
+                               && root.scanBuffer.length >= 4
+                               // Item Look Up: quick typing ("padron 1964", Enter) isn't a scan; codes are 8+.
+                               && !(root.controller.pageId === "item-lookup" && root.scanBuffer.length < 8)) {
                         const code = root.scanBuffer
                         root.scanBuffer = ""
                         if (root.controller.pageId === "admin-menu" || root.controller.pageId === "menu-builder") {
@@ -298,8 +300,10 @@ ApplicationWindow {
                     }
                     // Item Look Up (Retail: ALPHA LOOK UP, PRICE CHECK): what's typed on a keyboard goes into
                     // its search line without touching the line first: letters, digits, space, Backspace, and
-                    // Enter to look it up now (BHDAN 2026-11-15). A scan still arrives whole (lookupScan).
-                    if (!burst && root.controller.pageId === "item-lookup") {
+                    // Enter to look it up now (BHDAN 2026-11-15). A scan still arrives whole (lookupScan), and
+                    // replaces what its keys typed. However quickly it's typed: a fast typist's digits are
+                    // under the scanner's 60 ms ("padron 1964" lost its 1964, owner 2026-11-25).
+                    if (root.controller.pageId === "item-lookup") {
                         const t = event.text
                         const key = t.length === 1 && t >= " " && t !== "@" ? t
                                   : event.key === Qt.Key_Backspace ? "\b"

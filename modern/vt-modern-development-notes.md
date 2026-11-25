@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-25 15:35 ET — Bob (Claude) — Item Look Up: quick typing keeps its digits
+- **What:** Tablet app: changed. Server: no change. Main.qml: on Item Look Up (ALPHA LOOK UP), every key typed goes into the search line however quickly it comes (keys under the scanner's 60 ms used to be taken for a scan), and an Enter after quick typing counts as a scan only for 8 or more characters (UPCs), so 'padron 1964' + Enter searches for that. A real scan still replaces what its keys typed. Test: 'UI: Item Look Up takes quick typing, digits too; a scan replaces it'.
+- **Why:** Owner 2026-11-25 15:34 at BHDAN: 'alpha lookup does not take numbers \"padron 1964\"'.
+- **Files:** (none)
+
 ### 2026-11-25 15:00 ET — Bob (Claude) — Both Pis on Qt 6.12 (BHDAN confirmed)
 - **What:** Tablet app: no change. Server: no change. Notes only: the upstream sync ledger and HANDOFF_PART_FOUR.md record that both Pis run the official Qt 6.12.0 from /opt/qt/6.12.0 (HCA since 2026-11-13; BHDAN confirmed by the owner 2026-11-25 with vt-qt612 status, ViewTouch running build-qt612/vtmodern on /opt/qt/6.12.0). Debian Qt package updates no longer change ViewTouch on either Pi; upstream work needing Qt 6.12 no longer has to be skipped. The 6.8 CI build stays until the owner says to drop it.
 - **Why:** The notes never recorded BHDAN's move (the last record, 2026-11-13 16:12, still said Debian's 6.8), so the 2026-11-25 daily report wrongly assumed 6.8. From the daily housekeeping task's handoff (its read-only run couldn't push).

@@ -1554,6 +1554,30 @@ TEST_CASE("UI: Menu Builder: an item's Price check, with tax and back", "[flow][
     CHECK(s.pos.findItem(u"classic-burger"_s)->price.cents() == 1150);
 }
 
+TEST_CASE("UI: Item Look Up takes quick typing, digits too; a scan replaces it", "[flow][ui][itemlookup]")
+{
+    // Owner 2026-11-25: "alpha lookup does not take numbers 'padron 1964'" (fast typing looked like a scanner).
+    Screen s(false, 1280, 800);
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"item-lookup"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    QQuickItem *search = Screen::findBy(root, "objectName", u"lookupSearch"_s);
+    REQUIRE(search);
+    QTest::keyClicks(s.window, u"padron 1964"_s);          // back to back: quicker than any person
+    QTest::qWait(300);
+    CHECK(search->property("text").toString() == u"padron 1964"_s);
+    QTest::keyClick(s.window, Qt::Key_Return);
+    QTest::qWait(150);
+    CHECK(search->property("text").toString() == u"padron 1964"_s);
+    // A scan (a slower first key, the rest at once, Enter): its code replaces what was typed.
+    QTest::qWait(150);
+    QTest::keyClicks(s.window, u"012345678905"_s);
+    QTest::keyClick(s.window, Qt::Key_Return);
+    QTest::qWait(300);
+    CHECK(search->property("text").toString() == u"012345678905"_s);
+}
+
 TEST_CASE("UI: Menu Builder: letters typed on a keyboard go to a category", "[flow][ui][menubuild][typeahead]")
 {
     // Owner 2026-11-24: "type a letter from keyboard to go to a category like premium cigars".
