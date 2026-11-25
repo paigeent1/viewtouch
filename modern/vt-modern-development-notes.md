@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-25 15:45 ET — Bob (Claude) — Item Look Up test: keys one at a time
+- **What:** Tablet app: no change. Server: no change. The new Item Look Up test types with QTest::keyClick per character (keyClicks has no window form in Qt 6.8).
+- **Why:** CI run 45696380151 didn't compile: 'keyClicks' is not a member of 'QTest' for a QWindow.
+- **Files:** (none)
+
 ### 2026-11-25 15:35 ET — Bob (Claude) — Item Look Up: quick typing keeps its digits
 - **What:** Tablet app: changed. Server: no change. Main.qml: on Item Look Up (ALPHA LOOK UP), every key typed goes into the search line however quickly it comes (keys under the scanner's 60 ms used to be taken for a scan), and an Enter after quick typing counts as a scan only for 8 or more characters (UPCs), so 'padron 1964' + Enter searches for that. A real scan still replaces what its keys typed. Test: 'UI: Item Look Up takes quick typing, digits too; a scan replaces it'.
 - **Why:** Owner 2026-11-25 15:34 at BHDAN: 'alpha lookup does not take numbers \"padron 1964\"'.

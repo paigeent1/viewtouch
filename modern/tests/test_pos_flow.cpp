@@ -1564,7 +1564,8 @@ TEST_CASE("UI: Item Look Up takes quick typing, digits too; a scan replaces it",
     QQuickItem *root = s.window->contentItem();
     QQuickItem *search = Screen::findBy(root, "objectName", u"lookupSearch"_s);
     REQUIRE(search);
-    QTest::keyClicks(s.window, u"padron 1964"_s);          // back to back: quicker than any person
+    for (const QChar ch : u"padron 1964"_s)                  // back to back: quicker than any person
+        QTest::keyClick(s.window, ch.toLatin1());
     QTest::qWait(300);
     CHECK(search->property("text").toString() == u"padron 1964"_s);
     QTest::keyClick(s.window, Qt::Key_Return);
@@ -1572,7 +1573,8 @@ TEST_CASE("UI: Item Look Up takes quick typing, digits too; a scan replaces it",
     CHECK(search->property("text").toString() == u"padron 1964"_s);
     // A scan (a slower first key, the rest at once, Enter): its code replaces what was typed.
     QTest::qWait(150);
-    QTest::keyClicks(s.window, u"012345678905"_s);
+    for (const QChar ch : u"012345678905"_s)
+        QTest::keyClick(s.window, ch.toLatin1());
     QTest::keyClick(s.window, Qt::Key_Return);
     QTest::qWait(300);
     CHECK(search->property("text").toString() == u"012345678905"_s);
