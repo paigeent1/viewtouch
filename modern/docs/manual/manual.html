@@ -67,6 +67,7 @@
 <li>Site Setup, Hardware Configuration and Screen check</li>
 <li>Store computer commands (owner appendix)</li>
 <li>Mass Updates: many items at once</li>
+<li>Buydowns and promotions</li>
 </ol>
 
 <!-- ======================================================================= -->
@@ -3124,6 +3125,92 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 </ol>
 <p>Each store keeps its change sets in a <i>mass-updates</i> folder beside its database; the backups copy it (chapter 15).</p>
 <div class="tip">Later, a corporate office may send change sets straight to every store. Who may apply them is the price book permission (chapter 11).</div>
+
+<!-- ======================================================================= -->
+<h1>33. Buydowns and promotions</h1>
+<p>A <b>buydown</b> is money a cigarette maker gives for its items for a while: <i>Sonoma, $4.10 a carton,
+October 1 to December 31</i>. A <b>promotional sale</b> is the store lowering its own price for a while. Both
+work the same at the register: the item rings at its regular price and the savings are their own line under
+it, on the screen, on the customer's screen and on the receipt:</p>
+<pre>SONOMA FF BOX                $11.48
+  SONOMA SAVINGS!            -$0.41</pre>
+<p>They are set up on <b>Menu Builder → Mass Updates → Buydowns / Promotions</b> (the blue button at the right of the
+<i>Range on</i> row). Managers can look; saving one is an admin's, or needs an admin's PIN (chapter 11).</p>
+<!-- SHOT: Mass Updates > Buydowns / Promotions: the list with ID, Type, Name, $ Amount, Style, Qty, Start, End, Now (Running now in green), and Edit, Copy to New Buydown/Promo, Delete, Print, Sold report under it (page mass-updates) -->
+
+<h2>The list</h2>
+<p>Each one shows its <b>ID</b>, <b>Type</b> (Buydown or Promo), <b>Name</b>, <b>$ Amount</b> (per carton), <b>Style</b>,
+<b>Qty</b>, <b>Start</b> and <b>End</b>, and <b>Now</b>: <i>Coming</i>, <i>Running now</i> or <i>Ended</i>. Running ones are at the
+top. A ⚠ means some of its items are also in another one at the same time: then the <b>larger amount</b> applies,
+never both.</p>
+
+<h2>A new quarter: Copy to New</h2>
+<p>Most buydowns come back each quarter with new dates and maybe a new amount. The quick way:</p>
+<ol>
+<li>Touch last quarter's (<i>SONOMA 2026Q4</i>), then <b>Copy to New Buydown/Promo</b>. A copy opens with the same items.</li>
+<li>Change the <b>Name</b> (<i>SONOMA 2027Q1</i>), the <b>Start Date</b> and <b>End Date</b> (touch them: the calendar opens) and the <b>$ Amount</b>.</li>
+<li>Touch <b>Apply</b>. <b>Abort</b> drops it.</li>
+</ol>
+
+<h2>The fields</h2>
+<ul>
+<li><b>Type</b>: <i>Buydown</i> (the maker lowers your cost) or <i>Promotional Sale</i> (you lower your price). The reports keep them apart.</li>
+<li><b>Name</b> (for you and the reports) and <b>Receipt Text</b> (what the customer sees: <i>SONOMA SAVINGS!</i>).</li>
+<li><b>$ Amount (per carton)</b>: <i>4.10</i>.</li>
+<li><b>Style</b> and <b>Qty</b>, as ILSA had them. Qty is how many units (all its UPCs together) get the savings:
+  <ul>
+  <li><i>1 = Date Range Only</i>: every unit sold from the start to the end. Qty isn't used.</li>
+  <li><i>2 = Quantity Only</i>: the first Qty units sold from the start, with no end.</li>
+  <li><i>3 = Quantity with Date Range</i>: up to Qty units between the start and the end.</li>
+  <li><i>4 = Old Style</i>: an end date and a Qty: whichever comes first ends it.</li>
+  </ul>
+  The list shows <i>12 of 50 used</i>; when they are used up, the register stops adding the line.</li>
+<li><b>Start Date</b> and <b>End Date</b>, with the time. An item rung before the end keeps its line even if the sale is paid after.</li>
+<li><b>Use "Part of Carton" field</b>: each item's <b>Part/Ctn</b> says what part of the carton amount it gets. Off: every UPC gets the full amount.</li>
+<li><b>Manufacturer</b>, <b>Rpt Code</b> and <b>Acct #</b>: for your claim; they print on the reports.</li>
+<li><b>Taxes.</b> Buydowns follow the store's box at the top, <b>Buydowns: tax on the price before the buydown</b>. Off (the usual) means the tax is on the reduced price. A promotion has its own <b>Apply taxes before discount</b> box.</li>
+</ul>
+<div class="warn">Which way the tax goes is a tax question: ask your accountant which applies to manufacturer buydowns in your state before changing the store's box.</div>
+
+<h2>Its items</h2>
+<p>The items list shows each <b>UPC</b>, <b>Description</b>, <b>Part/Ctn</b>, <b>Price</b>, <b>$ Amount</b> and <b>Sale Price</b>:
+a carton ($114.79) gets the whole $4.10 and sells for $110.69; a pack ($11.48) is <i>0.1</i> of a carton, gets $0.41
+and sells for $11.07. Part/Ctn is filled in from the item's box: a single in a box of 10 is 0.1, a box is 0 (the whole
+amount; 1 means the same). Type another number in its box to change it.</p>
+<p>To add items:</p>
+<ul>
+<li><b>Tick items in Mass Updates</b>: the grid comes back. Find them (a name or UPC, a category, the brand tree, a range), tick them (<b>All</b> ticks every one found), then <b>Add the ticked items</b> on the blue bar.</li>
+<li><b>Add items that start with:</b> a brand name, <i>WINSTON</i>, and <b>Add</b>.</li>
+<li><b>UPC / item #</b>: one item.</li>
+</ul>
+<p>Tick items in the list and touch <b>Take out ticked</b> to remove them.</p>
+
+<h2>Printing and the reports</h2>
+<ul>
+<li><b>Print</b> prints the <b>Buydown Definition report</b> of the buydown you touched, as ILSA did: the store's name,
+address and phone, when it was printed, the buydown's fields, then its items with Part/Ctn, price, buydown amount and
+sale price. Tick several to print just those. <b>Print all…</b> prints every one (a long report).</li>
+<li><b>Sold report</b>: for the buydown you touched, over its own dates, each UPC's units, packs and cartons, carton
+equivalents and the savings given, then a summary with the totals, dates, manufacturer, Rpt Code and Acct #. Check it
+against what your distributor reports. <b>Print</b> prints it.</li>
+<li><b>Manager → Reports → Buydowns</b>: every buydown that gave something on the days shown (any day or dates),
+by buydown and by manufacturer, buydowns and promotions apart. Type a name in the box for just one. It is kept with each
+End of Day and in the report export.</li>
+<li>The <b>Sales</b> report shows a <b>Buydowns</b> line under Discounts &amp; comps, so net sales are right.</li>
+<li><b>Altria scan data</b> (chapter on scan data): a buydown goes in the file's manufacturer discount fields, no longer inside the price.</li>
+</ul>
+
+<h2>At the register</h2>
+<ul>
+<li>Scanning, a button, Find and Item Look Up all ring the line. <b>Price Check</b> shows <i>Sale price (with SONOMA SAVINGS!)</i>.</li>
+<li>The line goes with its item: more of it, an error correct or void, a moved or split check.</li>
+<li>A return gives back what was paid: the price less its buydown. A return without the receipt (ITEM RETURN, scan) uses the buydown running now.</li>
+</ul>
+
+<h2>Another store</h2>
+<p><b>Send to stores (file)…</b> saves the buydown you touched in <i>ViewTouch Exports</i> (<i>Buydown - … .vtbuydown.json</i>), its items by UPC.
+At the other store, <b>Import…</b> opens it as a new buydown: its UPCs are found there, those not found are listed (and left out). Check it, then <b>Apply</b>.</p>
+<div class="tip">The old Menu Builder <i>Buydown</i> fields on each item were made into buydowns here once, by group and dates; they are no longer on the item card.</div>
 
 </body>
 </html>

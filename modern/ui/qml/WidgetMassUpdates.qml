@@ -28,6 +28,13 @@ Item {
                           field: "", from: "", to: "", chosenOnly: false, sort: "name", desc: false, page: 0 })
     property string roundTo: "none"
     property string fileError: ""   // a change set file that couldn't be read
+    readonly property var buydownDraft: pos && pos.buydowns ? (pos.buydowns.draft ?? null) : null
+    function openBuydowns() {
+        if (!pos) return
+        pos.want("buydowns", true)
+        pos.buydownsOpen(true)
+        buydowns.visible = true
+    }
 
     function setView(changes) {
         const v = Object.assign({}, view, changes)
@@ -52,7 +59,7 @@ Item {
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose() }
+        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); asked.want("buydowns", false); asked.buydownsOpen(false) }
     }
     Component.onCompleted: {
         if (!pos || !pos.loggedIn) return
@@ -204,6 +211,13 @@ Item {
                     onClicked: { rangeFrom.text = ""; rangeTo.text = ""; w.setView({ field: "", from: "", to: "" }) }
                 }
                 Item { Layout.fillWidth: true }
+                // Manufacturer buydowns and promotions (BuydownsPanel.qml).
+                Small { u: w.unit;
+                    objectName: "massBuydowns"
+                    text: qsTr("Buydowns / Promotions")
+                    palette.button: "#1d4ed8"; palette.buttonText: "white"
+                    onClicked: w.openBuydowns()
+                }
             }
             // --- how many, choosing, pages ---
             RowLayout {
@@ -334,6 +348,23 @@ Item {
                 }
             }
 
+            // Ticking items for a buydown being edited: back to it, with them.
+            RowLayout {
+                objectName: "massBuydownBar"
+                visible: !buydowns.visible && !!w.buydownDraft
+                Layout.fillWidth: true
+                spacing: 6
+                Label {
+                    Layout.fillWidth: true
+                    text: w.buydownDraft ? qsTr("Editing %1: tick its items here, then add them.").arg(w.buydownDraft.name || qsTr("a new buydown")) : ""
+                    font.pixelSize: w.unit * 0.85
+                    font.bold: true
+                    color: "#1d4ed8"
+                    elide: Text.ElideRight
+                }
+                Small { u: w.unit; objectName: "massBuydownAdd"; text: qsTr("Add the ticked items"); onClicked: { w.pos.buydownAddChosen(); buydowns.visible = true } }
+                Small { u: w.unit; objectName: "massBuydownBack"; text: qsTr("Back to the buydown"); onClicked: buydowns.visible = true }
+            }
             Label {
                 objectName: "massMessage"
                 visible: text !== ""
@@ -657,6 +688,23 @@ Item {
                 }
                 Small { u: w.unit; objectName: "massCancel"; text: qsTr("Cancel"); onClicked: w.pos.massCancel() }
             }
+        }
+    }
+
+    // Buydowns / Promotions: over the grid; "Tick items in Mass Updates" shows the grid again.
+    BuydownsPanel {
+        id: buydowns
+        visible: false
+        anchors.fill: parent
+        z: 20
+        pos: w.pos
+        unit: w.unit
+        touch: w.touch
+        zoneController: w.zone ? w.zone.controller : null
+        onPickItems: visible = false
+        onClosed: {
+            visible = false
+            if (w.pos) { w.pos.buydownsOpen(false); w.pos.want("buydowns", false) }
         }
     }
 }

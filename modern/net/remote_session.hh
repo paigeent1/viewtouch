@@ -217,6 +217,7 @@ public:
     QVariantMap checkSearch() const override { return v(u"checkSearch").toMap(); }
     QVariantMap exceptionSearch() const override { return v(u"exceptionSearch").toMap(); }
     QVariantMap massUpdate() const override { return v(u"massUpdate").toMap(); }
+    QVariantMap buydowns() const override { return v(u"buydowns").toMap(); }
     QVariantMap itemSearch() const override { return v(u"itemSearch").toMap(); }
     QVariantMap printerSearch() const override { return v(u"printerSearch").toMap(); }
     // Where pictures from the server are kept on this device (tests set it).

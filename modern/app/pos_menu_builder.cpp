@@ -1011,7 +1011,7 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
             }
         }
     }
-    #include "pos_buydown_save.inc"
+    // (Buydowns are no longer on the item: Mass Updates > Buydowns / Promotions, app/pos_buydowns.cpp.)
     // Other prices: empty is the regular price.
     const auto otherPrice = [&](const QVariant &v, Money &into) {
         const QString t = v.toString().trimmed();

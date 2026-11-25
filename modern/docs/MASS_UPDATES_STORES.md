@@ -64,3 +64,18 @@ Store Updating > Export writes a copy to the device's "ViewTouch Exports" folder
 
 Open questions for the owner: whether the stores apply automatically or wait for a person, and whether
 each store may keep its own price for some items (a "local price" mark that imports skip).
+
+## Buydowns and promotions between stores (2026-11-25)
+
+Manufacturer buydowns and promotional sales (Mass Updates > Buydowns / Promotions, `app/pos_buydowns.cpp`,
+`core/buydown.hh`) travel the same way as change sets: by UPC, never by this store's item ids.
+
+- **Export.** *Send to stores (file)…* writes one definition as `Buydown - <name> - <date>.vtbuydown.json`:
+  `{format: "viewtouch-buydown", version: 1, store, exportedAt, buydown: {type, name, receiptText, amount (cents per
+  carton), taxBefore, usePartCtn, style, qty, start, end ("YYYY-MM-DD HH:MM", the store's local time), manufacturer,
+  rptCode, account, items: [{upc, partCtn, name}]}}`. The item ids and this store's count of units used are left out.
+- **Import.** *Import…* opens it as a new definition (a new ID here). Each UPC is looked up the way a scan is (11/12/13
+  digits); UPCs not found are listed and left out. Nothing is saved until Apply, which is the price book permission.
+- **Corporate later.** A head office would make the definition once (Copy to New each quarter), export it and send the
+  file to every store, the same path as change sets above (and the same permission). A store's own Part/Ctn edits
+  stay with the store; a later file replaces nothing by itself (it is always a new definition to check and Apply).

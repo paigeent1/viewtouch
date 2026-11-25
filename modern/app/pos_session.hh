@@ -200,6 +200,9 @@ class PosSession : public QObject {
     // rows (200 at a time), categories, brands, groups, subs, view, preview, last, sets, message}. Sent to a
     // tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap massUpdate READ massUpdate NOTIFY adminChanged)
+    // Mass Updates > Buydowns / Promotions (PosService::buydownsOpen): the definitions, the one being edited, a
+    // report shown. Sent to a tablet only while it shows the screen.
+    Q_PROPERTY(QVariantMap buydowns READ buydowns NOTIFY sessionChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -469,6 +472,7 @@ public:
     virtual QVariantMap checkSearch() const = 0;
     virtual QVariantMap exceptionSearch() const = 0;
     virtual QVariantMap massUpdate() const = 0;
+    virtual QVariantMap buydowns() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -779,6 +783,25 @@ public:
     Q_INVOKABLE void massApply() { invoke(QStringLiteral("massApply")); }
     Q_INVOKABLE void massUndo() { invoke(QStringLiteral("massUndo")); }
     Q_INVOKABLE void massImport(const QVariantMap &file) { invoke(QStringLiteral("massImport"), {file}); }
+    // Buydowns / Promotions (answers in buydowns).
+    Q_INVOKABLE void buydownsOpen(bool on) { invoke(QStringLiteral("buydownsOpen"), {on}); }
+    Q_INVOKABLE void buydownNew(const QString &type) { invoke(QStringLiteral("buydownNew"), {type}); }
+    Q_INVOKABLE void buydownEdit(const QString &id) { invoke(QStringLiteral("buydownEdit"), {id}); }
+    Q_INVOKABLE void buydownCopy(const QString &id) { invoke(QStringLiteral("buydownCopy"), {id}); }
+    Q_INVOKABLE void buydownSet(const QVariantMap &fields) { invoke(QStringLiteral("buydownSet"), {fields}); }
+    Q_INVOKABLE void buydownAddItems(const QStringList &codes) { invoke(QStringLiteral("buydownAddItems"), {codes}); }
+    Q_INVOKABLE void buydownAddChosen() { invoke(QStringLiteral("buydownAddChosen")); }
+    Q_INVOKABLE void buydownAddStartingWith(const QString &text) { invoke(QStringLiteral("buydownAddStartingWith"), {text}); }
+    Q_INVOKABLE void buydownRemoveItems(const QStringList &keys) { invoke(QStringLiteral("buydownRemoveItems"), {keys}); }
+    Q_INVOKABLE void buydownSetPartCtn(const QString &key, double part) { invoke(QStringLiteral("buydownSetPartCtn"), {key, part}); }
+    Q_INVOKABLE void buydownApply() { invoke(QStringLiteral("buydownApply")); }
+    Q_INVOKABLE void buydownAbort() { invoke(QStringLiteral("buydownAbort")); }
+    Q_INVOKABLE void buydownDelete(const QString &id) { invoke(QStringLiteral("buydownDelete"), {id}); }
+    Q_INVOKABLE void buydownSetStoreTax(bool before) { invoke(QStringLiteral("buydownSetStoreTax"), {before}); }
+    Q_INVOKABLE void buydownShowReport(const QString &kind, const QStringList &ids) { invoke(QStringLiteral("buydownShowReport"), {kind, ids}); }
+    Q_INVOKABLE void buydownPrintReport() { invoke(QStringLiteral("buydownPrintReport")); }
+    Q_INVOKABLE void buydownCloseReport() { invoke(QStringLiteral("buydownCloseReport")); }
+    Q_INVOKABLE void buydownImport(const QVariantMap &file) { invoke(QStringLiteral("buydownImport"), {file}); }
     Q_INVOKABLE void printEodArchive(qint64 seq) { invoke(QStringLiteral("printEodArchive"), {seq}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

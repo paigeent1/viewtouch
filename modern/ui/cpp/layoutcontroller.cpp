@@ -1293,6 +1293,42 @@ void LayoutController::exportChangeSet(const QString &id)
     });
 }
 
+void LayoutController::exportBuydown(const QString &id)
+{
+    if (!pos_)
+        return;
+    call(u"buydownFile"_s, {id}, [this](const QVariant &result) {
+        const QVariantMap file = result.toMap();
+        if (file.isEmpty())
+            return;   // not allowed, or gone: already said
+        const QString dir = exportDir_.isEmpty() ? QDir::home().filePath(u"ViewTouch Exports"_s) : exportDir_;
+        QString name = file.value(u"buydown"_s).toMap().value(u"name"_s).toString();
+        name.replace(QRegularExpression(u"[\\/:*?\"<>|%]"_s), u"-"_s);
+        const QString path = QDir(dir).filePath(u"Buydown - %1 - %2.vtbuydown.json"_s
+                                                    .arg(name.left(80).trimmed(), QDate::currentDate().toString(Qt::ISODate)));
+        QSaveFile f(path);
+        if (!QDir().mkpath(dir) || !f.open(QIODevice::WriteOnly)
+            || f.write(QJsonDocument(QJsonObject::fromVariantMap(file)).toJson()) < 0 || !f.commit()) {
+            setStatus(tr("Could not save the buydown: %1").arg(f.errorString()));
+            return;
+        }
+        setStatus(tr("Saved to %1").arg(path));
+    });
+}
+
+QVariantMap LayoutController::readBuydownFile(const QUrl &file) const
+{
+    QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());
+    if (f.size() > 16 * 1024 * 1024)
+        return {{u"error"_s, tr("That file is too big for a buydown.")}};
+    if (!f.open(QIODevice::ReadOnly))
+        return {{u"error"_s, tr("Can't open it: %1").arg(f.errorString())}};
+    const QVariantMap b = QJsonDocument::fromJson(f.readAll()).object().toVariantMap();
+    if (b.value(u"format"_s) != u"viewtouch-buydown"_s)
+        return {{u"error"_s, tr("That isn't a ViewTouch buydown file.")}};
+    return b;
+}
+
 QVariantMap LayoutController::readChangeSetFile(const QUrl &file) const
 {
     QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());

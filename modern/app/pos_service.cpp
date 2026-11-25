@@ -92,6 +92,7 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
     } else {
         startDay();
     }
+    migrateBuydownTags();   // the old per-item buydowns, once
 }
 
 const Employee *PosShared::employee(const std::string &id) const
@@ -1348,6 +1349,8 @@ bool PosService::priceCheckCode(const QString &code)
     priceCheck_ = {{u"on"_s, true},
                    {u"item"_s, QVariantMap{{u"name"_s, qs(m->name)}, {u"price"_s, priced(*m)}, {u"upc"_s, upcOf(*m)},
                                           {u"noDiscount"_s, m->noDiscount},
+                                          // A buydown running now: "Sale price (with SONOMA SAVINGS!)".
+                                          {u"buydown"_s, buydownPriceCheck(*m, c)},
                                           {u"soldOut"_s, !m->available || m->soldOutToday},
                                           {u"related"_s, related}}}};
     emit sessionChanged();
@@ -2721,6 +2724,9 @@ QVariantList PosService::lines() const
             // − / + / Again apply (not a comment, gift card or weighed item).
             {u"countable"_s, !l.isComment() && !l.isGiftCard() && !l.isFee() && !l.voided && l.weight == 0 && !l.isShare() && !l.isReturn()},
             {u"isReturn"_s, l.isReturn()}, {u"returnReason"_s, qs(l.returnReason)},
+            // A manufacturer buydown / promotion: its own line under the item ("SONOMA SAVINGS!  -$0.41").
+            {u"buydown"_s, l.hasBuydown() && !l.voided ? qs(l.buydownText) : QString()},
+            {u"buydownPrice"_s, l.hasBuydown() && !l.voided ? format(-l.buydownTotal()) : QString()},
             {u"fee"_s, l.isFee()},
             {u"shared"_s, l.isShare()},
             {u"selected"_s, qint64(l.id) == selectedLine_},
@@ -2808,6 +2814,8 @@ QVariantMap PosService::totals() const
     return {
         {u"items"_s, format(t.items)}, {u"discounts"_s, format(-t.discounts)},
         {u"hasDiscount"_s, t.discounts.cents() > 0},
+        // Manufacturer buydowns / promotions (each also its own line under its item).
+        {u"buydowns"_s, format(-t.buydowns)}, {u"hasBuydowns"_s, t.buydowns.cents() != 0},
         {u"subtotal"_s, format(t.subtotal)}, {u"tax"_s, format(t.tax)}, {u"taxLines"_s, taxLines},
         {u"taxIncluded"_s, t.taxIncluded},
         {u"total"_s, format(t.total)}, {u"paid"_s, format(t.paid)},

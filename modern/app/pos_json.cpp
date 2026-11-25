@@ -172,6 +172,14 @@ QJsonObject toJson(const Check &c)
             lo.insert(u"addedAt"_s, qint64(l.addedAt));
         if (!l.addedOn.empty())   // the terminal it was rung on
             lo.insert(u"addedOn"_s, qs(l.addedOn));
+        // A manufacturer buydown / promotion on it (core/buydown.hh).
+        if (!l.buydownId.empty()) {
+            lo.insert(u"buydownId"_s, qs(l.buydownId));
+            lo.insert(u"buydownText"_s, qs(l.buydownText));
+            lo.insert(u"buydownEach"_s, qint64(l.buydownEach.cents()));
+            if (l.buydownTaxBefore)
+                lo.insert(u"buydownTaxBefore"_s, true);
+        }
         // Responsible service: standard drinks in one, and the seats it is shared across.
         if (l.stdDrinks > 0)
             lo.insert(u"stdDrinks"_s, l.stdDrinks);
@@ -334,6 +342,10 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.addedByName = ss(lo.value(u"addedByName").toString());
         l.addedAt = i64(lo.value(u"addedAt"));
         l.addedOn = ss(lo.value(u"addedOn").toString());
+        l.buydownId = ss(lo.value(u"buydownId").toString());
+        l.buydownText = ss(lo.value(u"buydownText").toString());
+        l.buydownEach = l.buydownId.empty() ? Money() : money(lo.value(u"buydownEach"));
+        l.buydownTaxBefore = lo.value(u"buydownTaxBefore").toBool();
         l.stdDrinks = std::clamp(lo.value(u"stdDrinks").toDouble(0), 0.0, 1000.0);
         for (const QJsonValue &sv : lo.value(u"drinkSeats").toArray())
             l.drinkSeats.push_back(std::clamp(sv.toInt(), 0, 99));
@@ -1135,6 +1147,54 @@ QString dateTimeField(std::int64_t ms)
     return t.date().toString(u"yyyy-MM-dd"_s) + u' ' + QLocale(QLocale::English).toString(t.time(), u"h:mm AP"_s);
 }
 
+QJsonObject toJson(const Buydown &b)
+{
+    QJsonArray items;
+    for (const BuydownItem &i : b.items)
+        items.append(QJsonObject{{u"upc"_s, qs(i.upc)}, {u"itemId"_s, qs(i.itemId)}, {u"partCtn"_s, i.partCtn},
+                                 {u"name"_s, qs(i.name)}});
+    return QJsonObject{{u"id"_s, qs(b.id)}, {u"number"_s, b.number}, {u"type"_s, qs(b.type)}, {u"name"_s, qs(b.name)},
+                       {u"receiptText"_s, qs(b.receiptText)}, {u"amount"_s, qint64(b.amount.cents())},
+                       {u"taxBefore"_s, b.taxBefore}, {u"usePartCtn"_s, b.usePartCtn}, {u"style"_s, b.style},
+                       {u"qty"_s, b.qty}, {u"used"_s, b.used}, {u"start"_s, qs(b.start)}, {u"end"_s, qs(b.end)},
+                       {u"manufacturer"_s, qs(b.manufacturer)}, {u"rptCode"_s, qs(b.rptCode)}, {u"account"_s, qs(b.account)},
+                       {u"createdBy"_s, qs(b.createdBy)}, {u"createdAt"_s, qint64(b.createdAt)},
+                       {u"changedBy"_s, qs(b.changedBy)}, {u"changedAt"_s, qint64(b.changedAt)}, {u"items"_s, items}};
+}
+
+Buydown buydownFromJson(const QJsonObject &o)
+{
+    Buydown b;
+    b.id = ss(o.value(u"id").toString());
+    b.number = std::max(0, o.value(u"number").toInt());
+    b.type = o.value(u"type").toString() == u"promo" ? "promo" : "buydown";
+    b.name = ss(o.value(u"name").toString().left(60));
+    b.receiptText = ss(o.value(u"receiptText").toString().left(40));
+    b.amount = Money::fromCents(std::clamp<qint64>(o.value(u"amount").toInteger(), 0, 100'000));
+    b.taxBefore = o.value(u"taxBefore").toBool();
+    b.usePartCtn = o.value(u"usePartCtn").toBool(true);
+    b.style = std::clamp(o.value(u"style").toInt(1), 1, 4);
+    b.qty = std::clamp(o.value(u"qty").toInt(), 0, 9'999'999);
+    b.used = std::clamp(o.value(u"used").toInt(), -9'999'999, 9'999'999);
+    b.start = ss(o.value(u"start").toString().left(16));
+    b.end = ss(o.value(u"end").toString().left(16));
+    b.manufacturer = ss(o.value(u"manufacturer").toString().left(60));
+    b.rptCode = ss(o.value(u"rptCode").toString().left(30));
+    b.account = ss(o.value(u"account").toString().left(30));
+    b.createdBy = ss(o.value(u"createdBy").toString());
+    b.createdAt = o.value(u"createdAt").toInteger();
+    b.changedBy = ss(o.value(u"changedBy").toString());
+    b.changedAt = o.value(u"changedAt").toInteger();
+    for (const QJsonValue &v : o.value(u"items").toArray()) {
+        const QJsonObject i = v.toObject();
+        BuydownItem it{ss(i.value(u"upc").toString().left(40)), ss(i.value(u"itemId").toString()),
+                       std::clamp(i.value(u"partCtn").toDouble(), 0.0, 1.0), ss(i.value(u"name").toString().left(80))};
+        if (!it.upc.empty() || !it.itemId.empty())
+            b.items.push_back(std::move(it));
+    }
+    return b;
+}
+
 QJsonObject toJson(const PosSettings &s)
 {
     QJsonArray terminals;
@@ -1418,6 +1478,13 @@ QJsonObject toJson(const PosSettings &s)
              }
              return a;
          }()},
+        {u"buydowns"_s, [&] {
+             QJsonArray a;
+             for (const Buydown &b : s.buydowns)
+                 a.append(toJson(b));
+             return a;
+         }()},
+        {u"buydownTaxBefore"_s, s.buydownTaxBefore}, {u"buydownTagsMigrated"_s, s.buydownTagsMigrated},
         {u"scheduleRequired"_s, s.scheduleRequired}, {u"clockInEarlyMinutes"_s, s.clockInEarlyMinutes},
         {u"tipPool"_s, [&] {
              QJsonObject o;
@@ -1799,6 +1866,13 @@ PosSettings settingsFromJson(const QJsonObject &o)
         if (!promo.id.empty())
             s.promotions.push_back(promo);
     }
+    for (const QJsonValue &v : o.value(u"buydowns").toArray()) {
+        Buydown b = buydownFromJson(v.toObject());
+        if (!b.id.empty())
+            s.buydowns.push_back(std::move(b));
+    }
+    s.buydownTaxBefore = o.value(u"buydownTaxBefore").toBool(false);
+    s.buydownTagsMigrated = o.value(u"buydownTagsMigrated").toBool(false);
     s.scheduleRequired = o.value(u"scheduleRequired").toBool(false);
     s.clockInEarlyMinutes = std::clamp(o.value(u"clockInEarlyMinutes").toInt(15), 0, 240);
     {

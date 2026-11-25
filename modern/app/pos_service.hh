@@ -484,6 +484,8 @@ public:
     QString startPairing(bool standby = false);
 
     void startDay();
+    // The old per-item buydown tags made into definitions, once (pos_buydowns.cpp).
+    void migrateBuydownTags();
 
     // Power (Store Settings > Billboards: Power the TV off outside its hours): what this computer
     // last did to each TV - put it to sleep, or woke it and opened the billboard again (then it
@@ -708,6 +710,42 @@ public:
     // A change set applied here, as its file ({format: viewtouch-change-set, ...}); empty: none such.
     QVariantMap massChangeSetFile(const QString &id);
     QVariantMap massUpdate() const override;
+    // The items ticked in Mass Updates now (their ids): Buydowns' "Add the ticked items".
+    QStringList massChosenIds() const;
+    // --- Buydowns / Promotions (pos_buydowns.cpp; Mass Updates > Buydowns / Promotions, managers; saving: the
+    // price book permission). The definitions list, one being edited (Add / Edit / Copy to New, then Apply or
+    // Abort), its items by UPC, the reports one buydown at a time, a file for another store. State in buydowns():
+    // {active, canApply, storeTaxBefore, list: [{id, number, type, typeLabel, name, receiptText, amount, ...,
+    // style, styleLabel, qty, used, usedText, start, end, startText, endText, state (coming | running | ended),
+    // stateLabel, items, overlap}], draft: {... the same, isNew, from, itemList: [{key, upc, name, partCtn, found,
+    // price, amount, sale}], overlaps, problems, notFound}, report (a report, or {loading}), message, chosenInMass}.
+    bool buydownsOpen(bool on);
+    bool buydownNew(const QString &type);          // "buydown" | "promo"
+    bool buydownEdit(const QString &id);
+    bool buydownCopy(const QString &id);           // Copy to New: the same items; a new ID
+    // {type, name, receiptText, amount ("4.10"), taxBefore, usePartCtn, style (1-4), qty, start, end ("2026-10-01
+    // 00:00"; a date alone: the start of the day / the end), manufacturer, rptCode, account}: those given.
+    bool buydownSet(const QVariantMap &fields);
+    bool buydownAddItems(const QStringList &codes);   // item ids, UPCs or item numbers
+    bool buydownAddChosen();                           // the items ticked in Mass Updates
+    bool buydownAddStartingWith(const QString &text);  // ILSA's "Add Items that start with:" (WINSTON)
+    bool buydownRemoveItems(const QStringList &keys);  // itemList's keys
+    bool buydownSetPartCtn(const QString &key, double part);
+    bool buydownApply();
+    bool buydownAbort();
+    bool buydownDelete(const QString &id);
+    bool buydownSetStoreTax(bool before);   // Buydowns: tax on the price before the buydown
+    // kind "definition": the Buydown Definition report of these (["*"]: every one); "sold": the first one's
+    // sales over its dates. Shown in buydowns().report; Print prints the one shown.
+    bool buydownShowReport(const QString &kind, const QStringList &ids);
+    bool buydownPrintReport();
+    bool buydownCloseReport();
+    QVariantMap buydownFile(const QString &id);       // {format: viewtouch-buydown, store, buydown} (UPCs, no ids)
+    bool buydownImport(const QVariantMap &file);     // another store's: matched by UPC, shown to Apply
+    QVariantMap buydowns() const override;
+    core::Report buydownDefinitions(const QStringList &ids) const;
+    // The store's time, "2026-11-25 10:00" (as definitions keep it).
+    std::string buydownNow() const;
     bool printExceptionSearch();
     QVariantMap printerSearch() const override;
     bool findPrinters();
@@ -1920,6 +1958,26 @@ private:
     void applyPromotions(core::Check &c);
     // A closed check's coupons count as used (by 1), or not anymore (-1: reopened).
     void countCouponUses(const core::Check &c, int by);
+    // Buydowns (pos_buydowns.cpp): a line just rung gets the running one, if any; closing / reopening a check
+    // counts its units against capped definitions.
+    void buydownOnNewLine(core::OrderLine &l) const;
+    void countBuydownUses(const core::Check &c, int by);
+    std::map<std::string, int> buydownUnitsOpen() const;
+    QVariantMap buydownPriceCheck(const core::MenuItem &m, const QString &code) const;
+    QVariantMap buydownVariant(const core::Buydown &b, const std::map<std::string, int> &open) const;
+    bool buydownAddMenuItems(const std::vector<const core::MenuItem *> &items);
+    bool buydownMayLook();
+    struct BuydownView {
+        bool open = false;
+        std::optional<core::Buydown> draft;
+        bool isNew = false;
+        QVariantList notFound;
+        QString from, message;
+        core::Report report;
+        bool reportShown = false, reportLoading = false;
+        int request = 0;
+    };
+    BuydownView bd_;
     bool addCardHold(const QVariantMap &r);
     void letHoldGo(core::Check &c, const QString &why);
     bool startCounter(const QVariantMap &charge);

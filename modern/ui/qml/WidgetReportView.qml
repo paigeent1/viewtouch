@@ -56,6 +56,7 @@ Item {
         { id: "checklists", label: qsTr("Checklists") },
         { id: "drivers", label: qsTr("Drivers") },
         { id: "scandata", label: qsTr("Scan Data") },
+        { id: "buydowns", label: qsTr("Buydowns") },
         { id: "service", label: qsTr("Responsible Service") },
     ]
     property string reportId: zone && zone.props && zone.props.report ? zone.props.report : "sales"
@@ -67,12 +68,14 @@ Item {
     // Sales by Employee and Item: only items whose name, UPC or category has this text.
     property string itemFilter: ""
     readonly property bool isEmployeeItems: reportId === "employee_items"
+    // Buydowns: every one that gave something, or one by name ("buydowns|sonoma"); the same filter field.
+    readonly property bool isBuydowns: reportId === "buydowns"
     // Time Clock (the ILSA printout's layout): everyone, or one employee (their id).
     readonly property bool isTimeClock: reportId === "timeclock"
     property string timeClockEmployee: ""
     // What is asked of the server: "employee_items|cohiba" / "timeclock|78" carries the filter.
-    readonly property string requestId: isEmployeeItems && itemFilter.trim() !== ""
-                                        ? "employee_items|" + itemFilter.trim()
+    readonly property string requestId: (isEmployeeItems || isBuydowns) && itemFilter.trim() !== ""
+                                        ? reportId + "|" + itemFilter.trim()
                                         : isTimeClock && timeClockEmployee !== "" ? "timeclock|" + timeClockEmployee : reportId
     readonly property bool isGiftCardReport: reportId === "accounts" || reportId.indexOf("gc_") === 0
     readonly property var gcModes: [
@@ -380,16 +383,16 @@ Item {
 
         // Sales by Employee and Item: an item, a category or any text (Enter or Show).
         RowLayout {
-            visible: w.isEmployeeItems
+            visible: w.isEmployeeItems || w.isBuydowns
             Layout.fillWidth: true
             Layout.fillHeight: false
             spacing: w.unit * 0.4
-            Text { text: qsTr("Item, category or text"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
+            Text { text: w.isBuydowns ? qsTr("One buydown (its name or ID)") : qsTr("Item, category or text"); color: w.ink; font.family: w.face; font.pixelSize: w.unit * 0.8 }
             TextField {
                 id: itemFilterField
                 objectName: "employeeItemsFilter"
                 Layout.fillWidth: true
-                placeholderText: qsTr("all items")
+                placeholderText: w.isBuydowns ? qsTr("all buydowns") : qsTr("all items")
                 onAccepted: { w.itemFilter = text; w.refresh() }
             }
             WidgetKey {
@@ -408,6 +411,7 @@ Item {
             }
             WidgetKey {
                 objectName: "employeeItemsIlsa"
+                visible: w.isEmployeeItems
                 Layout.preferredWidth: w.unit * 8
                 Layout.preferredHeight: Math.max(w.unit * 2, w.zone ? w.zone.touch(46) : 0)
                 text: qsTr("+ ILSA history")

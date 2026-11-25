@@ -432,6 +432,20 @@ Rectangle {
                                 Text { text: modelData.price ? "+" + modelData.price : ""; color: "#9aa4b5"; font.pixelSize: d.unit * 0.7 }
                             }
                         }
+                        // A manufacturer buydown / promotion under its item.
+                        RowLayout {
+                            visible: (row.modelData.buydown ?? "") !== ""
+                            width: row.width
+                            Text {
+                                Layout.fillWidth: true
+                                leftPadding: d.unit
+                                text: row.modelData.buydown ?? ""
+                                color: "#7ee2a8"
+                                font.pixelSize: d.unit * 0.7
+                                elide: Text.ElideRight
+                            }
+                            Text { text: row.modelData.buydownPrice ?? ""; color: "#7ee2a8"; font.pixelSize: d.unit * 0.7 }
+                        }
                     }
                 }
 
@@ -450,6 +464,12 @@ Rectangle {
                     label: qsTr("Discounts & promotions")
                     value: d.totals.discounts ?? ""
                     visible: d.totals.hasDiscount ?? false
+                    ink: "#7ee2a8"
+                }
+                Line {
+                    label: qsTr("Savings")
+                    value: d.totals.buydowns ?? ""
+                    visible: d.totals.hasBuydowns ?? false
                     ink: "#7ee2a8"
                 }
                 // Each tax on its own (food and beverage, merchandise...), as the Order summary panel shows them.

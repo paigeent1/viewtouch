@@ -281,6 +281,8 @@ void PosService::stampNewLine(OrderLine &l) const
     }
     for (Modifier &m : l.modifiers)
         stampModifier(m);
+    // A manufacturer buydown / promotion running now: its line goes under the item (pos_buydowns.cpp).
+    buydownOnNewLine(l);
 }
 
 Money PosService::lineCost(const OrderLine &l, int *source) const

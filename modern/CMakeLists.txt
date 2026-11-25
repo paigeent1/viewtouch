@@ -77,6 +77,7 @@ if(Qt6_FOUND)
         app/eod_archive.hh app/eod_archive.cpp app/pos_eod_archive.cpp   # the End of Day archive (write-once PDFs, hash chain)
         app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
         app/pos_mass_update.cpp   # Menu Builder > Mass Updates (core/mass_update.hh): grid, previews, change sets
+        app/pos_buydowns.cpp   # Mass Updates > Buydowns / Promotions (core/buydown.hh): definitions, the register's line, reports
         app/pos_tv.cpp   # TV buttons (directv): the main computer runs vt-directv, for any screen
     )
     target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core Qt6::Sql)   # Sql: the Labels screen reads the ILSA price book
@@ -210,6 +211,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetEodArchive.qml
             ui/qml/WidgetExceptionSearch.qml
             ui/qml/WidgetMassUpdates.qml
+            ui/qml/BuydownsPanel.qml
             ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml

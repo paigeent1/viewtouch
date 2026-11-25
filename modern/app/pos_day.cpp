@@ -53,8 +53,11 @@ QVariantMap toVariant(const Report &r)
 const QStringList kReportIds = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s, u"tips"_s,
                                 u"labor"_s, u"drawer"_s, u"expenses"_s, u"purchases"_s, u"audit"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s, u"kitchen"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s,
                                 u"exceptions"_s, u"deposit"_s, u"customers"_s,
-                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s, u"costdiffs"_s, u"barvariance"_s, u"kegs"_s};
+                                u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s, u"costdiffs"_s, u"barvariance"_s, u"kegs"_s,
+                                u"buydowns"_s};
 
+// "buydowns|sonoma": the Buydowns report, only that buydown (its id, ID number or part of its name).
+bool isBuydowns(const QString &id) { return id == u"buydowns" || id.startsWith(u"buydowns|"); }
 // "employee_items|cohiba": the Sales by Employee and Item report, only items matching "cohiba".
 bool isEmployeeItems(const QString &id) { return id == u"employee_items" || id.startsWith(u"employee_items|"); }
 std::string reportFilter(const QString &id) { return id.section(u'|', 1).trimmed().toStdString(); }
@@ -1546,6 +1549,8 @@ Report PosService::buildReport(const QString &id) const
         return itemSales(s_->closedToday, s_->menu, ctx);
     if (isEmployeeItems(id))
         return employeeItemSales(s_->closedToday, s_->menu, s_->categories(), reportFilter(id), ctx);
+    if (isBuydowns(id))
+        return buydownsReport(s_->closedToday, s_->settings.buydowns, s_->menu, ctx, reportFilter(id));
     if (id == u"checklists")
         return checklistReport(ctx);
     if (id == u"servers")
@@ -1669,7 +1674,7 @@ namespace {
 const QStringList kRangeReports = {u"sales"_s, u"items"_s, u"categories"_s, u"hourly"_s, u"servers"_s,
                                    u"kitchen"_s, u"audit"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s, u"exceptions"_s, u"losswatch"_s, u"customers"_s,
                                    u"royalty"_s, u"accounting"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s,
-                                   u"employee_items"_s};
+                                   u"employee_items"_s, u"buydowns"_s};
 // Over a range: the report's own id, without a filter ("employee_items|cohiba" -> "employee_items").
 bool rangeCapable(const QString &id) { return kRangeReports.contains(id.section(u'|', 0, 0)); }
 } // namespace
@@ -1684,6 +1689,8 @@ Report PosService::rangeCapableReport(const QString &id, const std::vector<Check
         return itemSales(closed, s_->menu, ctx);
     if (isEmployeeItems(id))
         return employeeItemSales(closed, s_->menu, s_->categories(), reportFilter(id), ctx);
+    if (isBuydowns(id))
+        return buydownsReport(closed, s_->settings.buydowns, s_->menu, ctx, reportFilter(id));
     if (id == u"categories")
         return categorySales(closed, s_->menu, ctx);
     if (id == u"hourly")
@@ -1922,7 +1929,8 @@ QVariantMap PosService::report(const QString &id, qint64 dayId)
         if (p.day.id == dayId) {
             // A closed day's reports were saved at End of Day, unfiltered.
             const QJsonObject stored = p.reports.value(isEmployeeItems(id) ? u"employee_items"_s
-                                                       : isTimeClock(id) ? u"timeclock"_s : id).toObject();
+                                                       : isTimeClock(id) ? u"timeclock"_s
+                                                       : isBuydowns(id) ? u"buydowns"_s : id).toObject();
             if (stored.isEmpty())
                 return {{u"title"_s, tr("No report")}, {u"rows"_s, QVariantList()}};
             Report r = reportFromJson(stored);

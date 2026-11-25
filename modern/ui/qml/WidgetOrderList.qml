@@ -581,6 +581,27 @@ Item {
                             }
                         }
                     }
+                    // A manufacturer buydown / promotion: its own line under the item ("SONOMA SAVINGS!  -$0.41").
+                    RowLayout {
+                        visible: (row.modelData.buydown ?? "") !== ""
+                        Layout.fillWidth: true
+                        Layout.leftMargin: w.unit * 1.6
+                        Text {
+                            objectName: "buydownLine"
+                            Layout.fillWidth: true
+                            text: row.modelData.buydown ?? ""
+                            color: "#7ee2a8"
+                            font.family: w.face
+                            font.pixelSize: w.unit * 0.8
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            text: row.modelData.buydownPrice ?? ""
+                            color: "#7ee2a8"
+                            font.family: w.face
+                            font.pixelSize: w.unit * 0.8
+                        }
+                    }
                     // The touched line: − 2 + to change how many, Again for one
                     // more the same way (a sent line: only more, as a new line).
                     Row {

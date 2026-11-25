@@ -1044,6 +1044,16 @@ QVariantMap PosService::massChangeSetFile(const QString &id)
     return {};
 }
 
+QStringList PosService::massChosenIds() const
+{
+    QStringList out;
+    if (mass_)
+        for (const std::string &id : mass_->chosen)
+            out << qs(id);
+    out.sort();
+    return out;
+}
+
 QVariantMap PosService::massUpdate() const
 {
     if (!mass_ || !mass_->active || !user() || !permissionsOf(*user()).contains(perm::Manager))

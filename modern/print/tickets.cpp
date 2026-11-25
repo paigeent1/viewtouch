@@ -203,11 +203,15 @@ Document receipt(const Check &check, const TicketContext &ctx)
             for (const Modifier &m : l.modifiers) modLine += (modLine.empty() ? "  " : ", ") + m.displayName();
             if (!modLine.empty()) d.text(modLine);
         }
+        // A manufacturer buydown / promotion: its own line under the item, the item at its regular price.
+        if (l.hasBuydown())
+            d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
     }
     d.rule();
     // Prices include tax: the items as rung, the discounts, then the subtotal without tax, the tax
     // in it and the total (what the guest pays: the prices less the discounts).
-    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items));
+    // (Buydowns are on the lines above: the items less them.)
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns));
     for (const Payment &p : check.payments) {
         if (p.kind == TenderKind::Discount) {
             const auto off = t.discountBy.find(p.id);
@@ -379,9 +383,11 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
             // Always print all choices on guest receipt
             d.columns("  " + m.displayName(), m.price().cents() ? ctx.money(m.price() * l.quantity) : "");
         }
+        if (l.hasBuydown())
+            d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
     }
     d.rule();
-    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items));
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns));
     if (t.taxIncluded) {
         if (t.discounts.cents() > 0)
             d.columns(ctx.tr("Discounts & promotions"), ctx.money(-t.discounts));

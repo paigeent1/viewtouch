@@ -1740,6 +1740,84 @@ TEST_CASE("UI: Mass Updates: find by UPC, tick it, preview a Set price, apply it
     REQUIRE(by(u"massUndo"_s));
 }
 
+TEST_CASE("UI: Buydowns: open the setup, Copy to New, change the amount, apply; a scanned pack gets the line",
+          "[flow][ui][buydowns]")
+{
+    Screen s(false, 1600, 900);
+    for (core::Employee &e : s.pos.shared()->employees)
+        e.allow.insert("pricebook");
+    core::MenuItem pack;
+    pack.id = "bd-pack";
+    pack.name = "SONOMA FF BOX";
+    pack.family = "drinks";
+    pack.taxClass = core::TaxClass::Merchandise;
+    pack.barcodes = {"012345000023"};
+    pack.price = Money::fromCents(1148);
+    pack.kitchenHide = true;
+    pack.recipe = {{"__retail__", 1.0}, {"__parent__:012345000016", 10}};
+    s.pos.shared()->menu.push_back(pack);
+    core::Buydown b;
+    b.id = "bd-1";
+    b.number = 1;
+    b.name = "SONOMA 2026Q4";
+    b.receiptText = "SONOMA SAVINGS!";
+    b.amount = Money::fromCents(410);
+    b.start = "2020-01-01 00:00";
+    b.end = "2099-12-31 23:00";
+    b.items = {{"012345000023", "bd-pack", 0.1, "SONOMA FF BOX"}};
+    s.pos.shared()->settings.buydowns = {b};
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"mass-updates"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    const auto by = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    const auto tap = [&](const QString &name) {
+        QQuickItem *it = by(name);
+        REQUIRE(it);
+        s.tapItem(it);
+        QTest::qWait(100);
+    };
+    tap(u"massBuydowns"_s);
+    REQUIRE(by(u"buydownsPanel"_s));
+    REQUIRE(by(u"buydownRow-bd-1"_s));
+    tap(u"buydownRow-bd-1"_s);
+    tap(u"buydownCopy"_s);
+    REQUIRE(s.pos.buydowns().contains(u"draft"_s));
+    QQuickItem *amount = by(u"buydownAmount"_s);
+    REQUIRE(amount);
+    amount->setProperty("text", u"5.00"_s);
+    QMetaObject::invokeMethod(amount, "editingFinished");
+    QQuickItem *name = by(u"buydownName"_s);
+    REQUIRE(name);
+    name->setProperty("text", u"SONOMA EXTRA"_s);
+    QMetaObject::invokeMethod(name, "editingFinished");
+    QTest::qWait(80);
+    CHECK(s.pos.buydowns()[u"draft"_s].toMap()[u"amount"_s] == u"5.00"_s);
+    s.shot("91-buydowns-copy");
+    tap(u"buydownApply"_s);
+    const auto &list = s.pos.shared()->settings.buydowns;
+    REQUIRE(list.size() == 2);
+    CHECK(list[1].name == "SONOMA EXTRA");
+    CHECK(list[1].amount.cents() == 500);
+    CHECK(list[1].items == list[0].items);
+    CHECK_FALSE(s.pos.buydowns().contains(u"draft"_s));
+    tap(u"buydownClose"_s);
+
+    // A pack scanned at the counter: its line, the larger of the two.
+    REQUIRE(s.pos.startCheck(core::CheckType::Quick));
+    REQUIRE(s.c.jumpTo(u"menu-all"_s));
+    QTest::qWait(100);
+    REQUIRE(s.pos.noteScan(u"012345000023"_s, u"bd-pack"_s, true));
+    REQUIRE(s.pos.addItem(u"bd-pack"_s));
+    QTest::qWait(150);
+    REQUIRE(s.pos.lines().size() == 1);
+    CHECK(s.pos.lines()[0].toMap()[u"buydownPrice"_s] == u"-$0.50"_s);
+    QQuickItem *line = by(u"buydownLine"_s);
+    REQUIRE(line);
+    CHECK(line->property("text").toString() == u"SONOMA SAVINGS!"_s);
+    s.shot("92-buydown-line");
+}
+
 TEST_CASE("UI: Menu Builder: a new item like another", "[flow][ui][menubuild][like]")
 {
     Screen s(false, 1280, 800);

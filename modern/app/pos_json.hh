@@ -41,6 +41,9 @@ QJsonObject toJson(const core::Change &change);
 // The bar's draft lines and kegs, kept in the settings ("bar").
 QJsonObject barSettingsToJson(const core::PosSettings &s);
 void barSettingsFromJson(const QJsonObject &o, core::PosSettings &s);
+// A buydown / promotion definition (core/buydown.hh): in the settings and in an export file.
+QJsonObject toJson(const core::Buydown &b);
+core::Buydown buydownFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::StockCount &count);
 core::StockCount stockCountFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::Waste &waste);

@@ -2492,7 +2492,7 @@ Report buydownsReport(const std::vector<Check> &closed, const std::vector<Buydow
     r.subtitle = ctx.period;
     r.columns = {"", "Units", "Packs", "Cartons", "Carton equiv.", "Amount"};
     const std::map<std::string, buydown::Sold> sold = buydown::sold(closed, defs, menu);
-    // Upper case, any spacing: "sonoma" finds "SONOMA 2026Q4" (by its name, ID or id).
+    // Any case: sonoma finds SONOMA 2026Q4 (by its name, ID number or id).
     const auto lower = [](std::string t) {
         for (char &c : t)
             c = char(std::tolower(static_cast<unsigned char>(c)));

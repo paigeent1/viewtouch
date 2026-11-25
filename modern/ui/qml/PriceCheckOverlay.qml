@@ -87,6 +87,17 @@ Item {
                 font.pixelSize: o.unit * 3
                 font.bold: true
             }
+            // A manufacturer buydown / promotion running now: what it rings up at.
+            Text {
+                objectName: "priceCheckBuydown"
+                Layout.fillWidth: true
+                visible: !!o.item && !!o.item.buydown && (o.item.buydown.sale ?? "") !== ""
+                text: visible ? o.item.buydown.label + ":  " + o.item.buydown.sale : ""
+                color: "#15803d"
+                wrapMode: Text.Wrap
+                font.pixelSize: o.unit * 1.2
+                font.bold: true
+            }
             Text {
                 visible: !o.guest && o.item && (o.item.upc ?? "") !== ""
                 text: o.item ? qsTr("UPC %1").arg(o.item.upc) : ""

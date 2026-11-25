@@ -887,6 +887,7 @@ void PosService::applyCloseEffects(Check &c)
     }
     earnPoints(c);
     countCouponUses(c, 1);
+    countBuydownUses(c, 1);
     letHoldGo(c, tr("Paid another way: held card let go"));
     if (CustomerRecord *r = s_->customer(c.customerId)) {
         ++r->visits;
@@ -922,6 +923,7 @@ void PosService::undoCloseEffects(Check &c)
     }
     takeBackPoints(c);
     countCouponUses(c, -1);
+    countBuydownUses(c, -1);
     if (CustomerRecord *r = s_->customer(c.customerId)) {
         r->visits = std::max(0, r->visits - 1);
         r->spent -= c.totals(s_->settings.tax).total;
