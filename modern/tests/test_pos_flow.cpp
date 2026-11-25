@@ -3212,6 +3212,20 @@ TEST_CASE("UI: find an item by typing part of its name", "[flow][ui][find]")
         s.pos.textKey(QString(ch));
     QTest::qWait(350);
     CHECK(Screen::findBy(s.window->contentItem(), "text", u"Nothing on the menu has \"zzz\"."_s));
+
+    // From a keyboard, as quickly as one likes: letters and digits into the line (owner 2026-11-25:
+    // "padron 1964" lost its 1964 to ring-by-number). A scan's keys come out of it again.
+    s.pos.textKey(u"clear"_s);
+    for (const QChar ch : u"padron 1964"_s)
+        QTest::keyClick(s.window, ch.toLatin1());
+    QTest::qWait(100);
+    CHECK(s.pos.textEntry() == u"padron 1964"_s);
+    QTest::qWait(150);
+    for (const QChar ch : u"799999999999"_s)
+        QTest::keyClick(s.window, ch.toLatin1());
+    QTest::keyClick(s.window, Qt::Key_Return);
+    QTest::qWait(100);
+    CHECK(s.pos.textEntry() == u"padron 1964"_s);
 }
 
 TEST_CASE("UI: Preview shows a page on a phone, a tablet, a terminal and a kiosk", "[flow][ui][preview]")

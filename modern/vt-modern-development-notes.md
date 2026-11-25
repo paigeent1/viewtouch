@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-25 16:28 ET — Bob (Claude) — Find on the order screen: digits typed go into its search line
+- **What:** Tablet app: changed. Server: no change. Main.qml: on the order screen's Find (page find-item, the owner's 'alpha lookup' at BHDAN's register), digits typed on a keyboard now go into the search line like letters, however quickly they're typed (they used to go to ring-by-number: '#1964, then Enter'). An Enter after 8+ keys at scanner speed is still a scan and rings its item, and those keys are taken back out of the search line. Test: 'UI: find an item by typing part of its name' types 'padron 1964' and a scan from the keyboard.
+- **Why:** Owner 2026-11-25 16:27, video at BHDAN's register: typing 'padron 1964' in Find put 'padron' in the line and '#1926/#1964, then Enter' in the bottom bar. The earlier fix (f3e6758) was for the Item Look Up page, which isn't the Find he uses.
+- **Files:** (none)
+
 ### 2026-11-25 15:45 ET — Bob (Claude) — Item Look Up test: keys one at a time
 - **What:** Tablet app: no change. Server: no change. The new Item Look Up test types with QTest::keyClick per character (keyClicks has no window form in Qt 6.8).
 - **Why:** CI run 45696380151 didn't compile: 'keyClicks' is not a member of 'QTest' for a QWindow.

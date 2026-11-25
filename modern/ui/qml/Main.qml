@@ -256,10 +256,16 @@ ApplicationWindow {
                         return
                     } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && burst
                                && root.scanBuffer.length >= 4
-                               // Item Look Up: quick typing ("padron 1964", Enter) isn't a scan; codes are 8+.
-                               && !(root.controller.pageId === "item-lookup" && root.scanBuffer.length < 8)) {
+                               // Item Look Up and Find: quick typing ("padron 1964", Enter) isn't a scan; codes are 8+.
+                               && !((root.controller.pageId === "item-lookup" || root.controller.pageId === "find-item")
+                                    && root.scanBuffer.length < 8)) {
                         const code = root.scanBuffer
                         root.scanBuffer = ""
+                        // Find: a scan's keys went into the search line as they came; take them out again.
+                        if (root.controller.pageId === "find-item" && root.controller.pos
+                            && String(root.controller.pos.textEntry).endsWith(code))
+                            for (let i = 0; i < code.length; ++i)
+                                root.controller.pos.textKey("back")
                         if (root.controller.pageId === "admin-menu" || root.controller.pageId === "menu-builder") {
                             root.controller.keep("adminScan", code)
                         } else {
@@ -270,11 +276,13 @@ ApplicationWindow {
                     } else {
                         root.scanBuffer = ""
                     }
-                    // Find: letters, a space and Backspace typed on a keyboard go into its search line, as
-                    // its on-screen keys do (no touch on the line first). Digits stay item numbers / scans.
-                    if (!burst && root.controller.pageId === "find-item" && root.controller.pos) {
+                    // Find: letters, digits, a space and Backspace typed on a keyboard go into its search line,
+                    // as its on-screen keys do (no touch on the line first), however quickly they're typed
+                    // ("padron 1964": its digits went to ring-by-number, owner 2026-11-25). A scan still rings its
+                    // item on Enter (8+ keys at scanner speed), and its keys come out of the line again.
+                    if (root.controller.pageId === "find-item" && root.controller.pos) {
                         const t = event.text
-                        if (t.length === 1 && (t === " " || t.toLowerCase() !== t.toUpperCase())) {
+                        if (t.length === 1 && (t === " " || t.toLowerCase() !== t.toUpperCase() || (t >= "0" && t <= "9"))) {
                             root.controller.pos.textKey(t === " " ? "space" : t)
                             event.accepted = true
                             return
