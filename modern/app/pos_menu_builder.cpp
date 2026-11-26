@@ -6,6 +6,7 @@
 
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
+#include "app/slow_log.hh"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -155,16 +156,19 @@ PosService::MenuStep::~MenuStep()
     --pos_->s_->menuUndoDepth;
     if (!outer_)
         return;
+    SlowLog::markCurrent(u"other"_s);
     PosShared::MenuState after = pos_->menuState();
     if (after == before_)
         return;
     pos_->logMenuChanges(before_, after, label_);
+    SlowLog::markCurrent(u"undo"_s);
     auto &undo = pos_->s_->menuUndo;
     undo.push_back({label_, std::move(before_), std::move(after)});
     if (undo.size() > 20)
         undo.erase(undo.begin());
     ++pos_->s_->adminRevision;
     emit pos_->s_->adminChanged();
+    SlowLog::markCurrent(u"refresh"_s);
 }
 
 QString PosService::menuUndoText() const
@@ -263,10 +267,13 @@ void PosService::logMenuChanges(const PosShared::MenuState &before, const PosSha
 
 void PosService::menuChanged()
 {
+    SlowLog::markCurrent(u"other"_s);
     massRememberItems();   // (Mass Updates' New items: only when the menu has more items than before)
     refreshSoldOut();
+    SlowLog::markCurrent(u"sold out"_s);
     ++s_->adminRevision;
     emit s_->adminChanged();
+    SlowLog::markCurrent(u"refresh"_s);
 }
 
 // --- categories ----------------------------------------------------------------------
@@ -715,7 +722,10 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
         return false;
+    // Timed (owner 2026-11-26: 5-15 s at HCA): over 500 ms, one "slow: save item ..." line in the log.
+    SlowLog slow(u"save"_s, u"save item '%1'"_s.arg(card.value(u"name"_s).toString().trimmed()));
     const MenuStep step(this, card.value(u"name"_s).toString().trimmed());
+    slow.mark(u"undo"_s);
     const QString name = card.value(u"name"_s).toString().trimmed();
     if (name.isEmpty())
         return fail(tr("The item needs a name."));
@@ -1086,6 +1096,7 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         settingsChanged();
     }
 
+    slow.mark(u"check"_s);
     if (adding) {
         // After the last item of its category, so it shows at its end.
         auto at = menu.end();
@@ -1101,6 +1112,7 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         if (s_->sink)
             s_->sink->saveMenuItem(*it, int(it - menu.begin()));
     }
+    slow.mark(u"store"_s);
     menuChanged();
     const bool hadSizes = s_->settings.modifierGroup(sizeGroupId(item.id)) != nullptr;
     if (card.contains(u"sizes"_s) && (sized || hadSizes) && !setItemSizes(qs(item.id), card.value(u"sizes"_s).toList()))

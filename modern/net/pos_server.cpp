@@ -2,6 +2,7 @@
 
 #include "app/i18n.hh"
 #include "app/pos_service.hh"
+#include "app/slow_log.hh"
 #include "net/layout_hub.hh"
 #include "net/pairing.hh"
 #include "net/protocol.hh"
@@ -424,6 +425,8 @@ PosServer::PosServer(app::PosShared *shared, LayoutHub *layouts, QObject *parent
     connect(&flushTimer_, &QTimer::timeout, this, [this] {
         QElapsedTimer t;
         t.start();
+        // Timed with its pieces (over 500 ms: a "slow: server update ..." line in the log).
+        app::SlowLog slow(u"round"_s, u"server update to %1 screens"_s.arg(connections_.size()));
         shared_->beginMemo();
         inRound_ = true;
         for (auto &c : connections_)
@@ -808,8 +811,10 @@ void PosServer::handle(Connection *c, const QJsonObject &m)
         const qint64 id = m.value(u"id").toInteger();
         QVariant result;
         Connection *const outerCall = std::exchange(calling_, c);
+        app::SlowLog slow(u"call"_s, u"%1 from %2"_s.arg(m.value(u"m").toString(), c->session->terminalName()));
         c->session->invoke(m.value(u"m").toString(), m.value(u"a").toArray().toVariantList(),
                            [&result](const QVariant &r) { result = r; });
+        slow.mark(u"call"_s);
         // State (and events) before the reply (nothing changes meanwhile: shared parts made once).
         shared_->beginMemo();
         inRound_ = true;
@@ -1415,6 +1420,14 @@ void PosServer::flush(Connection *c)
             continue;   // a billboard: the slides, pictures and logo only (never read, never sent)
         if ((c->subscribes && onRequest(p.key) && !c->wanted.contains(p.key)) || notFor(c->subscribes, p.key))
             continue;   // not shown there, or not this way
+        // Each piece's time, for the round's slow line (made, compared, written).
+        struct PieceTime {
+            app::SlowLog *slow;
+            const QString &key;
+            QElapsedTimer t;
+            PieceTime(app::SlowLog *s, const QString &k) : slow(s), key(k) { if (slow) t.start(); }
+            ~PieceTime() { if (slow) slow->addInside(key, t.nsecsElapsed()); }
+        } pieceTime(app::SlowLog::current(), p.key);
         const QVariant value = p.property.read(s);
         const void *id = inRound_ ? identity(value) : nullptr;
         auto it = c->sent.find(p.key);
