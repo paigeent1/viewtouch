@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-26 16:32 ET — Bob (Claude) helper — Save-speed harness: build fix
+- **What:** Tablet app: no change. Server: no change. tests/test_save_speed.cpp: vt::Money (not core::Money), QVariant arguments for the QML call.
+- **Why:** The harness didn't build in CI (run 45897373775).
+- **Files:** `modern/tests/test_save_speed.cpp`
+
 ### 2026-11-26 16:19 ET — Bob (Claude) helper — Menu Builder save: timing harness and slow-log lines
 - **What:** Tablet app: no change. Server: changed. A 'slow: ...' line in the log (stderr, ~/.vt-run.log on the Pi) when saving an item's card, a server update round to the screens, or a tablet's call takes over 500 ms (VT_SLOW_MS changes the limit), with its parts (undo, check, store, sold out, refresh; the round's slowest pieces). New tests/test_save_speed.cpp ([speed][savespeed]): an HCA-like bar (18 drafts x 2 sizes, 16 bottles, 80 liquors x 2, 20 wines x 2, draft lines filled) and a 20,000-item price book, 3 tablets on a server; times the card's Save, what the Pi's screen reads again and the server's rounds, and the same through Main.qml's Menu Builder; prints 'speed: ...' lines.
 - **Why:** Owner 2026-11-26: at HCA a beer's price took 5-15 s to save in Menu Builder on the Pi's screen. First find where the time goes, and let the store's log show it.

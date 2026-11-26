@@ -13,6 +13,7 @@
 #include "qt_catch.hh"
 
 #include <QElapsedTimer>
+#include <QHostAddress>
 #include <QMetaProperty>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -109,7 +110,7 @@ void addPriceBook(app::PosData &d, int count)
         m.id = u"test-cigar-%1"_s.arg(i, 5, 10, QChar(u'0')).toStdString();
         m.name = u"TEST CIGAR %1"_s.arg(i, 5, 10, QChar(u'0')).toStdString();
         m.family = c.id;
-        m.price = core::Money::fromCents(500 + i % 900);
+        m.price = Money::fromCents(500 + i % 900);
         m.taxClass = core::TaxClass::Merchandise;
         m.available = true;
         m.barcodes = {u"9%1"_s.arg(i, 11, 10, QChar(u'0')).toStdString()};
@@ -401,7 +402,7 @@ struct PiScreen {
     {
         const double before = s.pi->findItem(itemId)->price.cents() / 100.0;
         const QString price = QString::number(before + 0.25, 'f', 2);
-        QMetaObject::invokeMethod(builder, "set", Q_ARG(QVariant, u"price"_s), Q_ARG(QVariant, price));
+        QMetaObject::invokeMethod(builder, "set", Q_ARG(QVariant, QVariant(u"price"_s)), Q_ARG(QVariant, QVariant(price)));
         QTest::qWait(50);
         QQuickItem *saveButton = by(u"builderSave"_s);
         REQUIRE(saveButton);
