@@ -52,7 +52,7 @@ struct MenuImport {
 // Prices: "$3.50", "3,50", "3.50".
 MenuImport readMenuCsv(const QString &text);
 
-// A spreadsheet saved as CSV (or tab- or semicolon-separated: told from its first line), cell by cell; and a
+// A spreadsheet saved as CSV (or tab- or semicolon-separated: told from its first lines), cell by cell; and a
 // money cell ("$24.99", "24,99", "1,250.00") as a number (false: not one).
 QList<QStringList> readCsvRows(const QString &text);
 bool readCsvMoney(const QString &text, double *out);

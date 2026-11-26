@@ -35,6 +35,28 @@ int indexOf(const PosService &pos, const std::string &name)
     return -1;
 }
 
+const core::MenuItem *item(const PosService &pos, const std::string &name)
+{
+    for (const core::MenuItem &m : pos.shared()->menu)
+        if (m.name == name)
+            return &m;
+    return nullptr;
+}
+
+double recipeAmount(const core::MenuItem &m, const std::string &id)
+{
+    for (const core::RecipeLine &l : m.recipe)
+        if (l.ingredientId == id)
+            return l.quantity;
+    return 0;
+}
+
+QVariantMap drink(const char *name, double price, const char *category, const char *pour)
+{
+    return {{u"name"_s, QString::fromLatin1(name)}, {u"price"_s, price}, {u"category"_s, QString::fromLatin1(category)},
+            {u"tax"_s, u"Alcohol"_s}, {u"pourOz"_s, QString::fromLatin1(pour)}, {u"abv"_s, u"40"_s}};
+}
+
 // A bottle good: 750ml at $20.00, 12 a case, and the sizes typed in Manager -> Inventory.
 void addVodka(PosService &pos, const QString &sizes)
 {
@@ -241,7 +263,8 @@ TEST_CASE("Bottle sizes: Import costs from a spreadsheet, preview then Apply", "
     CHECK(preview[u"same"_s] == 0);
     CHECK(preview[u"problemCount"_s] == 1);
     CHECK(preview[u"vendorsMade"_s] == 1);
-    CHECK(preview[u"drinkPrices"_s] == true);
+    CHECK(preview[u"pricesMissing"_s].toStringList().size() == 1);   // no drink item "example vodka"
+    CHECK(preview[u"prices"_s].toList().isEmpty());
     CHECK(preview[u"toApply"_s] == 2);
     CHECK(preview[u"rows"_s].toList().size() == 4);
     CHECK(preview[u"rows"_s].toList()[0].toMap()[u"what"_s].toString().contains(u"$20.00 → $21.50"_s));
@@ -298,4 +321,208 @@ TEST_CASE("Bottle sizes: Import costs needs the price book to apply", "[bar][siz
     CHECK(pos.barInventory()[u"costImport"_s].toMap()[u"canApply"_s] == false);
     CHECK_FALSE(pos.barCostImportApply());
     CHECK_FALSE(good(pos, "EXAMPLE RYE"));
+}
+
+TEST_CASE("Bottle sizes: the shelf count a line a size, added up into the one pool of oz", "[bar][sizes][count]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    addVodka(pos, u"1.75L 42.00 6"_s);
+    const std::string id = good(pos, "EXAMPLE VODKA")->id;
+    const QString vid = QString::fromStdString(id);
+    // Bar & Kegs -> Shelf count: a line for each size.
+    QStringList keys;
+    for (const QVariant &x : pos.barInventory()[u"goods"_s].toList()) {
+        const QVariantMap g = x.toMap();
+        if (g[u"id"_s] != vid)
+            continue;
+        keys << g[u"key"_s].toString();
+        if (g[u"key"_s] == vid) {
+            CHECK(g[u"name"_s] == u"EXAMPLE VODKA (750ml)"_s);
+            CHECK(g[u"sizeOz"_s].toDouble() == 0);
+        } else {
+            CHECK(g[u"name"_s] == u"EXAMPLE VODKA (1.75L)"_s);
+            CHECK(g[u"size"_s] == u"1.75L"_s);
+            CHECK(g[u"sizeOz"_s].toDouble() == Approx(core::kOz1750ml));
+        }
+    }
+    CHECK(keys == QStringList{vid, vid + u"@1.75L"_s});
+    // A size it doesn't come in: refused.
+    CHECK_FALSE(pos.saveBarCount({{u"lines"_s, QVariantList{QVariantMap{{u"ingredient"_s, vid}, {u"size"_s, core::kOz1L},
+                                                                        {u"count"_s, u"1"_s}}}}}));
+    // 2.4 bottles of 750ml and 1.3 of 1.75L: one count of the liquor, in oz.
+    REQUIRE(pos.saveBarCount({{u"lines"_s, QVariantList{
+                                   QVariantMap{{u"ingredient"_s, vid}, {u"count"_s, u"2.4"_s}},
+                                   QVariantMap{{u"ingredient"_s, vid}, {u"size"_s, core::kOz1750ml}, {u"count"_s, u"1.3"_s}}}}}));
+    CHECK(pos.shared()->ingredient(id)->onHand == Approx(2.4 * core::kOz750ml + 1.3 * core::kOz1750ml).margin(0.01));
+    // The size by its name works too ("1.75L").
+    REQUIRE(pos.saveBarCount({{u"lines"_s, QVariantList{
+                                   QVariantMap{{u"ingredient"_s, vid}, {u"size"_s, u"1.75L"_s}, {u"count"_s, u"2"_s}}}}}));
+    CHECK(pos.shared()->ingredient(id)->onHand == Approx(2 * core::kOz1750ml).margin(0.01));
+    // The last count, in oz of all sizes, on the main size's line.
+    for (const QVariant &x : pos.barInventory()[u"goods"_s].toList()) {
+        const QVariantMap g = x.toMap();
+        if (g[u"key"_s] == vid) {
+            CHECK(g[u"lastAll"_s] == true);
+            CHECK(g[u"lastCount"_s] == u"118.4"_s);
+        }
+    }
+}
+
+TEST_CASE("Bottle sizes: Import the price sheet (Liquor, Wine & Port, Beer), prices, then link the pours",
+          "[bar][sizes][import]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    // The made-up drink items.
+    const QVariantList drinks{
+        drink("EXAMPLE VODKA 1.25oz", 7.00, "Vodka", "1.25"), drink("EXAMPLE VODKA 2oz", 11.00, "Vodka", "2"),
+        drink("EXAMPLE MALBEC Glass", 9.00, "Red Wine", "5"), drink("EXAMPLE MALBEC Bottle", 36.00, "Red Wine", "25.4"),
+        drink("EXAMPLE MALBEC 375ml", 20.00, "Red Wine", "12.7"), drink("EXAMPLE TAWNY 2oz", 8.00, "Port", "2"),
+        drink("EXAMPLE LAGER", 5.00, "Bottled Beer", "12"), drink("EXAMPLE STOUT 12oz", 6.00, "Draft Beer", "12"),
+        drink("EXAMPLE STOUT 16oz", 8.00, "Draft Beer", "16"),
+    };
+    REQUIRE(pos.importMenuRows(drinks, QString(), false) == drinks.size());
+    const std::size_t vendorsBefore = pos.shared()->settings.vendors.size();
+
+    // Liquor: a note, an empty row, the header on row 3.
+    const QString liquor =
+        u"Bar price sheet: fill in the costs and prices; save each sheet as CSV.,,,,,,,,\n"
+        ",,,,,,,,\n"
+        "Category,Liquor,Size,Cost per bottle,Bottles per case,Vendor,1.25oz price,2oz price,Notes\n"
+        "Vodka,EXAMPLE VODKA,750ml,$16.64,12,Example Spirits,$7.50,$12.00,house pour\n"
+        "Vodka,Example  Vodka,1.75L,$31.20,6,Example Spirits,,,\n"
+        "Vodka,EXAMPLE VODKA,1L,\"$21.00\",12,Example Spirits,,,\n"
+        "Gin,EXAMPLE GIN,50ml,$1.10,120,example spirits,,,minis\n"_s;
+    REQUIRE(pos.barCostImport(liquor));
+    QVariantMap preview = pos.barInventory()[u"costImport"_s].toMap();
+    CHECK(preview[u"headerRow"_s] == 3);
+    CHECK(preview[u"problemCount"_s] == 0);
+    CHECK(preview[u"newGoods"_s] == 2);
+    CHECK(preview[u"vendorsMade"_s] == 1);
+    const QVariantList priceRows = preview[u"prices"_s].toList();
+    REQUIRE(priceRows.size() == 2);
+    CHECK(priceRows[0].toMap()[u"item"_s] == u"EXAMPLE VODKA 1.25oz"_s);
+    CHECK(priceRows[0].toMap()[u"before"_s] == u"$7.00"_s);
+    CHECK(priceRows[0].toMap()[u"after"_s] == u"$7.50"_s);
+    CHECK(preview[u"toApply"_s] == 4);   // 2 goods, 2 prices
+    CHECK(item(pos, "EXAMPLE VODKA 2oz")->price == Money::fromCents(1100));   // nothing changed by looking
+    REQUIRE(pos.barCostImportApply());
+    const core::Ingredient *vodka = good(pos, "EXAMPLE VODKA");
+    REQUIRE(vodka);
+    CHECK(vodka->kind == "bottle");
+    CHECK(vodka->unit == "oz");
+    CHECK(vodka->category == "Vodka");
+    CHECK(vodka->packOz == Approx(core::kOz750ml));
+    CHECK(vodka->packCost == Money::fromCents(1664));
+    CHECK(vodka->perCase == 12);
+    REQUIRE(vodka->sizes.size() == 2);
+    CHECK(vodka->otherSize(core::kOz1750ml)->cost == Money::fromCents(3120));
+    CHECK(vodka->otherSize(core::kOz1750ml)->perCase == 6);
+    CHECK(vodka->otherSize(core::kOz1L)->cost == Money::fromCents(2100));
+    const core::Ingredient *gin = good(pos, "EXAMPLE GIN");
+    REQUIRE(gin);
+    CHECK(gin->packOz == Approx(1.7));
+    CHECK(gin->perCase == 120);
+    CHECK(gin->vendor == vodka->vendor);   // the vendor by name, any case
+    CHECK(pos.shared()->settings.vendors.size() == vendorsBefore + 1);
+    CHECK(item(pos, "EXAMPLE VODKA 1.25oz")->price == Money::fromCents(750));
+    CHECK(item(pos, "EXAMPLE VODKA 2oz")->price == Money::fromCents(1200));
+    // The same sheet again: the prices are the same, so none to change.
+    REQUIRE(pos.barCostImport(liquor));
+    preview = pos.barInventory()[u"costImport"_s].toMap();
+    CHECK(preview[u"prices"_s].toList().isEmpty());
+    CHECK(preview[u"pricesSame"_s] == 2);
+    CHECK(preview[u"toApply"_s] == 0);
+    REQUIRE(pos.barCostImportCancel());
+
+    // Wine & Port: Glass and Bottle prices; a split's Bottle price on "<wine> 375ml"; a port's Glass price on
+    // "<port> 2oz"; a 3L box.
+    const QString wine =
+        u"Wine & Port price sheet,,,,,,,,\n"
+        "\n"
+        "Category,Wine,Size,Cost per bottle,Bottles per case,Vendor,Glass price,Bottle price,Notes\n"
+        "Red Wine,EXAMPLE MALBEC,750ml,$9.50,12,Example Wines,$10.00,$38.00,\n"
+        "Red Wine,EXAMPLE MALBEC,375ml,$5.25,24,Example Wines,,$21.00,\n"
+        "Red Wine,EXAMPLE BOX RED,3L box,$18.00,4,Example Wines,$7.00,,\n"
+        "Port,EXAMPLE TAWNY,750ml,$14.00,12,Example Wines,$9.00,,\n"_s;
+    REQUIRE(pos.barCostImport(wine));
+    preview = pos.barInventory()[u"costImport"_s].toMap();
+    CHECK(preview[u"problemCount"_s] == 0);
+    CHECK(preview[u"prices"_s].toList().size() == 4);
+    CHECK(preview[u"pricesMissing"_s].toStringList().size() == 1);   // no "EXAMPLE BOX RED Glass"
+    REQUIRE(pos.barCostImportApply());
+    const core::Ingredient *malbec = good(pos, "EXAMPLE MALBEC");
+    REQUIRE(malbec);
+    CHECK(malbec->packCost == Money::fromCents(950));
+    REQUIRE(malbec->otherSize(core::kOz375ml));
+    CHECK(malbec->otherSize(core::kOz375ml)->cost == Money::fromCents(525));
+    REQUIRE(good(pos, "EXAMPLE BOX RED"));
+    CHECK(good(pos, "EXAMPLE BOX RED")->packOz == Approx(101.4));
+    CHECK(good(pos, "EXAMPLE BOX RED")->perCase == 4);
+    CHECK(item(pos, "EXAMPLE MALBEC Glass")->price == Money::fromCents(1000));
+    CHECK(item(pos, "EXAMPLE MALBEC Bottle")->price == Money::fromCents(3800));
+    CHECK(item(pos, "EXAMPLE MALBEC 375ml")->price == Money::fromCents(2100));
+    CHECK(item(pos, "EXAMPLE TAWNY 2oz")->price == Money::fromCents(900));
+
+    // Beer: bottled beer by the bottle, draft by the keg; a draft's Price on its Pour's item.
+    const QString beer =
+        u"Beer price sheet,,,,,,,\n"
+        ",,,,,,,\n"
+        "Type,Beer,Size,Cost (bottle or keg),Per case,Vendor,Price,Pour\n"
+        "Bottled Beer,EXAMPLE LAGER,12oz bottle,$1.05,24,Example Beer Co,$5.50,\n"
+        "Draft,EXAMPLE STOUT,1/2 bbl,$185.00,1,Example Beer Co,$8.50,16oz\n"
+        "Draft,EXAMPLE STOUT,1/2 bbl,,,,$6.25,12oz\n"
+        "Draft,EXAMPLE IPA,1/6 bbl,$95.00,1,Example Beer Co,,\n"_s;
+    REQUIRE(pos.barCostImport(beer));
+    preview = pos.barInventory()[u"costImport"_s].toMap();
+    CHECK(preview[u"problemCount"_s] == 0);
+    CHECK(preview[u"newGoods"_s] == 3);
+    CHECK(preview[u"prices"_s].toList().size() == 3);
+    REQUIRE(pos.barCostImportApply());
+    const core::Ingredient *lager = good(pos, "EXAMPLE LAGER");
+    REQUIRE(lager);
+    CHECK(lager->kind == "beer");
+    CHECK(lager->unit == "bottle");
+    CHECK(lager->cost == Money::fromCents(105));
+    CHECK(lager->perCase == 24);
+    CHECK(lager->category == "Bottled Beer");
+    const core::Ingredient *stout = good(pos, "EXAMPLE STOUT 1/2 bbl");
+    REQUIRE(stout);
+    CHECK(stout->kind == "keg");
+    CHECK(stout->beer == "EXAMPLE STOUT");
+    CHECK(stout->packOz == Approx(core::kOzHalfBarrel));
+    CHECK(stout->cost == Money::fromCents(18500));
+    REQUIRE(good(pos, "EXAMPLE IPA 1/6 bbl"));
+    CHECK(good(pos, "EXAMPLE IPA 1/6 bbl")->packOz == Approx(core::kOzSixthBarrel));
+    CHECK(item(pos, "EXAMPLE LAGER")->price == Money::fromCents(550));
+    CHECK(item(pos, "EXAMPLE STOUT 16oz")->price == Money::fromCents(850));
+    CHECK(item(pos, "EXAMPLE STOUT 12oz")->price == Money::fromCents(625));
+
+    // Then link the pours: every drink to the good the sheet made (none made new), the split to its size.
+    const QVariantMap links = pos.barInventory()[u"links"_s].toMap();
+    CHECK(links[u"toLink"_s] == 9);
+    CHECK(links[u"newGoods"_s] == 0);
+    REQUIRE(pos.linkPours());
+    malbec = good(pos, "EXAMPLE MALBEC");
+    CHECK(recipeAmount(*item(pos, "EXAMPLE VODKA 2oz"), good(pos, "EXAMPLE VODKA")->id) == Approx(2));
+    CHECK(recipeAmount(*item(pos, "EXAMPLE MALBEC Bottle"), malbec->id) == Approx(core::kOz750ml));
+    CHECK(recipeAmount(*item(pos, "EXAMPLE MALBEC 375ml"), malbec->id) == Approx(core::kOz375ml));
+    CHECK(recipeAmount(*item(pos, "EXAMPLE TAWNY 2oz"), good(pos, "EXAMPLE TAWNY")->id) == Approx(2));
+    CHECK(recipeAmount(*item(pos, "EXAMPLE LAGER"), good(pos, "EXAMPLE LAGER")->id) == Approx(1));
+}
+
+TEST_CASE("Bottle sizes: Import costs finds no header; problems are listed, not applied", "[bar][sizes][import]")
+{
+    PosService pos(test::seedPosData(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    CHECK_FALSE(pos.barCostImport(u"Just a note\n\nLiquor,Cost\nX,1\n"_s));   // no Size
+    REQUIRE(pos.barCostImport(u"A note\nCategory,Liquor,Size,Cost per bottle,1.25oz price\n"
+                              "VODKA,,,,\n"                                // a heading: nothing to read
+                              "Vodka,EXAMPLE RYE,a jug,$20,\n"             // not a size
+                              "Vodka,EXAMPLE RUM,750ml,lots,\n"            // not a cost
+                              "Vodka,EXAMPLE BOURBON,750ml,$25,cheap\n"_s));   // not a price: the row stays
+    const QVariantMap preview = pos.barInventory()[u"costImport"_s].toMap();
+    CHECK(preview[u"problems"_s].toStringList().size() == 3);
+    CHECK(preview[u"newGoods"_s] == 1);
 }

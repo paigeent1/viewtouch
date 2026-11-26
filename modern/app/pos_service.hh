@@ -1772,27 +1772,49 @@ public:
         std::string note;
     };
     std::vector<PourLink> pourLinkPlan() const;
-    // Bar costs from a spreadsheet saved as CSV (Bar & Kegs -> Import costs, managers): Liquor, Category, Size
-    // (750ml, 1L, 1.75L, 375ml...), Bottles per case, Cost per bottle, Vendor (Drink price: read, never applied).
-    // Each row to its bottle good by name (any case, tidied): the size's cost and case, made when missing (the
-    // good too: kind bottle, kept in oz, its first size the main one). barCostImport only reads it and shows
-    // what would change (barInventory().costImport); barCostImportApply makes the changes (the price book's
-    // permission: they change system costs); barCostImportCancel forgets it.
+    // Bar costs (and drink prices) from a spreadsheet saved as CSV (Bar & Kegs -> Import costs, managers). The
+    // header row is found (the first with a name column, Liquor / Wine / Beer..., and Size; a note and empty
+    // rows above it are skipped); then Category or Type, Size (750ml, 1L, 1.75L, 3L box; "12oz bottle" for
+    // bottled beer; 1/2, 1/4, 1/6 bbl for kegs), Cost per bottle (or Cost: the keg's), Bottles per case (Per
+    // case), Vendor, and prices: "1.25oz price", "2oz price", "Glass price", "Bottle price", "Price" (with Pour,
+    // "16oz", for draft). Each row to its good by name (any case, tidied): liquor and wine a bottle good kept
+    // in oz (another size a size of it, made when missing), bottled beer a beer good, draft a keg good; made
+    // when missing, the vendor too. Prices go on the drink items of that name ("<name> 2oz", "<name> Glass",
+    // "<name> Bottle" or "<name> 375ml", a port's Glass price on "<name> 2oz", a beer's on "<name>", a draft's on
+    // "<name> 16oz"), only when they differ. barCostImport only reads it and shows what would change
+    // (barInventory().costImport); barCostImportApply makes the changes (the price book's permission: they
+    // change system costs and prices); barCostImportCancel forgets it.
     bool barCostImport(const QString &text);
     bool barCostImportApply();
     bool barCostImportCancel();
+    struct BarCostPrice {
+        QString column;               // its header, as in the file
+        std::int64_t cents = 0;
+        // The drink items it goes on, the first found: {size word (oz | glass | bottle | ml | empty), its number}.
+        std::vector<std::pair<QString, double>> wants;
+    };
     struct BarCostRow {
         int row = 0;                  // its line in the file
-        QString name, category, size, vendor, drinkPrice;
-        double oz = 0;
+        QString name, category, size, vendor;
+        std::string kind = "bottle";  // bottle (liquor, wine: kept in oz) | beer (bottled) | keg (draft)
+        double oz = 0;                // a bottle's or a keg's size; 0 for bottled beer
         int perCase = -1;             // -1: not given
-        std::int64_t cents = -1;      // cost per bottle; -1: not given
+        std::int64_t cents = -1;      // cost per bottle (a keg's); -1: not given
+        std::vector<BarCostPrice> prices;
     };
     // The rows applied to `goods` and `vendors` (copies, for the preview; the store's, to apply): what each did
     // ({row, good, size, what, before, after, status: new | change | same | problem}); `touched` the goods'
     // indexes changed or made, `vendorsMade` how many vendors were made.
     QVariantList applyBarCostRows(const std::vector<BarCostRow> &rows, std::vector<core::Ingredient> &goods,
                                   std::vector<core::Vendor> &vendors, std::set<int> *touched, int *vendorsMade) const;
+    // The prices the rows would change: [{id, price}] for applyPrices, the preview's rows ({row, item, before,
+    // after}), how many are already that price, and the prices with no drink item of that name.
+    struct BarPricePlan {
+        QVariantList apply, rows;
+        int same = 0;
+        QStringList missing;
+    };
+    BarPricePlan barPricePlan(const std::vector<BarCostRow> &rows) const;
     // A shelf count in bottles and tenths (3.4), kegs, or bottles of beer: {lines: [{ingredient, count}]};
     // kept in ounces as a stock count (the opening count of the next).
     bool saveBarCount(const QVariantMap &count);
@@ -2004,7 +2026,7 @@ private:
         std::vector<BarCostRow> rows;
         QStringList problems;   // rows that couldn't be read
         QStringList columns;    // what was found
-        bool drinkPrices = false;   // a Drink price column (not applied)
+        int headerRow = 0;      // its line in the file
     };
     std::optional<BarCostImport> barCost_;
     bool addCardHold(const QVariantMap &r);

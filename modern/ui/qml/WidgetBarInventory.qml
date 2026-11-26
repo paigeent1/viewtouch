@@ -3,10 +3,10 @@ import QtQuick.Controls.Fusion
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
-// The bar (HCA): the shelf count in bottles and tenths (3.4), by category; the 18 draft lines and Change
-// keg; Link pours to bottles (each drink item to its bottle, with a preview, undoable); Import costs (a
-// spreadsheet saved as CSV: each liquor's sizes, cost per bottle, bottles per case, vendor; a preview, then
-// Apply). The zone's props.tab opens a tab ("count", "draft", "link", "import"); a page of Change keg alone
+// The bar (HCA): the shelf count in bottles and tenths (3.4), by category (a liquor bought in more than one
+// size: a line a size, added up); the 18 draft lines and Change keg; Link pours to bottles (each drink item to
+// its bottle, with a preview, undoable); Import costs (a price sheet saved as CSV: liquor, wine, beer; sizes,
+// costs, cases, vendors, drink prices; a preview, then Apply, then the offer to link the pours). The zone's props.tab opens a tab ("count", "draft", "link", "import"); a page of Change keg alone
 // sets "draft".
 // The Bar Variance and Kegs reports are in Reports.
 Item {
@@ -21,7 +21,7 @@ Item {
 
     // --- the shelf count
     property string category: ""
-    property var counts: ({})   // good id -> bottles typed
+    property var counts: ({})   // line key (good id, or "<id>@<size>" for another size) -> bottles typed
     property int typed: 0
     readonly property var goods: (info.goods ?? []).filter(g => category === "" || g.category === category)
     readonly property int howMany: typed >= 0 ? Object.keys(counts).filter(k => String(counts[k]).trim() !== "").length : 0
@@ -29,9 +29,12 @@ Item {
     onCountIdChanged: { counts = ({}); ++typed }   // saved: start over
     function saveCount() {
         const lines = []
-        for (const id of Object.keys(counts))
-            if (String(counts[id]).trim() !== "")
-                lines.push({ ingredient: id, count: String(counts[id]) })
+        for (const g of (info.goods ?? [])) {
+            const c = counts[g.key]
+            if (c !== undefined && String(c).trim() !== "")
+                lines.push(g.sizeOz > 0 ? { ingredient: g.id, size: g.sizeOz, count: String(c) }
+                                        : { ingredient: g.id, count: String(c) })
+        }
         pos.saveBarCount({ lines: lines })
     }
 
@@ -52,6 +55,9 @@ Item {
     readonly property var costImport: info.costImport ?? ({})
     readonly property bool importing: (costImport.rows ?? []).length > 0 || (costImport.problems ?? []).length > 0
     property string fileError: ""
+    // Applied: then the offer to link the drink items to the goods (the Link pours to bottles preview).
+    property bool applied: false
+    readonly property var links: info.links ?? ({})
 
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 460 : 900) : 1.4
@@ -142,18 +148,20 @@ Item {
                         Label { visible: !w.narrow; text: good.modelData.size; Layout.preferredWidth: 80; opacity: 0.8 }
                         Label {
                             Layout.preferredWidth: 100
-                            text: good.modelData.lastCount !== "" ? good.modelData.lastCount + " " + good.modelData.counts : qsTr("never")
+                            // A liquor in more than one size: the last count of all its sizes, in oz, on its first line.
+                            text: good.modelData.lastAll ? (good.modelData.lastCount !== "" ? qsTr("%1 oz, all sizes").arg(good.modelData.lastCount) : "")
+                                  : good.modelData.lastCount !== "" ? good.modelData.lastCount + " " + good.modelData.counts : qsTr("never")
                             opacity: 0.8
                         }
                         TextField {
-                            objectName: "barCount-" + good.modelData.id
+                            objectName: "barCount-" + good.modelData.key
                             Layout.preferredWidth: 120
                             implicitHeight: 44
                             font.pixelSize: 16
                             inputMethodHints: Qt.ImhFormattedNumbersOnly
                             placeholderText: good.modelData.counts
-                            text: w.typed >= 0 ? (w.counts[good.modelData.id] ?? "") : ""
-                            onTextEdited: { w.counts[good.modelData.id] = text; ++w.typed }
+                            text: w.typed >= 0 ? (w.counts[good.modelData.key] ?? "") : ""
+                            onTextEdited: { w.counts[good.modelData.key] = text; ++w.typed }
                         }
                     }
                 }
@@ -171,6 +179,8 @@ Item {
                     font.pixelSize: 12
                     text: qsTr("Bottles and tenths: 3.4 is three full bottles and one with 4 tenths left. Kept in ounces; "
                                + "the last count is this count's opening. Reports -> Bar Variance shows what's short.")
+                          + " " + qsTr("A liquor bought in more than one size has a line a size: count each; they add up "
+                                       + "(a size left empty counts as none).")
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -404,10 +414,12 @@ Item {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.7
-                    text: qsTr("A spreadsheet saved as CSV, a row per liquor and size, with the columns Liquor, Category, Size "
-                               + "(750ml, 1L, 1.75L, 375ml...), Bottles per case, Cost per bottle and Vendor. Each row finds "
-                               + "its bottle by name; a size, a bottle or a vendor not here yet is made. Nothing changes "
-                               + "until Apply.")
+                    text: qsTr("The price sheet saved as CSV (each sheet on its own: Liquor, Wine & Port, Beer), a row a "
+                               + "name and size: Category (Type for beer), the name, Size (750ml, 1L, 1.75L, 3L box; 12oz "
+                               + "bottle; 1/2, 1/4, 1/6 bbl), Cost per bottle (or keg), Bottles per case, Vendor and the "
+                               + "prices (1.25oz and 2oz price; Glass and Bottle price; Price and Pour). A note above the "
+                               + "header is fine. Each row finds its good by name; a size, a good or a vendor not here yet "
+                               + "is made; drink prices go on the drink items of that name. Nothing changes until Apply.")
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -433,11 +445,43 @@ Item {
                     }
                 }
                 Label {
-                    visible: w.importing && w.costImport.drinkPrices === true
+                    objectName: "barImportPrices"
+                    visible: w.importing && ((w.costImport.prices ?? []).length > 0 || (w.costImport.pricesMissing ?? []).length > 0
+                                             || (w.costImport.pricesSame ?? 0) > 0)
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    opacity: 0.7
-                    text: qsTr("Drink price: read but not applied (set drink prices in the Menu Builder).")
+                    text: qsTr("Drink prices: %1 to change · %2 already that price · %3 with no drink item of that name")
+                              .arg((w.costImport.prices ?? []).length).arg(w.costImport.pricesSame ?? 0)
+                              .arg((w.costImport.pricesMissing ?? []).length)
+                }
+                // Applied: link the drink items to the goods now (the Link tab shows the list first).
+                RowLayout {
+                    objectName: "barImportLinkOffer"
+                    visible: w.applied && !w.importing && (w.links.toLink ?? 0) > 0
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        font.bold: true
+                        text: qsTr("Imported. Next: link the drink items to these goods, so pours take from them: %n to link", "", w.links.toLink ?? 0)
+                              + ((w.links.newGoods ?? 0) > 0 ? " " + qsTr("(%n new good(s) for drinks not in the file)", "", w.links.newGoods ?? 0) : "")
+                    }
+                    Button {
+                        objectName: "barImportSeeLinks"
+                        text: qsTr("See the list")
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        onClicked: { w.applied = false; w.tab = "link" }
+                    }
+                    Button {
+                        objectName: "barImportLink"
+                        text: qsTr("Link %n pour(s)", "", w.links.toLink ?? 0)
+                        highlighted: true
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        onClicked: { w.applied = false; w.pos.linkPours() }
+                    }
                 }
                 ListView {
                     id: importList
@@ -445,7 +489,11 @@ Item {
                     Layout.fillHeight: true
                     clip: true
                     spacing: 2
-                    model: w.tab === "import" ? (w.costImport.problems ?? []).map(p => ({ problem: p })).concat(w.costImport.rows ?? []) : []
+                    model: w.tab === "import" ? (w.costImport.problems ?? []).map(p => ({ problem: p }))
+                                                    .concat(w.costImport.rows ?? [])
+                                                    .concat((w.costImport.prices ?? []).map(p => ({ good: p.item, size: "", status: "price",
+                                                                                                   what: qsTr("price %1 → %2").arg(p.before).arg(p.after) })))
+                                                    .concat((w.costImport.pricesMissing ?? []).map(p => ({ problem: p }))) : []
                     ScrollBar.vertical: TouchScrollBar { id: importBar; needed: importList.contentHeight > importList.height + 1 }
                     delegate: RowLayout {
                         id: imp
@@ -470,15 +518,16 @@ Item {
                         Label {
                             Layout.preferredWidth: 90
                             horizontalAlignment: Text.AlignRight
-                            color: imp.modelData.status === "new" ? "#7ee2a8" : imp.modelData.status === "change" ? "#f5b940" : "#9aa4b2"
+                            color: imp.modelData.status === "new" ? "#7ee2a8" : imp.modelData.status === "change" || imp.modelData.status === "price" ? "#f5b940" : "#9aa4b2"
                             text: imp.modelData.problem ? qsTr("left out")
                                   : imp.modelData.status === "new" ? qsTr("new") : imp.modelData.status === "change" ? qsTr("change")
+                                  : imp.modelData.status === "price" ? qsTr("price")
                                   : imp.modelData.status === "same" ? qsTr("no change") : qsTr("left out")
                         }
                     }
                 }
                 Label {
-                    visible: !w.importing
+                    visible: !w.importing && !w.applied
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.6
@@ -491,7 +540,7 @@ Item {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                         opacity: 0.7
-                        text: qsTr("Applying changes system costs: it needs the price book permission.")
+                        text: qsTr("Applying changes system costs and drink prices: it needs the price book permission.")
                     }
                     Item { Layout.fillWidth: true; visible: !(w.importing && w.costImport.canApply !== true) }
                     Button {
@@ -510,7 +559,7 @@ Item {
                         implicitHeight: 52
                         implicitWidth: 220
                         font.pixelSize: 17
-                        onClicked: w.pos.barCostImportApply()
+                        onClicked: { w.applied = true; w.pos.barCostImportApply() }
                     }
                 }
             }
@@ -524,6 +573,7 @@ Item {
         onAccepted: {
             const read = w.zone && w.zone.controller ? w.zone.controller.readCsvFile(selectedFile) : { error: qsTr("Can't read files here.") }
             w.fileError = read.error ?? ""
+            w.applied = false
             if (!read.error) w.pos.barCostImport(read.text)
         }
     }

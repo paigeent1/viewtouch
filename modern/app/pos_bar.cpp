@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <map>
 #include <iterator>
 #include <set>
@@ -217,15 +218,26 @@ std::vector<PosService::PourLink> PosService::pourLinkPlan() const
         } else {
             QString name = d.base;
             const auto &all = sizes[keyOf(d.base)];
-            if (l.kind == "bottle" && d.size > 0 && all.size() > 1)
-                name += u' ' + bottleSizeText(d.size);
-            l.goodName = ss(name);
-            l.goodKey = keyOf(name);
-            const Ingredient *g = existing(l.goodKey, l.kind);
-            l.goodId = g ? g->id : std::string();
-            l.packOz = l.kind == "beer" ? 0 : g && g->packOz > 0 ? g->packOz : d.size > 0 ? d.size : kOz750ml;
-            if (d.whole)
-                l.amount = l.packOz;
+            // A bottle good of that name bought in that size (Other sizes, or its main size): it pours the
+            // whole bottle of that size from that good ("<wine> 375ml" from the wine's 375ml).
+            const Ingredient *sized = l.kind == "bottle" && d.size > 0 ? existing(keyOf(d.base), "bottle") : nullptr;
+            if (sized && (sameBottleSize(sized->packOz, d.size) || sized->otherSize(d.size))) {
+                l.goodName = ss(name);
+                l.goodKey = keyOf(name);
+                l.goodId = sized->id;
+                l.packOz = d.size;
+                l.amount = d.size;
+            } else {
+                if (l.kind == "bottle" && d.size > 0 && all.size() > 1)
+                    name += u' ' + bottleSizeText(d.size);
+                l.goodName = ss(name);
+                l.goodKey = keyOf(name);
+                const Ingredient *g = existing(l.goodKey, l.kind);
+                l.goodId = g ? g->id : std::string();
+                l.packOz = l.kind == "beer" ? 0 : g && g->packOz > 0 ? g->packOz : d.size > 0 ? d.size : kOz750ml;
+                if (d.whole)
+                    l.amount = l.packOz;
+            }
             lineId = l.goodId;
         }
         // Linked already: that line and no other bottle or draft line.
@@ -402,14 +414,31 @@ QVariantMap PosService::barInventory() const
         const QString category = g->category.empty() ? (g->kind == "keg" ? tr("Kegs") : tr("Other")) : qs(g->category);
         if (!categories.contains(category))
             categories << category;
-        goods.append(QVariantMap{{u"id"_s, qs(g->id)}, {u"name"_s, qs(g->name)}, {u"kind"_s, qs(g->kind)},
+        // Bought in more than one size: a line a size (its key "<id>@<size>", its "sizeOz"), counted in bottles
+        // of that size and added up; the last count, in oz of all sizes, on the main size's line.
+        const bool sized = bottle && !g->sizes.empty();
+        goods.append(QVariantMap{{u"id"_s, qs(g->id)}, {u"key"_s, qs(g->id)},
+                                 {u"name"_s, sized ? qs(g->name) + u" ("_s + size + u')' : qs(g->name)},
+                                 {u"kind"_s, qs(g->kind)},
                                  {u"category"_s, category}, {u"unit"_s, qs(g->unit)}, {u"packOz"_s, g->packOz},
-                                 {u"perCase"_s, g->perCase}, {u"size"_s, size},
+                                 {u"perCase"_s, g->perCase}, {u"size"_s, size}, {u"sizeOz"_s, 0},
                                  {u"counts"_s, g->kind == "keg" ? tr("kegs") : tr("bottles")},
                                  {u"onHand"_s, number(g->onHand)}, {u"onHandPacks"_s, inPacks(g->onHand)},
-                                 {u"lastCount"_s, g->countedAt ? inPacks(g->start) : QString()},
+                                 {u"lastCount"_s, !g->countedAt ? QString() : sized ? number(g->start) : inPacks(g->start)},
+                                 {u"lastAll"_s, sized && g->countedAt != 0},
                                  {u"lastCountWhen"_s, g->countedAt ? date(g->countedAt) : tr("never")},
                                  {u"cost"_s, format(each)}});
+        if (sized)
+            for (const BottleSize &z : g->sizes)
+                goods.append(QVariantMap{{u"id"_s, qs(g->id)}, {u"key"_s, qs(g->id) + u'@' + qs(z.label())},
+                                         {u"name"_s, qs(g->name) + u" ("_s + qs(z.label()) + u')'},
+                                         {u"kind"_s, qs(g->kind)}, {u"category"_s, category}, {u"unit"_s, qs(g->unit)},
+                                         {u"packOz"_s, z.oz}, {u"perCase"_s, z.perCase}, {u"size"_s, qs(z.label())},
+                                         {u"sizeOz"_s, z.oz}, {u"counts"_s, tr("bottles")},
+                                         {u"onHand"_s, number(g->onHand)}, {u"onHandPacks"_s, number(g->onHand / z.oz)},
+                                         {u"lastCount"_s, QString()}, {u"lastAll"_s, true},
+                                         {u"lastCountWhen"_s, g->countedAt ? date(g->countedAt) : tr("never")},
+                                         {u"cost"_s, format(z.cost.cents() > 0 ? z.cost : g->costOf(z.oz))}});
     }
     // Link pours to bottles: the preview.
     QVariantList rows;
@@ -463,11 +492,14 @@ QVariantMap PosService::barInventory() const
             sameRows += st == u"same"_s;
             problems += st == u"problem"_s;
         }
+        const BarPricePlan prices = barPricePlan(barCost_->rows);
         costImport = {{u"rows"_s, rows}, {u"problems"_s, barCost_->problems}, {u"changed"_s, changed},
                       {u"newGoods"_s, made}, {u"same"_s, sameRows}, {u"problemCount"_s, problems},
                       {u"vendorsMade"_s, vendorsMade}, {u"columns"_s, barCost_->columns},
-                      {u"drinkPrices"_s, barCost_->drinkPrices}, {u"canApply"_s, mayChangePriceBook()},
-                      {u"toApply"_s, int(touched.size())}};
+                      {u"headerRow"_s, barCost_->headerRow}, {u"canApply"_s, mayChangePriceBook()},
+                      {u"prices"_s, prices.rows}, {u"pricesSame"_s, prices.same}, {u"pricesMissing"_s, prices.missing},
+                      {u"goodsToApply"_s, int(touched.size())},
+                      {u"toApply"_s, int(touched.size()) + int(prices.apply.size())}};
     }
     return {{u"goods"_s, goods}, {u"categories"_s, categories}, {u"kegs"_s, kegs}, {u"beers"_s, beers},
             {u"costImport"_s, costImport},
@@ -523,7 +555,10 @@ bool PosService::saveBarCount(const QVariantMap &r)
 {
     if (!require(perm::Manager, tr("Counting stock")))
         return false;
-    QVariantList lines;
+    // A good bought in more than one size: a line a size ("size": its oz, or its label, "1.75L"; none: the main
+    // size), added up into its ounces.
+    std::vector<std::string> order;
+    std::map<std::string, double> counted;
     for (const QVariant &v : r.value(u"lines"_s).toList()) {
         const QVariantMap l = v.toMap();
         const QString typed = l.value(u"count"_s).toString().trimmed().replace(u',', u'.');
@@ -536,10 +571,31 @@ bool PosService::saveBarCount(const QVariantMap &r)
         const double count = typed.toDouble(&ok);
         if (!ok || count < 0 || !std::isfinite(count))
             return fail(tr("Type how many there are of %1, like 3.4 (0 or more).").arg(qs(g->name)));
+        const bool bottle = g->kind == "bottle" && g->packOz > 0;
+        double packOz = bottle ? g->packOz : 0;
+        if (bottle && l.contains(u"size"_s)) {
+            const QVariant sz = l.value(u"size"_s);
+            bool isNumber = false;
+            double asked = sz.toDouble(&isNumber);
+            if (!isNumber)
+                asked = parseBottleSize(ss(sz.toString()));
+            if (asked > 0 && !sameBottleSize(asked, g->packOz)) {
+                const BottleSize *z = g->otherSize(asked);
+                if (!z)
+                    return fail(tr("%1 doesn't come in %2 (Manager → Inventory: Other sizes).")
+                                    .arg(qs(g->name), QString::fromStdString(bottleSizeLabel(asked))));
+                packOz = z->oz;
+            }
+        }
         // Bottles (and tenths) of a bottle good in ounces; bottled beer and kegs as they are.
-        const double counted = g->kind == "bottle" && g->packOz > 0 ? std::round(count * g->packOz * 1000) / 1000 : count;
-        lines.append(QVariantMap{{u"ingredient"_s, qs(g->id)}, {u"counted"_s, QString::number(counted, 'g', 12)}});
+        const double oz = bottle ? std::round(count * packOz * 1000) / 1000 : count;
+        if (!counted.contains(g->id))
+            order.push_back(g->id);
+        counted[g->id] += oz;
     }
+    QVariantList lines;
+    for (const std::string &id : order)
+        lines.append(QVariantMap{{u"ingredient"_s, qs(id)}, {u"counted"_s, QString::number(counted[id], 'g', 12)}});
     if (lines.isEmpty())
         return fail(tr("Type how many there are of at least one item."));
     if (!saveStockCount({{u"lines"_s, lines}}))
@@ -1088,34 +1144,125 @@ Report PosService::kegReport(std::int64_t from, std::int64_t to, const ReportCon
     return r;
 }
 
-// --- Import costs (a spreadsheet: liquor, size, case, cost per bottle, vendor) -------------------------------
+// --- Import costs (a spreadsheet: liquor, wine, beer; size, case, cost, vendor, prices) ---------------------
 
 namespace {
 
-// A header to its column: "Liquor", "Cost per bottle", "Bottles/case"...
+// A header as words: "1.25oz price", "cost per bottle", "bottles case"...
+QString headerWords(const QString &header)
+{
+    QString h = header.trimmed().toLower().normalized(QString::NormalizationForm_KD);
+    h.replace(QRegularExpression(u"[^a-z0-9.]+"_s), u" "_s);
+    return h.simplified();
+}
+
+// A header to its column: "Liquor", "Cost per bottle", "Bottles/case"... (prices: barPriceColumn).
 QString barCostColumn(const QString &header)
 {
-    QString h = header.trimmed().toLower();
-    h = h.normalized(QString::NormalizationForm_KD);
-    h.replace(QRegularExpression(u"[^a-z]+"_s), u" "_s);
-    h = h.simplified();
+    const QString h = headerWords(header);
     static const QList<std::pair<QString, QStringList>> names = {
         {u"name"_s, {u"liquor"_s, u"name"_s, u"item"_s, u"good"_s, u"product"_s, u"bottle"_s, u"liquor name"_s,
-                     u"item name"_s, u"product name"_s, u"description"_s, u"spirit"_s, u"wine"_s}},
+                     u"item name"_s, u"product name"_s, u"description"_s, u"spirit"_s, u"wine"_s, u"wine name"_s,
+                     u"beer"_s, u"beer name"_s}},
         {u"category"_s, {u"category"_s, u"type"_s, u"group"_s, u"shelf"_s, u"shelf group"_s, u"shelf count group"_s,
                          u"family"_s}},
-        {u"size"_s, {u"size"_s, u"bottle size"_s, u"volume"_s, u"ml"_s}},
+        {u"size"_s, {u"size"_s, u"bottle size"_s, u"volume"_s, u"ml"_s, u"keg size"_s}},
         {u"perCase"_s, {u"bottles per case"_s, u"per case"_s, u"case"_s, u"case pack"_s, u"pack"_s, u"bottles case"_s,
                         u"btl per case"_s, u"btls per case"_s, u"units per case"_s, u"casepack"_s, u"bottles in a case"_s}},
         {u"cost"_s, {u"cost per bottle"_s, u"cost"_s, u"bottle cost"_s, u"unit cost"_s, u"cost bottle"_s,
-                     u"price per bottle"_s, u"my cost"_s, u"cost each"_s}},
+                     u"price per bottle"_s, u"my cost"_s, u"cost each"_s, u"cost bottle or keg"_s, u"cost per keg"_s,
+                     u"keg cost"_s, u"cost per bottle or keg"_s}},
         {u"vendor"_s, {u"vendor"_s, u"distributor"_s, u"supplier"_s}},
-        {u"drinkPrice"_s, {u"drink price"_s, u"sell price"_s, u"price"_s, u"drink"_s, u"pour price"_s}},
+        {u"pour"_s, {u"pour"_s, u"pour size"_s, u"draft pour"_s}},
     };
     for (const auto &[key, words] : names)
         if (words.contains(h))
             return key;
     return {};
+}
+
+// A price column: {oz, its number} ("1.25oz price"), {glass}, {bottle}, {plain} ("Price"); empty: not one.
+std::pair<QString, double> barPriceColumn(const QString &header)
+{
+    const QString h = headerWords(header);
+    static const QRegularExpression oz(uR"(^(\d+(?:\.\d+)?) ?(?:oz|ounces?)(?: pour)?(?: price)?$)"_s);
+    if (const auto m = oz.match(h); m.hasMatch())
+        return {u"oz"_s, m.captured(1).toDouble()};
+    if (QStringList{u"glass price"_s, u"glass"_s, u"by the glass"_s, u"price glass"_s, u"glass pour price"_s}.contains(h))
+        return {u"glass"_s, 0};
+    if (QStringList{u"bottle price"_s, u"price bottle"_s, u"by the bottle"_s}.contains(h))
+        return {u"bottle"_s, 0};
+    if (QStringList{u"price"_s, u"drink price"_s, u"sell price"_s, u"menu price"_s, u"pour price"_s}.contains(h))
+        return {u"plain"_s, 0};
+    return {};
+}
+
+// The sheet a name column says: liquor, wine, beer (or none).
+QString barSheetOf(const QString &header)
+{
+    const QString h = headerWords(header);
+    if (h.startsWith(u"wine"_s))
+        return u"wine"_s;
+    if (h.startsWith(u"beer"_s))
+        return u"beer"_s;
+    if (h.startsWith(u"liquor"_s) || h.startsWith(u"spirit"_s))
+        return u"liquor"_s;
+    return {};
+}
+
+// A keg's size: "1/2 bbl", "half barrel", "1/4", "1/6 bbl", "sixtel"; 0: not one.
+double kegOzOf(const QString &text)
+{
+    QString t = text.toLower();
+    t.remove(u' ');
+    if (t.contains(u"1/2"_s) || t.contains(u"half"_s) || t.startsWith(u"15.5gal"_s))
+        return kOzHalfBarrel;
+    if (t.contains(u"1/4"_s) || t.contains(u"quarter"_s) || t.contains(u"pony"_s) || t.startsWith(u"7.75gal"_s))
+        return kOzQuarterBarrel;
+    if (t.contains(u"1/6"_s) || t.contains(u"sixth"_s) || t.contains(u"sixtel"_s) || t.startsWith(u"5.16gal"_s)
+        || t.startsWith(u"5.2gal"_s))
+        return kOzSixthBarrel;
+    return 0;
+}
+
+// A bottle's size from the sheet's words: "750ml", "1.75L", "3L box", "1.5L magnum".
+double bottleOzOf(QString text)
+{
+    static const QRegularExpression extra(uR"(\b(?:bag|in|box|bib|bottles?|btls?|cans?|jug|magnum|split|wine)\b)"_s,
+                                          QRegularExpression::CaseInsensitiveOption);
+    text.replace(extra, QString());
+    return parseBottleSize(ss(text.simplified()));
+}
+
+// A bottle size in ml (375ml -> 375, 1.5L -> 1500): what a split's drink item says ("<wine> 375ml").
+double mlOfBottle(double oz)
+{
+    const std::string label = bottleSizeLabel(oz);
+    if (label.size() > 2 && label.ends_with("ml"))
+        return std::atof(label.c_str());
+    if (label.size() > 1 && label.ends_with("L"))
+        return std::atof(label.c_str()) * 1000;
+    return std::round(oz * 29.5735);
+}
+
+// A drink item's name: "<name> 2oz", "<name> Glass", "<name> 375ml", "<name>".
+QString drinkWanted(const QString &name, const std::pair<QString, double> &want)
+{
+    if (want.first == u"oz"_s)
+        return name + u' ' + number(want.second, 2) + u"oz"_s;
+    if (want.first == u"ml"_s)
+        return name + u' ' + number(want.second, 0) + u"ml"_s;
+    if (want.first == u"glass"_s)
+        return name + u" Glass"_s;
+    if (want.first == u"bottle"_s)
+        return name + u" Bottle"_s;
+    return name;
+}
+
+QString barKindWord(const std::string &kind)
+{
+    return kind == "keg" ? PosService::tr("a keg") : kind == "beer" ? PosService::tr("bottled beer")
+                                                                     : PosService::tr("a bottle kept in oz");
 }
 
 } // namespace
@@ -1128,26 +1275,49 @@ bool PosService::barCostImport(const QString &text)
     const auto blank = [](const QStringList &r) {
         return std::all_of(r.begin(), r.end(), [](const QString &c) { return c.trimmed().isEmpty(); });
     };
-    int header = 0;
-    while (header < int(rows.size()) && blank(rows[header]))
-        ++header;
+    // The header: the first row with a name column and Size (a note and empty rows above it).
+    int header = -1;
     QHash<QString, int> at;
-    if (header < int(rows.size()))
-        for (int i = 0; i < int(rows[header].size()); ++i)
-            if (const QString w = barCostColumn(rows[header][i]); !w.isEmpty() && !at.contains(w))
-                at.insert(w, i);
-    if (!at.contains(u"name"_s) || !at.contains(u"size"_s))
-        return fail(tr("That file needs a header row with at least Liquor and Size (and Bottles per case, Cost per "
-                       "bottle, Vendor, Category)."));
+    QString sheet;
+    struct PriceColumn {
+        int at;
+        QString header, kind;
+        double value;
+    };
+    std::vector<PriceColumn> priceColumns;
+    for (int r = 0; r < int(rows.size()) && r < 30 && header < 0; ++r) {
+        QHash<QString, int> found;
+        for (int i = 0; i < int(rows[r].size()); ++i)
+            if (const QString w = barCostColumn(rows[r][i]); !w.isEmpty() && !found.contains(w))
+                found.insert(w, i);
+        if (!found.contains(u"name"_s) || !found.contains(u"size"_s))
+            continue;
+        header = r;
+        at = found;
+        sheet = barSheetOf(rows[r][found[u"name"_s]]);
+        for (int i = 0; i < int(rows[r].size()); ++i)
+            if (const auto [kind, value] = barPriceColumn(rows[r][i]); !kind.isEmpty())
+                priceColumns.push_back({i, tidy(rows[r][i]), kind, value});
+    }
+    if (header < 0)
+        return fail(tr("That file needs a header row with at least a name (Liquor, Wine or Beer) and Size (and Cost "
+                       "per bottle, Bottles per case, Vendor, Category)."));
     BarCostImport imp;
-    for (const QString &key : {u"name"_s, u"category"_s, u"size"_s, u"perCase"_s, u"cost"_s, u"vendor"_s, u"drinkPrice"_s})
+    imp.headerRow = header + 1;
+    for (const QString &key : {u"name"_s, u"category"_s, u"size"_s, u"perCase"_s, u"cost"_s, u"vendor"_s, u"pour"_s})
         if (at.contains(key))
             imp.columns << key;
-    imp.drinkPrices = at.contains(u"drinkPrice"_s);
+    for (const PriceColumn &p : priceColumns)
+        imp.columns << p.header;
     const auto cell = [&](const QStringList &r, const QString &key) {
         const int i = at.value(key, -1);
         return i >= 0 && i < r.size() ? tidy(r[i]) : QString();
     };
+    // How many sizes each name has in the file (a wine's Bottle price: "<wine> Bottle" when it has one).
+    std::map<std::string, std::set<QString>> sizesOfName;
+    for (int r = header + 1; r < int(rows.size()); ++r)
+        if (const QString n = cell(rows[r], u"name"_s); !n.isEmpty())
+            sizesOfName[keyOf(n)].insert(cell(rows[r], u"size"_s).toLower());
     for (int r = header + 1; r < int(rows.size()); ++r) {
         const QStringList &row = rows[r];
         if (blank(row))
@@ -1158,15 +1328,32 @@ bool PosService::barCostImport(const QString &text)
         c.category = cell(row, u"category"_s);
         c.size = cell(row, u"size"_s);
         c.vendor = cell(row, u"vendor"_s);
-        c.drinkPrice = cell(row, u"drinkPrice"_s);
         if (c.name.isEmpty()) {
-            imp.problems << tr("Row %1: no liquor name").arg(c.row);
+            // A heading or a note between the rows: nothing to read.
+            if (c.size.isEmpty() && cell(row, u"cost"_s).isEmpty())
+                continue;
+            imp.problems << tr("Row %1: no name").arg(c.row);
             continue;
         }
-        c.oz = parseBottleSize(ss(c.size));
-        if (c.oz <= 0) {
-            imp.problems << tr("Row %1: %2: \"%3\" isn't a bottle size (750ml, 1L, 1.75L, 375ml...)").arg(c.row).arg(c.name, c.size);
-            continue;
+        // Which good: draft (a keg's size, or a Draft type) a keg; bottled beer; else a bottle kept in oz.
+        const QString type = c.category;
+        const bool spirits = sheet == u"liquor"_s || sheet == u"wine"_s;
+        const double kegOz = spirits ? 0 : kegOzOf(c.size);
+        if (kegOz > 0 || (!spirits && draftish(type))) {
+            c.kind = "keg";
+            c.oz = kegOz;
+            if (c.oz <= 0) {
+                imp.problems << tr("Row %1: %2: \"%3\" isn't a keg size (1/2 bbl, 1/4 bbl, 1/6 bbl)").arg(c.row).arg(c.name, c.size);
+                continue;
+            }
+        } else if (sheet == u"beer"_s || beerish(type)) {
+            c.kind = "beer";
+        } else {
+            c.oz = bottleOzOf(c.size);
+            if (c.oz <= 0) {
+                imp.problems << tr("Row %1: %2: \"%3\" isn't a bottle size (750ml, 1L, 1.75L, 375ml...)").arg(c.row).arg(c.name, c.size);
+                continue;
+            }
         }
         if (const QString n = cell(row, u"perCase"_s); !n.isEmpty()) {
             bool ok = false;
@@ -1185,6 +1372,45 @@ bool PosService::barCostImport(const QString &text)
             }
             c.cents = std::llround(v * 100);
         }
+        // Prices: on the drink items of its name.
+        const bool port = type.contains(u"port"_s, Qt::CaseInsensitive);
+        const double pour = parseDrink(u"x "_s + cell(row, u"pour"_s)).size == u"oz"_s
+                                ? parseDrink(u"x "_s + cell(row, u"pour"_s)).value : 0;
+        for (const PriceColumn &p : priceColumns) {
+            const QString t = p.at < row.size() ? tidy(row[p.at]) : QString();
+            if (t.isEmpty())
+                continue;
+            double v = 0;
+            if (!readCsvMoney(t, &v)) {
+                imp.problems << tr("Row %1: %2: the price \"%3\" isn't a number (%4 left out)").arg(c.row).arg(c.name, t, p.header);
+                continue;
+            }
+            BarCostPrice price{p.header, std::int64_t(std::llround(v * 100)), {}};
+            if (p.kind == u"oz"_s) {
+                price.wants = {{u"oz"_s, p.value}};
+            } else if (p.kind == u"glass"_s) {
+                price.wants = port ? std::vector<std::pair<QString, double>>{{u"oz"_s, 2}, {u"glass"_s, 0}}
+                                   : std::vector<std::pair<QString, double>>{{u"glass"_s, 0}};
+            } else if (p.kind == u"bottle"_s) {
+                const double ml = c.oz > 0 ? mlOfBottle(c.oz) : 0;
+                if (ml > 0)
+                    price.wants.push_back({u"ml"_s, ml});
+                if (std::abs(ml - 750) < 1 || sizesOfName[keyOf(c.name)].size() == 1)
+                    price.wants.push_back({u"bottle"_s, 0});
+            } else if (c.kind == "keg") {   // a draft's Price: its Pour's item
+                if (pour <= 0) {
+                    imp.problems << tr("Row %1: %2: a draft's price needs its Pour (12oz, 16oz): left out").arg(c.row).arg(c.name);
+                    continue;
+                }
+                price.wants = {{u"oz"_s, pour}};
+            } else if (c.kind == "beer") {
+                price.wants = {{QString(), 0}, {u"bottle"_s, 0}};
+            } else {
+                price.wants = {{QString(), 0}};
+            }
+            if (!price.wants.empty())
+                c.prices.push_back(price);
+        }
         imp.rows.push_back(c);
     }
     if (imp.rows.empty() && imp.problems.isEmpty())
@@ -1201,40 +1427,71 @@ QVariantList PosService::applyBarCostRows(const std::vector<BarCostRow> &rows, s
     QVariantList out;
     for (const BarCostRow &r : rows) {
         const std::string key = keyOf(r.name);
-        const QString size = qs(bottleSizeLabel(r.oz));
+        const bool keg = r.kind == "keg", beer = r.kind == "beer";
+        const QString size = keg ? kegSizeText(r.oz) : beer ? r.size : qs(bottleSizeLabel(r.oz));
+        // A keg good is "<beer> 1/2 bbl" (Draft lines, Add a keg).
+        const QString kegName = keg ? r.name + u' ' + kegSizeText(r.oz) : QString();
         int gi = -1;
-        bool notBottle = false;
-        for (int i = 0; i < int(goods.size()); ++i)
-            if (keyOf(qs(goods[i].name)) == key) {
-                if (goods[i].kind == "bottle") {
+        QString otherKind;
+        for (int i = 0; i < int(goods.size()); ++i) {
+            const Ingredient &x = goods[i];
+            if (keg) {
+                if (x.kind == "keg" && (keyOf(qs(x.name)) == keyOf(kegName)
+                                        || (keyOf(qs(x.beer)) == key && std::abs(x.packOz - r.oz) < 1))) {
                     gi = i;
                     break;
                 }
-                notBottle = true;
+                continue;
             }
+            if (keyOf(qs(x.name)) != key)
+                continue;
+            if (x.kind == r.kind) {
+                gi = i;
+                break;
+            }
+            otherKind = x.kind.empty() ? tr("a kitchen ingredient") : barKindWord(x.kind);
+        }
         const auto say = [&](const QString &good, const QString &status, const QString &what) {
             out.append(QVariantMap{{u"row"_s, r.row}, {u"good"_s, good}, {u"size"_s, size}, {u"status"_s, status},
                                    {u"what"_s, what}});
         };
-        if (gi < 0 && notBottle) {
-            say(r.name, u"problem"_s, tr("In Inventory, but not as a bottle kept in oz: left out"));
+        if (gi < 0 && !otherKind.isEmpty()) {
+            say(r.name, u"problem"_s, tr("In Inventory as %1, not as %2: left out").arg(otherKind, barKindWord(r.kind)));
             continue;
         }
         QStringList changes;
         bool made = false;
-        if (gi < 0) {   // a new bottle good: this size its main one
+        if (gi < 0) {
             Ingredient g;
-            g.name = ss(r.name);
-            g.kind = "bottle";
-            g.unit = "oz";
-            g.packOz = r.oz;
-            g.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
+            g.kind = r.kind;
             g.category = ss(r.category);
-            if (r.cents >= 0) {
-                g.packCost = Money::fromCents(r.cents);
-                g.cost = g.packCost.scaled(1000, milli(g.packOz));
+            if (keg) {   // a keg: its beer pours from it
+                g.name = ss(kegName);
+                g.unit = "keg";
+                g.packOz = r.oz;
+                g.beer = ss(r.name);
+                if (g.category.empty())
+                    g.category = "Kegs";
+                g.perCase = r.perCase > 0 ? r.perCase : 0;
+                if (r.cents >= 0)
+                    g.cost = Money::fromCents(r.cents);
+            } else if (beer) {   // bottled beer: by the bottle
+                g.name = ss(r.name);
+                g.unit = "bottle";
+                g.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("beer", 0);
+                if (r.cents >= 0)
+                    g.cost = Money::fromCents(r.cents);
+            } else {   // a bottle kept in oz: this size its main one
+                g.name = ss(r.name);
+                g.unit = "oz";
+                g.packOz = r.oz;
+                g.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
+                if (r.cents >= 0) {
+                    g.packCost = Money::fromCents(r.cents);
+                    g.cost = g.packCost.scaled(1000, milli(g.packOz));
+                }
             }
-            g.id = ss(admin::uniqueId(r.name, goods, [](const Ingredient &x) { return x.id; }, -1));
+            g.id = ss(admin::uniqueId((keg ? u"keg "_s : QString()) + qs(g.name), goods, [](const Ingredient &x) { return x.id; }, -1));
             goods.push_back(g);
             gi = int(goods.size()) - 1;
             made = true;
@@ -1263,35 +1520,44 @@ QVariantList PosService::applyBarCostRows(const std::vector<BarCostRow> &rows, s
                 changes << tr("shelf group %1 → %2").arg(g.category.empty() ? tr("(none)") : qs(g.category), r.category);
             g.category = ss(r.category);
         }
-        const bool main = sameBottleSize(g.packOz, r.oz);
-        BottleSize *z = main ? nullptr : g.otherSize(r.oz);
-        if (!main && !z) {
-            BottleSize n;
-            n.oz = r.oz;
-            n.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
-            g.sizes.push_back(n);
-            z = &g.sizes.back();
-            changes << tr("new size %1").arg(size);
+        Money *cost = nullptr;
+        int *perCase = nullptr;
+        bool main = true;
+        if (keg || beer) {
+            cost = &g.cost;
+            perCase = &g.perCase;
+        } else {
+            main = sameBottleSize(g.packOz, r.oz);
+            BottleSize *z = main ? nullptr : g.otherSize(r.oz);
+            if (!main && !z) {
+                BottleSize n;
+                n.oz = r.oz;
+                n.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
+                g.sizes.push_back(n);
+                z = &g.sizes.back();
+                changes << tr("new size %1").arg(size);
+            }
+            cost = main ? &g.packCost : &z->cost;
+            perCase = main ? &g.perCase : &z->perCase;
         }
-        Money &cost = main ? g.packCost : z->cost;
-        int &perCase = main ? g.perCase : z->perCase;
-        if (r.cents >= 0 && cost.cents() != r.cents) {
+        if (r.cents >= 0 && cost->cents() != r.cents) {
             if (!made)
-                changes << tr("cost per bottle %1 → %2").arg(cost.cents() ? format(cost) : tr("(none)"), format(Money::fromCents(r.cents)));
-            cost = Money::fromCents(r.cents);
-            if (main)   // the cost per oz: the main size's
+                changes << (keg ? tr("cost per keg %1 → %2") : tr("cost per bottle %1 → %2"))
+                               .arg(cost->cents() ? format(*cost) : tr("(none)"), format(Money::fromCents(r.cents)));
+            *cost = Money::fromCents(r.cents);
+            if (!keg && !beer && main)   // the cost per oz: the main size's
                 g.cost = g.packCost.scaled(1000, milli(g.packOz));
         }
-        if (r.perCase >= 0 && perCase != r.perCase) {
+        if (r.perCase >= 0 && *perCase != r.perCase) {
             if (!made)
-                changes << tr("bottles per case %1 → %2").arg(perCase).arg(r.perCase);
-            perCase = r.perCase;
+                changes << tr("bottles per case %1 → %2").arg(*perCase).arg(r.perCase);
+            *perCase = r.perCase;
         }
         if (made) {
-            say(qs(g.name), u"new"_s,
-                tr("New bottle good: %1 a bottle, %2 a case").arg(g.packCost.cents() ? format(g.packCost) : tr("no cost"))
-                        .arg(g.perCase)
-                    + (changes.isEmpty() ? QString() : u"; "_s + changes.join(u"; "_s)));
+            const QString what = keg ? tr("New keg: %1 a keg").arg(g.cost.cents() ? format(g.cost) : tr("no cost"))
+                                 : beer ? tr("New bottled beer: %1 a bottle, %2 a case").arg(g.cost.cents() ? format(g.cost) : tr("no cost")).arg(g.perCase)
+                                        : tr("New bottle good: %1 a bottle, %2 a case").arg(g.packCost.cents() ? format(g.packCost) : tr("no cost")).arg(g.perCase);
+            say(qs(g.name), u"new"_s, what + (changes.isEmpty() ? QString() : u"; "_s + changes.join(u"; "_s)));
         } else if (changes.isEmpty()) {
             say(qs(g.name), u"same"_s, tr("No change"));
             continue;
@@ -1304,14 +1570,73 @@ QVariantList PosService::applyBarCostRows(const std::vector<BarCostRow> &rows, s
     return out;
 }
 
+PosService::BarPricePlan PosService::barPricePlan(const std::vector<BarCostRow> &rows) const
+{
+    // The drink items by their names, split from their sizes ("Tito's 2oz": tito's, oz 2).
+    struct Item {
+        int index;
+        std::string key;
+        DrinkName name;
+    };
+    std::vector<Item> items;
+    for (int i = 0; i < int(s_->menu.size()); ++i) {
+        const MenuItem &m = s_->menu[i];
+        if (m.isModifier)
+            continue;
+        const DrinkName n = parseDrink(qs(m.name));
+        items.push_back({i, keyOf(n.base), n});
+    }
+    const auto matches = [&](const std::string &key, const std::pair<QString, double> &want) {
+        std::vector<int> found;
+        for (const Item &it : items) {
+            if (it.key != key || it.name.size != want.first)
+                continue;
+            if (want.first == u"oz"_s && std::abs(it.name.value - want.second) > 0.01)
+                continue;
+            if (want.first == u"ml"_s && std::abs(it.name.value - want.second) > want.second * 0.02)
+                continue;
+            found.push_back(it.index);
+        }
+        return found;
+    };
+    BarPricePlan plan;
+    std::map<int, std::pair<int, std::int64_t>> to;   // item -> {row, cents}: the last row wins
+    for (const BarCostRow &r : rows)
+        for (const BarCostPrice &p : r.prices) {
+            std::vector<int> found;
+            for (const auto &want : p.wants)
+                if (found = matches(keyOf(r.name), want); !found.empty())
+                    break;
+            if (found.empty()) {
+                plan.missing << tr("Row %1: no drink item %2 (%3 left out)").arg(r.row).arg(drinkWanted(r.name, p.wants.front()), p.column);
+                continue;
+            }
+            for (int i : found)
+                to[i] = {r.row, p.cents};
+        }
+    for (const auto &[i, rc] : to) {
+        const MenuItem &m = s_->menu[i];
+        if (m.price.cents() == rc.second) {
+            ++plan.same;
+            continue;
+        }
+        const Money after = Money::fromCents(rc.second);
+        plan.apply.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"price"_s, QString::number(double(rc.second) / 100.0, 'f', 2)}});
+        plan.rows.append(QVariantMap{{u"row"_s, rc.first}, {u"item"_s, qs(m.name)}, {u"before"_s, format(m.price)},
+                                     {u"after"_s, format(after)}});
+    }
+    return plan;
+}
+
 bool PosService::barCostImportApply()
 {
     if (!require(perm::Manager, tr("Importing bar costs")))
         return false;
     if (!barCost_)
         return fail(tr("There is nothing to import: choose the file first."));
-    if (!requirePriceBook([] { return true; }))   // system costs change
+    if (!requirePriceBook([] { return true; }))   // system costs and prices change
         return false;
+    const BarPricePlan prices = barPricePlan(barCost_->rows);
     std::set<int> touched;
     int vendorsMade = 0;
     applyBarCostRows(barCost_->rows, s_->ingredients, s_->settings.vendors, &touched, &vendorsMade);
@@ -1323,8 +1648,13 @@ bool PosService::barCostImportApply()
         settingsChanged();
     ++s_->adminRevision;
     emit s_->adminChanged();
+    if (!prices.apply.isEmpty() && !applyPrices(prices.apply, tr("Import bar prices"))) {
+        emit sessionChanged();
+        return false;
+    }
     emit sessionChanged();
-    emit notice(tr("Bar costs imported: %n bottle good(s) changed or made", "", int(touched.size())));
+    emit notice(tr("Bar costs imported: %n good(s) changed or made", "", int(touched.size()))
+                + (prices.apply.isEmpty() ? QString() : tr("; %n drink price(s) changed", "", int(prices.apply.size()))));
     return true;
 }
 
