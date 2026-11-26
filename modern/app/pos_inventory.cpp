@@ -13,7 +13,9 @@
 #include <map>
 
 #include <QSet>
+#include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -142,13 +144,20 @@ QVariantMap PosService::stockLeftNow() const
 void PosService::refreshSoldOut()
 {
     QStringList out, back;
+    // The ingredients by id, once (each item's recipe looked each one up in the whole list; a price book's
+    // items carry tags like __cost__ that are no ingredient, and were looked for too).
+    std::unordered_map<std::string_view, const Ingredient *> byId;
+    byId.reserve(s_->ingredients.size());
+    for (const Ingredient &g : s_->ingredients)
+        byId.emplace(g.id, &g);   // (the first of an id, as ingredient() finds it)
     for (int i = 0; i < int(s_->menu.size()); ++i) {
         MenuItem &m = s_->menu[i];
         if (m.recipe.empty())
             continue;
         bool shortOf = false;
         for (const RecipeLine &r : m.recipe) {
-            const Ingredient *g = s_->ingredient(r.ingredientId);
+            const auto found = byId.find(r.ingredientId);
+            const Ingredient *g = found == byId.end() ? nullptr : found->second;
             // The bar's bottles and kegs never sell a drink out by themselves (the count is a guess until
             // the shelf count; the bartender 86's it).
             if (g && !g->bar() && r.quantity > 0 && g->onHand + 1e-9 < r.quantity)

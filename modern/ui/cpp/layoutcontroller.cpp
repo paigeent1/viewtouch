@@ -4,6 +4,8 @@
 #include <QCoreApplication>
 #endif
 #include "layoutcontroller.hh"
+#include "app/slow_log.hh"
+#include <optional>
 
 #include <QGuiApplication>
 
@@ -346,6 +348,7 @@ void LayoutController::setPos(PosSession *pos)
         });
         connect(pos_, &PosSession::qualifierChanged, this, &LayoutController::refresh);
         connect(pos_, &PosSession::adminChanged, this, [this] {
+            vt::app::SlowLog::markCurrent(u"refresh"_s);   // (a slow save's line: this screen's own part)
             cardReader_.setKind(pos_->terminalCardReader());   // Manager -> Terminals: this screen's reader
             applyCustomerDisplay();   // Manager -> Terminals: the guest's screen on the second HDMI
             if (pos_->terminalLook() != lookedId_)
@@ -360,6 +363,7 @@ void LayoutController::setPos(PosSession *pos)
             refresh();   // sold-out marks
             if (editor_)
                 editor_->setMealPeriods(pos_->mealPeriods());
+            vt::app::SlowLog::markCurrent(u"screen pages"_s);
         });
         // Whoever is editing must stay allowed to: logging out, being
         // deactivated or losing the role closes the editor (unsaved edits
@@ -2855,6 +2859,7 @@ void LayoutController::refresh()
                 nextLeft = pz.zone->rect.x();
     }
     const int canvasW = page ? page->canvas.width() : 1920;
+    std::optional<QStringList> soldOutList;
     QList<ZoneModel::Row> rows;
     for (const Layout::PlacedZone &pz : s.zones) {
         const vt::layout::Zone &z = *pz.zone;
@@ -2876,8 +2881,9 @@ void LayoutController::refresh()
                                    ? z.actions.first().str(u"item") : QString();
         if (pos_ && !editing() && !z.actions.isEmpty() && z.actions.first().type() == u"addItem") {
             const QString item = z.actions.first().str(u"item");
-            const QStringList out = pos_->soldOut();
-            soldOut = out.contains(item) || out.contains(item.toLower());
+            if (!soldOutList)   // (once for the page: it goes through the whole menu)
+                soldOutList = pos_->soldOut();
+            soldOut = soldOutList->contains(item) || soldOutList->contains(item.toLower());
         }
         const QString target = primaryJumpTarget(l, z);
         const QString qualifier = pos_ ? qualifierOf(z) : QString();

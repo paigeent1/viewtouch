@@ -157,7 +157,7 @@ Dialog {
         }
         // Set for later already: each can be canceled.
         Repeater {
-            model: menu.pos ? menu.pos.priceChanges : []
+            model: menu.pos && pricesDialog.visible ? menu.pos.priceChanges : []   // (only while it shows)
             delegate: RowLayout {
                 required property var modelData
                 Layout.fillWidth: true

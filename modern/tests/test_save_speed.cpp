@@ -14,6 +14,7 @@
 
 #include <QElapsedTimer>
 #include <QHostAddress>
+#include <QJSValue>
 #include <QMetaProperty>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -418,10 +419,17 @@ struct PiScreen {
             waitFor([&] { return by(u"builderFound-"_s + itemId) != nullptr; });
             tile = by(u"builderFound-"_s + itemId);
         }
-        REQUIRE(tile);
-        const QPointF centre = tile->mapToScene(QPointF(tile->width() / 2, tile->height() / 2));
-        QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
-        QTest::qWait(400);
+        if (tile) {
+            const QPointF centre = tile->mapToScene(QPointF(tile->width() / 2, tile->height() / 2));
+            QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
+            QTest::qWait(400);
+        }
+        if (!by(u"builderPrice"_s)) {   // (not where a touch reaches it: opened as its tile does)
+            const QJSValue item = w->property("itemById").value<QJSValue>().property(itemId);
+            REQUIRE(item.isObject());
+            REQUIRE(QMetaObject::invokeMethod(w, "editItem", Q_ARG(QVariant, QVariant::fromValue(item))));
+            QTest::qWait(400);
+        }
         REQUIRE(by(u"builderPrice"_s));
     }
 

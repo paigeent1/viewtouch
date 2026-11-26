@@ -19,9 +19,11 @@
 #include <cmath>
 #include <cstdint>
 #include <ranges>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 using namespace Qt::StringLiterals;
 using namespace vt::core;
@@ -157,9 +159,15 @@ PosService::MenuStep::~MenuStep()
     if (!outer_)
         return;
     SlowLog::markCurrent(u"other"_s);
+    const bool heard = std::exchange(pos_->s_->menuChangeHeard, false);
     PosShared::MenuState after = pos_->menuState();
-    if (after == before_)
+    if (after == before_) {
+        if (heard) {   // (settings that aren't the menu's state, a sold-out mark undone meanwhile)
+            emit pos_->s_->adminChanged();
+            SlowLog::markCurrent(u"refresh"_s);
+        }
         return;
+    }
     pos_->logMenuChanges(before_, after, label_);
     SlowLog::markCurrent(u"undo"_s);
     auto &undo = pos_->s_->menuUndo;
@@ -222,9 +230,23 @@ void PosService::logMenuChanges(const PosShared::MenuState &before, const PosSha
         if (++logged <= 40)
             logChange(area, item, field, was, is);
     };
-    for (const MenuItem &m : after.menu) {
-        const auto old = std::ranges::find(before.menu, m.id, &MenuItem::id);
-        if (old == before.menu.end()) {
+    // Each item found by its id (usually in the same place; else by an index: a 20,000-item price book
+    // searched once for each item was 200 million compares, seconds on the Pi).
+    std::unordered_map<std::string_view, const MenuItem *> beforeById, afterById;
+    const auto in = [](const std::vector<MenuItem> &list, std::unordered_map<std::string_view, const MenuItem *> &index,
+                       std::size_t i, const std::string &id) -> const MenuItem * {
+        if (i < list.size() && list[i].id == id)
+            return &list[i];
+        if (index.empty())
+            for (const MenuItem &x : list)
+                index.emplace(x.id, &x);
+        const auto it = index.find(id);
+        return it == index.end() ? nullptr : it->second;
+    };
+    for (std::size_t i = 0; i < after.menu.size(); ++i) {
+        const MenuItem &m = after.menu[i];
+        const MenuItem *old = in(before.menu, beforeById, i, m.id);
+        if (!old) {
             log(qs(m.name), QString(), QString(), tr("Added, %1").arg(format(m.price)));
             continue;
         }
@@ -244,9 +266,9 @@ void PosService::logMenuChanges(const PosShared::MenuState &before, const PosSha
         if (!(rest == m))
             log(qs(m.name), tr("Other details"), QString(), step);
     }
-    for (const MenuItem &m : before.menu)
-        if (std::ranges::find(after.menu, m.id, &MenuItem::id) == after.menu.end())
-            log(qs(m.name), QString(), QString(), tr("Removed"));
+    for (std::size_t i = 0; i < before.menu.size(); ++i)
+        if (!in(after.menu, afterById, i, before.menu[i].id))
+            log(qs(before.menu[i].name), QString(), QString(), tr("Removed"));
     for (const MenuCategory &c : after.categories) {
         const auto old = std::ranges::find(before.categories, c.id, &MenuCategory::id);
         if (old == before.categories.end())
@@ -272,6 +294,10 @@ void PosService::menuChanged()
     refreshSoldOut();
     SlowLog::markCurrent(u"sold out"_s);
     ++s_->adminRevision;
+    if (s_->menuUndoDepth > 0) {   // inside a Menu Builder step: told once, when it ends (MenuStep)
+        s_->menuChangeHeard = true;
+        return;
+    }
     emit s_->adminChanged();
     SlowLog::markCurrent(u"refresh"_s);
 }
@@ -435,7 +461,9 @@ bool PosService::moveCategory(const QString &id, int by)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
         return false;
+    SlowLog slow(u"move"_s, u"move category '%1'"_s.arg(id));   // (HCA 2026-11-26: the arrow keys seemed dead)
     const MenuStep step(this, tr("Move a category"));
+    slow.mark(u"undo"_s);
     std::vector<MenuCategory> list = s_->categories();
     const auto it = std::ranges::find_if(list, [&](const MenuCategory &c) { return qs(c.id) == id; });
     if (it == list.end())
@@ -447,6 +475,7 @@ bool PosService::moveCategory(const QString &id, int by)
     std::swap(list[from], list[to]);
     s_->settings.menuCategories = list;
     settingsChanged();
+    slow.mark(u"store"_s);
     menuChanged();
     return true;
 }
@@ -455,7 +484,9 @@ bool PosService::moveCategoryTo(const QString &id, int position)
 {
     if (!require(perm::Manager, tr("Changing the menu")))
         return false;
+    SlowLog slow(u"move"_s, u"move category '%1'"_s.arg(id));   // (HCA 2026-11-26: the arrow keys seemed dead)
     const MenuStep step(this, tr("Move a category"));
+    slow.mark(u"undo"_s);
     std::vector<MenuCategory> list = s_->categories();
     const auto it = std::ranges::find_if(list, [&](const MenuCategory &c) { return qs(c.id) == id; });
     if (it == list.end())
@@ -465,6 +496,7 @@ bool PosService::moveCategoryTo(const QString &id, int position)
     list.insert(list.begin() + std::clamp(position, 0, int(list.size())), c);
     s_->settings.menuCategories = list;
     settingsChanged();
+    slow.mark(u"store"_s);
     menuChanged();
     return true;
 }
@@ -926,8 +958,9 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         if (!plu.isEmpty()) {
             if (plu.size() > 6 || !std::ranges::all_of(plu, [](QChar c) { return c.isDigit(); }))
                 return fail(tr("The number is digits only (up to 6), like 104."));
+            const std::string number = ss(plu);   // (compared as stored: no conversion per item)
             for (const MenuItem &m : menu)
-                if (m.id != item.id && qs(m.number) == plu)
+                if (m.id != item.id && m.number == number)
                     return fail(tr("%1 already has number %2.").arg(qs(m.name), plu));
         }
         item.number = ss(plu);
@@ -1013,8 +1046,12 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
                     if (crl.ingredientId == parentTag) {
                         const double div = std::max(1.0, crl.quantity);
                         const double subCost = std::round((myCost / div) * 100.0) / 100.0;
+                        const std::vector<RecipeLine> was = child.recipe;
                         std::erase_if(child.recipe, [](const RecipeLine &r) { return r.ingredientId == "__cost__"; });
                         child.recipe.push_back({"__cost__", subCost});
+                        // (Kept in the store's records too: only in memory, it was lost at the next start.)
+                        if (s_->sink && !(child.recipe == was))
+                            s_->sink->saveMenuItem(child, int(&child - menu.data()));
                         break;
                     }
                 }
@@ -1072,6 +1109,8 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
     if (card.contains(u"onIt"_s)) {
         const QStringList ingredients = strings(card.value(u"onIt"_s));
         auto &groups = s_->settings.modifierGroups;
+        // (Saved, and every screen's checks made again, only when it changed: the card always sends it.)
+        const std::vector<ModifierGroup> groupsWere = groups;
         std::erase_if(groups, [&](const ModifierGroup &g) { return g.id == onIt; });
         std::erase(item.modifierGroups, onIt);
         if (!ingredients.isEmpty()) {
@@ -1093,7 +1132,8 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
         // Its size is still asked first.
         if (std::erase(item.modifierGroups, sizeGroupId(item.id)) > 0)
             item.modifierGroups.insert(item.modifierGroups.begin(), sizeGroupId(item.id));
-        settingsChanged();
+        if (!(groups == groupsWere))
+            settingsChanged();
     }
 
     slow.mark(u"check"_s);

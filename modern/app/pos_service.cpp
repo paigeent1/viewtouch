@@ -414,8 +414,9 @@ QString PosService::barcodeProblem(const QStringList &codes, const std::string &
         // No check-digit test here: a scanner always sends the code printed on the
         // package, and some real store and vendor codes do not follow GS1. Blocking
         // them meant those items could never be saved (audit 2026-11-04).
+        const std::string code = ss(c);   // (once, not once per item)
         for (const MenuItem &m : s_->menu)
-            if (m.id != itemId && std::ranges::find(m.barcodes, ss(c)) != m.barcodes.end())
+            if (m.id != itemId && std::ranges::find(m.barcodes, code) != m.barcodes.end())
                 return tr("%1 already has the barcode %2.").arg(qs(m.name), c);
     }
     return {};

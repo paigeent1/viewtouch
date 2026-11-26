@@ -271,6 +271,9 @@ public:
     };
     std::vector<MenuUndo> menuUndo;
     int menuUndoDepth = 0;   // inside a change (an import's many saves): one step
+    // The menu changed inside a step (menuChanged): every screen hears of it once, when the step ends
+    // (an item's Save had every screen read the whole menu twice; an import, once a row).
+    bool menuChangeHeard = false;
     std::vector<core::Employee> employees;
     std::map<std::int64_t, core::Check> open;
     std::vector<core::TimePunch> punches;   // today's, plus any still open
@@ -1422,6 +1425,9 @@ public:
     QVariantList expoTicketsNow() const;
     QVariantMap dashboardNow() const;
     QVariantList menuItemsNow() const;
+    // Those items only (places in the menu), made as menuItemsNow makes them; null: every item.
+    QVariantList menuItemsAt(const std::vector<std::uint32_t> *places) const;
+    bool menuItemsCacheFresh() const;   // menuItems() would answer from its cache
     QVariantList orderItemsNow() const;
     // The item list as last made, for this computer's own screens (every binding that shows it asks
     // again; with a 30,000-item price book making it each time froze the Pi): made again after any

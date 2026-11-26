@@ -8,7 +8,8 @@ Dialog {
     id: checkDialog
     property Item menu   // the WidgetMenuBuilder (not by its type: that would be a cycle)
     objectName: "builderCheckDialog"
-    readonly property var problems: menu.pos ? menu.pos.menuProblems : []
+    // Read only while it shows (closed, every menu change made the store work them all out again).
+    readonly property var problems: menu.pos && checkDialog.visible ? menu.pos.menuProblems : []
     title: problems.length ? qsTr("Before service") : qsTr("Ready to go")
     parent: Overlay.overlay
     anchors.centerIn: parent

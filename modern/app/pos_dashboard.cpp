@@ -5,8 +5,10 @@
 #include "app/pos_json.hh"
 #include "app/i18n.hh"
 #include "app/pos_service.hh"
+#include "app/slow_log.hh"
 
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QLocale>
 
 #include <algorithm>
@@ -255,6 +257,12 @@ QVariantMap PosService::dashboard() const
         return {};
     return s_->memo(u"dashboard "_s + language(), [this] { return QVariant(dashboardNow()); }).toMap();
 }
+bool PosService::menuItemsCacheFresh() const
+{
+    return menuItemsCache_ && menuItemsCachePeriod_ == currentMealPeriod() && menuItemsCacheLanguage_ == language()
+           && menuItemsCacheRevision_ == s_->adminRevision && menuItemsCacheSize_ == s_->menu.size();
+}
+
 QVariantList PosService::menuItems() const
 {
     if (!user())
@@ -264,9 +272,12 @@ QVariantList PosService::menuItems() const
     const std::string period = currentMealPeriod();
     const QString lang = language();
     // Also made again when the menu's revision or size moved without a signal reaching this screen.
-    if (!menuItemsCache_ || menuItemsCachePeriod_ != period || menuItemsCacheLanguage_ != lang
-        || menuItemsCacheRevision_ != s_->adminRevision || menuItemsCacheSize_ != s_->menu.size()) {
+    if (!menuItemsCacheFresh()) {
+        QElapsedTimer t;
+        t.start();
         menuItemsCache_ = menuItemsNow();
+        if (SlowLog *slow = SlowLog::current())
+            slow->addInside(u"menu list"_s, t.nsecsElapsed());
         menuItemsCachePeriod_ = period;
         menuItemsCacheLanguage_ = lang;
         menuItemsCacheRevision_ = s_->adminRevision;

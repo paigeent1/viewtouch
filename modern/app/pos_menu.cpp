@@ -13,6 +13,7 @@
 #include <QLocale>
 
 #include <algorithm>
+#include <string_view>
 #include <unordered_set>
 
 using namespace Qt::StringLiterals;
@@ -667,8 +668,12 @@ QVariantList PosService::choiceGroupsNow() const
 std::vector<MenuCategory> PosShared::categories() const
 {
     std::vector<MenuCategory> out = settings.menuCategories;
+    // (The ids seen, so a 20,000-item menu isn't a search of the list for each item.)
+    std::unordered_set<std::string_view> seen;
+    for (const MenuCategory &c : settings.menuCategories)   // (views of the settings' and the menu's own ids)
+        seen.insert(c.id);
     for (const MenuItem &m : menu) {
-        if (m.isModifier || m.family.empty() || std::ranges::any_of(out, [&](const MenuCategory &c) { return c.id == m.family; }))
+        if (m.isModifier || m.family.empty() || !seen.insert(m.family).second)
             continue;
         MenuCategory c;
         c.id = m.family;
@@ -961,6 +966,13 @@ const PosService::BuilderPick &PosService::builderPick() const
 
 QVariantList PosService::builderItems() const
 {
+    // A big price book held back: only the items picked are made (making all 20,000 for a few took most
+    // of a second after each change on the Pi), unless the whole list is made already.
+    if (user() && !s_->memoOn() && !menuItemsCacheFresh()) {
+        const BuilderPick &pick = builderPick();
+        if (!pick.all)
+            return menuItemsAt(&pick.items);
+    }
     const QVariantList all = menuItems();
     if (all.size() != qsizetype(s_->menu.size()))
         return all;
@@ -984,13 +996,24 @@ QVariantMap PosService::builderTree() const
 
 QVariantList PosService::menuItemsNow() const
 {
+    return menuItemsAt(nullptr);
+}
+
+QVariantList PosService::menuItemsAt(const std::vector<std::uint32_t> *places) const
+{
     QVariantList out;
     if (!user())
         return out;
     const std::string period = currentMealPeriod();
     const core::scandata::ItemIndex scanIndex(s_->menu);   // how each sells for scan data (packs, cartons)
     const std::map<std::string, PourOf> pours = pourGroups();   // the bar: pours grouped by bottle
-    for (const MenuItem &m : s_->menu) {
+    const std::size_t count = places ? places->size() : s_->menu.size();
+    out.reserve(qsizetype(count));
+    for (std::size_t k = 0; k < count; ++k) {
+        const std::size_t at = places ? std::size_t((*places)[k]) : k;
+        if (at >= s_->menu.size())
+            continue;
+        const MenuItem &m = s_->menu[at];
         const auto pour = pours.find(m.id);
         out.append(QVariantMap{{u"id"_s, qs(m.id)}, {u"name"_s, qs(m.name)}, {u"family"_s, qs(m.family)},
                                {u"price"_s, format(m.priceDuring(period))}, {u"modifier"_s, m.isModifier},

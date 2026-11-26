@@ -23,7 +23,7 @@ Dialog {
             text: qsTr("Its categories, choices and items, with typical prices, are added to your menu; nothing already on it changes. Then change anything you like.")
         }
         Repeater {
-            model: menu.pos ? menu.pos.menuTemplates : []
+            model: menu.pos && templateDialog.visible ? menu.pos.menuTemplates : []   // (only while it shows)
             delegate: MenuTouchButton {
                 required property var modelData
                 objectName: "builderTemplate-" + modelData.id

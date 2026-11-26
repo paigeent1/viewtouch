@@ -16,7 +16,9 @@ Popup {
     padding: 16
     property string find: ""
     onOpened: find = ""
+    // Worked out only while it shows (closed, it went through every item at each change and each key typed on the card).
     readonly property var choices: {
+        if (!likeDialog.visible) return []
         const t = find.trim().toLowerCase()
         const others = menu.allItems.filter(i => i.id !== menu.draft.id && (t === "" || i.name.toLowerCase().includes(t)))
         return others.filter(i => i.family === menu.draft.family).concat(others.filter(i => i.family !== menu.draft.family))
