@@ -3,8 +3,10 @@
 
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
+#include "app/slow_log.hh"
 #include "core/builder_index.hh"
 
+#include <QElapsedTimer>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QThreadPool>
@@ -792,6 +794,7 @@ QString PosService::builderRevision() const
 struct PosService::BuilderCache {
     std::uint64_t shared = 0;
     int revision = -1;
+    std::uint64_t content = 0;   // the items' parts the index is made of (builderCache)
     std::size_t size = 0;
     std::string categoriesKey;
     std::uint64_t generation = 0;
@@ -817,10 +820,29 @@ const PosService::BuilderCache &PosService::builderCache() const
         }
         key += c.retailOnly ? "1\x1e" : "0\x1e";
     }
-    if (x.shared == s_->serial && x.revision == s_->adminRevision && x.size == s_->menu.size() && x.categoriesKey == key)
+    // What the index is made of, as one number: a price or a sold-out mark changed keeps the index (a
+    // 20,000-item price book's took ~60 ms to make again, at every change).
+    std::uint64_t content = 1469598103934665603ull;
+    const auto mix = [&content](std::uint64_t v) { content = (content ^ v) * 1099511628211ull; };
+    const std::hash<std::string> h;
+    for (const MenuItem &m : s_->menu) {
+        for (const std::string *part : {&m.name, &m.family, &m.number, &m.manufacturer, &m.productGroup, &m.subGroup})
+            mix(h(*part));
+        for (const std::string &b : m.barcodes)
+            mix(h(b));
+        mix((m.isModifier ? 1u : 0u) | (itemIsEvent(m) ? 2u : 0u) | (std::uint64_t(m.barcodes.size()) << 2));
+    }
+    if (x.shared == s_->serial && x.content == content && x.size == s_->menu.size() && x.categoriesKey == key)
         return x;
     x.shared = s_->serial;
     x.revision = s_->adminRevision;
+    x.content = content;
+    QElapsedTimer made;
+    made.start();
+    const struct Timed {   // (a slow save's line: "builder index")
+        QElapsedTimer &t;
+        ~Timed() { if (SlowLog *slow = SlowLog::current()) slow->addInside(u"builder index"_s, t.nsecsElapsed()); }
+    } timed{made};
     x.size = s_->menu.size();
     x.categoriesKey = std::move(key);
     ++x.generation;
@@ -970,8 +992,14 @@ QVariantList PosService::builderItems() const
     // of a second after each change on the Pi), unless the whole list is made already.
     if (user() && !s_->memoOn() && !menuItemsCacheFresh()) {
         const BuilderPick &pick = builderPick();
-        if (!pick.all)
-            return menuItemsAt(&pick.items);
+        if (!pick.all) {
+            QElapsedTimer t;
+            t.start();
+            QVariantList out = menuItemsAt(&pick.items);
+            if (SlowLog *slow = SlowLog::current())
+                slow->addInside(u"builder list"_s, t.nsecsElapsed());
+            return out;
+        }
     }
     const QVariantList all = menuItems();
     if (all.size() != qsizetype(s_->menu.size()))

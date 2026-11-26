@@ -412,24 +412,17 @@ struct PiScreen {
         w->setProperty("choosingScope", false);
         w->setProperty("categoryId", categoryId);
         QTest::qWait(400);   // (the view told to the store, its list back)
-        // Found by its name (as a person finds one down the list, or in a big department's tree).
-        QQuickItem *tile = nullptr;
-        {
-            w->setProperty("search", search);
-            waitFor([&] { return by(u"builderFound-"_s + itemId) != nullptr; });
-            tile = by(u"builderFound-"_s + itemId);
-        }
-        if (tile) {
-            const QPointF centre = tile->mapToScene(QPointF(tile->width() / 2, tile->height() / 2));
-            QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
-            QTest::qWait(400);
-        }
-        if (!by(u"builderPrice"_s)) {   // (not where a touch reaches it: opened as its tile does)
-            const QJSValue item = w->property("itemById").value<QJSValue>().property(itemId);
-            REQUIRE(item.isObject());
-            REQUIRE(QMetaObject::invokeMethod(w, "editItem", Q_ARG(QVariant, QVariant::fromValue(item))));
-            QTest::qWait(400);
-        }
+        // Opened as its tile does (the tile can be below the window's edge, or in a big department's tree).
+        if (!search.isEmpty())
+            w->setProperty("search", search);   // (a big department's item comes along with the search)
+        QJSValue item;
+        waitFor([&] {
+            item = w->property("itemById").value<QJSValue>().property(itemId);
+            return item.isObject();
+        });
+        REQUIRE(item.isObject());
+        REQUIRE(QMetaObject::invokeMethod(w, "editItem", Q_ARG(QVariant, QVariant::fromValue(item))));
+        QTest::qWait(400);
         REQUIRE(by(u"builderPrice"_s));
     }
 
@@ -459,11 +452,11 @@ struct PiScreen {
         QTest::qWait(50);
         QQuickItem *saveButton = by(u"builderSave"_s);
         REQUIRE(saveButton);
-        const QPointF centre = saveButton->mapToScene(QPointF(saveButton->width() / 2, saveButton->height() / 2));
         const qint64 nsBefore = s.server->updateNsecs();
         QElapsedTimer t;
         t.start();
-        QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
+        // (Its onClicked: the button can be below the window's edge on a long card.)
+        REQUIRE(QMetaObject::invokeMethod(builder, "saveItem"));
         const qint64 tap = t.nsecsElapsed();
         // Then what the event loop does for it (the list's delegates, the server's round), busy time only.
         const qint64 busy = busyFor(1500);
@@ -488,7 +481,7 @@ TEST_CASE("Speed: the Pi's screen saves a beer's price on Menu Builder's card, H
     const QString beerId = itemNamed(s.pi->builderItems(), u"TEST DRAFT 07 16oz"_s).value(u"id"_s).toString();
     REQUIRE_FALSE(beerId.isEmpty());
     PiScreen screen(s);
-    screen.open(u"hospitality"_s, draftId, beerId, u"TEST DRAFT 07 16oz"_s);
+    screen.open(u"hospitality"_s, draftId, beerId);
     for (int round = 1; round <= 3; ++round)
         screen.save(s, u"HCA"_s, round, beerId);
     // The category's ▲ and ▼ (under the category list, the card closed): each touch moves it at once.

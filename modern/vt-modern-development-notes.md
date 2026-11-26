@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-26 17:46 ET — Bob (Claude) helper — Menu Builder: keep its index when only prices change; harness opens the card as its tile does
+- **What:** Tablet app: no change. Server: changed. Menu Builder's quick index (a 20,000-item price book's tree and search) is made again only when what it is made of changes (names, categories, numbers, barcodes, maker, groups, ticket marks), not at every price or sold-out change. Slow-log parts 'builder index' and 'builder list'. tests/test_save_speed.cpp opens the card with editItem and saves with saveItem (the tile and the Save button were below the 1600x900 window).
+- **Why:** CI run 45904134025: HCA-like saves are 2 ms; the 20,000-item save is 25-120 ms in the service but ~480 ms on the Pi's screen; the index was ~60 ms of each refresh.
+- **Files:** `modern/app/pos_menu.cpp`, `modern/tests/test_save_speed.cpp`
+
 ### 2026-11-26 17:20 ET — Bob (Claude) helper — Menu Builder: quicker Save and category moves (one refresh, no whole-menu searches)
 - **What:** Tablet app: changed (QML: closed Menu Builder dialogs no longer work out their lists). Server: changed. A Menu Builder step (Save, a category moved, an import) tells the screens once when it ends, not at each menuChanged inside it (Save had every screen read everything twice; an import, once a row). The undo step's change log finds items by an index (20,000 items: 200 million compares, ~2 s). Sold out looks ingredients up in a map once. categories() keeps a set of ids. Save: What's on it saves settings (and re-totals checks) only when its group changed; a parent's new cost cascaded to its singles is now saved for them too (it was only in memory). builderItems makes only the items picked when the price book is held back, not all 20,000. The pages screen reads the sold-out list once per refresh. Closed dialogs (Before service, Change prices, Starter menus, Like...) read nothing. Slow-log parts: menu list, screen pages; category moves are timed too ('slow: move category ...').
 - **Why:** Owner 2026-11-26: saving a beer's price took 5-15 s at HCA and the category arrow keys seemed dead. CI numbers before: 20,000-item price book save 2.2-2.5 s (undo 2 s), the Pi's screen refresh ~1 s, a category move 1.6 s; HCA-like 2 ms in the service.
