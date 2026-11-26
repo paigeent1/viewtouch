@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-26 16:58 ET — Bob (Claude) helper — Save-speed harness: open the card by search; time the category arrows
+- **What:** Tablet app: no change. Server: no change. tests/test_save_speed.cpp: the card opened through the search (the beer was below the screen's edge), and Menu Builder's category up/down (moveCategoryTo) timed too, also by touch on the Pi's screen.
+- **Why:** First CI numbers (run 45898818437): HCA-like save 2 ms in the service; 20k price book: 2.2-2.5 s, 2 s of it the undo step's change log. The UI part didn't reach the card. The owner also finds the category arrow keys unresponsive at HCA.
+- **Files:** `modern/tests/test_save_speed.cpp`
+
 ### 2026-11-26 16:32 ET — Bob (Claude) helper — Save-speed harness: build fix
 - **What:** Tablet app: no change. Server: no change. tests/test_save_speed.cpp: vt::Money (not core::Money), QVariant arguments for the QML call.
 - **Why:** The harness didn't build in CI (run 45897373775).

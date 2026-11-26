@@ -273,6 +273,31 @@ qint64 timedSave(Store &s, const QString &name, const QString &label, int round)
     return save + readNs + (s.server->updateNsecs() - nsBefore);
 }
 
+// A category moved up and back (Menu Builder's ▲ ▼: moveCategoryTo), timed as a save is.
+void timedMoves(Store &s, const QString &categoryId, const QString &label)
+{
+    for (int round = 1; round <= 2; ++round) {
+        const std::vector<core::MenuCategory> cats = s.shared->categories();
+        const auto at = std::ranges::find(cats, categoryId.toStdString(), &core::MenuCategory::id);
+        REQUIRE(at != cats.end());
+        const int from = int(at - cats.begin());
+        const int to = round == 1 ? std::max(0, from - 1) : from + 1;
+        const qint64 nsBefore = s.server->updateNsecs();
+        QElapsedTimer t;
+        t.start();
+        REQUIRE(s.pi->moveCategoryTo(categoryId, to));
+        const qint64 move = t.nsecsElapsed();
+        t.restart();
+        const QString reads = s.piReads();
+        const qint64 readNs = t.nsecsElapsed();
+        s.settle();
+        say(u"%1 move category %2: %3 ms [%4]; the Pi's screen reads again %5 ms; server rounds %6 ms [%7]"_s.arg(label)
+                .arg(round).arg(ms(move), 0, 'f', 1).arg(app::SlowLog::last(u"move"_s)).arg(ms(readNs), 0, 'f', 1)
+                .arg(ms(s.server->updateNsecs() - nsBefore), 0, 'f', 1).arg(app::SlowLog::last(u"round"_s)));
+        Q_UNUSED(reads)
+    }
+}
+
 app::PosData hcaData()
 {
     app::PosData d = test::seedPosData();
@@ -312,6 +337,7 @@ TEST_CASE("Speed: saving a beer's price on Menu Builder's card, HCA-like bar, 3 
     qint64 worst = 0;
     for (int round = 1; round <= 3; ++round)
         worst = std::max(worst, timedSave(s, beer, u"HCA"_s, round));
+    timedMoves(s, draftId, u"HCA"_s);
     CHECK(s.pi->findItem(beerId) != nullptr);
     CHECK(ms(worst) < 20000);   // (a ceiling far above what is expected: the times are in the log)
 }
@@ -330,6 +356,7 @@ TEST_CASE("Speed: saving an item's price on Menu Builder's card, a 20,000-item p
     qint64 worst = 0;
     for (int round = 1; round <= 3; ++round)
         worst = std::max(worst, timedSave(s, name, u"20k"_s, round));
+    timedMoves(s, u"test-cigars"_s, u"20k"_s);
     CHECK(ms(worst) < 60000);
 }
 
@@ -384,8 +411,9 @@ struct PiScreen {
         w->setProperty("choosingScope", false);
         w->setProperty("categoryId", categoryId);
         QTest::qWait(400);   // (the view told to the store, its list back)
-        QQuickItem *tile = by(u"builderItem-"_s + itemId);
-        if (!tile) {   // a big department (a tree): found by its name
+        // Found by its name (as a person finds one down the list, or in a big department's tree).
+        QQuickItem *tile = nullptr;
+        {
             w->setProperty("search", search);
             waitFor([&] { return by(u"builderFound-"_s + itemId) != nullptr; });
             tile = by(u"builderFound-"_s + itemId);
@@ -395,6 +423,23 @@ struct PiScreen {
         QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
         QTest::qWait(400);
         REQUIRE(by(u"builderPrice"_s));
+    }
+
+    // The event loop's busy time over the next `msec` (what the screen does after a touch).
+    static qint64 busyFor(int msec)
+    {
+        qint64 busy = 0;
+        QElapsedTimer all;
+        all.start();
+        while (all.elapsed() < msec) {
+            QElapsedTimer b;
+            b.start();
+            QCoreApplication::sendPostedEvents();
+            QCoreApplication::processEvents(QEventLoop::AllEvents);
+            busy += b.nsecsElapsed();
+            QThread::msleep(5);
+        }
+        return busy;
     }
 
     // Price changed, Save touched: the time until the screen is done (the save and everything after it).
@@ -413,17 +458,7 @@ struct PiScreen {
         QTest::mouseClick(window, Qt::LeftButton, {}, centre.toPoint());
         const qint64 tap = t.nsecsElapsed();
         // Then what the event loop does for it (the list's delegates, the server's round), busy time only.
-        qint64 busy = 0;
-        QElapsedTimer all;
-        all.start();
-        while (all.elapsed() < 1500) {
-            QElapsedTimer b;
-            b.start();
-            QCoreApplication::sendPostedEvents();
-            QCoreApplication::processEvents(QEventLoop::AllEvents);
-            busy += b.nsecsElapsed();
-            QThread::msleep(5);
-        }
+        const qint64 busy = busyFor(1500);
         CHECK(s.pi->findItem(itemId)->price.cents() == std::llround(price.toDouble() * 100));
         say(u"%1 UI save %2: the tap %3 ms [%4]; after it %5 ms busy (server rounds %6 ms) [%7]"_s.arg(label).arg(round)
                 .arg(ms(tap), 0, 'f', 1).arg(app::SlowLog::last(u"save"_s)).arg(ms(busy), 0, 'f', 1)
@@ -445,9 +480,32 @@ TEST_CASE("Speed: the Pi's screen saves a beer's price on Menu Builder's card, H
     const QString beerId = itemNamed(s.pi->builderItems(), u"TEST DRAFT 07 16oz"_s).value(u"id"_s).toString();
     REQUIRE_FALSE(beerId.isEmpty());
     PiScreen screen(s);
-    screen.open(u"hospitality"_s, draftId, beerId);
+    screen.open(u"hospitality"_s, draftId, beerId, u"TEST DRAFT 07 16oz"_s);
     for (int round = 1; round <= 3; ++round)
         screen.save(s, u"HCA"_s, round, beerId);
+    // The category's ▲ and ▼ (under the category list, the card closed): each touch moves it at once.
+    screen.builder->setProperty("search", QString());
+    REQUIRE(QMetaObject::invokeMethod(screen.builder, "pickCategory", Q_ARG(QVariant, QVariant(draftId))));
+    QTest::qWait(300);
+    for (const QString &key : {u"builderCategoryUp"_s, u"builderCategoryDown"_s, u"builderCategoryUp"_s}) {
+        const auto place = [&] {
+            const std::vector<core::MenuCategory> cats = s.shared->categories();
+            return int(std::ranges::find(cats, draftId.toStdString(), &core::MenuCategory::id) - cats.begin());
+        };
+        const int was = place();
+        QQuickItem *button = screen.by(key);
+        REQUIRE(button);
+        REQUIRE(button->isEnabled());
+        const QPointF centre = button->mapToScene(QPointF(button->width() / 2, button->height() / 2));
+        QElapsedTimer t;
+        t.start();
+        QTest::mouseClick(screen.window, Qt::LeftButton, {}, centre.toPoint());
+        const qint64 tap = t.nsecsElapsed();
+        CHECK(place() != was);
+        const qint64 busy = screen.busyFor(800);
+        say(u"HCA UI %1: the tap %2 ms [%3]; after it %4 ms busy"_s.arg(key).arg(ms(tap), 0, 'f', 1)
+                .arg(app::SlowLog::last(u"move"_s)).arg(ms(busy), 0, 'f', 1));
+    }
 }
 
 TEST_CASE("Speed: the Pi's screen saves an item's price on Menu Builder's card, a 20,000-item price book", "[speed][savespeed][ui]")
