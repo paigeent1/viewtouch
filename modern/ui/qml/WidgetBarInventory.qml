@@ -1,10 +1,13 @@
 import QtQuick
 import QtQuick.Controls.Fusion
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 // The bar (HCA): the shelf count in bottles and tenths (3.4), by category; the 18 draft lines and Change
-// keg; Link pours to bottles (each drink item to its bottle, with a preview, undoable). The zone's
-// props.tab opens a tab ("count", "draft", "link"); a page of Change keg alone sets "draft".
+// keg; Link pours to bottles (each drink item to its bottle, with a preview, undoable); Import costs (a
+// spreadsheet saved as CSV: each liquor's sizes, cost per bottle, bottles per case, vendor; a preview, then
+// Apply). The zone's props.tab opens a tab ("count", "draft", "link", "import"); a page of Change keg alone
+// sets "draft".
 // The Bar Variance and Kegs reports are in Reports.
 Item {
     id: w
@@ -45,6 +48,11 @@ Item {
     }
     property string kegSize: "half"
 
+    // --- Import costs
+    readonly property var costImport: info.costImport ?? ({})
+    readonly property bool importing: (costImport.rows ?? []).length > 0 || (costImport.problems ?? []).length > 0
+    property string fileError: ""
+
     readonly property bool narrow: zone ? zone.narrow : false
     readonly property real zoom: zone ? zone.formZoom(narrow ? 460 : 900) : 1.4
     Item {
@@ -64,7 +72,7 @@ Item {
                 spacing: 6
                 Repeater {
                     model: [{ id: "count", text: qsTr("Shelf count") }, { id: "draft", text: qsTr("Draft lines") },
-                            { id: "link", text: qsTr("Link pours to bottles") }]
+                            { id: "link", text: qsTr("Link pours to bottles") }, { id: "import", text: qsTr("Import costs") }]
                     delegate: Button {
                         required property var modelData
                         objectName: "barTab-" + modelData.id
@@ -384,6 +392,139 @@ Item {
                     }
                 }
             }
+
+            // ---------------- Import costs ----------------
+            ColumnLayout {
+                objectName: "barImport"
+                visible: w.tab === "import" && w.manager
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 6
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.7
+                    text: qsTr("A spreadsheet saved as CSV, a row per liquor and size, with the columns Liquor, Category, Size "
+                               + "(750ml, 1L, 1.75L, 375ml...), Bottles per case, Cost per bottle and Vendor. Each row finds "
+                               + "its bottle by name; a size, a bottle or a vendor not here yet is made. Nothing changes "
+                               + "until Apply.")
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Button {
+                        objectName: "barImportChoose"
+                        text: qsTr("Choose a CSV file…")
+                        implicitHeight: 48
+                        font.pixelSize: 16
+                        onClicked: importFile.open()
+                    }
+                    Label {
+                        objectName: "barImportSummary"
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        font.bold: true
+                        color: w.fileError !== "" ? "#f5b940" : "white"
+                        text: w.fileError !== "" ? w.fileError
+                              : !w.importing ? ""
+                              : qsTr("New bottles: %1 · changed: %2 · no change: %3 · problems: %4 · new vendors: %5")
+                                    .arg(w.costImport.newGoods ?? 0).arg(w.costImport.changed ?? 0).arg(w.costImport.same ?? 0)
+                                    .arg(w.costImport.problemCount ?? 0).arg(w.costImport.vendorsMade ?? 0)
+                    }
+                }
+                Label {
+                    visible: w.importing && w.costImport.drinkPrices === true
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.7
+                    text: qsTr("Drink price: read but not applied (set drink prices in the Menu Builder).")
+                }
+                ListView {
+                    id: importList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 2
+                    model: w.tab === "import" ? (w.costImport.problems ?? []).map(p => ({ problem: p })).concat(w.costImport.rows ?? []) : []
+                    ScrollBar.vertical: TouchScrollBar { id: importBar; needed: importList.contentHeight > importList.height + 1 }
+                    delegate: RowLayout {
+                        id: imp
+                        required property var modelData
+                        width: ListView.view.width - importBar.room
+                        height: 34
+                        Label {
+                            visible: !imp.modelData.problem
+                            text: imp.modelData.good ?? ""
+                            Layout.preferredWidth: w.narrow ? 140 : 260
+                            elide: Text.ElideRight
+                            font.bold: true
+                        }
+                        Label { visible: !imp.modelData.problem; text: imp.modelData.size ?? ""; Layout.preferredWidth: 70 }
+                        Label {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: imp.modelData.problem ?? imp.modelData.what
+                            color: imp.modelData.problem || imp.modelData.status === "problem" ? "#f5b940"
+                                   : imp.modelData.status === "same" ? "#9aa4b2" : "white"
+                        }
+                        Label {
+                            Layout.preferredWidth: 90
+                            horizontalAlignment: Text.AlignRight
+                            color: imp.modelData.status === "new" ? "#7ee2a8" : imp.modelData.status === "change" ? "#f5b940" : "#9aa4b2"
+                            text: imp.modelData.problem ? qsTr("left out")
+                                  : imp.modelData.status === "new" ? qsTr("new") : imp.modelData.status === "change" ? qsTr("change")
+                                  : imp.modelData.status === "same" ? qsTr("no change") : qsTr("left out")
+                        }
+                    }
+                }
+                Label {
+                    visible: !w.importing
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    text: qsTr("No file chosen. From a USB stick: plug it in, then find it under its name in the file list.")
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        visible: w.importing && w.costImport.canApply !== true
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                        text: qsTr("Applying changes system costs: it needs the price book permission.")
+                    }
+                    Item { Layout.fillWidth: true; visible: !(w.importing && w.costImport.canApply !== true) }
+                    Button {
+                        objectName: "barImportCancel"
+                        visible: w.importing
+                        text: qsTr("Cancel")
+                        implicitHeight: 52
+                        font.pixelSize: 16
+                        onClicked: { w.fileError = ""; w.pos.barCostImportCancel() }
+                    }
+                    Button {
+                        objectName: "barImportApply"
+                        text: qsTr("Apply %n change(s)", "", w.costImport.toApply ?? 0)
+                        highlighted: true
+                        enabled: (w.costImport.toApply ?? 0) > 0
+                        implicitHeight: 52
+                        implicitWidth: 220
+                        font.pixelSize: 17
+                        onClicked: w.pos.barCostImportApply()
+                    }
+                }
+            }
+        }
+    }
+
+    FileDialog {
+        id: importFile
+        title: qsTr("Bar costs: a spreadsheet saved as CSV")
+        nameFilters: [qsTr("Spreadsheets saved as CSV (*.csv *.txt *.tsv)"), qsTr("All files (*)")]
+        onAccepted: {
+            const read = w.zone && w.zone.controller ? w.zone.controller.readCsvFile(selectedFile) : { error: qsTr("Can't read files here.") }
+            w.fileError = read.error ?? ""
+            if (!read.error) w.pos.barCostImport(read.text)
         }
     }
 

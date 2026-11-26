@@ -294,7 +294,18 @@ QVariantList PosService::adminRecords(const QString &panel)
                 qs(v.name), qs(v.phone));
     } else if (panel == u"inventory") {
         for (const Ingredient &g : s_->ingredients)
-            add([&] { QVariantMap r = toJson(g).toVariantMap(); r.remove(u"sinceCount"_s); return r; }(), qs(g.name),
+            add([&] {
+                    QVariantMap r = toJson(g).toVariantMap();
+                    r.remove(u"sinceCount"_s);
+                    // Its barcodes and other sizes as the editor shows them (Other sizes: a size a line).
+                    QStringList upcs;
+                    for (const std::string &u : g.upcs)
+                        upcs << qs(u);
+                    r.insert(u"upcText"_s, upcs.join(u' '));
+                    r.insert(u"sizesText"_s, qs(bottleSizesText(g.sizes)).trimmed());
+                    return r;
+                }(),
+                qs(g.name),
                 QString::number(g.onHand, 'g', 8) + u' ' + qs(g.unit)
                     + (g.onHand <= 0 ? tr(" · OUT") : g.low() ? tr(" · LOW") : QString()));
     } else if (panel == u"modifierGroups") {
@@ -397,7 +408,8 @@ QVariantMap PosService::adminNewRecord(const QString &panel)
         return promotionRecord({});
     if (panel == u"inventory")
         return {{u"id"_s, QString()}, {u"name"_s, QString()}, {u"unit"_s, u"each"_s}, {u"onHand"_s, 0.0},
-                {u"lowAt"_s, 0.0}, {u"cost"_s, 0.0}, {u"vendor"_s, QString()}};
+                {u"lowAt"_s, 0.0}, {u"cost"_s, 0.0}, {u"vendor"_s, QString()}, {u"upcText"_s, QString()},
+                {u"sizesText"_s, QString()}};
     if (panel == u"punches")
         return punchNewRecord();
     if (panel == u"cardReaders")

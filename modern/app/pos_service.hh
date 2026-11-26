@@ -1772,6 +1772,27 @@ public:
         std::string note;
     };
     std::vector<PourLink> pourLinkPlan() const;
+    // Bar costs from a spreadsheet saved as CSV (Bar & Kegs -> Import costs, managers): Liquor, Category, Size
+    // (750ml, 1L, 1.75L, 375ml...), Bottles per case, Cost per bottle, Vendor (Drink price: read, never applied).
+    // Each row to its bottle good by name (any case, tidied): the size's cost and case, made when missing (the
+    // good too: kind bottle, kept in oz, its first size the main one). barCostImport only reads it and shows
+    // what would change (barInventory().costImport); barCostImportApply makes the changes (the price book's
+    // permission: they change system costs); barCostImportCancel forgets it.
+    bool barCostImport(const QString &text);
+    bool barCostImportApply();
+    bool barCostImportCancel();
+    struct BarCostRow {
+        int row = 0;                  // its line in the file
+        QString name, category, size, vendor, drinkPrice;
+        double oz = 0;
+        int perCase = -1;             // -1: not given
+        std::int64_t cents = -1;      // cost per bottle; -1: not given
+    };
+    // The rows applied to `goods` and `vendors` (copies, for the preview; the store's, to apply): what each did
+    // ({row, good, size, what, before, after, status: new | change | same | problem}); `touched` the goods'
+    // indexes changed or made, `vendorsMade` how many vendors were made.
+    QVariantList applyBarCostRows(const std::vector<BarCostRow> &rows, std::vector<core::Ingredient> &goods,
+                                  std::vector<core::Vendor> &vendors, std::set<int> *touched, int *vendorsMade) const;
     // A shelf count in bottles and tenths (3.4), kegs, or bottles of beer: {lines: [{ingredient, count}]};
     // kept in ounces as a stock count (the opening count of the next).
     bool saveBarCount(const QVariantMap &count);
@@ -1978,6 +1999,14 @@ private:
         int request = 0;
     };
     BuydownView bd_;
+    // Bar & Kegs -> Import costs: the file read, until applied or cancelled (barCostImport).
+    struct BarCostImport {
+        std::vector<BarCostRow> rows;
+        QStringList problems;   // rows that couldn't be read
+        QStringList columns;    // what was found
+        bool drinkPrices = false;   // a Drink price column (not applied)
+    };
+    std::optional<BarCostImport> barCost_;
     bool addCardHold(const QVariantMap &r);
     void letHoldGo(core::Check &c, const QString &why);
     bool startCounter(const QVariantMap &charge);

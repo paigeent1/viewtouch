@@ -8,10 +8,12 @@
 
 #include "app/pos_admin_shared.hh"
 #include "app/i18n.hh"
+#include "app/menu_import.hh"
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
 
 #include <QDateTime>
+#include <QHash>
 #include <QRegularExpression>
 #include <QTimer>
 
@@ -67,8 +69,7 @@ DrinkName parseDrink(const QString &name)
 
 std::string keyOf(const QString &name) { return ss(tidy(name).toLower()); }
 
-// A bottle of `ml` in ounces, to a tenth (375 -> 12.7, 187 -> 6.3, 750 -> 25.4).
-double ozOfMl(double ml) { return std::round(ml / 29.5735 * 10.0) / 10.0; }
+// (A bottle of `ml` in ounces: core::ozOfMl.)
 
 QString number(double v, int decimals = 1)
 {
@@ -446,7 +447,30 @@ QVariantMap PosService::barInventory() const
     for (const Ingredient *g : list)
         if (g->kind == "keg" && !g->beer.empty() && !beers.contains(qs(g->beer)))
             beers << qs(g->beer);
+    // Import costs: what the file read would change (nothing changed yet).
+    QVariantMap costImport;
+    if (barCost_) {
+        std::vector<Ingredient> goodsCopy = s_->ingredients;
+        std::vector<Vendor> vendorsCopy = s_->settings.vendors;
+        std::set<int> touched;
+        int vendorsMade = 0;
+        const QVariantList rows = applyBarCostRows(barCost_->rows, goodsCopy, vendorsCopy, &touched, &vendorsMade);
+        int changed = 0, made = 0, sameRows = 0, problems = int(barCost_->problems.size());
+        for (const QVariant &v : rows) {
+            const QString st = v.toMap()[u"status"_s].toString();
+            changed += st == u"change"_s;
+            made += st == u"new"_s;
+            sameRows += st == u"same"_s;
+            problems += st == u"problem"_s;
+        }
+        costImport = {{u"rows"_s, rows}, {u"problems"_s, barCost_->problems}, {u"changed"_s, changed},
+                      {u"newGoods"_s, made}, {u"same"_s, sameRows}, {u"problemCount"_s, problems},
+                      {u"vendorsMade"_s, vendorsMade}, {u"columns"_s, barCost_->columns},
+                      {u"drinkPrices"_s, barCost_->drinkPrices}, {u"canApply"_s, mayChangePriceBook()},
+                      {u"toApply"_s, int(touched.size())}};
+    }
     return {{u"goods"_s, goods}, {u"categories"_s, categories}, {u"kegs"_s, kegs}, {u"beers"_s, beers},
+            {u"costImport"_s, costImport},
             {u"allowance"_s, s_->settings.kegAllowancePercent},
             {u"links"_s, QVariantMap{{u"rows"_s, rows}, {u"toLink"_s, toLink}, {u"newGoods"_s, int(newGoods.size())},
                                      {u"same"_s, same}, {u"skipped"_s, skipped}}},
@@ -1062,6 +1086,256 @@ Report PosService::kegReport(std::int64_t from, std::int64_t to, const ReportCon
         r.note("! Over the allowance: look at the pours, the lines and free drinks.");
     r.note("Loss ($): at the keg's system cost.");
     return r;
+}
+
+// --- Import costs (a spreadsheet: liquor, size, case, cost per bottle, vendor) -------------------------------
+
+namespace {
+
+// A header to its column: "Liquor", "Cost per bottle", "Bottles/case"...
+QString barCostColumn(const QString &header)
+{
+    QString h = header.trimmed().toLower();
+    h = h.normalized(QString::NormalizationForm_KD);
+    h.replace(QRegularExpression(u"[^a-z]+"_s), u" "_s);
+    h = h.simplified();
+    static const QList<std::pair<QString, QStringList>> names = {
+        {u"name"_s, {u"liquor"_s, u"name"_s, u"item"_s, u"good"_s, u"product"_s, u"bottle"_s, u"liquor name"_s,
+                     u"item name"_s, u"product name"_s, u"description"_s, u"spirit"_s, u"wine"_s}},
+        {u"category"_s, {u"category"_s, u"type"_s, u"group"_s, u"shelf"_s, u"shelf group"_s, u"shelf count group"_s,
+                         u"family"_s}},
+        {u"size"_s, {u"size"_s, u"bottle size"_s, u"volume"_s, u"ml"_s}},
+        {u"perCase"_s, {u"bottles per case"_s, u"per case"_s, u"case"_s, u"case pack"_s, u"pack"_s, u"bottles case"_s,
+                        u"btl per case"_s, u"btls per case"_s, u"units per case"_s, u"casepack"_s, u"bottles in a case"_s}},
+        {u"cost"_s, {u"cost per bottle"_s, u"cost"_s, u"bottle cost"_s, u"unit cost"_s, u"cost bottle"_s,
+                     u"price per bottle"_s, u"my cost"_s, u"cost each"_s}},
+        {u"vendor"_s, {u"vendor"_s, u"distributor"_s, u"supplier"_s}},
+        {u"drinkPrice"_s, {u"drink price"_s, u"sell price"_s, u"price"_s, u"drink"_s, u"pour price"_s}},
+    };
+    for (const auto &[key, words] : names)
+        if (words.contains(h))
+            return key;
+    return {};
+}
+
+} // namespace
+
+bool PosService::barCostImport(const QString &text)
+{
+    if (!require(perm::Manager, tr("Importing bar costs")))
+        return false;
+    const QList<QStringList> rows = readCsvRows(text);
+    const auto blank = [](const QStringList &r) {
+        return std::all_of(r.begin(), r.end(), [](const QString &c) { return c.trimmed().isEmpty(); });
+    };
+    int header = 0;
+    while (header < int(rows.size()) && blank(rows[header]))
+        ++header;
+    QHash<QString, int> at;
+    if (header < int(rows.size()))
+        for (int i = 0; i < int(rows[header].size()); ++i)
+            if (const QString w = barCostColumn(rows[header][i]); !w.isEmpty() && !at.contains(w))
+                at.insert(w, i);
+    if (!at.contains(u"name"_s) || !at.contains(u"size"_s))
+        return fail(tr("That file needs a header row with at least Liquor and Size (and Bottles per case, Cost per "
+                       "bottle, Vendor, Category)."));
+    BarCostImport imp;
+    for (const QString &key : {u"name"_s, u"category"_s, u"size"_s, u"perCase"_s, u"cost"_s, u"vendor"_s, u"drinkPrice"_s})
+        if (at.contains(key))
+            imp.columns << key;
+    imp.drinkPrices = at.contains(u"drinkPrice"_s);
+    const auto cell = [&](const QStringList &r, const QString &key) {
+        const int i = at.value(key, -1);
+        return i >= 0 && i < r.size() ? tidy(r[i]) : QString();
+    };
+    for (int r = header + 1; r < int(rows.size()); ++r) {
+        const QStringList &row = rows[r];
+        if (blank(row))
+            continue;
+        BarCostRow c;
+        c.row = r + 1;
+        c.name = cell(row, u"name"_s);
+        c.category = cell(row, u"category"_s);
+        c.size = cell(row, u"size"_s);
+        c.vendor = cell(row, u"vendor"_s);
+        c.drinkPrice = cell(row, u"drinkPrice"_s);
+        if (c.name.isEmpty()) {
+            imp.problems << tr("Row %1: no liquor name").arg(c.row);
+            continue;
+        }
+        c.oz = parseBottleSize(ss(c.size));
+        if (c.oz <= 0) {
+            imp.problems << tr("Row %1: %2: \"%3\" isn't a bottle size (750ml, 1L, 1.75L, 375ml...)").arg(c.row).arg(c.name, c.size);
+            continue;
+        }
+        if (const QString n = cell(row, u"perCase"_s); !n.isEmpty()) {
+            bool ok = false;
+            const double v = n.toDouble(&ok);
+            if (!ok || v < 0 || v > 1000 || v != std::floor(v)) {
+                imp.problems << tr("Row %1: %2: bottles per case \"%3\" isn't a whole number").arg(c.row).arg(c.name, n);
+                continue;
+            }
+            c.perCase = int(v);
+        }
+        if (const QString n = cell(row, u"cost"_s); !n.isEmpty()) {
+            double v = 0;
+            if (!readCsvMoney(n, &v)) {
+                imp.problems << tr("Row %1: %2: the cost per bottle \"%3\" isn't a number").arg(c.row).arg(c.name, n);
+                continue;
+            }
+            c.cents = std::llround(v * 100);
+        }
+        imp.rows.push_back(c);
+    }
+    if (imp.rows.empty() && imp.problems.isEmpty())
+        return fail(tr("There are no rows to import in that file."));
+    barCost_ = std::move(imp);
+    emit adminChanged();
+    emit sessionChanged();
+    return true;
+}
+
+QVariantList PosService::applyBarCostRows(const std::vector<BarCostRow> &rows, std::vector<Ingredient> &goods,
+                                          std::vector<Vendor> &vendors, std::set<int> *touched, int *vendorsMade) const
+{
+    QVariantList out;
+    for (const BarCostRow &r : rows) {
+        const std::string key = keyOf(r.name);
+        const QString size = qs(bottleSizeLabel(r.oz));
+        int gi = -1;
+        bool notBottle = false;
+        for (int i = 0; i < int(goods.size()); ++i)
+            if (keyOf(qs(goods[i].name)) == key) {
+                if (goods[i].kind == "bottle") {
+                    gi = i;
+                    break;
+                }
+                notBottle = true;
+            }
+        const auto say = [&](const QString &good, const QString &status, const QString &what) {
+            out.append(QVariantMap{{u"row"_s, r.row}, {u"good"_s, good}, {u"size"_s, size}, {u"status"_s, status},
+                                   {u"what"_s, what}});
+        };
+        if (gi < 0 && notBottle) {
+            say(r.name, u"problem"_s, tr("In Inventory, but not as a bottle kept in oz: left out"));
+            continue;
+        }
+        QStringList changes;
+        bool made = false;
+        if (gi < 0) {   // a new bottle good: this size its main one
+            Ingredient g;
+            g.name = ss(r.name);
+            g.kind = "bottle";
+            g.unit = "oz";
+            g.packOz = r.oz;
+            g.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
+            g.category = ss(r.category);
+            if (r.cents >= 0) {
+                g.packCost = Money::fromCents(r.cents);
+                g.cost = g.packCost.scaled(1000, milli(g.packOz));
+            }
+            g.id = ss(admin::uniqueId(r.name, goods, [](const Ingredient &x) { return x.id; }, -1));
+            goods.push_back(g);
+            gi = int(goods.size()) - 1;
+            made = true;
+        }
+        Ingredient &g = goods[gi];
+        if (!r.vendor.isEmpty()) {
+            auto v = std::ranges::find_if(vendors, [&](const Vendor &x) { return keyOf(qs(x.name)) == keyOf(r.vendor); });
+            if (v == vendors.end()) {
+                Vendor nv;
+                nv.name = ss(r.vendor);
+                nv.id = ss(admin::uniqueId(r.vendor, vendors, [](const Vendor &x) { return x.id; }, -1));
+                vendors.push_back(nv);
+                v = vendors.end() - 1;
+                if (vendorsMade)
+                    ++*vendorsMade;
+                changes << tr("new vendor %1").arg(r.vendor);
+            }
+            if (g.vendor != v->id) {
+                if (!made)
+                    changes << tr("vendor %1").arg(qs(v->name));
+                g.vendor = v->id;
+            }
+        }
+        if (!r.category.isEmpty() && g.category != ss(r.category)) {
+            if (!made)
+                changes << tr("shelf group %1 → %2").arg(g.category.empty() ? tr("(none)") : qs(g.category), r.category);
+            g.category = ss(r.category);
+        }
+        const bool main = sameBottleSize(g.packOz, r.oz);
+        BottleSize *z = main ? nullptr : g.otherSize(r.oz);
+        if (!main && !z) {
+            BottleSize n;
+            n.oz = r.oz;
+            n.perCase = r.perCase >= 0 ? r.perCase : perCaseFor("bottle", r.oz);
+            g.sizes.push_back(n);
+            z = &g.sizes.back();
+            changes << tr("new size %1").arg(size);
+        }
+        Money &cost = main ? g.packCost : z->cost;
+        int &perCase = main ? g.perCase : z->perCase;
+        if (r.cents >= 0 && cost.cents() != r.cents) {
+            if (!made)
+                changes << tr("cost per bottle %1 → %2").arg(cost.cents() ? format(cost) : tr("(none)"), format(Money::fromCents(r.cents)));
+            cost = Money::fromCents(r.cents);
+            if (main)   // the cost per oz: the main size's
+                g.cost = g.packCost.scaled(1000, milli(g.packOz));
+        }
+        if (r.perCase >= 0 && perCase != r.perCase) {
+            if (!made)
+                changes << tr("bottles per case %1 → %2").arg(perCase).arg(r.perCase);
+            perCase = r.perCase;
+        }
+        if (made) {
+            say(qs(g.name), u"new"_s,
+                tr("New bottle good: %1 a bottle, %2 a case").arg(g.packCost.cents() ? format(g.packCost) : tr("no cost"))
+                        .arg(g.perCase)
+                    + (changes.isEmpty() ? QString() : u"; "_s + changes.join(u"; "_s)));
+        } else if (changes.isEmpty()) {
+            say(qs(g.name), u"same"_s, tr("No change"));
+            continue;
+        } else {
+            say(qs(g.name), u"change"_s, changes.join(u"; "_s));
+        }
+        if (touched)
+            touched->insert(gi);
+    }
+    return out;
+}
+
+bool PosService::barCostImportApply()
+{
+    if (!require(perm::Manager, tr("Importing bar costs")))
+        return false;
+    if (!barCost_)
+        return fail(tr("There is nothing to import: choose the file first."));
+    if (!requirePriceBook([] { return true; }))   // system costs change
+        return false;
+    std::set<int> touched;
+    int vendorsMade = 0;
+    applyBarCostRows(barCost_->rows, s_->ingredients, s_->settings.vendors, &touched, &vendorsMade);
+    barCost_.reset();
+    if (s_->sink)
+        for (int i : touched)
+            s_->sink->saveIngredient(s_->ingredients[i], i);
+    if (vendorsMade)
+        settingsChanged();
+    ++s_->adminRevision;
+    emit s_->adminChanged();
+    emit sessionChanged();
+    emit notice(tr("Bar costs imported: %n bottle good(s) changed or made", "", int(touched.size())));
+    return true;
+}
+
+bool PosService::barCostImportCancel()
+{
+    if (!barCost_)
+        return false;
+    barCost_.reset();
+    emit adminChanged();
+    emit sessionChanged();
+    return true;
 }
 
 } // namespace vt::app

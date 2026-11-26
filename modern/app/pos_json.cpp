@@ -2148,6 +2148,27 @@ QJsonObject toJson(const Ingredient &i)
             o.insert(u"beer"_s, qs(i.beer));
         if (i.packCost.cents() != 0)
             o.insert(u"packCost"_s, decimalFromCents(i.packCost.cents()));
+        // Its barcodes, and the other sizes it comes in (none: left out, as before).
+        if (!i.upcs.empty()) {
+            QJsonArray u;
+            for (const std::string &c : i.upcs)
+                u.append(qs(c));
+            o.insert(u"upcs"_s, u);
+        }
+        if (!i.sizes.empty()) {
+            QJsonArray a;
+            for (const BottleSize &z : i.sizes) {
+                QJsonObject so{{u"oz"_s, z.oz}, {u"cost"_s, decimalFromCents(z.cost.cents())}, {u"perCase"_s, z.perCase}};
+                if (!z.upcs.empty()) {
+                    QJsonArray u;
+                    for (const std::string &c : z.upcs)
+                        u.append(qs(c));
+                    so.insert(u"upcs"_s, u);
+                }
+                a.append(so);
+            }
+            o.insert(u"sizes"_s, a);
+        }
     }
     if (i.countedAt || i.start || i.received || i.sold || i.wasted || i.adjusted)
         o.insert(u"sinceCount"_s, QJsonObject{{u"at"_s, qint64(i.countedAt)}, {u"start"_s, i.start},
@@ -2178,6 +2199,22 @@ Ingredient ingredientFromJson(const QJsonObject &o)
     i.category = ss(o.value(u"category").toString().trimmed());
     i.beer = ss(o.value(u"beer").toString().trimmed());
     i.packCost = Money::fromCents(std::max<std::int64_t>(0, centsFromDecimal(o.value(u"packCost").toDouble())));
+    for (const QJsonValue &u : o.value(u"upcs").toArray())
+        if (const QString c = u.toString().trimmed(); !c.isEmpty())
+            i.upcs.push_back(ss(c));
+    for (const QJsonValue &v : o.value(u"sizes").toArray()) {
+        const QJsonObject so = v.toObject();
+        BottleSize z;
+        z.oz = std::clamp(so.value(u"oz").toDouble(), 0.0, 100000.0);
+        if (z.oz <= 0)
+            continue;
+        z.cost = Money::fromCents(std::max<std::int64_t>(0, centsFromDecimal(so.value(u"cost").toDouble())));
+        z.perCase = std::clamp(so.value(u"perCase").toInt(), 0, 1000);
+        for (const QJsonValue &u : so.value(u"upcs").toArray())
+            if (const QString c = u.toString().trimmed(); !c.isEmpty())
+                z.upcs.push_back(ss(c));
+        i.sizes.push_back(std::move(z));
+    }
     if (o.contains(u"sinceCount")) {
         const QJsonObject c = o.value(u"sinceCount").toObject();
         i.countedAt = i64(c.value(u"at"));
@@ -2204,6 +2241,8 @@ QJsonObject toJson(const Delivery &d)
             o.insert(u"packs"_s, l.packs);
             o.insert(u"packCost"_s, qint64(l.packCost.cents()));
             o.insert(u"packSystemCost"_s, qint64(l.packSystemCost.cents()));
+            if (l.packOz > 0)
+                o.insert(u"packOz"_s, l.packOz);
         }
         if (!l.reason.empty())
             o.insert(u"reason"_s, qs(l.reason));
@@ -2235,6 +2274,7 @@ Delivery deliveryFromJson(const QJsonObject &o)
         d.lines.back().packs = l.value(u"packs").toDouble();
         d.lines.back().packCost = money(l.value(u"packCost"));
         d.lines.back().packSystemCost = money(l.value(u"packSystemCost"));
+        d.lines.back().packOz = l.value(u"packOz").toDouble();
         d.lines.back().reason = ss(l.value(u"reason").toString());
     }
     return d;

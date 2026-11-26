@@ -963,7 +963,7 @@
 <p><b>Undo</b> takes them off again (lines poured from since stay) and removes the kegs it made (until ViewTouch restarts).</p>
 
 <h2>Bar &amp; Kegs: the bar's stock by the bottle and the keg</h2>
-<p><b>Manager → Bar &amp; Kegs…</b> has three tabs: <b>Shelf count</b>, <b>Draft lines</b> and <b>Link pours to bottles</b>.</p>
+<p><b>Manager → Bar &amp; Kegs…</b> has four tabs: <b>Shelf count</b>, <b>Draft lines</b>, <b>Link pours to bottles</b> and <b>Import costs</b>.</p>
 <ul>
 <li><b>Link pours to bottles</b> (do it once, after the drink sheet is imported): each drink item is tied to its bottle by its name without the size (<i>Tito's 1.25oz</i> and <i>Tito's 2oz</i> pour from <i>Tito's</i>). The list shows what it will link first; <b>Apply</b> links them and makes the bottles that are missing; <b>Undo linking</b> takes it back (until ViewTouch restarts). After that, every pour rung in comes off its bottle.</li>
 <li><b>Bottle sizes and costs</b> are in Manager → Inventory: the size (750 ml, 1 L, 1.75 L, 375 ml, 187 ml), bottles per case and the cost per bottle. The cost per ounce is worked out from them.</li>
@@ -977,6 +977,29 @@
 <li><b>Kegs</b>: for each keg, its size, what was poured from it, what's left and what was lost (ounces, dollars and percent). A loss over the allowance (Draft lines → <b>Allowance %</b>, 7% to start) is marked <b>!</b>. What is on tap now is at the end.</li>
 </ul>
 <div class="tip">On the item card in the Menu Builder, a drink shows a <b>5× target, tax included</b> price: five times its pour cost, with its tax. A quick guide for pricing a pour.</div>
+
+<h2>Bar &amp; Kegs: the sizes you buy a liquor in</h2>
+<p>The same liquor often comes in more than one size (750 ml, 1 L, 1.75 L; sometimes 375 ml, 187 ml or 50 ml). It stays <b>one bottle good</b>, kept in ounces: every size goes into the same ounces on hand, and every pour comes out of them.</p>
+<ul>
+<li><b>Manager → Inventory</b>, the bottle: <i>Bottle or keg size</i>, <i>Cost per bottle</i> and <i>Bottles per case</i> are its <b>main size</b>, as before. <i>Bottle UPC(s)</i> are that size's barcodes. <b>Other sizes</b> takes the others, one per line: the size, its cost per bottle, bottles in its case and its UPCs, e.g. <i>1.75L 42.99 6 012345678905</i> (only the size is needed). Delete a line to remove that size.</li>
+<li><b>Receive a Delivery</b> shows a row for each size (<i>Tito's (750ml)</i>, <i>Tito's (1.75L)</i>), so the same liquor can be on one invoice in two sizes. Bottles, or cases times that size's bottles per case, times that size's ounces go on hand. The invoice cost is per bottle of that size; a cost that differs from that size's system cost goes on <b>Cost differences</b>, by the bottle.</li>
+<li><b>Scan a bottle</b> (shown once a bottle has a UPC): a scan adds one bottle to the row of the size with that UPC.</li>
+<li><b>The cost per ounce</b> (pour cost, food cost, Bar Variance) stays the <b>main size's</b>, whatever size came in last: the main size is the one the cost is kept for. Make the size you buy most the main size.</li>
+<li><b>Shelf count</b> is still in bottles of the main size: a full 1.75 L counts as 2.3 bottles of 750 ml.</li>
+</ul>
+<h3>Import costs: a spreadsheet of liquors, sizes and costs</h3>
+<p>Fill in a spreadsheet with a row per liquor and size, and save it as <b>CSV</b> (Excel or Google Sheets: File → Save As / Download → CSV). The columns, by their header (any order):</p>
+<table border="1" cellpadding="5" cellspacing="0" width="100%">
+<tr><th>Column</th><th>What goes in it</th></tr>
+<tr><td><i>Liquor</i></td><td>The bottle's name, as in Inventory (capitals and extra spaces don't matter). Needed.</td></tr>
+<tr><td><i>Size</i></td><td>750ml, 1L, 1.75L, 375ml, 187ml, 50ml (or ounces: 25.4oz). Needed.</td></tr>
+<tr><td><i>Category</i></td><td>Its shelf count group (Vodka, Red Wine).</td></tr>
+<tr><td><i>Bottles per case</i></td><td>For that size.</td></tr>
+<tr><td><i>Cost per bottle</i></td><td>For that size ($24.99 is fine).</td></tr>
+<tr><td><i>Vendor</i></td><td>Who it comes from; a vendor not in Manager → Vendors yet is made.</td></tr>
+<tr><td><i>Drink price</i></td><td>Read but <b>not applied</b>: drink prices are set in the Menu Builder.</td></tr>
+</table>
+<p>Then Manager → Bar &amp; Kegs → <b>Import costs</b> → <b>Choose a CSV file…</b> (in your home folder, or on a USB stick: plug it in and find it under its name). Nothing changes yet: the list shows each row and what it would do (<i>new</i>, <i>change</i>: the old and new cost or case, <i>no change</i>, or <i>left out</i> and why). A liquor not in Inventory yet is made as a bottle kept in ounces, its first size its main one; a size it doesn't have yet is added to its Other sizes. <b>Apply</b> makes the changes; <b>Cancel</b> forgets the file. Applying changes system costs, so it needs the <b>price book</b> permission (an admin), like other price changes. Loading the same file again shows <i>no change</i>.</p>
 
 <h2>Responsible service: drinks per guest</h2>
 <p>ViewTouch can count each guest's drinks as they are rung in and warn the bartender before one too many. It is off until a manager turns it on: <b>Store Settings → Responsible service</b>.</p>

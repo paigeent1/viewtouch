@@ -708,6 +708,11 @@ public:
     // Change keg ({line, keg, kicked, left}), a keg good ({beer, size, cost}), the keg allowance (%).
     Q_INVOKABLE void linkPours() { invoke(QStringLiteral("linkPours")); }
     Q_INVOKABLE void undoLinkPours() { invoke(QStringLiteral("undoLinkPours")); }
+    // Bar & Kegs -> Import costs: a spreadsheet's text (CSV) read and shown (barInventory.costImport), then
+    // applied or cancelled.
+    Q_INVOKABLE void barCostImport(const QString &text) { invoke(QStringLiteral("barCostImport"), {text}); }
+    Q_INVOKABLE void barCostImportApply() { invoke(QStringLiteral("barCostImportApply")); }
+    Q_INVOKABLE void barCostImportCancel() { invoke(QStringLiteral("barCostImportCancel")); }
     Q_INVOKABLE void saveBarCount(const QVariantMap &count) { invoke(QStringLiteral("saveBarCount"), {count}); }
     Q_INVOKABLE void changeKeg(const QVariantMap &change) { invoke(QStringLiteral("changeKeg"), {change}); }
     Q_INVOKABLE void addKeg(const QVariantMap &keg) { invoke(QStringLiteral("addKeg"), {keg}); }

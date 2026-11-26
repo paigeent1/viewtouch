@@ -13,10 +13,12 @@ Item {
     readonly property PosService pos: zone ? zone.pos : null
     readonly property var info: pos ? pos.receiving : ({})
     property string vendor: ""
-    property var qty: ({})    // ingredient id -> quantity typed
-    property var cost: ({})   // ingredient id -> cost typed
-    property var cases: ({})  // ingredient id -> cases typed (the bar: bottles per case)
-    // Damaged or swapped goods: plus/minus lines [{ingredient, qty, reason: "damaged" | "swap"}].
+    // Each by its row's key: the ingredient id, or for a bottle bought in more than one size "<id>@<size>"
+    // (a row a size; Manager -> Inventory: Other sizes).
+    property var qty: ({})    // row key -> quantity typed
+    property var cost: ({})   // row key -> cost typed
+    property var cases: ({})  // row key -> cases typed (the bar: bottles per case)
+    // Damaged or swapped goods: plus/minus lines [{key, qty, reason: "damaged" | "swap"}].
     property var extras: []
     property int typed: 0     // bumps when either changes (for the total)
     property bool showDiffs: false   // the Cost differences review, over the screen
@@ -31,17 +33,31 @@ Item {
         cases = ({})
         extras = []
         invoice.text = ""
+        scanned.text = ""
+        scanNote = ""
         ++typed
     }
     function unitCost(item) {
-        const c = cost[item.id]
+        const c = cost[item.key]
         return c !== undefined && c !== "" ? Number(c) : item.cost
     }
     // How many came: typed, plus cases x bottles per case (the bar).
     function count(item) {
-        return Number(qty[item.id] ?? 0) + Number(cases[item.id] ?? 0) * (item.perCase ?? 0)
+        return Number(qty[item.key] ?? 0) + Number(cases[item.key] ?? 0) * (item.perCase ?? 0)
     }
-    function itemById(id) { return (info.ingredients ?? []).find(i => i.id === id) }
+    function itemByKey(key) { return (info.ingredients ?? []).find(i => i.key === key) }
+    // A bottle scanned (or its UPC typed): one more of its row (its size, for a good in more than one).
+    property string scanNote: ""
+    function scan(code) {
+        const c = String(code).trim()
+        if (c === "") return
+        const item = (info.ingredients ?? []).find(i => (i.upcs ?? []).includes(c))
+        if (!item) { scanNote = qsTr("No bottle has the UPC %1 (Manager → Inventory).").arg(c); return }
+        if (vendor !== "" && item.vendor !== vendor) vendor = ""
+        qty[item.key] = String(Number(qty[item.key] ?? 0) + 1)
+        scanNote = item.name + ": " + qty[item.key]
+        ++typed
+    }
     readonly property real total: {
         if (typed < 0) return 0   // compared, not just read: so it refreshes
         let t = 0
@@ -49,17 +65,18 @@ Item {
             if (count(item) > 0)
                 t += count(item) * unitCost(item)
         for (const x of extras) {
-            const item = itemById(x.ingredient)
+            const item = itemByKey(x.key)
             if (item) t += Number(x.qty || 0) * unitCost(item)
         }
         return t
     }
     readonly property bool anything: typed >= 0 && ((info.ingredients ?? []).some(i => count(i) > 0)
-                                                    || extras.some(x => x.ingredient && Number(x.qty || 0) !== 0))
+                                                    || extras.some(x => x.key && Number(x.qty || 0) !== 0))
     function line(item, n, reason) {
         const l = { ingredient: item.id, cost: unitCost(item) }
         if (item.kind) l.bottles = n   // the bar: bottles (kegs), kept in ounces for bottles
         else l.qty = n
+        if (item.size) l.size = item.size   // another size than the main one (oz)
         if (reason) l.reason = reason
         return l
     }
@@ -71,7 +88,7 @@ Item {
                 lines.push(line(item, n, ""))
         }
         for (const x of extras) {
-            const item = itemById(x.ingredient)
+            const item = itemByKey(x.key)
             if (item && Number(x.qty || 0) !== 0)
                 lines.push(line(item, Number(x.qty), x.reason))
         }
@@ -126,6 +143,18 @@ Item {
                         implicitHeight: 44
                         font.pixelSize: 15
                     }
+                    // A bottle's barcode (a scanner types it here): one more of that bottle, its size.
+                    TextField {
+                        id: scanned
+                        objectName: "deliveryScan"
+                        visible: (w.info.ingredients ?? []).some(i => (i.upcs ?? []).length > 0)
+                        Layout.preferredWidth: 200
+                        implicitHeight: 44
+                        font.pixelSize: 15
+                        placeholderText: qsTr("Scan a bottle")
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        onAccepted: { w.scan(text); text = "" }
+                    }
                     Item { Layout.fillWidth: true }
                     // Invoice costs that differed from the system cost, for review.
                     Button {
@@ -178,7 +207,7 @@ Item {
                             opacity: 0.8
                         }
                         TextField {   // cases (the bar), when it has bottles per case
-                            objectName: "cases-" + row.modelData.id
+                            objectName: "cases-" + row.modelData.key
                             visible: w.anyCases
                             enabled: (row.modelData.perCase ?? 0) > 0
                             opacity: enabled ? 1 : 0.3
@@ -186,29 +215,29 @@ Item {
                             implicitHeight: 44
                             font.pixelSize: 16
                             inputMethodHints: Qt.ImhDigitsOnly
-                            text: w.typed >= 0 ? (w.cases[row.modelData.id] ?? "") : ""
+                            text: w.typed >= 0 ? (w.cases[row.modelData.key] ?? "") : ""
                             placeholderText: enabled ? qsTr("× %1").arg(row.modelData.perCase) : ""
-                            onTextEdited: { w.cases[row.modelData.id] = text; ++w.typed }
+                            onTextEdited: { w.cases[row.modelData.key] = text; ++w.typed }
                         }
                         TextField {
-                            objectName: "qty-" + row.modelData.id
+                            objectName: "qty-" + row.modelData.key
                             Layout.preferredWidth: 110
                             implicitHeight: 44
                             font.pixelSize: 16
                             inputMethodHints: Qt.ImhFormattedNumbersOnly
-                            text: w.typed >= 0 ? (w.qty[row.modelData.id] ?? "") : ""
+                            text: w.typed >= 0 ? (w.qty[row.modelData.key] ?? "") : ""
                             placeholderText: row.modelData.unit
-                            onTextEdited: { w.qty[row.modelData.id] = text; ++w.typed }
+                            onTextEdited: { w.qty[row.modelData.key] = text; ++w.typed }
                         }
                         TextField {
-                            objectName: "cost-" + row.modelData.id
+                            objectName: "cost-" + row.modelData.key
                             Layout.preferredWidth: 110
                             implicitHeight: 44
                             font.pixelSize: 16
                             inputMethodHints: Qt.ImhFormattedNumbersOnly
-                            text: w.typed >= 0 ? (w.cost[row.modelData.id] ?? "") : ""
+                            text: w.typed >= 0 ? (w.cost[row.modelData.key] ?? "") : ""
                             placeholderText: Number(row.modelData.cost).toFixed(2)
-                            onTextEdited: { w.cost[row.modelData.id] = text; ++w.typed }
+                            onTextEdited: { w.cost[row.modelData.key] = text; ++w.typed }
                         }
                         Label {
                             Layout.preferredWidth: 90
@@ -233,8 +262,8 @@ Item {
                             Layout.fillWidth: true
                             implicitHeight: 44
                             model: (w.info.ingredients ?? []).map(i => i.name)
-                            currentIndex: (w.info.ingredients ?? []).findIndex(i => i.id === extra.modelData.ingredient)
-                            onActivated: i => { w.extras[extra.index].ingredient = w.info.ingredients[i].id; ++w.typed }
+                            currentIndex: (w.info.ingredients ?? []).findIndex(i => i.key === extra.modelData.key)
+                            onActivated: i => { w.extras[extra.index].key = w.info.ingredients[i].key; ++w.typed }
                         }
                         TextField {
                             objectName: "extraQty-" + extra.index
@@ -269,7 +298,15 @@ Item {
                     text: qsTr("+ Damaged or swapped")
                     implicitHeight: 40
                     enabled: (w.info.ingredients ?? []).length > 0
-                    onClicked: { w.extras = w.extras.concat([{ ingredient: w.shown.length ? w.shown[0].id : w.info.ingredients[0].id, qty: "", reason: "damaged" }]); ++w.typed }
+                    onClicked: { w.extras = w.extras.concat([{ key: w.shown.length ? w.shown[0].key : w.info.ingredients[0].key, qty: "", reason: "damaged" }]); ++w.typed }
+                }
+                Label {   // what the last scan found
+                    objectName: "deliveryScanNote"
+                    visible: w.scanNote !== ""
+                    Layout.fillWidth: true
+                    text: w.scanNote
+                    color: "#f5b940"
+                    wrapMode: Text.WordWrap
                 }
                 Label {   // what the cost typed here is (and isn't)
                     objectName: "invoiceCostNote"

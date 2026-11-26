@@ -11,7 +11,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vt::core {
@@ -22,6 +26,155 @@ inline constexpr double kOz750ml = 25.4, kOz1L = 33.8, kOz1750ml = 59.2, kOz375m
 inline constexpr double kOzHalfBarrel = 1984, kOzQuarterBarrel = 992, kOzSixthBarrel = 661;
 // Thousandths of an ounce (or of a bottle, a keg): money on ounces in exact integer math (Money::scaled).
 inline std::int64_t milli(double v) { return std::llround(v * 1000.0); }
+// A bottle of `ml` in ounces, to a tenth (375 -> 12.7, 187 -> 6.3, 750 -> 25.4).
+inline double ozOfMl(double ml) { return std::round(ml / 29.5735 * 10.0) / 10.0; }
+// Two bottle sizes the same (to the tenth of an ounce they're kept in).
+inline bool sameBottleSize(double a, double b) { return std::abs(a - b) < 0.05; }
+
+// A bottle size as the store says it: "750ml", "1L", "1.75L", "375ml", "50ml"; others in oz ("20 oz").
+inline std::string bottleSizeLabel(double oz)
+{
+    static const struct { int ml; const char *text; } known[] = {
+        {50, "50ml"}, {100, "100ml"}, {187, "187ml"}, {200, "200ml"}, {375, "375ml"}, {500, "500ml"},
+        {700, "700ml"}, {750, "750ml"}, {1000, "1L"}, {1500, "1.5L"}, {1750, "1.75L"}, {3000, "3L"}};
+    for (const auto &k : known)
+        if (sameBottleSize(ozOfMl(k.ml), oz))
+            return k.text;
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%g oz", std::round(oz * 10) / 10);
+    return buf;
+}
+
+// "750ml", "750 ML", "1L", "1.75 L", "1.75 liter", "25.4oz", "25.4 oz"; a bare number is liters up to 5
+// (1.75), ml from 50 (750). Its ounces; 0: not a size.
+inline double parseBottleSize(std::string_view text)
+{
+    std::string t;
+    for (char c : text)
+        if (c != ' ' && c != '\t')
+            t += char(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+    std::size_t n = 0;
+    while (n < t.size() && ((t[n] >= '0' && t[n] <= '9') || t[n] == '.'))
+        ++n;
+    if (n == 0)
+        return 0;
+    char *end = nullptr;
+    const std::string num = t.substr(0, n);
+    const double v = std::strtod(num.c_str(), &end);
+    if (end != num.c_str() + num.size() || !(v > 0) || !std::isfinite(v))
+        return 0;
+    const std::string unit = t.substr(n);
+    double oz = 0;
+    if (unit == "ml" || unit == "mls")
+        oz = ozOfMl(v);
+    else if (unit == "l" || unit == "liter" || unit == "liters" || unit == "litre" || unit == "litres" || unit == "lt" || unit == "ltr")
+        oz = ozOfMl(v * 1000);
+    else if (unit == "oz" || unit == "ounce" || unit == "ounces" || unit == "floz")
+        oz = std::round(v * 10) / 10;
+    else if (unit.empty() && v <= 5)
+        oz = ozOfMl(v * 1000);
+    else if (unit.empty() && v >= 50)
+        oz = ozOfMl(v);
+    return oz > 0 && oz <= 1000 ? oz : 0;
+}
+
+// A size a bottle good also comes in (the bar: the same liquor as 750ml, 1L and 1.75L), beside its main size
+// (Ingredient::packOz, packCost, perCase): its cost per bottle, bottles in its case, and its barcodes (a scan
+// at receiving picks the size). It all goes into the same ounces on hand.
+struct BottleSize {
+    double oz = 0;
+    Money cost;                     // per bottle (0: not known)
+    int perCase = 0;
+    std::vector<std::string> upcs;
+    std::string label() const { return bottleSizeLabel(oz); }
+    bool operator==(const BottleSize &) const = default;
+};
+
+// Manager -> Inventory's "Other sizes", a size a line: "1.75L 42.99 6 012345678905" (the size, its cost per
+// bottle, bottles in its case, its UPCs; all but the size may be left off).
+inline std::string bottleSizesText(const std::vector<BottleSize> &sizes)
+{
+    std::string out;
+    for (const BottleSize &s : sizes) {
+        char buf[64];
+        std::snprintf(buf, sizeof buf, "%s %lld.%02lld %d", s.label().c_str(), (long long)(s.cost.cents() / 100),
+                      (long long)(s.cost.cents() % 100), s.perCase);
+        out += buf;
+        for (const std::string &u : s.upcs)
+            out += ' ' + u;
+        out += '\n';
+    }
+    return out;
+}
+
+// The lines above back into sizes; false and `bad` (the line) when one isn't a size.
+inline bool parseBottleSizes(std::string_view text, std::vector<BottleSize> *out, std::string *bad)
+{
+    out->clear();
+    std::size_t at = 0;
+    while (at <= text.size()) {
+        std::size_t nl = text.find('\n', at);
+        if (nl == std::string_view::npos)
+            nl = text.size();
+        const std::string_view line = text.substr(at, nl - at);
+        at = nl + 1;
+        std::vector<std::string> words;
+        std::string w;
+        for (char c : line) {
+            if (c == ' ' || c == '\t' || c == ',' || c == '\r') {
+                if (!w.empty())
+                    words.push_back(w);
+                w.clear();
+            } else {
+                w += c;
+            }
+        }
+        if (!w.empty())
+            words.push_back(w);
+        if (words.empty())
+            continue;
+        // "1.75 L": the unit apart from the number.
+        if (words.size() > 1 && parseBottleSize(words[0] + words[1]) > 0 && parseBottleSize(words[1]) == 0
+            && words[1].find_first_of("0123456789") == std::string::npos) {
+            words[0] += words[1];
+            words.erase(words.begin() + 1);
+        }
+        BottleSize s;
+        s.oz = parseBottleSize(words[0]);
+        bool ok = s.oz > 0;
+        int numbers = 0;
+        for (std::size_t i = 1; ok && i < words.size(); ++i) {
+            std::string t = words[i];
+            if (!t.empty() && t[0] == '$')
+                t.erase(0, 1);
+            const bool digits = !t.empty() && t.find_first_not_of("0123456789") == std::string::npos;
+            if (digits && t.size() >= 8) {
+                s.upcs.push_back(t);
+                continue;
+            }
+            char *end = nullptr;
+            const double v = std::strtod(t.c_str(), &end);
+            if (t.empty() || end != t.c_str() + t.size() || !std::isfinite(v) || v < 0 || v > 100000) {
+                ok = false;
+            } else if (numbers == 0) {
+                s.cost = Money::fromCents(std::llround(v * 100));
+                ++numbers;
+            } else if (numbers == 1 && digits && v <= 1000) {
+                s.perCase = int(v);
+                ++numbers;
+            } else {
+                ok = false;
+            }
+        }
+        if (!ok) {
+            if (bad)
+                *bad = std::string(line);
+            return false;
+        }
+        out->push_back(std::move(s));
+    }
+    return true;
+}
 
 // Something the kitchen uses up: buns, patties, oz of coffee... Stock goes
 // down as recipes are sent to the kitchen and back up on a void; a manager
@@ -61,6 +214,10 @@ struct Ingredient {
     std::string category;
     std::string beer;
     Money packCost;
+    // A bottle good: the main size's barcodes, and other sizes it comes in (none: one size, as before). The
+    // cost per oz (`cost`, pours' cost, food cost) stays the main size's.
+    std::vector<std::string> upcs;
+    std::vector<BottleSize> sizes;
 
     bool low() const { return onHand <= lowAt; }
     bool bar() const { return !kind.empty(); }
@@ -71,6 +228,15 @@ struct Ingredient {
             return packCost.scaled(milli(qty), milli(packOz));
         return cost.scaled(milli(qty), 1000);
     }
+    // The other size of `oz` (nullptr: none; the main size is packOz).
+    const BottleSize *otherSize(double oz) const
+    {
+        for (const BottleSize &s : sizes)
+            if (sameBottleSize(s.oz, oz))
+                return &s;
+        return nullptr;
+    }
+    BottleSize *otherSize(double oz) { return const_cast<BottleSize *>(std::as_const(*this).otherSize(oz)); }
     bool operator==(const Ingredient &) const = default;
 };
 
@@ -108,6 +274,8 @@ struct Delivery {
         double packs = 0;
         Money packCost;
         Money packSystemCost;
+        // The bottle size received, in oz (a good bought in more than one size); 0: its main size then.
+        double packOz = 0;
         // A plus/minus line (owner's rule, retail and bar): "damaged" (came broken: less) or "swap" (one
         // product sent back for another). Only these may be less than nothing.
         std::string reason;

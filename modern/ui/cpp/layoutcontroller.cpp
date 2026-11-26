@@ -1329,6 +1329,19 @@ QVariantMap LayoutController::readBuydownFile(const QUrl &file) const
     return b;
 }
 
+QVariantMap LayoutController::readCsvFile(const QUrl &file) const
+{
+    QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());
+    if (f.size() > 8 * 1024 * 1024)
+        return {{u"error"_s, tr("That file is too big for a spreadsheet of costs.")}};
+    if (!f.open(QIODevice::ReadOnly))
+        return {{u"error"_s, tr("Can't open it: %1").arg(f.errorString())}};
+    const QByteArray bytes = f.readAll();
+    if (bytes.startsWith("PK"))   // an .xlsx: a zip, not text
+        return {{u"error"_s, tr("That's an Excel file: save it as CSV (File → Save As → CSV) and choose that.")}};
+    return {{u"text"_s, QString::fromUtf8(bytes)}};
+}
+
 QVariantMap LayoutController::readChangeSetFile(const QUrl &file) const
 {
     QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());

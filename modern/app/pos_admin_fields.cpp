@@ -191,6 +191,12 @@ QVariantList PosService::adminFields(const QString &panel)
             field(u"category"_s, tr("Shelf count group"), u"string"_s, tr("Vodka, Red Wine, Bottled Beer…")),
             field(u"packCost"_s, tr("Cost per bottle"), u"money"_s,
                   tr("A bottle's system cost: its cost per oz comes from it. Receiving never changes it.")),
+            field(u"upcText"_s, tr("Bottle UPC(s)"), u"string"_s,
+                  tr("The main size's barcodes, separated by spaces: a scan at Receive a Delivery adds one of it.")),
+            field(u"sizesText"_s, tr("Other sizes"), u"text"_s,
+                  tr("Other sizes it's bought in, one per line: size, cost per bottle, bottles per case, UPCs, "
+                     "e.g. \"1.75L 42.99 6 012345678905\". All go into the same oz on hand; the cost per oz stays "
+                     "the main size's.")),
             field(u"beer"_s, tr("Keg: its beer"), u"string"_s, tr("The draft items \"<beer> 12oz\" and \"<beer> 16oz\" pour from it.")),
         };
     }

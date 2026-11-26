@@ -552,17 +552,26 @@ bool PosService::receiveDelivery(const QVariantMap &r)
         const QVariantMap l = v.toMap();
         const auto g = std::ranges::find_if(s_->ingredients, [&](const Ingredient &x) { return qs(x.id) == l.value(u"ingredient"_s).toString(); });
         // The bar: bottles (and cases x bottles per case) of a good kept in ounces; bottled beer and kegs by
-        // the bottle or keg (and case).
+        // the bottle or keg (and case). A good bought in more than one size: the size of the line ("size",
+        // its oz; none: the main size), its bottles per case, its ounces.
+        const bool found = g != s_->ingredients.end();
+        const bool bottle = found && g->kind == "bottle" && g->packOz > 0;
+        const double sizeAsked = l.value(u"size"_s).toDouble();
+        const bool otherAsked = bottle && sizeAsked > 0 && !sameBottleSize(sizeAsked, g->packOz);
+        const BottleSize *other = otherAsked ? g->otherSize(sizeAsked) : nullptr;
+        if (otherAsked && !other)
+            return fail(tr("%1 doesn't come in %2 (Manager → Inventory: Other sizes).")
+                            .arg(qs(g->name), QString::fromStdString(bottleSizeLabel(sizeAsked))));
+        const double packOz = other ? other->oz : found ? g->packOz : 0;
+        const int perCase = other ? other->perCase : found ? g->perCase : 0;
         const bool byPack = l.contains(u"bottles"_s) || l.contains(u"cases"_s);
-        const double packs = l.value(u"bottles"_s).toDouble()
-                             + l.value(u"cases"_s).toDouble() * (g != s_->ingredients.end() ? g->perCase : 0);
-        const bool bottle = g != s_->ingredients.end() && g->kind == "bottle" && g->packOz > 0;
-        const double qty = byPack ? (bottle ? packs * g->packOz : packs) : l.value(u"qty"_s).toDouble();
+        const double packs = l.value(u"bottles"_s).toDouble() + l.value(u"cases"_s).toDouble() * perCase;
+        const double qty = byPack ? (bottle ? packs * packOz : packs) : l.value(u"qty"_s).toDouble();
         if (qty == 0)
             continue;
-        if (g == s_->ingredients.end())
+        if (!found)
             return fail(tr("There is no ingredient '%1' (see Manager → Inventory).").arg(l.value(u"ingredient"_s).toString()));
-        if (l.value(u"cases"_s).toDouble() != 0 && g->perCase <= 0)
+        if (l.value(u"cases"_s).toDouble() != 0 && perCase <= 0)
             return fail(tr("%1 has no bottles per case set (Manager → Inventory).").arg(qs(g->name)));
         // Damaged or swapped goods: plus/minus lines (a minus only with its reason).
         const QString reason = l.value(u"reason"_s).toString().trimmed().toLower();
@@ -571,21 +580,26 @@ bool PosService::receiveDelivery(const QVariantMap &r)
         if (qty < 0 && reason.isEmpty())
             return fail(tr("Amounts received can't be negative: %1.").arg(qs(g->name)));
         // The invoice's cost (typed; none typed or empty: the system cost). Never the system cost's new value.
-        // By the bottle for a bottle good.
-        const Money systemEach = bottle ? g->packCost : g->cost;
+        // By the bottle for a bottle good (of the size received: that size's system cost; none set: the main
+        // size's cost per oz times its ounces).
+        const Money systemEach = other ? (other->cost.cents() > 0 ? other->cost : g->costOf(other->oz))
+                                       : bottle ? g->packCost : g->cost;
         const QString typed = l.value(u"cost"_s).toString().trimmed();
         const double cost = l.contains(u"cost"_s) && !typed.isEmpty() ? l.value(u"cost"_s).toDouble()
                                                                         : double(systemEach.cents()) / 100.0;
         if (cost < 0)
             return fail(tr("Costs can't be negative: %1.").arg(qs(g->name)));
         const Money each = Money::fromCents(std::llround(cost * 100));
-        Delivery::Line line{g->id, g->name, g->unit, qty, bottle ? each.scaled(1000, milli(g->packOz)) : each};
-        line.systemCost = g->cost;
+        // Bought in more than one size: the size goes with its name ("Vodka (1.75L)").
+        const std::string name = bottle && !g->sizes.empty() ? g->name + " (" + bottleSizeLabel(packOz) + ")" : g->name;
+        Delivery::Line line{g->id, name, g->unit, qty, bottle ? each.scaled(1000, milli(packOz)) : each};
+        line.systemCost = other ? systemEach.scaled(1000, milli(packOz)) : g->cost;
         line.systemCostKnown = true;
         if (bottle) {
-            line.packs = qty / g->packOz;
+            line.packs = qty / packOz;
             line.packCost = each;
-            line.packSystemCost = g->packCost;
+            line.packSystemCost = systemEach;
+            line.packOz = other ? other->oz : 0;
         }
         line.reason = ss(reason);
         d.lines.push_back(line);
@@ -648,15 +662,37 @@ QVariantMap PosService::receiving() const
     for (const Vendor &v : s_->settings.vendors)
         vendors.append(QVariantMap{{u"id"_s, qs(v.id)}, {u"name"_s, qs(v.name)}});
     QVariantList ingredients;
+    const auto upcList = [](const std::vector<std::string> &upcs) {
+        QStringList out;
+        for (const std::string &u : upcs)
+            out << qs(u);
+        return out;
+    };
     for (const Ingredient &g : s_->ingredients) {
-        // A bottle good is received by the bottle (or case): its on hand and cost by the bottle too.
+        // A bottle good is received by the bottle (or case): its on hand and cost by the bottle too. Bought in
+        // more than one size: a row for each size ("key" tells them apart; "size" the oz of another size).
         const bool bottle = g.kind == "bottle" && g.packOz > 0;
-        ingredients.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"name"_s, qs(g.name)},
+        const bool sized = bottle && !g.sizes.empty();
+        const QString name = sized ? qs(g.name) + u" ("_s + qs(bottleSizeLabel(g.packOz)) + u')' : qs(g.name);
+        ingredients.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"key"_s, qs(g.id)}, {u"name"_s, name},
                                        {u"unit"_s, bottle ? tr("bottles") : g.kind == "keg" ? tr("kegs") : qs(g.unit)},
                                        {u"onHand"_s, bottle ? std::round(g.onHand / g.packOz * 10) / 10 : g.onHand},
                                        {u"cost"_s, double((bottle ? g.packCost : g.cost).cents()) / 100.0},
                                        {u"vendor"_s, qs(g.vendor)}, {u"low"_s, g.low()}, {u"kind"_s, qs(g.kind)},
-                                       {u"perCase"_s, g.perCase}});
+                                       {u"perCase"_s, g.perCase}, {u"upcs"_s, upcList(g.upcs)}});
+        if (!sized)
+            continue;
+        for (const BottleSize &z : g.sizes) {
+            const Money each = z.cost.cents() > 0 ? z.cost : g.costOf(z.oz);
+            ingredients.append(QVariantMap{{u"id"_s, qs(g.id)}, {u"key"_s, qs(g.id) + u'@' + qs(z.label())},
+                                           {u"size"_s, z.oz},
+                                           {u"name"_s, qs(g.name) + u" ("_s + qs(z.label()) + u')'},
+                                           {u"unit"_s, tr("bottles")},
+                                           {u"onHand"_s, std::round(g.onHand / z.oz * 10) / 10},
+                                           {u"cost"_s, double(each.cents()) / 100.0},
+                                           {u"vendor"_s, qs(g.vendor)}, {u"low"_s, g.low()}, {u"kind"_s, qs(g.kind)},
+                                           {u"perCase"_s, z.perCase}, {u"upcs"_s, upcList(z.upcs)}});
+        }
     }
     QVariantList recent;
     for (auto it = s_->deliveries.rbegin(); it != s_->deliveries.rend() && recent.size() < 15; ++it)
@@ -681,8 +717,10 @@ QVariantList PosService::costDifferences() const
                 continue;
             out.append(QVariantMap{{u"when"_s, i18n::locale().toString(QDateTime::fromMSecsSinceEpoch(it->at), u"ddd M/d h:mm AP"_s)},
                                    {u"at"_s, qint64(it->at)}, {u"vendor"_s, qs(it->vendorName)}, {u"invoice"_s, qs(it->invoice)},
-                                   {u"item"_s, qs(l.name)}, {u"systemCost"_s, format(l.systemCost)},
-                                   {u"invoiceCost"_s, format(l.unitCost)},
+                                   {u"item"_s, qs(l.name)},
+                                   // By the bottle (as the difference is): a bottle's system and invoice cost.
+                                   {u"systemCost"_s, format(l.packs != 0 ? l.packSystemCost : l.systemCost)},
+                                   {u"invoiceCost"_s, format(l.packs != 0 ? l.packCost : l.unitCost)},
                                    {u"difference"_s, (diff.cents() > 0 ? u"+"_s : QString()) + format(diff)},
                                    {u"differenceCents"_s, qint64(diff.cents())}});
         }
@@ -2010,7 +2048,8 @@ Report PosService::costDifferencesReport(const ReportContext &ctx) const
                           + (it->invoice.empty() ? std::string() : ", #" + it->invoice));
                 header = true;
             }
-            r.line({l.name, ctx.money(l.systemCost), ctx.money(l.unitCost), (diff.cents() > 0 ? "+" : "") + ctx.money(diff)});
+            r.line({l.name, ctx.money(l.packs != 0 ? l.packSystemCost : l.systemCost), ctx.money(l.packs != 0 ? l.packCost : l.unitCost),
+                    (diff.cents() > 0 ? "+" : "") + ctx.money(diff)});
             any = true;
         }
     }

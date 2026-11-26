@@ -110,6 +110,21 @@ bool price(QString text, double *out)
 
 } // namespace
 
+QList<QStringList> readCsvRows(const QString &text)
+{
+    QString t = text;
+    if (t.startsWith(QChar(0xFEFF)))
+        t.remove(0, 1);   // a spreadsheet's byte order mark
+    const QString first = t.section(u'\n', 0, 0);
+    const QChar sep = first.count(u'\t') > 0 ? u'\t' : first.count(u';') > first.count(u',') ? u';' : u',';
+    return rowsOf(t, sep);
+}
+
+bool readCsvMoney(const QString &text, double *out)
+{
+    return price(text, out);
+}
+
 MenuImport readMenuCsv(const QString &text)
 {
     MenuImport out;

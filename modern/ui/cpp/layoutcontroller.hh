@@ -348,6 +348,8 @@ public:
     // Buydowns / Promotions: one definition as a file for another store (its UPCs), and reading one.
     Q_INVOKABLE void exportBuydown(const QString &id);
     Q_INVOKABLE QVariantMap readBuydownFile(const QUrl &file) const;
+    // A spreadsheet saved as CSV read on this device (Bar & Kegs -> Import costs): {text} or {error}.
+    Q_INVOKABLE QVariantMap readCsvFile(const QUrl &file) const;
     // A ready-made picture for an item: the emoji drawn big into a PNG the
     // store keeps ("store:emoji-1f32e.png"); "" if it can't be.
     Q_INVOKABLE QString emojiPicture(const QString &emoji);

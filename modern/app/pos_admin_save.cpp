@@ -158,12 +158,34 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
             g.unit = "each";
         if (g.lowAt < 0)
             return fail(tr("Low at can't be negative."));
+        // Its barcodes and other sizes, as typed in the editor (a record without them keeps what it had).
+        if (record.contains(u"upcText"_s)) {
+            g.upcs.clear();
+            for (const QString &u : record.value(u"upcText"_s).toString().split(QRegularExpression(u"[\\s,]+"_s), Qt::SkipEmptyParts))
+                g.upcs.push_back(ss(u));
+        }
+        if (record.contains(u"sizesText"_s)) {
+            std::string bad;
+            if (!parseBottleSizes(ss(record.value(u"sizesText"_s).toString()), &g.sizes, &bad))
+                return fail(tr("Other sizes: \"%1\" isn't a size, cost per bottle, bottles per case and UPCs "
+                               "(e.g. 1.75L 42.99 6).").arg(qs(bad).trimmed()));
+        }
         if (g.kind == "bottle") {   // kept in oz: its cost per oz from the cost per bottle
             g.unit = "oz";
             if (g.packOz <= 0)
                 return fail(tr("Type the bottle's size in oz (750ml = 25.4)."));
             if (g.packCost.cents() > 0)
                 g.cost = g.packCost.scaled(1000, milli(g.packOz));
+            for (std::size_t a = 0; a < g.sizes.size(); ++a) {
+                if (sameBottleSize(g.sizes[a].oz, g.packOz))
+                    return fail(tr("Other sizes: %1 is its main size (Bottle or keg size) already.")
+                                    .arg(qs(g.sizes[a].label())));
+                for (std::size_t b = 0; b < a; ++b)
+                    if (sameBottleSize(g.sizes[a].oz, g.sizes[b].oz))
+                        return fail(tr("Other sizes: %1 is there twice.").arg(qs(g.sizes[a].label())));
+            }
+        } else {
+            g.sizes.clear();   // only a bottle good comes in other sizes
         }
         if (index >= 0) {
             // Since its last count: kept; a different amount on hand is a change by hand.
