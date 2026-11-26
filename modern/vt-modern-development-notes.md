@@ -143,6 +143,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-26 18:06 ET — Bob (Claude) helper — Menu Builder: its picked item list kept between reads
+- **What:** Tablet app: no change. Server: changed. builderItems, when it makes only the items picked (a held-back price book), keeps them until the menu, the view, the meal period or the checks change (as menuItems' cache does), so each binding on the screen that reads it doesn't make them again.
+- **Why:** CI run 45906905567 (green: 28 known failures, 850 cases): 20,000-item save on the Pi's screen 394 ms, 161 ms of it making the picked list more than once.
+- **Files:** `modern/app/pos_menu.cpp`, `modern/app/pos_service.cpp`, `modern/app/pos_service.hh`
+
 ### 2026-11-26 17:46 ET — Bob (Claude) helper — Menu Builder: keep its index when only prices change; harness opens the card as its tile does
 - **What:** Tablet app: no change. Server: changed. Menu Builder's quick index (a 20,000-item price book's tree and search) is made again only when what it is made of changes (names, categories, numbers, barcodes, maker, groups, ticket marks), not at every price or sold-out change. Slow-log parts 'builder index' and 'builder list'. tests/test_save_speed.cpp opens the card with editItem and saves with saveItem (the tile and the Save button were below the 1600x900 window).
 - **Why:** CI run 45904134025: HCA-like saves are 2 ms; the 20,000-item save is 25-120 ms in the service but ~480 ms on the Pi's screen; the index was ~60 ms of each refresh.

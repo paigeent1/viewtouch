@@ -1433,6 +1433,9 @@ public:
     // again; with a 30,000-item price book making it each time froze the Pi): made again after any
     // change (the signals below), a new meal period or language.
     mutable std::optional<QVariantList> menuItemsCache_;
+    // builderItems' own when it makes only the items picked (a held-back price book), and for which pick.
+    mutable std::optional<QVariantList> builderItemsCache_;
+    mutable QString builderItemsCacheKey_;
     mutable std::string menuItemsCachePeriod_;
     mutable QString menuItemsCacheLanguage_;
     mutable int menuItemsCacheRevision_ = -1;

@@ -993,12 +993,17 @@ QVariantList PosService::builderItems() const
     if (user() && !s_->memoOn() && !menuItemsCacheFresh()) {
         const BuilderPick &pick = builderPick();
         if (!pick.all) {
-            QElapsedTimer t;
-            t.start();
-            QVariantList out = menuItemsAt(&pick.items);
-            if (SlowLog *slow = SlowLog::current())
-                slow->addInside(u"builder list"_s, t.nsecsElapsed());
-            return out;
+            // (Kept for the reads that follow: every binding on the screen asks for it.)
+            const QString key = pick.key + u'|' + qs(currentMealPeriod()) + u'|' + QString::number(s_->adminRevision);
+            if (!builderItemsCache_ || builderItemsCacheKey_ != key) {
+                QElapsedTimer t;
+                t.start();
+                builderItemsCache_ = menuItemsAt(&pick.items);
+                builderItemsCacheKey_ = key;
+                if (SlowLog *slow = SlowLog::current())
+                    slow->addInside(u"builder list"_s, t.nsecsElapsed());
+            }
+            return *builderItemsCache_;
         }
     }
     const QVariantList all = menuItems();
