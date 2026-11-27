@@ -103,6 +103,25 @@ struct Totals {
     double units = 0;            // stock units counted in
 };
 
+// A change to an invoice after it was received (Invoices received > Open > Edit): one line of it, as it was and
+// as it is (a line added: before 0; taken off: after 0).
+struct EditLine {
+    std::string name;
+    double qtyBefore = 0, qtyAfter = 0;
+    std::int64_t extBefore = 0, extAfter = 0;
+    bool operator==(const EditLine &) const = default;
+};
+
+// One change to a received invoice: who, when, where, its total and units before and after, the lines changed.
+struct Edit {
+    std::int64_t at = 0;
+    std::string by, terminal;
+    std::int64_t totalBefore = 0, totalAfter = 0;
+    double unitsBefore = 0, unitsAfter = 0;
+    std::vector<EditLine> lines;
+    bool operator==(const Edit &) const = default;
+};
+
 struct Receipt {
     std::int64_t id = 0;
     std::string vendorId, vendorName;
@@ -115,6 +134,13 @@ struct Receipt {
     std::int64_t typedTotal = -1;  // the invoice's total from the paper or the file (-1: none)
     std::string note;
     std::vector<Line> lines;
+    std::vector<Edit> edits;       // received: the changes made after (oldest first)
+    // An unfinished invoice (a draft: nothing on hand yet; kept in its own table as it's worked on).
+    std::int64_t changedAt = 0;    // its last change (epoch ms)
+    std::string terminal;          // the terminal it was last changed at
+    bool parked = false;           // Save for later (else: left as it was, e.g. by a restart)
+    std::int64_t reopenOf = 0;     // changes to this received invoice (its id; 0: a new invoice)
+    int baseEdits = 0;             // ...which had this many changes when it was opened
     bool operator==(const Receipt &) const = default;
 
     Totals totals() const
@@ -149,6 +175,62 @@ struct Receipt {
         return typedTotal - totals().total;
     }
 };
+
+// What a line is, to compare an invoice before and after a change: its kind, its item (else the vendor's item
+// number, the code, the description) and its unit.
+inline std::string lineKey(const Line &l)
+{
+    std::string k = l.kind + '\x1f';
+    if (!l.itemId.empty())
+        k += l.itemId;
+    else if (!l.vendorItem.empty())
+        k += "#" + l.vendorItem;
+    else if (!l.upc.empty())
+        k += "~" + l.upc;
+    else
+        k += "=" + l.name;
+    if (itemKind(l.kind)) {
+        char b[32];
+        std::snprintf(b, sizeof b, "\x1f%g", l.perUom);
+        k += b;
+    }
+    return k;
+}
+
+// The lines that changed between two versions of an invoice (the same line by lineKey, its quantities and
+// amounts added up), in the order they come (before's, then the ones added).
+inline std::vector<EditLine> diffLines(const std::vector<Line> &before, const std::vector<Line> &after)
+{
+    std::vector<std::string> order;
+    std::map<std::string, EditLine> by;
+    const auto at = [&](const Line &l) -> EditLine & {
+        const std::string k = lineKey(l);
+        auto it = by.find(k);
+        if (it == by.end()) {
+            order.push_back(k);
+            it = by.emplace(k, EditLine{}).first;
+            it->second.name = !l.name.empty() ? l.name : !l.upc.empty() ? l.upc : l.vendorItem.empty() ? l.kind : l.vendorItem;
+        }
+        return it->second;
+    };
+    for (const Line &l : before) {
+        EditLine &e = at(l);
+        e.qtyBefore += itemKind(l.kind) ? l.qty : 0;
+        e.extBefore += l.extended();
+    }
+    for (const Line &l : after) {
+        EditLine &e = at(l);
+        e.qtyAfter += itemKind(l.kind) ? l.qty : 0;
+        e.extAfter += l.extended();
+    }
+    std::vector<EditLine> out;
+    for (const std::string &k : order) {
+        const EditLine &e = by[k];
+        if (std::abs(e.qtyBefore - e.qtyAfter) > 1e-9 || e.extBefore != e.extAfter)
+            out.push_back(e);
+    }
+    return out;
+}
 
 // --- a vendor's item: its number, unit and last cost -----------------------------------------------------
 

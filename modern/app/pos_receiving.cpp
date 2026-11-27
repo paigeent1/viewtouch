@@ -4,8 +4,11 @@
 // __parent__ link), find it, or type the vendor's item number; the invoice's price, OTP and prepaid tax per
 // unit; store-use lines (supplies: never on hand); delivery, credit and other amounts; the invoice's total
 // from the paper ties out. A code not on file is linked to an item (its alt UPC), added, or left out.
-// Saving adds the stock lines to the retail on hand (the same on hand as Transfers, pos_transfers.cpp) and
-// keeps each vendor's item number, unit and last cost. It never changes an item's system cost or price.
+// The invoice is kept as it's worked on (unfinished: autosaved in retail_drafts, nothing on hand; Save for later,
+// the Unfinished tab). Receive adds the stock lines to the retail on hand (the same on hand as Transfers,
+// pos_transfers.cpp) and keeps each vendor's item number, unit and last cost; it asks first when the invoice
+// doesn't tie out. A received invoice can be opened and changed: only the difference goes on hand, the change
+// is kept on it. It never changes an item's system cost or price (owner 2026-11-27).
 // Import invoice file: a CSV of a vendor's invoices (many invoices, both accounts of a distributor), its
 // columns guessed and kept per vendor, received or loaded as history only (item numbers and costs, no stock).
 // The rules and the file's reading: core/receiving.hh.
@@ -124,10 +127,35 @@ QJsonObject toJson(const Receipt &r)
     QJsonArray lines;
     for (const Line &l : r.lines)
         lines.append(lineJson(l));
-    return {{u"id"_s, qint64(r.id)}, {u"vendorId"_s, qs(r.vendorId)}, {u"vendorName"_s, qs(r.vendorName)},
-            {u"invoice"_s, qs(r.invoice)}, {u"date"_s, qs(r.date)}, {u"at"_s, qint64(r.at)}, {u"by"_s, qs(r.by)},
-            {u"historyOnly"_s, r.historyOnly}, {u"source"_s, qs(r.source)}, {u"typedTotal"_s, qint64(r.typedTotal)},
-            {u"note"_s, qs(r.note)}, {u"lines"_s, lines}};
+    QJsonObject o{{u"id"_s, qint64(r.id)}, {u"vendorId"_s, qs(r.vendorId)}, {u"vendorName"_s, qs(r.vendorName)},
+                  {u"invoice"_s, qs(r.invoice)}, {u"date"_s, qs(r.date)}, {u"at"_s, qint64(r.at)}, {u"by"_s, qs(r.by)},
+                  {u"historyOnly"_s, r.historyOnly}, {u"source"_s, qs(r.source)}, {u"typedTotal"_s, qint64(r.typedTotal)},
+                  {u"note"_s, qs(r.note)}, {u"lines"_s, lines}};
+    // (Only when there is something: a receipt saved before these were kept reads the same.)
+    if (!r.edits.empty()) {
+        QJsonArray edits;
+        for (const recv::Edit &e : r.edits) {
+            QJsonArray el;
+            for (const recv::EditLine &x : e.lines)
+                el.append(QJsonObject{{u"name"_s, qs(x.name)}, {u"qtyBefore"_s, x.qtyBefore}, {u"qtyAfter"_s, x.qtyAfter},
+                                      {u"extBefore"_s, qint64(x.extBefore)}, {u"extAfter"_s, qint64(x.extAfter)}});
+            edits.append(QJsonObject{{u"at"_s, qint64(e.at)}, {u"by"_s, qs(e.by)}, {u"terminal"_s, qs(e.terminal)},
+                                     {u"totalBefore"_s, qint64(e.totalBefore)}, {u"totalAfter"_s, qint64(e.totalAfter)},
+                                     {u"unitsBefore"_s, e.unitsBefore}, {u"unitsAfter"_s, e.unitsAfter}, {u"lines"_s, el}});
+        }
+        o.insert(u"edits"_s, edits);
+    }
+    if (r.changedAt)
+        o.insert(u"changedAt"_s, qint64(r.changedAt));
+    if (!r.terminal.empty())
+        o.insert(u"terminal"_s, qs(r.terminal));
+    if (r.parked)
+        o.insert(u"parked"_s, true);
+    if (r.reopenOf) {
+        o.insert(u"reopenOf"_s, qint64(r.reopenOf));
+        o.insert(u"baseEdits"_s, r.baseEdits);
+    }
+    return o;
 }
 
 Receipt retailReceiptFromJson(const QJsonObject &o)
@@ -146,6 +174,28 @@ Receipt retailReceiptFromJson(const QJsonObject &o)
     r.note = ss(o.value(u"note").toString());
     for (const QJsonValue &v : o.value(u"lines").toArray())
         r.lines.push_back(lineFrom(v.toObject()));
+    for (const QJsonValue &v : o.value(u"edits").toArray()) {
+        const QJsonObject eo = v.toObject();
+        recv::Edit e;
+        e.at = eo.value(u"at").toInteger();
+        e.by = ss(eo.value(u"by").toString());
+        e.terminal = ss(eo.value(u"terminal").toString());
+        e.totalBefore = eo.value(u"totalBefore").toInteger();
+        e.totalAfter = eo.value(u"totalAfter").toInteger();
+        e.unitsBefore = eo.value(u"unitsBefore").toDouble();
+        e.unitsAfter = eo.value(u"unitsAfter").toDouble();
+        for (const QJsonValue &lv : eo.value(u"lines").toArray()) {
+            const QJsonObject lo = lv.toObject();
+            e.lines.push_back({ss(lo.value(u"name").toString()), lo.value(u"qtyBefore").toDouble(), lo.value(u"qtyAfter").toDouble(),
+                               lo.value(u"extBefore").toInteger(), lo.value(u"extAfter").toInteger()});
+        }
+        r.edits.push_back(std::move(e));
+    }
+    r.changedAt = o.value(u"changedAt").toInteger();
+    r.terminal = ss(o.value(u"terminal").toString());
+    r.parked = o.value(u"parked").toBool();
+    r.reopenOf = o.value(u"reopenOf").toInteger();
+    r.baseEdits = o.value(u"baseEdits").toInt();
     return r;
 }
 
@@ -177,8 +227,14 @@ VendorItem vendorItemFromJson(const QJsonObject &o)
 
 struct PosService::RecvView {
     bool active = false;
-    QString tab = u"receive"_s;   // receive | import | list
-    // The invoice being received.
+    QString tab = u"receive"_s;   // receive | unfinished | import | list
+    // The invoice being received: autosaved as an unfinished one (draftId, once there is something on it); a
+    // received invoice being changed (editingId, and its changes when it was opened).
+    std::int64_t draftId = 0;
+    std::int64_t editingId = 0;
+    int baseEdits = 0;
+    QVariantMap confirm;          // the question Receive asks: {kind: off | nototal | duplicate, text, receiptId}
+    std::int64_t showId = 0;      // Invoices received: the one opened
     QString vendorId, invoice, date, note;
     std::int64_t typedTotal = -1;
     std::vector<Line> lines;
@@ -309,10 +365,13 @@ const Vendor *PosService::vendorById(const QString &id) const
     return nullptr;
 }
 
-bool PosService::recvDuplicate(const std::string &vendorId, const std::string &invoice) const
+std::int64_t PosService::recvDuplicate(const std::string &vendorId, const std::string &invoice, std::int64_t except) const
 {
     const std::string k = recv::numberKey(invoice);
-    return std::ranges::any_of(s_->retailReceipts, [&](const Receipt &r) { return r.vendorId == vendorId && recv::numberKey(r.invoice) == k; });
+    for (const Receipt &r : s_->retailReceipts)
+        if (r.id != except && r.vendorId == vendorId && recv::numberKey(r.invoice) == k)
+            return r.id;
+    return 0;
 }
 
 // An item line as it starts: the item, its unit, the system cost now, the vendor's number and unit.
@@ -341,20 +400,47 @@ bool PosService::recvOpen(const QString &tab)
     if (!user())
         return fail(tr("Log in first."));
     RecvView &v = recvView();
+    const bool opening = !v.active;
     v.active = true;
-    if (tab == u"receive" || tab == u"import" || tab == u"list")
+    if (tab == u"receive" || tab == u"unfinished" || tab == u"import" || tab == u"list")
         v.tab = tab;
     if (v.date.isEmpty())
         v.date = QDateTime::fromMSecsSinceEpoch(now()).date().toString(u"yyyy-MM-dd"_s);
     v.message.clear();
+    if (opening) {
+        if (v.draftId) {
+            // Back to the screen: its invoice as it is now (another screen may have had it meanwhile).
+            const Receipt *d = recvDraft(v.draftId);
+            const QObject *h = recvHolder(v.draftId);
+            if (!d || (h && h != this)) {
+                recvReset();
+                v.message = d ? tr("The invoice you were on is open at another screen now; it's on Unfinished.") : QString();
+            } else {
+                recvLoad(*d);
+            }
+        } else if (v.lines.empty() && v.invoice.isEmpty()) {
+            // The invoice this terminal was on when ViewTouch stopped (not saved for later): back.
+            const Receipt *found = nullptr;
+            for (const Receipt &d : s_->retailDrafts)
+                if (!d.parked && d.terminal == ss(terminal_) && !recvHolder(d.id) && (!found || d.changedAt >= found->changedAt))
+                    found = &d;
+            if (found) {
+                recvLoad(*found);
+                v.message = tr("Invoice #%1 is back as you left it (it's kept as you work). Nothing is on hand from it until you Receive it.")
+                                .arg(qs(found->invoice));
+            }
+        }
+    }
     emit adminChanged();
     return true;
 }
 
 bool PosService::recvClose()
 {
-    if (recv_)
+    if (recv_) {
         recv_->active = false;
+        recvRelease();   // (its invoice stays as it is: back when this screen opens again, or Open on another)
+    }
     emit adminChanged();
     return true;
 }
@@ -366,6 +452,8 @@ bool PosService::recvSetHeader(const QVariantMap &h)
         const QString id = h.value(u"vendor"_s).toString();
         if (!id.isEmpty() && !vendorById(id))
             return fail(tr("There is no vendor '%1'.").arg(id));
+        if (v.editingId && id != v.vendorId)
+            return fail(tr("A received invoice keeps its vendor (delete the lines and receive it again under the other vendor)."));
         v.vendorId = id;
     }
     if (h.contains(u"invoice"_s))
@@ -389,7 +477,7 @@ bool PosService::recvSetHeader(const QVariantMap &h)
     }
     if (h.contains(u"note"_s))
         v.note = h.value(u"note"_s).toString().trimmed().left(300);
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -412,13 +500,13 @@ bool PosService::recvAddItem(const QString &itemId, double perUom)
         if (l.kind == recv::kStock && l.itemId == m->id && std::abs(l.perUom - per) < 1e-9) {
             l.qty += 1;
             v.last = int(i);
-            emit adminChanged();
+            recvTouched();
             return true;
         }
     }
     v.lines.push_back(recvLineFor(*m, per, v.vendorId));
     v.last = int(v.lines.size()) - 1;
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -445,6 +533,7 @@ bool PosService::recvScan(const QString &code)
                 l.vendorItem = f.vendorItem->vendorItem;
             if (l.uom.empty())
                 l.uom = f.vendorItem->uom;
+            recvTouched();
         }
         return ok;
     }
@@ -457,7 +546,7 @@ bool PosService::recvScan(const QString &code)
         l.qty = 1;
         v.lines.push_back(l);
         v.last = int(v.lines.size()) - 1;
-        emit adminChanged();
+        recvTouched();
         return true;
     }
     if (looksLikeBarcode(c)) {
@@ -467,7 +556,7 @@ bool PosService::recvScan(const QString &code)
             if (v.lines[i].kind == recv::kStock && v.lines[i].itemId.empty() && BuilderIndex::codeKey(v.lines[i].upc) == key) {
                 v.lines[i].qty += 1;
                 v.last = int(i);
-                emit adminChanged();
+                recvTouched();
                 return true;
             }
         Line l;
@@ -477,7 +566,7 @@ bool PosService::recvScan(const QString &code)
         v.lines.push_back(l);
         v.last = int(v.lines.size()) - 1;
         v.message = tr("%1 isn't on file: link it to an item, add it, or leave it out (it's set aside below).").arg(c);
-        emit adminChanged();
+        recvTouched();
         return true;
     }
     return recvFind(c);
@@ -599,7 +688,7 @@ bool PosService::recvSetLine(int index, const QVariantMap &f)
     }
     v.lines[std::size_t(index)] = l;
     v.last = index;
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -611,7 +700,7 @@ bool PosService::recvRemoveLine(int index)
     v.lines.erase(v.lines.begin() + index);
     v.linking = -1;
     v.last = -1;
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -630,7 +719,7 @@ bool PosService::recvAddCharge(const QString &kind)
     }
     v.lines.push_back(l);
     v.last = int(v.lines.size()) - 1;
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -694,7 +783,7 @@ bool PosService::recvLink(int index, const QString &itemId)
     v.choices.clear();
     v.last = index;
     v.message = tr("%1 is now an alt UPC of %2.").arg(code, qs(m->name));
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -704,7 +793,7 @@ bool PosService::recvLeaveOut(int index, bool out)
     if (index < 0 || index >= int(v.lines.size()) || !v.lines[std::size_t(index)].itemId.empty())
         return false;
     v.lines[std::size_t(index)].leftOut = out;
-    emit adminChanged();
+    recvTouched();
     return true;
 }
 
@@ -767,6 +856,7 @@ bool PosService::recvQuickAdd(const QVariantMap &r)
             if (packSize > 0)
                 l.perUom = packSize;
             v.last = index;
+            recvTouched();
         }
     }
     if (r.contains(u"code"_s)) {   // the import: the code is this new item
@@ -779,9 +869,48 @@ bool PosService::recvQuickAdd(const QVariantMap &r)
     return true;
 }
 
-bool PosService::recvClear()
+// --- unfinished invoices (owner 2026-11-27: "I pressed Save meaning save my work") ---------------------
+// The invoice on the screen is kept as it's worked on (autosaved: every change), in its own table, so a
+// restart or an update loses nothing; nothing goes on hand until Receive. Save for later sets it aside
+// (Unfinished: any screen can open it, one screen at a time). A screen left with an invoice on it (a restart)
+// finds it there again when Receive retail opens.
+
+Receipt *PosService::recvDraft(std::int64_t id) const
+{
+    if (id <= 0)
+        return nullptr;
+    for (Receipt &d : s_->retailDrafts)
+        if (d.id == id)
+            return &d;
+    return nullptr;
+}
+
+const QObject *PosService::recvHolder(std::int64_t id) const
+{
+    const auto it = s_->recvHeldBy.find(id);
+    return it == s_->recvHeldBy.end() ? nullptr : it->second.first;
+}
+
+void PosService::recvRelease()
 {
     RecvView &v = recvView();
+    if (v.draftId && recvHolder(v.draftId) == this)
+        s_->recvHeldBy.erase(v.draftId);
+}
+
+void PosService::recvReset()
+{
+    RecvView &v = recvView();
+    recvRelease();
+    // (The vendor and date stay for the next invoice, as they come in a stack; not a received one's.)
+    if (v.editingId || v.date.isEmpty()) {
+        v.vendorId.clear();
+        v.date = QDateTime::fromMSecsSinceEpoch(now()).date().toString(u"yyyy-MM-dd"_s);
+    }
+    v.draftId = 0;
+    v.editingId = 0;
+    v.baseEdits = 0;
+    v.confirm.clear();
     v.lines.clear();
     v.invoice.clear();
     v.note.clear();
@@ -790,7 +919,159 @@ bool PosService::recvClear()
     v.linking = -1;
     v.last = -1;
     v.message.clear();
-    emit adminChanged();
+}
+
+void PosService::recvLoad(const Receipt &d)
+{
+    RecvView &v = recvView();
+    v.draftId = d.id;
+    v.editingId = d.reopenOf;
+    v.baseEdits = d.baseEdits;
+    v.vendorId = qs(d.vendorId);
+    v.invoice = qs(d.invoice);
+    v.date = qs(d.date);
+    v.note = qs(d.note);
+    v.typedTotal = d.typedTotal;
+    v.lines = d.lines;
+    v.confirm.clear();
+    v.choices.clear();
+    v.linking = -1;
+    v.last = -1;
+    s_->recvHeldBy[d.id] = {this, terminal_};
+}
+
+// The invoice here changed: kept as unfinished (once it has an invoice number or a line).
+void PosService::recvTouched()
+{
+    RecvView &v = recvView();
+    v.confirm.clear();
+    if (v.draftId) {
+        if (const QObject *h = recvHolder(v.draftId); h && h != this) {
+            const QString at = s_->recvHeldBy[v.draftId].second;
+            recvReset();
+            v.message = tr("That invoice was opened at %1, so the change here wasn't kept. It's on Unfinished.").arg(at);
+            emit adminChanged();
+            return;
+        }
+    }
+    Receipt *d = recvDraft(v.draftId);
+    bool created = false;
+    if (!d) {
+        if (v.lines.empty() && v.invoice.trimmed().isEmpty() && !v.editingId) {
+            emit adminChanged();
+            return;   // nothing to keep yet
+        }
+        Receipt fresh;
+        fresh.id = ++s_->lastRetailDraftId;
+        fresh.at = now();
+        s_->retailDrafts.push_back(fresh);
+        d = &s_->retailDrafts.back();
+        v.draftId = d->id;
+        s_->recvHeldBy[d->id] = {this, terminal_};
+        created = true;
+    }
+    d->vendorId = ss(v.vendorId);
+    const Vendor *vendor = vendorById(v.vendorId);
+    d->vendorName = vendor ? vendor->name : std::string();
+    d->invoice = ss(v.invoice.trimmed());
+    d->date = ss(v.date);
+    d->note = ss(v.note);
+    d->typedTotal = v.typedTotal;
+    d->lines = v.lines;
+    d->by = user() ? user()->name : ss(terminal_);
+    d->terminal = ss(terminal_);
+    d->changedAt = now();
+    d->parked = false;
+    d->reopenOf = v.editingId;
+    d->baseEdits = v.baseEdits;
+    if (s_->sink)
+        s_->sink->saveRetailDraft(*d);
+    if (created)
+        emit s_->adminChanged();   // (on every screen's Unfinished)
+    else
+        emit adminChanged();
+}
+
+// A new invoice: the one here (if it has anything) stays on Unfinished.
+bool PosService::recvClear()
+{
+    RecvView &v = recvView();
+    if (Receipt *d = recvDraft(v.draftId); d && recvHolder(d->id) == this) {
+        d->parked = true;
+        if (s_->sink)
+            s_->sink->saveRetailDraft(*d);
+    }
+    const bool kept = v.draftId != 0;
+    recvReset();
+    if (kept)
+        v.message = tr("The invoice you were on is kept on Unfinished.");
+    emit s_->adminChanged();
+    return true;
+}
+
+bool PosService::recvSaveForLater()
+{
+    RecvView &v = recvView();
+    if (!v.draftId && v.lines.empty() && v.invoice.trimmed().isEmpty() && !v.editingId)
+        return fail(tr("There's nothing on this invoice to save yet."));
+    recvTouched();
+    Receipt *d = recvDraft(v.draftId);
+    if (!d)
+        return false;   // (taken over by another screen: recvTouched said so)
+    d->parked = true;
+    if (s_->sink)
+        s_->sink->saveRetailDraft(*d);
+    const QString what = d->invoice.empty() ? tr("The invoice") : tr("Invoice #%1").arg(qs(d->invoice));
+    recvReset();
+    v.message = tr("%1 is saved for later, on Unfinished. Nothing was added to on hand.").arg(what);
+    emit notice(v.message);
+    emit s_->adminChanged();
+    return true;
+}
+
+bool PosService::recvOpenDraft(std::int64_t id, bool takeOver)
+{
+    RecvView &v = recvView();
+    const Receipt *d = recvDraft(id);
+    if (!d)
+        return fail(tr("That unfinished invoice isn't there any more."));
+    if (const QObject *h = recvHolder(id); h && h != this && !takeOver)
+        return fail(tr("That invoice is open at %1. Open it here anyway to take it over.").arg(s_->recvHeldBy[id].second));
+    if (v.draftId != id) {
+        // The one here first: kept (Unfinished).
+        if (Receipt *mine = recvDraft(v.draftId); mine && recvHolder(mine->id) == this) {
+            mine->parked = true;
+            if (s_->sink)
+                s_->sink->saveRetailDraft(*mine);
+        }
+        recvRelease();
+    }
+    recvLoad(*d);
+    v.tab = u"receive"_s;
+    v.message = d->reopenOf ? tr("Changing invoice #%1 from %2, received before: Receive puts only the changes on hand.").arg(qs(d->invoice), qs(d->vendorName))
+                            : tr("Invoice #%1 opened. Nothing is on hand from it until you Receive it.").arg(qs(d->invoice));
+    emit s_->adminChanged();
+    return true;
+}
+
+bool PosService::recvDeleteDraft(std::int64_t id)
+{
+    RecvView &v = recvView();
+    const auto it = std::ranges::find_if(s_->retailDrafts, [&](const Receipt &d) { return d.id == id; });
+    if (it == s_->retailDrafts.end())
+        return fail(tr("That unfinished invoice isn't there any more."));
+    if (const QObject *h = recvHolder(id); h && h != this)
+        return fail(tr("That invoice is open at %1.").arg(s_->recvHeldBy[id].second));
+    const QString what = tr("Invoice #%1 from %2").arg(qs(it->invoice), qs(it->vendorName));
+    s_->recvHeldBy.erase(id);
+    s_->retailDrafts.erase(it);
+    if (s_->sink)
+        s_->sink->deleteRetailDraft(id);
+    if (v.draftId == id)
+        recvReset();
+    logChange(tr("Inventory"), what, tr("Unfinished invoice deleted"), QString(), QString());
+    v.message = tr("%1 deleted (it was never received).").arg(what);
+    emit s_->adminChanged();
     return true;
 }
 
@@ -824,6 +1105,11 @@ void PosService::recvKeep(Receipt r)
     r.id = ++s_->lastRetailReceiptId;
     r.at = now();
     r.by = user() ? user()->name : ss(terminal_);
+    r.changedAt = 0;
+    r.terminal.clear();
+    r.parked = false;
+    r.reopenOf = 0;
+    r.baseEdits = 0;
     if (!r.historyOnly)
         for (const Line &l : r.lines)
             if (l.kind == recv::kStock && !l.itemId.empty() && !l.leftOut)
@@ -834,22 +1120,62 @@ void PosService::recvKeep(Receipt r)
         s_->sink->saveRetailReceipt(r);
 }
 
-// A stock line on hand: a box / carton and its single (pos_retail_stock.cpp) by what came, cartons sealed (a
-// carton's UPC, or a vendor's unit of whole cartons: a case of 6 cartons) and packs loose; else the item's count.
-void PosService::recvStock(const Line &l)
+// Where a stock line goes on hand: a box / carton and its single (pos_retail_stock.cpp) by what came, cartons
+// sealed (a carton's UPC, or a vendor's unit of whole cartons: a case of 6 cartons) and packs loose; else the
+// item's count. (None: not a stock line on file.)
+std::pair<std::string, double> PosService::recvStockTarget(const Line &l) const
 {
+    if (l.kind != recv::kStock || l.itemId.empty() || l.leftOut)
+        return {};
     const RetailFamily *f = retailFamilyOf(l.itemId);
     if (f && l.itemId == f->singleId && f->packSize > 1 && l.perUom >= f->packSize
-        && std::abs(std::fmod(l.perUom, double(f->packSize))) < 1e-9) {
-        addRetailStock(f->parentId, l.units() / f->packSize);
-        return;
-    }
-    addRetailStock(l.itemId, l.units());
+        && std::abs(std::fmod(l.perUom, double(f->packSize))) < 1e-9)
+        return {f->parentId, l.units() / f->packSize};
+    return {l.itemId, l.units()};
 }
 
-bool PosService::recvSave()
+void PosService::recvStock(const Line &l)
+{
+    const auto [id, n] = recvStockTarget(l);
+    addRetailStock(id, n);
+}
+
+namespace {
+
+// The lines that can be received: none still waiting for an item, store use described; lines at 0 dropped.
+QString recvCheckLines(const std::vector<Line> &in, std::vector<Line> &out)
+{
+    out.clear();
+    for (const Line &l : in) {
+        if (recv::itemKind(l.kind) && l.qty == 0)
+            continue;   // (a line taken down to 0)
+        if (l.kind == recv::kStock && l.itemId.empty() && !l.leftOut)
+            return PosService::tr("%1 isn't on file: link it to an item, add it, or leave it out.").arg(qs(l.upc.empty() ? l.name : l.upc));
+        if (l.kind == recv::kStoreUse && l.itemId.empty() && l.name.empty())
+            return PosService::tr("Say what the store-use line is (its description).");
+        out.push_back(l);
+    }
+    return {};
+}
+
+} // namespace
+
+bool PosService::recvConfirmCancel()
+{
+    recvView().confirm.clear();
+    emit adminChanged();
+    return true;
+}
+
+// Receive: the invoice finished, its stock on hand. Not tying out (or no total typed) asks first; the same
+// vendor and invoice # received before offers to open that one and add to it.
+bool PosService::recvReceive(bool anyway)
 {
     RecvView &v = recvView();
+    v.confirm.clear();
+    if (v.draftId)
+        if (const QObject *h = recvHolder(v.draftId); h && h != this)
+            return fail(tr("That invoice is open at %1 now.").arg(s_->recvHeldBy[v.draftId].second));
     const Vendor *vendor = vendorById(v.vendorId);
     if (!vendor)
         return fail(tr("Choose the vendor first."));
@@ -857,45 +1183,202 @@ bool PosService::recvSave()
         return fail(tr("Type the invoice number."));
     if (v.date.isEmpty())
         return fail(tr("Type the invoice date."));
-    if (recvDuplicate(vendor->id, ss(v.invoice)))
-        return fail(tr("Invoice #%1 from %2 was already received.").arg(v.invoice, qs(vendor->name)));
-    std::vector<Line> lines;
-    for (const Line &l : v.lines) {
-        if (recv::itemKind(l.kind) && l.qty == 0)
-            continue;   // (a line taken down to 0)
-        if (l.kind == recv::kStock && l.itemId.empty() && !l.leftOut)
-            return fail(tr("%1 isn't on file: link it to an item, add it, or leave it out.").arg(qs(l.upc.empty() ? l.name : l.upc)));
-        if (l.kind == recv::kStoreUse && l.itemId.empty() && l.name.empty())
-            return fail(tr("Say what the store-use line is (its description)."));
-        lines.push_back(l);
+    if (const std::int64_t dup = recvDuplicate(vendor->id, ss(v.invoice), v.editingId)) {
+        if (v.editingId)
+            return fail(tr("Invoice #%1 from %2 was already received (another one).").arg(v.invoice, qs(vendor->name)));
+        v.confirm = {{u"kind"_s, u"duplicate"_s}, {u"receiptId"_s, qint64(dup)},
+                     {u"text"_s, tr("Invoice #%1 from %2 was already received. Open it to add these lines to it?").arg(v.invoice, qs(vendor->name))}};
+        emit adminChanged();
+        return false;
     }
-    if (lines.empty())
+    std::vector<Line> lines;
+    if (const QString why = recvCheckLines(v.lines, lines); !why.isEmpty())
+        return fail(why);
+    if (lines.empty() && !v.editingId)
         return fail(tr("Scan or find the items first."));
     Receipt r;
+    r.typedTotal = v.typedTotal;
+    r.lines = lines;
+    if (!anyway) {
+        const auto off = r.offBy();
+        if (!off || *off != 0) {
+            v.confirm = {{u"kind"_s, off ? u"off"_s : u"nototal"_s},
+                         {u"text"_s, off ? tr("Off by %1 from the invoice's total. Receive anyway?").arg(format(Money::fromCents(*off)))
+                                         : tr("No invoice total typed, so it can't tie out. Receive anyway?")}};
+            emit adminChanged();
+            return false;
+        }
+    }
+    if (v.editingId)
+        return recvFinishEdit();
     r.vendorId = vendor->id;
     r.vendorName = vendor->name;
     r.invoice = ss(v.invoice.trimmed());
     r.date = ss(v.date);
-    r.typedTotal = v.typedTotal;
     r.note = ss(v.note);
-    for (Line &l : lines)
+    for (Line &l : r.lines)
         if (const MenuItem *m = findItem(qs(l.itemId)); m && !l.itemId.empty())
             l.systemCostCents = systemCostOf(*m);   // (as it is now, beside the invoice's: never changed)
-    r.lines = std::move(lines);
     const recv::Totals t = r.totals();
     const auto off = r.offBy();
     recvKeep(r);
     logChange(tr("Inventory"), tr("Invoice #%1 from %2").arg(qs(r.invoice), qs(r.vendorName)), tr("Received"), QString(),
               tr("%1 units in stock, invoice %2").arg(qtyText(t.units), format(Money::fromCents(t.total))));
-    v.message = !off ? tr("Invoice #%1 from %2 received: %3 units in stock, %4.").arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)))
-                : *off == 0 ? tr("Invoice #%1 from %2 received: %3 units in stock; it ties out at %4.").arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)))
-                            : tr("Invoice #%1 from %2 received: %3 units in stock; the lines are %4, off by %5 from the total typed.")
-                                  .arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)), format(Money::fromCents(*off)));
-    emit notice(v.message);
-    const QString keep = v.message;
-    recvClear();
-    v.message = keep;
+    const QString done = !off ? tr("Invoice #%1 from %2 received: %3 units in stock, %4.").arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)))
+                       : *off == 0 ? tr("Invoice #%1 from %2 received: %3 units in stock; it ties out at %4.").arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)))
+                                   : tr("Invoice #%1 from %2 received: %3 units in stock; the lines are %4, off by %5 from the total typed.")
+                                         .arg(qs(r.invoice), qs(r.vendorName), qtyText(t.units), format(Money::fromCents(t.total)), format(Money::fromCents(*off)));
+    // Finished: no longer unfinished.
+    if (const std::int64_t id = v.draftId) {
+        std::erase_if(s_->retailDrafts, [&](const Receipt &d) { return d.id == id; });
+        if (s_->sink)
+            s_->sink->deleteRetailDraft(id);
+    }
+    recvReset();
+    v.message = done;
+    emit notice(done);
     emit s_->adminChanged();
+    return true;
+}
+
+// Receive on a received invoice reopened: only the difference goes on hand (each line's item, a carton line's
+// cartons sealed), the change kept on the invoice (who, when, the lines), the vendor's last cost if newer.
+bool PosService::recvFinishEdit()
+{
+    RecvView &v = recvView();
+    const auto it = std::ranges::find_if(s_->retailReceipts, [&](const Receipt &r) { return r.id == v.editingId; });
+    if (it == s_->retailReceipts.end())
+        return fail(tr("That received invoice isn't there any more."));
+    if (int(it->edits.size()) != v.baseEdits)
+        return fail(tr("Invoice #%1 was changed somewhere else since it was opened here. Delete this on Unfinished and open it again.").arg(qs(it->invoice)));
+    std::vector<Line> lines;
+    if (const QString why = recvCheckLines(v.lines, lines); !why.isEmpty())
+        return fail(why);
+    Receipt was = *it;
+    Receipt now_ = was;
+    now_.invoice = ss(v.invoice.trimmed());
+    now_.date = ss(v.date);
+    now_.note = ss(v.note);
+    now_.typedTotal = v.typedTotal;
+    for (Line &l : lines)   // a line added now: the system cost now (the others keep theirs, from when they came)
+        if (l.systemCostCents == 0 && !l.itemId.empty())
+            if (const MenuItem *m = findItem(qs(l.itemId)))
+                l.systemCostCents = systemCostOf(*m);
+    now_.lines = lines;
+    recv::Edit e;
+    e.at = now();
+    e.by = user() ? user()->name : ss(terminal_);
+    e.terminal = ss(terminal_);
+    e.totalBefore = was.totals().total;
+    e.totalAfter = now_.totals().total;
+    e.unitsBefore = was.totals().units;
+    e.unitsAfter = now_.totals().units;
+    e.lines = recv::diffLines(was.lines, now_.lines);
+    const bool headerSame = was.invoice == now_.invoice && was.date == now_.date && was.note == now_.note && was.typedTotal == now_.typedTotal;
+    QString done;
+    if (e.lines.empty() && headerSame) {
+        done = tr("No changes to invoice #%1.").arg(qs(was.invoice));
+    } else {
+        // On hand: what each item had from this invoice, and has now.
+        double moved = 0;
+        if (!was.historyOnly) {
+            std::map<std::string, double> delta;
+            for (const Line &l : was.lines)
+                if (const auto [id, n] = recvStockTarget(l); !id.empty())
+                    delta[id] -= n;
+            for (const Line &l : now_.lines)
+                if (const auto [id, n] = recvStockTarget(l); !id.empty())
+                    delta[id] += n;
+            for (const auto &[id, n] : delta)
+                if (std::abs(n) > 1e-9) {
+                    addRetailStock(id, n);
+                    moved += n;
+                }
+        }
+        now_.edits.push_back(e);
+        *it = now_;
+        if (s_->sink)
+            s_->sink->saveRetailReceipt(*it);
+        recvLearn(*it);   // (a newer cost only: learn() keeps the newest invoice's)
+        logChange(tr("Inventory"), tr("Invoice #%1 from %2").arg(qs(now_.invoice), qs(now_.vendorName)), tr("Changed after receiving"),
+                  format(Money::fromCents(e.totalBefore)), format(Money::fromCents(e.totalAfter)));
+        done = was.historyOnly
+                   ? tr("Invoice #%1 from %2 changed (history only: on hand unchanged).").arg(qs(now_.invoice), qs(now_.vendorName))
+                   : tr("Invoice #%1 from %2 changed: %3 line(s) different, %4 units on hand from the change, invoice now %5.")
+                         .arg(qs(now_.invoice), qs(now_.vendorName)).arg(e.lines.size())
+                         .arg((moved > 0 ? u"+"_s : QString()) + qtyText(moved), format(Money::fromCents(e.totalAfter)));
+    }
+    if (const std::int64_t id = v.draftId) {
+        std::erase_if(s_->retailDrafts, [&](const Receipt &d) { return d.id == id; });
+        if (s_->sink)
+            s_->sink->deleteRetailDraft(id);
+    }
+    recvReset();
+    v.message = done;
+    v.tab = u"list"_s;
+    v.showId = was.id;
+    emit notice(done);
+    emit s_->adminChanged();
+    return true;
+}
+
+bool PosService::recvShowReceived(std::int64_t id)
+{
+    RecvView &v = recvView();
+    v.showId = std::ranges::any_of(s_->retailReceipts, [&](const Receipt &r) { return r.id == id; }) ? id : 0;
+    emit adminChanged();
+    return true;
+}
+
+// Invoices received > Open > Edit: the invoice on the screen to change (an unfinished change of it already
+// there: that one). The one on the screen first stays on Unfinished.
+bool PosService::recvEditReceived(std::int64_t id)
+{
+    RecvView &v = recvView();
+    const auto it = std::ranges::find_if(s_->retailReceipts, [&](const Receipt &r) { return r.id == id; });
+    if (it == s_->retailReceipts.end())
+        return fail(tr("That received invoice isn't there any more."));
+    for (const Receipt &d : s_->retailDrafts)
+        if (d.reopenOf == id)
+            return recvOpenDraft(d.id, false);
+    if (v.draftId || !v.lines.empty())
+        recvClear();
+    recvReset();
+    v.editingId = id;
+    v.baseEdits = int(it->edits.size());
+    v.vendorId = qs(it->vendorId);
+    v.invoice = qs(it->invoice);
+    v.date = qs(it->date);
+    v.note = qs(it->note);
+    v.typedTotal = it->typedTotal;
+    v.lines = it->lines;
+    v.tab = u"receive"_s;
+    v.showId = 0;
+    v.message = tr("Changing invoice #%1 from %2, received before: Receive puts only the changes on hand.").arg(qs(it->invoice), qs(it->vendorName));
+    recvTouched();   // (kept as unfinished from now on)
+    return true;
+}
+
+// The duplicate's offer: the received invoice opened to change, with the lines on the screen added to it.
+bool PosService::recvAddToReceived(std::int64_t id)
+{
+    RecvView &v = recvView();
+    const std::vector<Line> adding = v.lines;
+    const std::int64_t was = v.draftId;
+    if (was && recvHolder(was) == this) {   // (this invoice becomes part of the received one)
+        std::erase_if(s_->retailDrafts, [&](const Receipt &d) { return d.id == was; });
+        s_->recvHeldBy.erase(was);
+        if (s_->sink)
+            s_->sink->deleteRetailDraft(was);
+        v.draftId = 0;
+    }
+    v.lines.clear();
+    if (!recvEditReceived(id))
+        return false;
+    for (const Line &l : adding)
+        v.lines.push_back(l);
+    v.message = tr("%n line(s) added to the invoice received before. Check them, then Receive (only they go on hand).", "", int(adding.size()));
+    recvTouched();
     return true;
 }
 
@@ -1297,7 +1780,7 @@ QVariantMap PosService::retailReceiving() const
             recent.append(QVariantMap{{u"id"_s, qint64(it->id)}, {u"date"_s, qs(it->date)}, {u"vendor"_s, qs(it->vendorName)},
                                       {u"invoice"_s, qs(it->invoice)}, {u"lines"_s, int(it->lines.size())},
                                       {u"total"_s, money(rt.total)}, {u"units"_s, qtyText(rt.units)}, {u"by"_s, qs(it->by)},
-                                      {u"history"_s, it->historyOnly},
+                                      {u"history"_s, it->historyOnly}, {u"changes"_s, int(it->edits.size())},
                                       {u"tie"_s, !ro ? QString() : *ro == 0 ? tr("ties out") : tr("off by %1").arg(money(*ro))}});
             if (recent.size() >= 300)
                 break;
@@ -1394,7 +1877,79 @@ QVariantMap PosService::retailReceiving() const
                   {u"ready"_s, ready}, {u"duplicates"_s, duplicates}, {u"problems"_s, problems}, {u"waiting"_s, waiting},
                   {u"rows"_s, int(im.rows.size()) - im.header - 1}};
     }
+    const auto when = [](std::int64_t ms) { return ms > 0 ? QDateTime::fromMSecsSinceEpoch(ms).toString(u"yyyy-MM-dd hh:mm"_s) : QString(); };
+    // Unfinished: the invoices not received yet, the newest change first.
+    QVariantList unfinished;
+    {
+        std::vector<const Receipt *> ds;
+        for (const Receipt &d : s_->retailDrafts)
+            ds.push_back(&d);
+        std::ranges::sort(ds, [](const Receipt *a, const Receipt *b) { return a->changedAt > b->changedAt; });
+        for (const Receipt *d : ds) {
+            const auto held = s_->recvHeldBy.find(d->id);
+            const bool elsewhere = held != s_->recvHeldBy.end() && held->second.first != this;
+            unfinished.append(QVariantMap{
+                {u"id"_s, qint64(d->id)}, {u"vendor"_s, qs(d->vendorName)}, {u"invoice"_s, qs(d->invoice)}, {u"date"_s, qs(d->date)},
+                {u"lines"_s, int(d->lines.size())}, {u"units"_s, qtyText(d->totals().units)}, {u"total"_s, money(d->totals().total)},
+                {u"by"_s, qs(d->by)}, {u"changed"_s, when(d->changedAt)}, {u"terminal"_s, qs(d->terminal)},
+                {u"openAt"_s, elsewhere ? held->second.second : QString()}, {u"here"_s, d->id == v.draftId},
+                {u"reopen"_s, d->reopenOf != 0}, {u"saved"_s, d->parked}});
+        }
+    }
+    // Invoices received > Open: its lines and the changes made to it.
+    QVariantMap shownReceipt;
+    for (const Receipt &rc : s_->retailReceipts) {
+        if (rc.id != v.showId || !v.showId)
+            continue;
+        QVariantList rl;
+        for (const Line &l : rc.lines)
+            rl.append(QVariantMap{{u"kind"_s, kindLabel(l.kind)}, {u"name"_s, qs(l.name.empty() ? l.upc : l.name)},
+                                  {u"qty"_s, qtyText(l.qty)}, {u"uom"_s, qs(l.uom)}, {u"perUom"_s, qtyText(l.perUom)},
+                                  {u"cost"_s, amount(l.costCents)}, {u"extended"_s, money(l.extended())},
+                                  {u"isItem"_s, recv::itemKind(l.kind)}, {u"leftOut"_s, l.leftOut}});
+        QVariantList el;
+        for (auto e = rc.edits.rbegin(); e != rc.edits.rend(); ++e) {
+            QStringList what;
+            for (const recv::EditLine &x : e->lines) {
+                if (x.qtyBefore == 0 && x.extBefore == 0)
+                    what << tr("%1 added (%2, %3)").arg(qs(x.name), qtyText(x.qtyAfter), money(x.extAfter));
+                else if (x.qtyAfter == 0 && x.extAfter == 0)
+                    what << tr("%1 taken off (was %2, %3)").arg(qs(x.name), qtyText(x.qtyBefore), money(x.extBefore));
+                else
+                    what << tr("%1: %2 → %3 (%4 → %5)").arg(qs(x.name), qtyText(x.qtyBefore), qtyText(x.qtyAfter), money(x.extBefore), money(x.extAfter));
+            }
+            el.append(QVariantMap{{u"when"_s, when(e->at)}, {u"by"_s, qs(e->by)}, {u"terminal"_s, qs(e->terminal)},
+                                  {u"text"_s, tr("total %1 → %2, units %3 → %4").arg(money(e->totalBefore), money(e->totalAfter),
+                                                                                    qtyText(e->unitsBefore), qtyText(e->unitsAfter))},
+                                  {u"lines"_s, what}});
+        }
+        const auto ro = rc.offBy();
+        bool beingChanged = false;
+        for (const Receipt &d : s_->retailDrafts)
+            beingChanged = beingChanged || d.reopenOf == rc.id;
+        shownReceipt = {{u"id"_s, qint64(rc.id)}, {u"vendor"_s, qs(rc.vendorName)}, {u"invoice"_s, qs(rc.invoice)},
+                        {u"date"_s, qs(rc.date)}, {u"by"_s, qs(rc.by)}, {u"at"_s, when(rc.at)}, {u"total"_s, money(rc.totals().total)},
+                        {u"units"_s, qtyText(rc.totals().units)}, {u"history"_s, rc.historyOnly},
+                        {u"tie"_s, !ro ? QString() : *ro == 0 ? tr("ties out") : tr("off by %1").arg(money(*ro))},
+                        {u"lines"_s, rl}, {u"edits"_s, el}, {u"beingChanged"_s, beingChanged}};
+    }
+    // The invoice here: a received one being changed; open at another screen (taken over); received before.
+    QVariantMap editing;
+    if (v.editingId)
+        for (const Receipt &rc : s_->retailReceipts)
+            if (rc.id == v.editingId)
+                editing = {{u"id"_s, qint64(rc.id)}, {u"invoice"_s, qs(rc.invoice)}, {u"vendor"_s, qs(rc.vendorName)},
+                           {u"at"_s, when(rc.at)}, {u"by"_s, qs(rc.by)}};
+    QString heldAt;
+    if (v.draftId)
+        if (const auto held = s_->recvHeldBy.find(v.draftId); held != s_->recvHeldBy.end() && held->second.first != this)
+            heldAt = held->second.second;
+    std::int64_t duplicateOf = 0;
+    if (!v.editingId && !v.invoice.trimmed().isEmpty() && !v.vendorId.isEmpty())
+        duplicateOf = recvDuplicate(ss(v.vendorId), ss(v.invoice));
     return {{u"active"_s, true}, {u"tab"_s, v.tab}, {u"vendors"_s, vendors}, {u"categories"_s, categories},
+            {u"draftId"_s, qint64(v.draftId)}, {u"editing"_s, editing}, {u"heldAt"_s, heldAt}, {u"confirm"_s, v.confirm},
+            {u"duplicateOf"_s, qint64(duplicateOf)}, {u"unfinished"_s, unfinished}, {u"received"_s, shownReceipt},
             {u"vendorId"_s, v.vendorId}, {u"invoice"_s, v.invoice}, {u"date"_s, v.date},
             {u"total"_s, v.typedTotal >= 0 ? qs(mass::centsText(v.typedTotal)) : QString()}, {u"note"_s, v.note},
             {u"lines"_s, lines}, {u"totals"_s, totals}, {u"tie"_s, tie}, {u"ties"_s, off && *off == 0},
@@ -1481,7 +2036,8 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
     std::vector<std::string> offs;
     for (const Receipt *rc : in) {
         const recv::Totals t = rc->totals();
-        r.line(row(rc->date + " " + rc->vendorName + " #" + rc->invoice + (rc->historyOnly ? " (history)" : ""), t));
+        r.line(row(rc->date + " " + rc->vendorName + " #" + rc->invoice + (rc->historyOnly ? " (history)" : "")
+                       + (rc->edits.empty() ? "" : " (changed)"), t));
         if (const auto off = rc->offBy(); off && *off != 0)
             offs.push_back(rc->date + " " + rc->vendorName + " #" + rc->invoice + ": typed "
                            + ctx.money(Money::fromCents(rc->typedTotal)) + ", lines " + ctx.money(Money::fromCents(t.total))
@@ -1494,7 +2050,7 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
     }
     r.note("Prepaid sales tax is kept apart from the items' cost. Delivery is not spread into item costs. "
            "Store use: supplies the store uses (never in stock). (history): loaded from a file of past invoices, "
-           "on hand unchanged.");
+           "on hand unchanged. (changed): changed after it was received (as it is now).");
     return r;
 }
 

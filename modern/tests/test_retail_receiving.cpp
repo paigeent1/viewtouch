@@ -3,9 +3,12 @@
 #include "app/pos_json.hh"
 #include "pos_fixture.hh"
 #include "qt_catch.hh"
+#include "storage/async_writer.hh"
+#include "storage/pos_store.hh"
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTemporaryDir>
 
 #include <algorithm>
 
@@ -130,7 +133,7 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     ls = lines(pos);
     REQUIRE(ls.size() == 6);
     CHECK(ls[5].toMap()[u"aside"_s].toBool());
-    CHECK_FALSE(pos.recvSave());
+    CHECK_FALSE(pos.recvReceive(true));
     REQUIRE(pos.recvLinkStart(5));
     REQUIRE(pos.recvLink(5, u"cigar"_s));
     const core::MenuItem *cigar = pos.findItem(u"cigar"_s);
@@ -139,7 +142,7 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     REQUIRE(pos.recvSetLine(5, {{u"cost"_s, u"5.00"_s}}));
     REQUIRE(pos.recvSetHeader({{u"total"_s, u"164.95"_s}}));
 
-    REQUIRE(pos.recvSave());
+    REQUIRE(pos.recvReceive(false));   // (it ties out: nothing asked)
     CHECK(pos.retailOnHand("pack") == 21.0);    // 2 cartons of 10 and a pack
     CHECK(pos.retailOnHand("cigar") == 1.0);    // the linked line; the store-use one isn't counted
     REQUIRE(pos.retailReceipts().size() == 1);
@@ -168,7 +171,8 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     // The same invoice again: refused.
     REQUIRE(pos.recvSetHeader({{u"invoice"_s, u"inv-1"_s}}));
     REQUIRE(pos.recvScan(QString::fromLatin1(kPack)));
-    CHECK_FALSE(pos.recvSave());
+    CHECK_FALSE(pos.recvReceive(true));
+    CHECK(pos.retailReceiving()[u"confirm"_s].toMap()[u"kind"_s].toString() == u"duplicate"_s);   // (offers to open it)
     CHECK(pos.retailReceipts().size() == 1);
     CHECK(pos.retailOnHand("pack") == 21.0);
     // The vendor's item number typed: its item.
@@ -298,7 +302,7 @@ TEST_CASE("Receive retail: quick add an item not on file; a code left out isn't 
     CHECK(l0[u"aside"_s].toBool() == false);
     CHECK(l0[u"perUom"_s].toDouble() == 20);
     REQUIRE(pos.recvLeaveOut(1, true));
-    REQUIRE(pos.recvSave());
+    REQUIRE(pos.recvReceive(true));
     const QString id = lines(pos).isEmpty() ? QString::fromStdString(pos.retailReceipts().back().lines[0].itemId) : QString();
     REQUIRE_FALSE(id.isEmpty());
     const core::MenuItem *m = pos.findItem(id);
@@ -308,4 +312,128 @@ TEST_CASE("Receive retail: quick add an item not on file; a code left out isn't 
     CHECK(m->price.cents() == 7999);
     CHECK(pos.retailOnHand(m->id) == 40.0);   // 2 boxes of 20
     CHECK(pos.retailReceipts().back().lines[1].leftOut);
+}
+
+TEST_CASE("Receive retail: the invoice is kept as it's worked on (a restart loses nothing); Save for later adds no "
+          "stock; Unfinished > Open; Receive asks when it doesn't tie out, then adds the stock", "[receiving][store]")
+{
+    QTemporaryDir dir;
+    const QString path = dir.filePath(u"vt.db"_s);
+    const app::PosData seed = store();
+    {
+        storage::PosStore st(path);
+        REQUIRE(st.open());
+        REQUIRE(st.seed(seed.settings, seed.menu, seed.employees, nullptr, seed.ingredients));
+    }
+    {   // Typed in, and ViewTouch stops (an update) before anything is pressed.
+        storage::PosStore st(path);
+        REQUIRE(st.open());
+        storage::AsyncWriter writer(path);
+        storage::SqlPosSink sink(writer);
+        PosService pos(*st.load(), &sink);
+        REQUIRE(pos.loginWithPin(u"1234"_s));
+        REQUIRE(pos.recvOpen(u"receive"_s));
+        REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme-n"_s}, {u"invoice"_s, u"D-1"_s}, {u"date"_s, u"11/27/2026"_s}}));
+        REQUIRE(pos.recvScan(QString::fromLatin1(kCarton)));
+        REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"60.00"_s}}));
+        CHECK(pos.retailDrafts().size() == 1);
+        CHECK(pos.retailOnHand("pack").value_or(0) == 0);
+    }
+    {
+        storage::PosStore st(path);
+        REQUIRE(st.open());
+        storage::AsyncWriter writer(path);
+        storage::SqlPosSink sink(writer);
+        PosService pos(*st.load(), &sink);
+        REQUIRE(pos.retailDrafts().size() == 1);
+        REQUIRE(pos.loginWithPin(u"1234"_s));
+        REQUIRE(pos.recvOpen(u"receive"_s));
+        // Back as it was left on this terminal.
+        QVariantMap info = pos.retailReceiving();
+        CHECK(info[u"invoice"_s].toString() == u"D-1"_s);
+        REQUIRE(lines(pos).size() == 1);
+        CHECK(lines(pos)[0].toMap()[u"cost"_s].toString() == u"60.00"_s);
+        CHECK(pos.retailOnHand("pack").value_or(0) == 0);
+
+        // Save for later: off the screen, on Unfinished; nothing on hand.
+        REQUIRE(pos.recvSaveForLater());
+        CHECK(lines(pos).isEmpty());
+        CHECK(pos.retailOnHand("pack").value_or(0) == 0);
+        CHECK(pos.retailReceipts().empty());
+        QVariantList unfinished = pos.retailReceiving()[u"unfinished"_s].toList();
+        REQUIRE(unfinished.size() == 1);
+        const QVariantMap u0 = unfinished[0].toMap();
+        CHECK(u0[u"invoice"_s].toString() == u"D-1"_s);
+        CHECK(u0[u"vendor"_s].toString() == u"Acme Distributing North"_s);
+        CHECK(u0[u"lines"_s].toInt() == 1);
+        CHECK(u0[u"units"_s].toString() == u"10"_s);
+        // Saved for later: not brought back by itself.
+        REQUIRE(pos.recvClose());
+        REQUIRE(pos.recvOpen(u"receive"_s));
+        CHECK(lines(pos).isEmpty());
+
+        // Another screen can't take it while this one has it open (unless it takes it over).
+        REQUIRE(pos.recvOpenDraft(u0[u"id"_s].toLongLong(), false));
+        REQUIRE(lines(pos).size() == 1);
+        {
+            PosService other(pos.shared(), u"BAR2"_s);
+            REQUIRE(other.loginWithPin(u"1234"_s));
+            REQUIRE(other.recvOpen(u"unfinished"_s));
+            const QVariantMap seen = other.retailReceiving()[u"unfinished"_s].toList()[0].toMap();
+            CHECK_FALSE(seen[u"openAt"_s].toString().isEmpty());
+            CHECK_FALSE(other.recvOpenDraft(u0[u"id"_s].toLongLong(), false));
+            CHECK_FALSE(other.recvDeleteDraft(u0[u"id"_s].toLongLong()));
+        }
+
+        // Receive: no total typed, so it asks; Go back leaves it as it is.
+        CHECK_FALSE(pos.recvReceive(false));
+        CHECK(pos.retailReceiving()[u"confirm"_s].toMap()[u"kind"_s].toString() == u"nototal"_s);
+        REQUIRE(pos.recvConfirmCancel());
+        CHECK(pos.retailOnHand("pack").value_or(0) == 0);
+        // Off by: asks too.
+        REQUIRE(pos.recvSetHeader({{u"total"_s, u"61.00"_s}}));
+        CHECK_FALSE(pos.recvReceive(false));
+        const QVariantMap ask = pos.retailReceiving()[u"confirm"_s].toMap();
+        CHECK(ask[u"kind"_s].toString() == u"off"_s);
+        CHECK(ask[u"text"_s].toString().contains(u"1.00"_s));
+        CHECK(pos.retailReceipts().empty());
+        // Receive anyway: on hand, no longer unfinished.
+        REQUIRE(pos.recvReceive(true));
+        CHECK(pos.retailOnHand("pack") == 10.0);
+        CHECK(pos.retailReceipts().size() == 1);
+        CHECK(pos.retailDrafts().empty());
+    }
+    storage::PosStore st(path);
+    REQUIRE(st.open());
+    const auto data = st.load();
+    REQUIRE(data);
+    CHECK(data->retailDrafts.empty());
+    REQUIRE(data->retailReceipts.size() == 1);
+    CHECK(data->retailReceipts[0].invoice == "D-1");
+    CHECK(data->retailStock.at("pack") == 10.0);
+}
+
+TEST_CASE("Receive retail: Unfinished > Delete; New invoice keeps the one on the screen", "[receiving]")
+{
+    PosService pos(store(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.recvOpen(u"receive"_s));
+    REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme-s"_s}, {u"invoice"_s, u"E-1"_s}}));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kCigar)));
+    REQUIRE(pos.recvClear());   // New invoice
+    CHECK(lines(pos).isEmpty());
+    REQUIRE(pos.retailDrafts().size() == 1);
+    CHECK(pos.retailDrafts()[0].parked);
+    REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme-s"_s}, {u"invoice"_s, u"E-2"_s}}));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kPack)));
+    REQUIRE(pos.retailDrafts().size() == 2);
+    // E-1 opened: E-2 stays on Unfinished.
+    REQUIRE(pos.recvOpenDraft(pos.retailDrafts()[0].id, false));
+    CHECK(pos.retailReceiving()[u"invoice"_s].toString() == u"E-1"_s);
+    REQUIRE(pos.retailDrafts().size() == 2);
+    REQUIRE(pos.recvDeleteDraft(pos.retailDrafts()[1].id));
+    REQUIRE(pos.retailDrafts().size() == 1);
+    CHECK(pos.retailDrafts()[0].invoice == "E-1");
+    CHECK(pos.retailOnHand("pack").value_or(0) == 0);
+    CHECK(pos.retailOnHand("cigar").value_or(0) == 0);
 }

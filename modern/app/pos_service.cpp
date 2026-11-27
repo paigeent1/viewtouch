@@ -78,6 +78,8 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
     retailStock = std::move(data.retailStock);
     retailReceipts = std::move(data.retailReceipts);
     lastRetailReceiptId = data.lastRetailReceiptId;
+    retailDrafts = std::move(data.retailDrafts);
+    lastRetailDraftId = data.lastRetailDraftId;
     for (core::recv::VendorItem &v : data.vendorItems)
         vendorItems[core::recv::keyOf(v)] = std::move(v);
     // What goes to the kitchen and the expediter follows the menu and settings.
@@ -145,6 +147,7 @@ PosService::~PosService()
     }
     // A terminal going away (or disconnecting) lets go of its check.
     std::erase_if(s_->lockedBy, [this](const auto &kv) { return kv.second == this; });
+    std::erase_if(s_->recvHeldBy, [this](const auto &kv) { return kv.second.first == this; });   // its unfinished invoice
     disconnect(s_, nullptr, this, nullptr);
 }
 

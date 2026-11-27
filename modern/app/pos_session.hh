@@ -849,7 +849,14 @@ public:
     Q_INVOKABLE void recvLeaveOut(int index, bool out) { invoke(QStringLiteral("recvLeaveOut"), {index, out}); }
     Q_INVOKABLE void recvQuickAdd(const QVariantMap &item) { invoke(QStringLiteral("recvQuickAdd"), {item}); }
     Q_INVOKABLE void recvClear() { invoke(QStringLiteral("recvClear")); }
-    Q_INVOKABLE void recvSave() { invoke(QStringLiteral("recvSave")); }
+    Q_INVOKABLE void recvSaveForLater() { invoke(QStringLiteral("recvSaveForLater")); }
+    Q_INVOKABLE void recvReceive(bool anyway) { invoke(QStringLiteral("recvReceive"), {anyway}); }
+    Q_INVOKABLE void recvConfirmCancel() { invoke(QStringLiteral("recvConfirmCancel")); }
+    Q_INVOKABLE void recvOpenDraft(double id, bool takeOver) { invoke(QStringLiteral("recvOpenDraft"), {id, takeOver}); }
+    Q_INVOKABLE void recvDeleteDraft(double id) { invoke(QStringLiteral("recvDeleteDraft"), {id}); }
+    Q_INVOKABLE void recvShowReceived(double id) { invoke(QStringLiteral("recvShowReceived"), {id}); }
+    Q_INVOKABLE void recvEditReceived(double id) { invoke(QStringLiteral("recvEditReceived"), {id}); }
+    Q_INVOKABLE void recvAddToReceived(double id) { invoke(QStringLiteral("recvAddToReceived"), {id}); }
     Q_INVOKABLE void recvRange(const QString &from, const QString &until) { invoke(QStringLiteral("recvRange"), {from, until}); }
     Q_INVOKABLE void recvImportText(const QString &text, const QString &fileName) { invoke(QStringLiteral("recvImportText"), {text, fileName}); }
     Q_INVOKABLE void recvImportVendor(const QString &vendorId) { invoke(QStringLiteral("recvImportVendor"), {vendorId}); }

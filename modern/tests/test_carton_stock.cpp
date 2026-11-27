@@ -242,7 +242,7 @@ TEST_CASE("Carton stock: receiving a carton adds sealed, a pack loose; transfers
     REQUIRE(lines.size() == 2);
     CHECK(lines[0].toMap()[u"stockAs"_s].toString() == u"2 ctn"_s);
     CHECK(lines[1].toMap()[u"stockAs"_s].toString() == u"1 pk"_s);
-    REQUIRE(pos.recvSave());
+    REQUIRE(pos.recvReceive(true));
     CHECK(text(pos, "pack") == u"4 ctn 4 pk"_s);
 
     // Transfer out: the carton and its packs on one line, 1 carton + 6 packs.
@@ -293,4 +293,95 @@ TEST_CASE("Carton stock: counts kept before (cartons received as packs, cartons 
     REQUIRE(later.loginWithPin(u"1234"_s));
     CHECK(later.retailOnHand("pack") == 15.0);
     CHECK_FALSE(later.shared()->retailStock.contains("__families_v2__"));
+}
+
+TEST_CASE("Receive retail: a received invoice reopened; only the difference goes on hand (cartons sealed, packs "
+          "loose); a line taken off comes back off; its changes kept; the same invoice # offers to add to it",
+          "[receiving][cartonstock]")
+{
+    app::PosData d = store();
+    d.settings.vendors.push_back({"acme", "Acme Distributing", "", "1001", "", "", ""});
+    PosService pos(std::move(d), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.retailSetCount(u"carton"_s, 2, 3));
+    REQUIRE(text(pos, "pack") == u"2 ctn 3 pk"_s);
+
+    REQUIRE(pos.recvOpen(u"receive"_s));
+    REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme"_s}, {u"invoice"_s, u"R-1"_s}, {u"date"_s, u"2026-11-27"_s}, {u"total"_s, u"80.00"_s}}));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kCarton)));
+    REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"80.00"_s}}));
+    REQUIRE(pos.recvReceive(false));
+    CHECK(text(pos, "pack") == u"3 ctn 3 pk"_s);
+    REQUIRE(pos.retailReceipts().size() == 1);
+    const std::int64_t id = pos.retailReceipts()[0].id;
+
+    // Open > Edit: one more carton (the price corrected) and a pack: only those go on hand.
+    REQUIRE(pos.recvOpen(u"list"_s));
+    REQUIRE(pos.recvShowReceived(id));
+    CHECK(pos.retailReceiving()[u"received"_s].toMap()[u"invoice"_s].toString() == u"R-1"_s);
+    REQUIRE(pos.recvEditReceived(id));
+    QVariantMap info = pos.retailReceiving();
+    CHECK(info[u"editing"_s].toMap()[u"id"_s].toLongLong() == id);
+    REQUIRE(info[u"lines"_s].toList().size() == 1);
+    CHECK(pos.retailDrafts().size() == 1);   // (kept as unfinished while it's changed)
+    CHECK_FALSE(pos.recvSetHeader({{u"vendor"_s, QString()}}));   // a received invoice keeps its vendor
+    REQUIRE(pos.recvScan(QString::fromLatin1(kCarton)));   // 2 cartons now
+    REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"79.00"_s}}));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kPack)));
+    REQUIRE(pos.recvSetLine(1, {{u"cost"_s, u"8.50"_s}}));
+    CHECK(text(pos, "pack") == u"3 ctn 3 pk"_s);   // nothing yet
+    REQUIRE(pos.recvReceive(true));   // (off from the old total: asked, and yes)
+    CHECK(text(pos, "pack") == u"4 ctn 4 pk"_s);
+    REQUIRE(pos.retailReceipts().size() == 1);
+    CHECK(pos.retailDrafts().empty());
+    const core::recv::Receipt &r = pos.retailReceipts()[0];
+    REQUIRE(r.lines.size() == 2);
+    REQUIRE(r.edits.size() == 1);
+    CHECK(r.edits[0].totalBefore == 8000);
+    CHECK(r.edits[0].totalAfter == 2 * 7900 + 850);
+    CHECK(r.edits[0].unitsBefore == 10);
+    CHECK(r.edits[0].unitsAfter == 21);
+    CHECK(r.edits[0].lines.size() == 2);
+    CHECK_FALSE(r.edits[0].by.empty());
+    // The list and the reports show the invoice as it is now.
+    REQUIRE(pos.recvShowReceived(id));
+    CHECK(pos.retailReceiving()[u"received"_s].toMap()[u"edits"_s].toList().size() == 1);
+    const core::Report pr = pos.buildReport(u"retailpurchases"_s);
+    bool changed = false;
+    for (const core::ReportRow &row : pr.rows)
+        for (const std::string &c : row.cells)
+            changed = changed || c.find("R-1 (changed)") != std::string::npos;
+    CHECK(changed);
+
+    // Again: the pack taken off, one carton less: they come back off.
+    REQUIRE(pos.recvEditReceived(id));
+    REQUIRE(pos.recvRemoveLine(1));
+    REQUIRE(pos.recvSetLine(0, {{u"qty"_s, u"1"_s}}));
+    REQUIRE(pos.recvReceive(true));
+    CHECK(text(pos, "pack") == u"3 ctn 3 pk"_s);
+    CHECK(pos.retailReceipts()[0].edits.size() == 2);
+    CHECK(pos.retailReceipts()[0].lines.size() == 1);
+    // The vendor's last cost: the carton's, corrected (the same invoice: as new as the cost it had).
+    REQUIRE(pos.vendorItemOf("acme", "pack"));
+    CHECK(pos.vendorItemOf("acme", "pack")->lastCostCents == 7900);
+
+    // The same vendor and invoice # as a new invoice: refused, with the offer to add to the one received.
+    REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme"_s}, {u"invoice"_s, u"r1"_s}}));
+    CHECK(pos.retailReceiving()[u"duplicateOf"_s].toLongLong() == id);
+    REQUIRE(pos.recvScan(QString::fromLatin1(kPack)));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kPack)));
+    CHECK_FALSE(pos.recvReceive(true));
+    const QVariantMap ask = pos.retailReceiving()[u"confirm"_s].toMap();
+    CHECK(ask[u"kind"_s].toString() == u"duplicate"_s);
+    CHECK(ask[u"receiptId"_s].toLongLong() == id);
+    CHECK(ask[u"text"_s].toString().contains(u"already received"_s));
+    CHECK(text(pos, "pack") == u"3 ctn 3 pk"_s);
+    REQUIRE(pos.recvAddToReceived(id));
+    REQUIRE(pos.retailReceiving()[u"lines"_s].toList().size() == 2);   // the carton line, and the packs added
+    REQUIRE(pos.retailDrafts().size() == 1);   // (the new one became the change)
+    REQUIRE(pos.recvReceive(true));
+    CHECK(text(pos, "pack") == u"3 ctn 5 pk"_s);
+    CHECK(pos.retailReceipts().size() == 1);
+    CHECK(pos.retailReceipts()[0].edits.size() == 3);
+    CHECK(pos.retailDrafts().empty());
 }

@@ -84,6 +84,9 @@ public:
     virtual void saveRetailStock(const std::string &itemId, double onHand) { Q_UNUSED(itemId) Q_UNUSED(onHand) }
     // Retail receiving (pos_receiving.cpp): an invoice received, and a vendor's item (its number, unit, last cost).
     virtual void saveRetailReceipt(const core::recv::Receipt &) {}
+    // An unfinished invoice (Save for later, and autosaved as it's worked on), and one finished or deleted.
+    virtual void saveRetailDraft(const core::recv::Receipt &) {}
+    virtual void deleteRetailDraft(std::int64_t id) { Q_UNUSED(id) }
     virtual void saveVendorItem(const core::recv::VendorItem &) {}
     // The store's pictures (logo, buttons, backgrounds): name -> file bytes.
     virtual void saveImage(const std::string &name, const QByteArray &data) { Q_UNUSED(name) Q_UNUSED(data) }
@@ -242,6 +245,8 @@ struct PosData {
     std::map<std::string, double> retailStock;    // retail item id -> on hand (items counted or transferred)
     std::vector<core::recv::Receipt> retailReceipts;   // retail invoices received, oldest first
     std::int64_t lastRetailReceiptId = 0;
+    std::vector<core::recv::Receipt> retailDrafts;     // retail invoices not finished yet (nothing on hand)
+    std::int64_t lastRetailDraftId = 0;
     std::vector<core::recv::VendorItem> vendorItems;  // each vendor's item numbers, units and last costs
 };
 
@@ -404,6 +409,11 @@ public:
     // counts their changes (the lookups by item number are made again).
     std::vector<core::recv::Receipt> retailReceipts;
     std::int64_t lastRetailReceiptId = 0;
+    // The invoices not finished yet (Unfinished: saved for later, or left as they were), and which terminal's
+    // screen has each open now (the session and its terminal's name): one at a time.
+    std::vector<core::recv::Receipt> retailDrafts;
+    std::int64_t lastRetailDraftId = 0;
+    std::map<std::int64_t, std::pair<const QObject *, QString>> recvHeldBy;
     std::map<std::string, core::recv::VendorItem> vendorItems;
     int vendorItemsRevision = 0;
     QString transferDir;
@@ -1359,8 +1369,15 @@ public:
     bool recvLink(int index, const QString &itemId);     // ...its alt UPC from now on
     bool recvLeaveOut(int index, bool out);              // a code not on file: not counted in
     bool recvQuickAdd(const QVariantMap &item);          // {index | code, upc, name, category, cost, price, packSize}
-    bool recvClear();
-    bool recvSave();                                     // on hand up, the vendor's items learned
+    bool recvClear();                                    // a new invoice (the one here stays on Unfinished)
+    bool recvSaveForLater();                             // kept on Unfinished: nothing on hand
+    bool recvReceive(bool anyway);                       // on hand up (a reopened one: the difference); anyway: not tying out is OK
+    bool recvConfirmCancel();                            // the question Receive asked: Go back
+    bool recvOpenDraft(std::int64_t id, bool takeOver);  // an unfinished invoice, here (takeOver: from another screen)
+    bool recvDeleteDraft(std::int64_t id);
+    bool recvShowReceived(std::int64_t id);              // a received invoice's lines and changes (0: close)
+    bool recvEditReceived(std::int64_t id);              // ...changed: lines added, changed, taken off
+    bool recvAddToReceived(std::int64_t id);             // the lines here added to a received invoice (the duplicate's offer)
     bool recvRange(const QString &from, const QString &until);   // the list's dates, yyyy-MM-dd
     bool recvImportText(const QString &text, const QString &fileName);   // a CSV's text: its columns guessed
     bool recvImportVendor(const QString &vendorId);      // the file's vendor (its saved columns; no account column: all its)
@@ -1376,6 +1393,7 @@ public:
     core::Report retailPurchasesReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
     core::Report retailCostDiffsReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
     const std::vector<core::recv::Receipt> &retailReceipts() const { return s_->retailReceipts; }
+    const std::vector<core::recv::Receipt> &retailDrafts() const { return s_->retailDrafts; }
     const core::recv::VendorItem *vendorItemOf(const std::string &vendorId, const std::string &itemId) const;
     const core::recv::VendorItem *vendorItemByNumber(const std::string &vendorId, const std::string &number) const;
     // "<source> price" (the bar): each retail line on the sale back to the price source's price (a discount per
@@ -2199,7 +2217,16 @@ private:
     const RecvIndex &recvIndex() const;
     RecvFound recvResolve(const QString &code, const QString &vendorId) const;
     const core::Vendor *vendorById(const QString &id) const;
-    bool recvDuplicate(const std::string &vendorId, const std::string &invoice) const;
+    // The received invoice with this vendor and number (0: none), other than `except`.
+    std::int64_t recvDuplicate(const std::string &vendorId, const std::string &invoice, std::int64_t except = 0) const;
+    std::pair<std::string, double> recvStockTarget(const core::recv::Line &line) const;   // the item on hand it goes to, how many
+    void recvTouched();                                  // the invoice here changed: autosaved as unfinished
+    void recvLoad(const core::recv::Receipt &draft);     // an unfinished invoice into the screen
+    void recvRelease();                                  // this screen lets go of its unfinished invoice
+    void recvReset();                                    // an empty screen (no unfinished invoice)
+    core::recv::Receipt *recvDraft(std::int64_t id) const;
+    const QObject *recvHolder(std::int64_t id) const;    // the screen that has it open (null: none)
+    bool recvFinishEdit();                               // Receive on a reopened invoice: the difference
     core::recv::Line recvLineFor(const core::MenuItem &m, double perUom, const QString &vendorId) const;
     bool recvAddCode(const std::string &itemId, const QString &code);
     void recvLearn(const core::recv::Receipt &r);

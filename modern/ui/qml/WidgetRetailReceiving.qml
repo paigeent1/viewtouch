@@ -9,9 +9,12 @@ import QtQuick.Layouts
 // scan is one more; a carton's UPC brings its packs), type a UPC or the vendor's item number, or part of a
 // name and Find; per line the quantity in the vendor's unit, units in it, the invoice's price, OTP and prepaid
 // tax; Store use lines; Delivery, Credit / return and Other amounts; the tie-out against the total. A code
-// not on file: Link it to an item (its alt UPC), Add it, or Leave it out. Save never changes a system cost or
-// a price. Import: an invoice file (CSV), its columns, its invoices and the items not on file, then Receive
-// these invoices or History only. Invoices received: the list.
+// not on file: Link it to an item (its alt UPC), Add it, or Leave it out. The invoice is kept as it's worked on
+// (nothing on hand); Save for later sets it aside on Unfinished (Open, Delete; any screen, one at a time);
+// Receive puts it on hand, asking first when it doesn't tie out. Receiving never changes a system cost or a
+// price. Import: an invoice file (CSV), its columns, its invoices and the items not on file, then Receive these
+// invoices or History only. Invoices received: the list; Open shows one (its lines, its changes) and Edit
+// changes it (only the difference goes on hand).
 Item {
     id: w
     objectName: "retailReceiving"
@@ -28,6 +31,10 @@ Item {
     property var adding: null
     // The import's Link: the code being linked.
     property string linkCode: ""
+    // Delete an unfinished invoice: {id, text} being asked about.
+    property var deleting: null
+    readonly property var editing: info.editing ?? ({})
+    readonly property bool isEditing: (editing.id ?? 0) > 0
 
     // The state comes to a tablet only while a screen shows it (PosServer: on request).
     Item {
@@ -85,7 +92,8 @@ Item {
         RowLayout {
             spacing: 8
             Repeater {
-                model: [["receive", qsTr("Receive invoice")], ["import", qsTr("Import invoice file…")], ["list", qsTr("Invoices received")]]
+                model: [["receive", qsTr("Receive invoice")], ["unfinished", qsTr("Unfinished (%1)").arg((w.info.unfinished ?? []).length)],
+                        ["import", qsTr("Import invoice file…")], ["list", qsTr("Invoices received")]]
                 delegate: Big {
                     required property var modelData
                     objectName: "recvTab-" + modelData[0]
@@ -117,6 +125,35 @@ Item {
                 text: qsTr("Add the vendors first: Manager > Inventory > Vendors (name, account number).")
                 color: "#b00020"
                 Layout.fillWidth: true
+            }
+            Words {
+                objectName: "recvEditingNote"
+                visible: w.isEditing
+                Layout.fillWidth: true
+                font.bold: true
+                color: "#1f5fa8"
+                text: qsTr("Changing invoice #%1 from %2 (received %3 by %4). Add, change or take off lines; Save changes puts only the difference on hand.")
+                          .arg(w.editing.invoice ?? "").arg(w.editing.vendor ?? "").arg(w.editing.at ?? "").arg(w.editing.by ?? "")
+            }
+            Words {
+                objectName: "recvHeldAt"
+                visible: (w.info.heldAt ?? "") !== ""
+                Layout.fillWidth: true
+                font.bold: true
+                color: "#b00020"
+                text: qsTr("This invoice is being edited at %1 now: changes here aren't kept. Touch New invoice, or open it again from Unfinished.").arg(w.info.heldAt ?? "")
+            }
+            RowLayout {
+                visible: (w.info.duplicateOf ?? 0) > 0
+                Layout.fillWidth: true
+                spacing: 8
+                Words {
+                    Layout.fillWidth: true
+                    color: "#b35c00"
+                    font.bold: true
+                    text: qsTr("Invoice #%1 from this vendor was already received.").arg(w.info.invoice ?? "")
+                }
+                Big { objectName: "recvDuplicateOpen"; text: qsTr("Open it to add to it"); onClicked: w.pos.recvAddToReceived(w.info.duplicateOf) }
             }
             Flow {
                 Layout.fillWidth: true
@@ -398,13 +435,100 @@ Item {
                     onEditingFinished: if (text !== (w.info.note ?? "")) w.pos.recvSetHeader({ note: text })
                 }
                 Label { objectName: "recvLinesTotal"; text: qsTr("Lines: %1").arg((w.info.totals ?? {}).total ?? ""); font.pixelSize: w.unit; font.bold: true }
-                Big { objectName: "recvClear"; text: qsTr("Clear"); enabled: (w.info.lines ?? []).length > 0; onClicked: w.pos.recvClear() }
                 Big {
-                    objectName: "recvSave"
-                    text: qsTr("Save")
+                    objectName: "recvClear"
+                    visible: !w.isEditing
+                    text: qsTr("New invoice")
+                    enabled: (w.info.draftId ?? 0) > 0 || (w.info.lines ?? []).length > 0
+                    onClicked: w.pos.recvClear()
+                }
+                Big {
+                    objectName: "recvCancelChanges"
+                    visible: w.isEditing
+                    text: qsTr("Cancel changes")
+                    onClicked: {
+                        if ((w.info.draftId ?? 0) > 0)
+                            w.deleting = { id: w.info.draftId, text: qsTr("Forget the changes to invoice #%1? The invoice stays as it was received.").arg(w.editing.invoice ?? "") }
+                    }
+                }
+                Big {
+                    objectName: "recvSaveForLater"
+                    text: qsTr("Save for later")
+                    enabled: (w.info.draftId ?? 0) > 0 || (w.info.lines ?? []).length > 0 || (w.info.invoice ?? "") !== ""
+                    onClicked: w.pos.recvSaveForLater()
+                }
+                Big {
+                    objectName: "recvReceive"
+                    text: w.isEditing ? qsTr("Save changes") : qsTr("Receive")
                     highlighted: true
-                    enabled: (w.info.lines ?? []).length > 0
-                    onClicked: w.pos.recvSave()
+                    enabled: w.isEditing || (w.info.lines ?? []).length > 0
+                    onClicked: w.pos.recvReceive(false)
+                }
+            }
+        }
+
+        // --- Unfinished invoices (saved for later, or left as they were) ---
+        ColumnLayout {
+            visible: w.tab === "unfinished"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 6
+            Words {
+                Layout.fillWidth: true
+                text: qsTr("Invoices not received yet: nothing from them is on hand. They're kept as you work (a restart loses nothing). Open one to finish it and Receive it.")
+            }
+            ListView {
+                id: draftList
+                objectName: "recvUnfinished"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 4
+                model: w.info.unfinished ?? []
+                ScrollBar.vertical: TouchScrollBar { needed: draftList.contentHeight > draftList.height + 1 }
+                delegate: RowLayout {
+                    required property var modelData
+                    width: draftList.width - 14
+                    spacing: 8
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Label {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            font.pixelSize: w.unit
+                            font.bold: true
+                            text: (modelData.vendor !== "" ? modelData.vendor : qsTr("(no vendor yet)")) + "  #" + (modelData.invoice !== "" ? modelData.invoice : "?")
+                                  + "  " + modelData.date + (modelData.reopen ? "  ·  " + qsTr("changes to a received invoice") : "")
+                        }
+                        Small {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: [qsTr("%1 lines").arg(modelData.lines), qsTr("%1 units").arg(modelData.units), modelData.total,
+                                   qsTr("by %1").arg(modelData.by), qsTr("last changed %1 at %2").arg(modelData.changed).arg(modelData.terminal),
+                                   modelData.here ? qsTr("on this screen") : "",
+                                   modelData.openAt !== "" ? qsTr("being edited at %1").arg(modelData.openAt) : ""].filter(s => s !== "").join("  ·  ")
+                            color: modelData.openAt !== "" ? "#b35c00" : palette.windowText
+                        }
+                    }
+                    Big {
+                        objectName: "recvDraftOpen-" + modelData.id
+                        text: modelData.openAt !== "" ? qsTr("Open here anyway") : qsTr("Open")
+                        highlighted: modelData.openAt === ""
+                        onClicked: w.pos.recvOpenDraft(modelData.id, modelData.openAt !== "")
+                    }
+                    Big {
+                        objectName: "recvDraftDelete-" + modelData.id
+                        text: qsTr("Delete…")
+                        enabled: modelData.openAt === ""
+                        onClicked: w.deleting = { id: modelData.id, text: qsTr("Delete unfinished invoice #%1 from %2? It was never received; nothing on hand changes.")
+                                                                         .arg(modelData.invoice).arg(modelData.vendor) }
+                    }
+                }
+                Words {
+                    anchors.centerIn: parent
+                    visible: draftList.count === 0
+                    text: qsTr("No unfinished invoices.")
                 }
             }
         }
@@ -638,15 +762,20 @@ Item {
                 spacing: 3
                 model: w.info.recent ?? []
                 ScrollBar.vertical: TouchScrollBar { needed: recentList.contentHeight > recentList.height + 1 }
-                delegate: Label {
+                delegate: RowLayout {
                     required property var modelData
                     width: recentList.width - 14
-                    font.pixelSize: w.unit * 0.9
-                    elide: Text.ElideRight
-                    text: modelData.date + "  " + modelData.vendor + "  #" + modelData.invoice + "  ·  " + qsTr("%1 lines").arg(modelData.lines)
-                          + "  ·  " + modelData.total + (modelData.tie !== "" ? "  (" + modelData.tie + ")" : "")
-                          + "  ·  " + (modelData.history ? qsTr("history only") : qsTr("%1 units").arg(modelData.units))
-                          + "  ·  " + modelData.by
+                    spacing: 8
+                    Label {
+                        Layout.fillWidth: true
+                        font.pixelSize: w.unit * 0.9
+                        elide: Text.ElideRight
+                        text: modelData.date + "  " + modelData.vendor + "  #" + modelData.invoice + "  ·  " + qsTr("%1 lines").arg(modelData.lines)
+                              + "  ·  " + modelData.total + (modelData.tie !== "" ? "  (" + modelData.tie + ")" : "")
+                              + "  ·  " + (modelData.history ? qsTr("history only") : qsTr("%1 units").arg(modelData.units))
+                              + "  ·  " + modelData.by + (modelData.changes > 0 ? "  ·  " + qsTr("changed %1 time(s)").arg(modelData.changes) : "")
+                    }
+                    Big { objectName: "recvOpenReceived-" + modelData.id; text: qsTr("Open"); onClicked: w.pos.recvShowReceived(modelData.id) }
                 }
                 Words {
                     anchors.centerIn: parent
@@ -807,6 +936,174 @@ Item {
                         w.pos.recvQuickAdd(r)
                         w.adding = null
                         addPrice.text = ""
+                    }
+                }
+            }
+        }
+    }
+
+    // Invoices received > Open: its lines and its changes; Edit.
+    Rectangle {
+        objectName: "recvReceivedView"
+        anchors.fill: parent
+        readonly property var r: w.info.received ?? ({})
+        visible: w.tab === "list" && (r.id ?? 0) > 0
+        color: "#14181e"
+        MouseArea { anchors.fill: parent }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 6
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Label {
+                    Layout.fillWidth: true
+                    color: "white"
+                    font.pixelSize: w.unit * 1.1
+                    font.bold: true
+                    elide: Text.ElideRight
+                    readonly property var r: w.info.received ?? ({})
+                    text: (r.date ?? "") + "  " + (r.vendor ?? "") + "  #" + (r.invoice ?? "") + "  ·  " + (r.total ?? "")
+                          + ((r.tie ?? "") !== "" ? "  (" + r.tie + ")" : "") + "  ·  " + qsTr("received %1 by %2").arg(r.at ?? "").arg(r.by ?? "")
+                }
+                Big {
+                    objectName: "recvEditReceived"
+                    text: (w.info.received ?? {}).beingChanged ? qsTr("Edit (changes waiting on Unfinished)") : qsTr("Edit")
+                    highlighted: true
+                    onClicked: w.pos.recvEditReceived((w.info.received ?? {}).id ?? 0)
+                }
+                Big { objectName: "recvReceivedClose"; text: qsTr("Close"); onClicked: w.pos.recvShowReceived(0) }
+            }
+            ListView {
+                id: receivedLines
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: 3
+                clip: true
+                model: (w.info.received ?? {}).lines ?? []
+                ScrollBar.vertical: TouchScrollBar { needed: receivedLines.contentHeight > receivedLines.height + 1 }
+                delegate: Label {
+                    required property var modelData
+                    width: receivedLines.width - 14
+                    color: "white"
+                    font.pixelSize: w.unit * 0.85
+                    elide: Text.ElideRight
+                    text: modelData.kind + "  " + modelData.name
+                          + (modelData.isItem ? "  ·  " + modelData.qty + " " + modelData.uom + " × " + modelData.perUom + "  @ " + modelData.cost : "")
+                          + "  =  " + modelData.extended + (modelData.leftOut ? "  ·  " + qsTr("skipped") : "")
+                }
+            }
+            Label {
+                visible: ((w.info.received ?? {}).edits ?? []).length > 0
+                text: qsTr("Changes after it was received")
+                color: "white"
+                font.pixelSize: w.unit
+                font.bold: true
+            }
+            ListView {
+                id: editList
+                objectName: "recvEdits"
+                visible: count > 0
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: 2
+                clip: true
+                spacing: 4
+                model: (w.info.received ?? {}).edits ?? []
+                ScrollBar.vertical: TouchScrollBar { needed: editList.contentHeight > editList.height + 1 }
+                delegate: Label {
+                    required property var modelData
+                    width: editList.width - 14
+                    color: "#d0d8e0"
+                    font.pixelSize: w.unit * 0.8
+                    wrapMode: Text.WordWrap
+                    text: qsTr("%1 by %2 at %3: %4").arg(modelData.when).arg(modelData.by).arg(modelData.terminal).arg(modelData.text)
+                          + (modelData.lines.length > 0 ? "\n    " + modelData.lines.join("\n    ") : "")
+                }
+            }
+        }
+    }
+
+    // Receive's question: not tying out, no total, or received before.
+    Rectangle {
+        objectName: "recvConfirmView"
+        anchors.fill: parent
+        readonly property var c: w.info.confirm ?? ({})
+        visible: (c.kind ?? "") !== ""
+        color: "#cc000000"
+        MouseArea { anchors.fill: parent }
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 24, w.unit * 36)
+            height: confirmCol.implicitHeight + 32
+            radius: 8
+            color: "#14181e"
+            ColumnLayout {
+                id: confirmCol
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 12
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: "white"
+                    font.pixelSize: w.unit * 1.1
+                    font.bold: true
+                    text: (w.info.confirm ?? {}).text ?? ""
+                }
+                RowLayout {
+                    spacing: 8
+                    Item { Layout.fillWidth: true }
+                    Big { objectName: "recvConfirmNo"; text: qsTr("Go back"); onClicked: w.pos.recvConfirmCancel() }
+                    Big {
+                        objectName: "recvConfirmYes"
+                        highlighted: true
+                        readonly property var c: w.info.confirm ?? ({})
+                        text: c.kind === "duplicate" ? qsTr("Open it and add these lines")
+                                                     : (w.isEditing ? qsTr("Save changes anyway") : qsTr("Receive anyway"))
+                        onClicked: c.kind === "duplicate" ? w.pos.recvAddToReceived(c.receiptId) : w.pos.recvReceive(true)
+                    }
+                }
+            }
+        }
+    }
+
+    // Delete an unfinished invoice (or forget the changes to a received one): asked first.
+    Rectangle {
+        objectName: "recvDeleteView"
+        anchors.fill: parent
+        visible: w.deleting !== null
+        color: "#cc000000"
+        MouseArea { anchors.fill: parent }
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 24, w.unit * 36)
+            height: deleteCol.implicitHeight + 32
+            radius: 8
+            color: "#14181e"
+            ColumnLayout {
+                id: deleteCol
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 12
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: "white"
+                    font.pixelSize: w.unit * 1.1
+                    font.bold: true
+                    text: w.deleting ? w.deleting.text : ""
+                }
+                RowLayout {
+                    spacing: 8
+                    Item { Layout.fillWidth: true }
+                    Big { objectName: "recvDeleteNo"; text: qsTr("Keep it"); onClicked: w.deleting = null }
+                    Big {
+                        objectName: "recvDeleteYes"
+                        highlighted: true
+                        text: qsTr("Delete")
+                        onClicked: { w.pos.recvDeleteDraft(w.deleting.id); w.deleting = null }
                     }
                 }
             }

@@ -3357,9 +3357,42 @@ spread into the items' costs.</li>
 <li>A code that isn't on file is set aside on its own line: <b>Link to an item…</b> (find it; the code becomes
 its alt UPC, so the next scan finds it), <b>Add it…</b> (a new retail item: UPC, name, category, cost, price and
 pack size), or <b>Leave it out</b> (not counted in; its amount still counts toward the invoice).</li>
-<li><b>Save</b>. The stock lines go into on hand, each vendor's item number, unit and last cost are kept, and the
-invoice is on the Changes report. The same vendor's invoice number can't be received twice.</li>
+<li><b>Receive</b> when the invoice is finished. The stock lines go into on hand, each vendor's item number, unit
+and last cost are kept, and the invoice is on the Changes report. If it doesn't tie out (or no total was typed)
+ViewTouch asks first: <i>Off by $x from the invoice's total. Receive anyway?</i> — <b>Go back</b> to fix it, or
+<b>Receive anyway</b>.</li>
 </ol>
+
+<h2>Unfinished invoices: Save for later</h2>
+<p>Nothing from an invoice is on hand until you press <b>Receive</b>. Until then it is an <i>unfinished</i>
+invoice, and it is kept as you work: every scan and every change is saved at once, so a restart or an update
+loses nothing. Come back to the screen and the invoice is there as you left it.</p>
+<ul>
+<li><b>Save for later</b> sets the invoice aside (for example while you wait for the vendor about a line). The
+screen is ready for the next invoice; nothing goes on hand.</li>
+<li><b>New invoice</b> starts another one; the one on the screen stays on Unfinished.</li>
+<li>The <b>Unfinished</b> tab lists them: vendor, invoice #, date, lines, units, who changed it last, and when and
+where. <b>Open</b> brings one back to Receive invoice (any screen can); <b>Delete…</b> throws one away after asking
+(it was never received, so on hand doesn't change).</li>
+<li>One screen at a time: an invoice open on another screen says <i>being edited at BAR2</i>. <b>Open here
+anyway</b> takes it over; the other screen is told and its next change isn't kept, so the two never overwrite each
+other.</li>
+</ul>
+
+<h2>Changing an invoice already received</h2>
+<p><b>Invoices received</b> → <b>Open</b> shows an invoice's lines and every change made to it after it was received.
+<b>Edit</b> brings it back to Receive invoice: add lines (scan as usual), change quantities and prices, or take
+lines off (✕). <b>Save changes</b> puts <b>only the difference</b> on hand: one more carton adds one sealed
+carton, a pack line taken off takes its packs back off; lines that didn't change don't touch on hand. The change is
+kept on the invoice (who, when, at which screen, each line before and after, the total before and after), the
+vendor's last cost is updated when this invoice is the newest, and Retail Purchases and Retail Cost Diffs show the
+invoice as it is now (<i>(changed)</i> beside it on Purchases). <b>Cancel changes</b> forgets them; the invoice stays
+as it was received. A received invoice keeps its vendor.</p>
+<p>The same vendor and invoice # can't be received twice as a new invoice. Instead, Receive offers: <i>Invoice #x
+from Y was already received. Open it to add these lines to it?</i> — <b>Open it and add these lines</b> opens the
+received invoice with the new lines added; <b>Save changes</b> then puts only those on hand. The same offer shows
+above the lines as soon as you type an invoice # that was already received.</p>
+<div class="tip">Invoices received before this version stay received as they were; nothing needs doing.</div>
 
 <h2>Importing an invoice file</h2>
 <p>Ask the vendor for a file of the invoices (for example the last 12 months). <b>Receive retail… → Import invoice
@@ -3385,7 +3418,7 @@ for the months before you started receiving here). An older invoice never replac
 </ul>
 
 <h2>The list and the reports</h2>
-<p><b>Invoices received</b>: by invoice date (the last 60 days, or From / to). <b>Reports → Retail Purchases</b>
+<p><b>Invoices received</b>: by invoice date (the last 60 days, or From / to); <b>Open</b> on one shows it. <b>Reports → Retail Purchases</b>
 (today: the invoices received today; or any dates, by invoice date): by vendor group, by vendor and by invoice,
 the stock's cost (with OTP / excise), prepaid tax, delivery, store use, use tax, credits, other and the invoices'
 totals, and the invoices that don't tie out. <b>Reports → Retail Cost Diffs</b>: each line whose invoice cost per

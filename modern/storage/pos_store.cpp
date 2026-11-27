@@ -288,7 +288,9 @@ bool PosStore::open(QString *error)
         return false;
     // Retail receiving (2026-11-27): the invoices received, each vendor's items. New tables only, as above.
     if (!run(q, u"CREATE TABLE IF NOT EXISTS retail_receipts (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"_s, error)
-        || !run(q, u"CREATE TABLE IF NOT EXISTS vendor_items (key TEXT PRIMARY KEY, json TEXT NOT NULL)"_s, error))
+        || !run(q, u"CREATE TABLE IF NOT EXISTS vendor_items (key TEXT PRIMARY KEY, json TEXT NOT NULL)"_s, error)
+        // ...and the invoices not finished yet (Save for later, autosaved as they're worked on; 2026-11-27).
+        || !run(q, u"CREATE TABLE IF NOT EXISTS retail_drafts (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"_s, error))
         return false;
     // Indexes for what's looked up by time, so a store with years of data
     // doesn't read whole tables. An older ViewTouch opens the database the
@@ -544,6 +546,12 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
     }
     if (q.exec(u"SELECT COALESCE(MAX(id), 0) FROM retail_receipts"_s) && q.next())
         data.lastRetailReceiptId = q.value(0).toLongLong();
+    if (q.exec(u"SELECT json FROM retail_drafts ORDER BY id"_s)) {
+        while (q.next())
+            data.retailDrafts.push_back(app::retailReceiptFromJson(parse(q.value(0))));
+    }
+    for (const core::recv::Receipt &d : data.retailDrafts)
+        data.lastRetailDraftId = std::max(data.lastRetailDraftId, d.id);
     if (q.exec(u"SELECT json FROM vendor_items"_s)) {
         while (q.next())
             data.vendorItems.push_back(app::vendorItemFromJson(parse(q.value(0))));
@@ -757,6 +765,17 @@ void SqlPosSink::saveRetailReceipt(const core::recv::Receipt &r)
 {
     writer_.upsert(u"retail_receipts"_s, QString::number(r.id),
                    {{u"id"_s, qint64(r.id)}, {u"at"_s, qint64(r.at)}, {u"json"_s, compact(app::toJson(r))}});
+}
+
+void SqlPosSink::saveRetailDraft(const core::recv::Receipt &r)
+{
+    writer_.upsert(u"retail_drafts"_s, QString::number(r.id),
+                   {{u"id"_s, qint64(r.id)}, {u"at"_s, qint64(r.changedAt)}, {u"json"_s, compact(app::toJson(r))}});
+}
+
+void SqlPosSink::deleteRetailDraft(std::int64_t id)
+{
+    writer_.remove(u"retail_drafts"_s, u"id"_s, QString::number(id));
 }
 
 void SqlPosSink::saveVendorItem(const core::recv::VendorItem &v)
