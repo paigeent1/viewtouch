@@ -1063,14 +1063,16 @@ bool PosService::recvDeleteDraft(std::int64_t id)
     if (const QObject *h = recvHolder(id); h && h != this)
         return fail(tr("That invoice is open at %1.").arg(s_->recvHeldBy[id].second));
     const QString what = tr("Invoice #%1 from %2").arg(qs(it->invoice), qs(it->vendorName));
+    const bool changes = it->reopenOf != 0;   // (changes to a received invoice: forgotten; it stays as received)
     s_->recvHeldBy.erase(id);
     s_->retailDrafts.erase(it);
     if (s_->sink)
         s_->sink->deleteRetailDraft(id);
     if (v.draftId == id)
         recvReset();
-    logChange(tr("Inventory"), what, tr("Unfinished invoice deleted"), QString(), QString());
-    v.message = tr("%1 deleted (it was never received).").arg(what);
+    logChange(tr("Inventory"), what, changes ? tr("Changes not kept") : tr("Unfinished invoice deleted"), QString(), QString());
+    v.message = changes ? tr("The changes to %1 were not kept; it stays as it was received.").arg(what)
+                        : tr("%1 deleted (it was never received).").arg(what);
     emit s_->adminChanged();
     return true;
 }
