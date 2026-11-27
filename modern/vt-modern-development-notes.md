@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-27 10:20 ET — Bob (Claude) — Settings rows: a card per row on narrow screens
+- **What:** Tablet app: changed. Server: no change. FieldEditor rows (4+ columns) too narrow for every column side by side: each row becomes a card, two fields a line, each field's name over it, a gap under each row; wide screens unchanged. Text ('string') cells are left-aligned so an address shows its start.
+- **Why:** Owner's photo of Store Settings > Other stores (Nov 27): with five columns the address showed only '...168.1.81' and the choices were cut ('Sent th', 'Price chan...').
+- **Files:** (none)
+
 ### 2026-11-27 09:05 ET — Bob (Claude) — Store Settings rows: columns shrink to fit; ssh address visible
 - **What:** Tablet app: changed. Server: changed. Settings rows editor (FieldEditor.qml): every column fills and shrinks to a 60 px minimum instead of fixed widths pushing the last columns off a narrow screen; Other stores' ssh address column gets 220 px (it was a 0-width fill column squeezed to nothing, its header drawn over Transfers).
 - **Why:** Owner's photo at BHDAN (Nov 27): the ssh address column was invisible and Share customers off-screen, so a store row would be saved without its address.

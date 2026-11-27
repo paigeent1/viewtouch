@@ -654,6 +654,10 @@ ColumnLayout {
             readonly property var cols: fe.field.columns ?? [{ label: "", type: "text" }]
             readonly property string current: fe.mixed || fe.value == null ? "" : String(fe.value)
             property var rows: []
+            // Too narrow for every column side by side (4 or more columns): each row becomes a card, two
+            // fields a line, each with its own name over it, instead of squeezing the fields unreadable.
+            readonly property bool stacked: cols.length > 3
+                && width < cols.reduce((t, c) => t + (c.width || 160) + 4, 0) + 60
             function parse(text) {
                 const split = new RegExp(fe.field.split ?? "\\n")
                 const pattern = fe.field.pattern ? new RegExp(fe.field.pattern, "i") : null
@@ -679,7 +683,7 @@ ColumnLayout {
 
             // Column names over the rows (more than one column).
             RowLayout {
-                visible: rowsBox.cols.length > 1 && rowsBox.rows.length > 0
+                visible: rowsBox.cols.length > 1 && rowsBox.rows.length > 0 && !rowsBox.stacked
                 Layout.fillWidth: true
                 spacing: 4
                 Repeater {
@@ -701,14 +705,18 @@ ColumnLayout {
             }
             Repeater {
                 model: rowsBox.rows.length
-                RowLayout {
+                GridLayout {
                     id: rowLine
                     required property int index
                     Layout.fillWidth: true
-                    spacing: 4
+                    // Side by side; or (stacked) a card of two fields a line, a line under each row.
+                    columns: rowsBox.stacked ? 2 : -1
+                    columnSpacing: 4
+                    rowSpacing: 4
+                    Layout.bottomMargin: rowsBox.stacked ? 10 : 0
                     Repeater {
                         model: rowsBox.cols
-                        Loader {
+                        ColumnLayout {
                             id: cell
                             required property var modelData
                             required property int index
@@ -718,10 +726,22 @@ ColumnLayout {
                                 rowsBox.rows[row][index] = String(v)
                                 rowsBox.save()
                             }
+                            spacing: 2
                             Layout.fillWidth: true
-                            Layout.preferredWidth: modelData.width || 160
+                            Layout.preferredWidth: rowsBox.stacked ? 100 : (modelData.width || 160)
                             Layout.minimumWidth: 60
-                            sourceComponent: modelData.type === "enum" ? cellCombo
+                            // Stacked: the field's name over it (the column names row is hidden).
+                            Label {
+                                visible: rowsBox.stacked
+                                text: cell.modelData.label ?? ""
+                                color: EditorStyle.muted
+                                font.pixelSize: 11
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+                          Loader {
+                            Layout.fillWidth: true
+                            sourceComponent: cell.modelData.type === "enum" ? cellCombo
                                            : fe.field.addPicture && cell.cellValue.startsWith("image:") ? cellPicture
                                            : fe.field.addPicture && cell.cellValue.startsWith("video:") ? cellVideo : cellText
                             // A video ("video:/home/pi/Pictures/Guest Screen/sale.mp4", "#sound" at the end
@@ -811,7 +831,7 @@ ColumnLayout {
                                     text: cell.cellValue
                                     placeholderText: cell.modelData.placeholder ?? ""
                                     readOnly: fe.readOnly
-                                    horizontalAlignment: cell.modelData.type === "text" || !cell.modelData.type ? Text.AlignLeft : Text.AlignRight
+                                    horizontalAlignment: cell.modelData.type === "text" || cell.modelData.type === "string" || !cell.modelData.type ? Text.AlignLeft : Text.AlignRight
                                     inputMethodHints: cell.modelData.type === "int" ? Qt.ImhDigitsOnly
                                                     : cell.modelData.type === "number" || cell.modelData.type === "money" ? Qt.ImhFormattedNumbersOnly : Qt.ImhNone
                                     onEditingFinished: if (text !== cell.cellValue) cell.put(cell.modelData.type === "money" && text !== "" ? Number(text).toFixed(2) : text)
@@ -830,6 +850,7 @@ ColumnLayout {
                                     onActivated: i => cell.put(cell.modelData.options[i].value)
                                 }
                             }
+                          }
                         }
                     }
                     // field.reorder: a row moved up (the order they're shown in).
