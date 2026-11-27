@@ -569,14 +569,19 @@ Totals Check::totals(const TaxRates &now) const
     // An item discount comes off its own line; the rest are shared over the check.
     Money shared;
     std::map<TaxClass, Money> onLines;
+    std::map<TaxClass, Money> storeOnLines;
+    Money storePriceOff;   // (on lines that may not be discounted otherwise: not out of `discountable`)
     for (const Payment &p : payments) {
         if (p.kind != TenderKind::Discount)
             continue;
         Money off;
         const OrderLine *line = nullptr;
+        const bool storePrice = p.tenderId == kStorePriceTender && p.lineId != 0;
         if (p.lineId != 0) {
             const auto it = std::ranges::find(lines, p.lineId, &OrderLine::id);
-            if (it == lines.end() || !mayDiscount(*it))
+            const bool may = it != lines.end()
+                             && (storePrice ? !it->voided && !it->isGiftCard() && !it->isReturn() : mayDiscount(*it));
+            if (!may)
                 continue;   // its item was voided or can't be discounted: nothing off
             line = &*it;
             const Money base = line->total();
@@ -587,7 +592,16 @@ Totals Check::totals(const TaxRates &now) const
             // Percent off what may be discounted, or a fixed amount (rewards, promotions).
             off = (p.staffMeal ? staffDiscountable : discountable).percent(p.percentBp) + p.amount;
         }
-        const Money room = discountable - t.discounts;
+        if (storePrice && !mayDiscount(*line)) {
+            if (off.cents() <= 0)
+                continue;
+            t.discounts += off;
+            storePriceOff += off;
+            t.discountBy[p.id] = off;
+            storeOnLines[line->taxClass] += off;
+            continue;
+        }
+        const Money room = discountable - (t.discounts - storePriceOff);
         if (off > room)
             off = room;
         if (off.cents() <= 0)
@@ -623,12 +637,14 @@ Totals Check::totals(const TaxRates &now) const
         sharedRoom += amount;
     for (const auto &[cls, off] : onLines)
         discountableByClass[cls] -= off;
-    sharedRoom = sharedRoom - (t.discounts - shared);
+    sharedRoom = sharedRoom - (t.discounts - shared - storePriceOff);
     Money allocated;
     TaxClass largest = TaxClass::None;
     Money largestAmount;
     bool any = false;
     std::map<TaxClass, Money> discountShare = onLines;
+    for (const auto &[cls, off] : storeOnLines)
+        discountShare[cls] += off;
     for (const auto &[cls, amount] : discountableByClass) {
         if (!any || amount > largestAmount) {
             largest = cls;

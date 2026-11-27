@@ -171,6 +171,7 @@ inline QVariantList storeSections(const QVariantList &fields)
          {"kioskSendNow", "kioskSlip", "kioskIdleSeconds", "kioskWelcome", "kioskAskWhere", "kioskAskName", "kioskEasyReach",
           "kioskSizePercent", "kioskBackground", "kioskCard", "kioskGo", "kioskText", "kioskFont"}},
         {"checklists", PosService::tr("Checklists"), {"openingChecklist", "closingChecklist"}},
+        {"otherStores", PosService::tr("Other stores"), {"storeCode", "otherStores", "storePricesFrom", "storePricesApply"}},
         {"backups", PosService::tr("Backups"), {"backupCopyDir", "encryptBackups", "backupPassword", "longTermArchiveDir", "longTermArchiveDays"}},
         {"accounting", PosService::tr("Franchise and accounting"), {"royaltyPercent", "adFundPercent", "chartOfAccounts"}},
         {"scanData", PosService::tr("Tobacco scan data (Altria)"),

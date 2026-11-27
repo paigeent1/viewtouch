@@ -351,7 +351,7 @@ Item {
         return i ? { id: i.id, name: i.name, price: i.priceValue.toFixed(2), family: i.family, image: i.image,
                      groups: i.groups.slice(), onIt: i.onIt.join(", "), available: i.availableSet,
                      kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
-                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode, isEvent: i.isEvent ?? w.eventMode,
+                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", basePriceText: i.basePriceText ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode, isEvent: i.isEvent ?? w.eventMode,
                      length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
                      abv: i.abv ?? "", pourOz: i.pourOz ?? "",
                      scanMaker: i.scanMaker ?? "", scanCategory: i.scanCategory ?? "", scanUom: i.scanUom ?? "", scanUnits: i.scanUnits ?? "",
@@ -1889,6 +1889,13 @@ Item {
 
                                 // Cost, Target Margin %, and Retail Price Calculation
                                 Label { text: qsTr("Pricing & Margin"); font.bold: true }
+                                // The price source's price (a store that takes its prices from another: "BH price: $10.49").
+                                Label {
+                                    objectName: "builderBasePrice"
+                                    visible: text !== ""
+                                    text: w.draft.basePriceText ?? ""
+                                    color: "#0e7490"
+                                }
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 12

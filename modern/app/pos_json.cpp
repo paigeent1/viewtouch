@@ -1245,6 +1245,16 @@ QJsonObject toJson(const PosSettings &s)
         {u"storeName"_s, qs(s.storeName)}, {u"storeZip"_s, qs(s.storeZip)}, {u"storeAddress"_s, qs(s.storeAddress)}, {u"storePhone"_s, qs(s.storePhone)}, {u"giftCardLocation"_s, qs(s.giftCardLocation)}, {u"topRibbonShowWeather"_s, s.topRibbonShowWeather}, {u"setupDone"_s, s.setupDone},
         {u"currencySymbol"_s, qs(s.currencySymbol)},
         {u"ilsaHistoryStore"_s, qs(s.ilsaHistoryStore)},
+        {u"storeCode"_s, qs(s.storeCode)},
+        {u"otherStores"_s, [&s] {
+             QJsonArray a;
+             for (const OtherStore &o : s.otherStores)
+                 a.append(QJsonObject{{u"name"_s, qs(o.name)}, {u"host"_s, qs(o.host)}, {u"on"_s, o.on}, {u"sendPrices"_s, o.sendPrices}});
+             return a;
+         }()},
+        {u"storePricesFrom"_s, qs(s.storePricesFrom)}, {u"storePricesApply"_s, qs(s.storePricesApply)},
+        {u"priceZone"_s, QJsonObject{{u"name"_s, qs(s.priceZone.name)}, {u"markup"_s, s.priceZone.markupPercent},
+                                     {u"round"_s, qs(s.priceZone.round)}}},
         {u"customColors"_s, [&s] { QJsonArray a; for (const std::string &c : s.customColors) a.append(qs(c)); return a; }()},
         {u"priceChanges"_s, [&s] {
              QJsonArray a;
@@ -1539,6 +1549,19 @@ PosSettings settingsFromJson(const QJsonObject &o)
     s.setupDone = o.value(u"setupDone").toBool(false);
     s.currencySymbol = ss(o.value(u"currencySymbol").toString(qs(s.currencySymbol)));
     s.ilsaHistoryStore = ss(o.value(u"ilsaHistoryStore").toString(qs(s.ilsaHistoryStore)));
+    s.storeCode = ss(o.value(u"storeCode").toString());
+    for (const QJsonValue &v : o.value(u"otherStores").toArray()) {
+        const QJsonObject x = v.toObject();
+        s.otherStores.push_back({ss(x.value(u"name").toString()), ss(x.value(u"host").toString()), x.value(u"on").toBool(true),
+                                 x.value(u"sendPrices").toBool(false)});
+    }
+    s.storePricesFrom = ss(o.value(u"storePricesFrom").toString());
+    s.storePricesApply = ss(o.value(u"storePricesApply").toString(qs(s.storePricesApply)));
+    if (const QJsonObject z = o.value(u"priceZone").toObject(); !z.isEmpty()) {
+        s.priceZone.name = ss(z.value(u"name").toString(u"Base"_s));
+        s.priceZone.markupPercent = z.value(u"markup").toDouble(0);
+        s.priceZone.round = ss(z.value(u"round").toString(u"none"_s));
+    }
     for (const QJsonValue &c : o.value(u"customColors").toArray())
         s.customColors.push_back(ss(c.toString()));
     for (const QJsonValue &v : o.value(u"priceChanges").toArray()) {

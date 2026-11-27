@@ -1,0 +1,74 @@
+#!/bin/bash
+# vt-send-transfers: send what ViewTouch put in the transfers outbox to the other stores (inventory transfers,
+# their results and voids, retail price changes). ViewTouch starts it by itself, detached, when it writes a file
+# and about once a minute while files wait (modern/app/pos_transfers.cpp), so a slow or down link never holds up
+# the register. Safe to run by hand any time (one at a time: a second copy just exits).
+#
+#   vt-send-transfers [DATA]     DATA: ViewTouch's data folder's transfers/ (default
+#                                ~/.local/share/ViewTouch/ViewTouch/transfers)
+#
+# DATA/outbox/<STORE>/*.json goes to <STORE>'s Pi, into the same folder's inbox/ there
+# (~/.local/share/ViewTouch/ViewTouch/transfers/inbox/), over ssh with the keys vt-update-stores already uses:
+# no new port, no password. The addresses come from DATA/stores.conf ("NAME user@address on|off", written by
+# ViewTouch from Store Settings > Other stores), else from OTHER_STORES in this Pi's site settings (vt-site).
+# A file sent moves to DATA/sent/<STORE>/; one that couldn't go stays in the outbox for the next try.
+# The last word is in DATA/send-status ("ok", or "fail STORE what ssh said"); a log in DATA/send.log.
+set -u
+DATA="${1:-$HOME/.local/share/ViewTouch/ViewTouch/transfers}"
+REMOTE_INBOX='.local/share/ViewTouch/ViewTouch/transfers/inbox'
+[ -d "$DATA/outbox" ] || exit 0
+LIB="$(dirname "$(readlink -f "$0")")/vt-site-lib"
+# shellcheck disable=SC1090
+[ -f "$LIB" ] && . "$LIB" >/dev/null 2>&1
+exec 9>"$DATA/.send.lock"
+flock -n 9 || exit 0
+log() { echo "$(date '+%F %T') $*" >> "$DATA/send.log"; echo "$*"; }
+
+host_of() {   # STORE -> user@address ("" if unknown or off)
+    local name="$1" n h on
+    if [ -f "$DATA/stores.conf" ]; then
+        while read -r n h on _; do
+            [ -z "$n" ] || [ "${n:0:1}" = "#" ] && continue
+            if [ "$n" = "$name" ]; then
+                [ "$on" = off ] && return
+                echo "$h"; return
+            fi
+        done < "$DATA/stores.conf"
+    fi
+    for s in ${OTHER_STORES:-}; do
+        [ "$(echo "${s%%=*}" | tr '[:lower:]' '[:upper:]')" = "$name" ] && { echo "${s#*=}"; return; }
+    done
+}
+
+status=ok
+for dir in "$DATA"/outbox/*/; do
+    [ -d "$dir" ] || continue
+    store=$(basename "$dir")
+    files=("$dir"*.json)
+    [ -e "${files[0]}" ] || continue
+    host=$(host_of "$store")
+    if [ -z "$host" ]; then
+        log "$store: no address (Store Settings > Other stores): ${#files[@]} file(s) wait"
+        status="fail $store no address"
+        continue
+    fi
+    for f in "${files[@]}"; do
+        name=$(basename "$f")
+        # Written under a temporary name and renamed there, so the other store never reads half a file.
+        if out=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$host" \
+            "mkdir -p $REMOTE_INBOX && cat > $REMOTE_INBOX/.$name.part && mv -f $REMOTE_INBOX/.$name.part $REMOTE_INBOX/$name" \
+            < "$f" 2>&1); then
+            mkdir -p "$DATA/sent/$store"
+            mv -f "$f" "$DATA/sent/$store/$name"
+            log "$store: sent $name"
+        else
+            log "$store: couldn't send $name ($out); it waits for the next try"
+            status="fail $store $(echo "$out" | tail -1)"
+            break   # the link is down: the rest wait too
+        fi
+    done
+done
+echo "$status" > "$DATA/send-status"
+# Keep the log short.
+[ -f "$DATA/send.log" ] && tail -n 2000 "$DATA/send.log" > "$DATA/send.log.tmp" && mv -f "$DATA/send.log.tmp" "$DATA/send.log"
+exit 0

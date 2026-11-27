@@ -429,6 +429,23 @@ QVariantList PosService::adminFields(const QString &panel)
                      "someone in from Manager → Schedule.")),
             with(with(field(u"clockInEarlyMinutes"_s, tr("…clock in up to (minutes) early"), u"int"_s), u"min"_s, 0),
                  u"max"_s, 240),
+            field(u"storeCode"_s, tr("This store's short name"), u"string"_s,
+                  tr("How the other stores know this one, in letters and digits: BH, HCA. On transfers and price changes.")),
+            asRows(field(u"otherStores"_s, tr("Other stores"), u"text"_s,
+                         tr("The owner's other stores: each one's short name (as it calls itself), the ssh address "
+                            "vt-update-stores uses for it (pi@192.168.6.81), whether transfers go there, and whether this "
+                            "store's retail price changes are sent there (the retail store to the bar; never the other way).")),
+                   tr("+ Add a store"),
+                   {column(tr("Short name"), "string", 120, {}, u"HCA"_s), column(tr("ssh address"), "string", 0, {}, u"pi@192.168.6.81"_s),
+                    column(tr("Transfers"), "enum", 130, options({{"on", "On"}, {"off", "Off"}})),
+                    column(tr("Price changes"), "enum", 190, options({{"no-prices", "Not sent"}, {"prices", "Sent there"}}))},
+                   uR"(^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$)"_s, u"%1 %2 %3 %4"_s),
+            field(u"storePricesFrom"_s, tr("Take retail prices from"), u"string"_s,
+                  tr("The short name of the store whose retail price changes this store takes (the bar: the retail store). "
+                     "Empty: none. Changes from any other store are refused. Markup: Mass Updates > Prices from…")),
+            with(field(u"storePricesApply"_s, tr("Its price changes are applied"), u"enum"_s,
+                       tr("Automatically (open checks keep their prices), or waiting on Mass Updates for someone with the price book permission.")),
+                 u"options"_s, options({{"auto", "Automatically"}, {"ask", "When someone applies them"}})),
             asRows(field(u"tipOuts"_s, tr("Tip-outs"), u"text"_s,
                          tr("A share of each server's tips (or sales), split by hours among everyone in that job who "
                             "worked today.")),

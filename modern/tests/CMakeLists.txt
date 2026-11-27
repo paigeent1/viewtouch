@@ -1,7 +1,8 @@
 set(VTM_TEST_SOURCES test_money.cpp test_check.cpp test_scan_data.cpp test_price_check.cpp
     test_builder_index.cpp   # Menu Builder's quick index (core/builder_index.hh)
     test_buydown_core.cpp   # manufacturer buydowns and promotions (core/buydown.hh)
-    test_mass_update_core.cpp)   # Mass Updates' rounding, margins, ranges (core/mass_update.hh)
+    test_mass_update_core.cpp   # Mass Updates' rounding, margins, ranges (core/mass_update.hh)
+    test_transfer_core.cpp)   # transfers between stores: UPC matching with packs, totals, the markup (core/transfer.hh)
 if(TARGET vtm_layout)
     list(APPEND VTM_TEST_SOURCES
         main.cpp   # QCoreApplication for Qt plugins
@@ -17,6 +18,7 @@ if(TARGET vtm_layout)
     test_eod_archive.cpp   # the End of Day archive: write-once PDFs, the hash chain, the long-term folder
     test_exceptions_search.cpp   # Manager > Reports > Exceptions search: filters, totals match the report
     test_mass_updates.cpp   # Menu Builder > Mass Updates: paging, previews, Apply/Undo, change sets by UPC, price book
+    test_transfers.cpp   # Manager > Inventory > Transfers: out, receive, differences, void, offline outbox, price flow
     test_buydowns.cpp   # Mass Updates > Buydowns / Promotions: the setup, the register's line, reports, scan data, a file for another store
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
     )

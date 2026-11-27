@@ -100,6 +100,25 @@
       "label": "Items marked No discounts (cigarettes) are never discounted."
     },
     {
+      "id": "rds-store-price",
+      "kind": "button",
+      "rect": {
+        "x": 680,
+        "y": 832,
+        "w": 1224,
+        "h": 128
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "OTHER STORE'S PRICE\nretail items at the price of the store this one takes its prices from",
+      "actions": [
+        {
+          "type": "command",
+          "name": "storePrice"
+        }
+      ]
+    },
+    {
       "id": "rds-back",
       "kind": "button",
       "label": "‹ Back to the sale",

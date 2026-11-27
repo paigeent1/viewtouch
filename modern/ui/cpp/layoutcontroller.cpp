@@ -1995,6 +1995,11 @@ void LayoutController::scanned(const QString &code)
         call(u"priceCheckCode"_s, {c}, [](const QVariant &) {});
         return;
     }
+    // Transfers shown: the scan goes on the transfer (or ticks a line off when receiving).
+    if (std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"transfers"; })) {
+        pos_->invoke(u"transferScan"_s, {c});
+        return;
+    }
     // Item Look Up shown: the scan is looked up there (it rings nothing by itself).
     if (std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"itemLookup"; })) {
         keep(u"lookupScan"_s, c);
@@ -2660,6 +2665,8 @@ void LayoutController::runCommand(const QString &name, const QVariantMap &args, 
         {u"priceCheck"_s, {u"togglePriceCheck"_s, {}}},
         // ITEM RETURN: the old sale (Find a Check) or the item scanned, at a price the cashier may change.
         {u"itemReturn"_s, {u"startItemReturn"_s, {}}},
+        // The bar: the retail lines back to the price source's price (Store Settings > Take retail prices from).
+        {u"storePrice"_s, {u"storePriceDiscount"_s, {}}},
         {u"printReceipt"_s, {u"printReceipt"_s, {}}}, {u"noSale"_s, {u"noSale"_s, {}}},
         {u"xReport"_s, {u"xReport"_s, {}}},
         {u"openDrawer"_s, {u"noSale"_s, {}}}, {u"openDrawerSession"_s, {u"openDrawerSession"_s, {}}},
@@ -2969,6 +2976,7 @@ QString LayoutController::describeAction(const Action &a) const
             {u"printReceipt"_s, QT_TR_NOOP("Prints the check for the guest.")},
             {u"closeCheck"_s, QT_TR_NOOP("Closes the paid check.")},
             {u"itemReturn"_s, QT_TR_NOOP("Item return: find the old sale, or scan the item and give back its price (a manager approves).")},
+            {u"storePrice"_s, QT_TR_NOOP("The other store's price: the retail items on the sale at the price of the store this one takes its prices from (a discount).")},
             {u"removePayment"_s, QT_TR_NOOP("Takes off the touched payment.")},
             {u"noSale"_s, QT_TR_NOOP("Opens the cash drawer without a sale (it's recorded).")},
             {u"xReport"_s, QT_TR_NOOP("Prints an X report: today's sales and drawers so far, nothing closed or reset.")},

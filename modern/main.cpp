@@ -1109,6 +1109,8 @@ int runStore(const Args &cli, const Options &o)
                 {u"reports", u"eod-archive"},            // End of Day archive (the day's PDFs, write-once)
                 {u"reports", u"exceptions-search"},      // Exceptions search (from the database)
                 {u"menu-builder", u"mass-updates"},      // Mass Updates… (many items at once, owner 2026-11-24)
+                {u"admin-inventory", u"transfers"},      // Transfers… (between stores, owner 2026-11-26)
+                {u"retail-discounts", u"rds-store-price"},   // OTHER STORE'S PRICE (the price source's price, 2026-11-26)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
                 {u"manager", u"bar-inventory"},          // Bar & Kegs (the bar's shelf count, draft lines, Link pours)
@@ -1434,6 +1436,14 @@ int runStore(const Args &cli, const Options &o)
     laterOrders.setInterval(30'000);
     QObject::connect(&laterOrders, &QTimer::timeout, &pos, [&pos] { pos.fireDueOrders(); });
     laterOrders.start();
+    // Transfers between stores: the inbox read and the outbox sent, every 20 seconds (the store's server only).
+    QTimer transfersTimer;
+    transfersTimer.setInterval(20'000);
+    QObject::connect(&transfersTimer, &QTimer::timeout, &pos, [&pos] { pos.transfersTick(); });
+    if (havePosStore) {
+        transfersTimer.start();
+        QTimer::singleShot(5'000, &pos, [&pos] { pos.transfersTick(); });
+    }
     if (QFile::exists(dbPath + u".took-over"_s)) {   // this was the standby until a moment ago
         QFile marker(dbPath + u".took-over"_s);
         const QString by = marker.open(QIODevice::ReadOnly) ? QString::fromUtf8(marker.readAll()) : QString();
@@ -1492,6 +1502,10 @@ int runStore(const Args &cli, const Options &o)
         shared->archiveDir = QFileInfo(dbPath).absoluteDir().filePath(u"eod-archive"_s);
         // Mass Updates: the change sets applied here, and when each item was first had (New items).
         shared->massUpdateDir = QFileInfo(dbPath).absoluteDir().filePath(u"mass-updates"_s);
+        // Transfers and price changes between stores: <data>/transfers (outbox/<STORE>/, inbox/), sent by
+        // vt-send-transfers (started from here, detached; pos_transfers.cpp).
+        shared->transferDir = QFileInfo(dbPath).absoluteDir().filePath(u"transfers"_s);
+        shared->transferScript = qEnvironmentVariable("VT_SEND_TRANSFERS", u"/usr/local/bin/vt-send-transfers"_s);
         QString archiveError;
         if (!vt::app::eod::ensureTable(dbPath, &archiveError))
             qWarning().noquote() << "End of Day archive: can't set up its table:" << archiveError;

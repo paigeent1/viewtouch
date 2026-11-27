@@ -30,6 +30,7 @@ enum class Round {
     Up9,      // "9 (up)": the next price ending in 9 cents, at or above (12.31 -> 12.39)
     Near9,    // "9 (up/down)": the nearest price ending in 9 cents (12.33 -> 12.29, 12.34 -> 12.39: a tie goes up)
     Up5or9,   // "5 or 9 (up)": the next price ending in 5 or 9 cents (12.31 -> 12.35, 12.36 -> 12.39)
+    Up49or99, // ".49 / .99 (up)": the next amount ending in .49 or .99, at or above (10.12 -> 10.49, 10.50 -> 10.99)
 };
 
 inline std::optional<Round> roundFrom(std::string_view s)
@@ -44,6 +45,8 @@ inline std::optional<Round> roundFrom(std::string_view s)
         return Round::Near9;
     if (s == "5or9up")
         return Round::Up5or9;
+    if (s == "49or99up")
+        return Round::Up49or99;
     return std::nullopt;
 }
 
@@ -55,6 +58,7 @@ inline const char *toString(Round r)
     case Round::Up9: return "9up";
     case Round::Near9: return "9near";
     case Round::Up5or9: return "5or9up";
+    case Round::Up49or99: return "49or99up";
     }
     return "none";
 }
@@ -81,6 +85,10 @@ inline std::int64_t roundCents(std::int64_t cents, Round r)
     }
     case Round::Up5or9:
         return last <= 5 ? tens + 5 : tens + 9;
+    case Round::Up49or99: {
+        const std::int64_t dollars = cents - cents % 100;
+        return cents % 100 <= 49 ? dollars + 49 : dollars + 99;
+    }
     }
     return cents;
 }
@@ -166,6 +174,7 @@ struct Row {
     std::string categoryId, category;  // its category (name); empty name: none
     std::string brand, group, sub;     // the tree below it (brand > product group > sub group)
     std::int64_t cost = 0, price = 0;  // cents (cost 0: none)
+    std::int64_t base = -1;            // the price source's price (cents; -1: none received)
     bool soldOut = false;
     bool noCategory = false;           // in no category the store has set up
     std::int64_t firstSeen = 0;        // when this ViewTouch first had it (epoch ms; 0: before that was kept)
@@ -173,21 +182,21 @@ struct Row {
     double margin() const { return marginOf(price, cost); }
 };
 
-enum class Field { Upc, Name, Category, Brand, Group, Sub, Cost, Price, Margin, SoldOut };
+enum class Field { Upc, Name, Category, Brand, Group, Sub, Cost, Price, Margin, SoldOut, Base };
 
 inline std::optional<Field> fieldFrom(std::string_view s)
 {
     static const std::pair<const char *, Field> all[] = {
         {"upc", Field::Upc}, {"name", Field::Name}, {"category", Field::Category}, {"brand", Field::Brand},
         {"group", Field::Group}, {"sub", Field::Sub}, {"cost", Field::Cost}, {"price", Field::Price},
-        {"margin", Field::Margin}, {"soldOut", Field::SoldOut}};
+        {"margin", Field::Margin}, {"soldOut", Field::SoldOut}, {"base", Field::Base}};
     for (const auto &[name, f] : all)
         if (s == name)
             return f;
     return std::nullopt;
 }
 
-inline bool numeric(Field f) { return f == Field::Cost || f == Field::Price || f == Field::Margin; }
+inline bool numeric(Field f) { return f == Field::Cost || f == Field::Price || f == Field::Margin || f == Field::Base; }
 
 inline std::string lowerAscii(std::string_view s) { return BuilderIndex::asciiLower(s); }
 
@@ -211,6 +220,7 @@ inline double numberOf(const Row &r, Field f)
     case Field::Cost: return double(r.cost) / 100.0;
     case Field::Price: return double(r.price) / 100.0;
     case Field::Margin: return r.margin();
+    case Field::Base: return r.base < 0 ? std::numeric_limits<double>::quiet_NaN() : double(r.base) / 100.0;
     default: return std::numeric_limits<double>::quiet_NaN();
     }
 }

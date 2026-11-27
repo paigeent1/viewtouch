@@ -520,6 +520,32 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         }
         if (record.contains(u"declareCashTips"_s))
             s_->settings.declareCashTips = record.value(u"declareCashTips"_s).toBool();
+        // Other stores (transfers and price changes between them, pos_transfers.cpp).
+        if (record.contains(u"storeCode"_s))
+            s_->settings.storeCode = core::xfer::storeKey(ss(record.value(u"storeCode"_s).toString()));
+        if (record.contains(u"otherStores"_s)) {
+            std::vector<OtherStore> stores;
+            for (const QString &line : record.value(u"otherStores"_s).toString().split(u'\n', Qt::SkipEmptyParts)) {
+                const QStringList parts = line.simplified().split(u' ', Qt::SkipEmptyParts);
+                if (parts.isEmpty())
+                    continue;
+                OtherStore o;
+                o.name = core::xfer::storeKey(ss(parts.value(0)));
+                o.host = ss(parts.value(1));
+                o.on = parts.value(2, u"on"_s).toLower() != u"off";
+                o.sendPrices = parts.value(3).toLower() == u"prices";
+                if (o.name.empty() || o.host.empty() || o.host.find_first_of(" ;|&$`'\"") != std::string::npos)
+                    return fail(tr("Other stores: write each like \"HCA pi@192.168.6.81 on no-prices\" (its short name, its ssh address)."));
+                if (!s_->settings.storeCode.empty() && o.name == s_->settings.storeCode)
+                    return fail(tr("Other stores: %1 is this store's own short name.").arg(qs(o.name)));
+                stores.push_back(o);
+            }
+            s_->settings.otherStores = stores;
+        }
+        if (record.contains(u"storePricesFrom"_s))
+            s_->settings.storePricesFrom = core::xfer::storeKey(ss(record.value(u"storePricesFrom"_s).toString()));
+        if (record.contains(u"storePricesApply"_s))
+            s_->settings.storePricesApply = record.value(u"storePricesApply"_s).toString() == u"ask" ? "ask" : "auto";
         if (record.contains(u"tipOuts"_s)) {
             std::vector<PosSettings::TipOut> outs;
             for (const QString &line : record.value(u"tipOuts"_s).toString().split(u'\n', Qt::SkipEmptyParts)) {

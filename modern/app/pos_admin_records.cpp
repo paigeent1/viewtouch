@@ -220,6 +220,16 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"clockInEarlyMinutes"_s, s_->settings.clockInEarlyMinutes},
              {u"tipPool"_s, tipPool},
              {u"declareCashTips"_s, s_->settings.declareCashTips},
+             {u"storeCode"_s, qs(s_->settings.storeCode)},
+             {u"otherStores"_s, [&] {
+                  QStringList l;
+                  for (const OtherStore &o : s_->settings.otherStores)
+                      l << u"%1 %2 %3 %4"_s.arg(qs(o.name), qs(o.host), o.on ? u"on"_s : u"off"_s,
+                                                 o.sendPrices ? u"prices"_s : u"no-prices"_s);
+                  return l.join(u'\n');
+              }()},
+             {u"storePricesFrom"_s, qs(s_->settings.storePricesFrom)},
+             {u"storePricesApply"_s, qs(s_->settings.storePricesApply)},
              {u"tipOuts"_s, [&] {
                   QStringList l;
                   for (const PosSettings::TipOut &t : s_->settings.tipOuts)

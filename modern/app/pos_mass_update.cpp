@@ -10,12 +10,14 @@
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
 #include "core/mass_update.hh"
+#include "core/transfer.hh"
 
 #include <QDateTime>
 #include <QDebug>
 #include <QHash>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocale>
@@ -144,6 +146,7 @@ struct PosShared::MassShared {
         std::unordered_map<std::string, std::vector<std::uint32_t>> childrenOf;   // a box's UPC -> its singles
         std::vector<std::pair<std::string, std::string>> categories;   // id, name: this scope's
         std::int64_t generation = 0;
+        int baseRevision = -1;   // the price source's prices (basePrices) as they were
     } rows;
 };
 
@@ -165,6 +168,10 @@ struct PosService::MassView {
         std::vector<mass::Change> changes;
         std::vector<mass::Skip> skipped;
         int page = 0;
+        // Price zone: the base price each change is made from (UPC key -> cents), and the bases first taken
+        // from the item's own price (none received from the price source yet), kept at Apply.
+        std::unordered_map<std::string, std::int64_t> bases;
+        std::vector<std::pair<std::string, std::int64_t>> newBases;
     };
     std::optional<Preview> preview;
     QString message;
@@ -239,9 +246,12 @@ struct MassImpl {
         PosService &p = const_cast<PosService &>(cp);
         Shared &m = shared(p);
         Shared::Rows &x = m.rows;
-        if (x.shared == p.s_->serial && x.revision == p.s_->adminRevision && x.size == p.s_->menu.size() && x.scope == scope)
+        p.loadBasePrices();
+        if (x.shared == p.s_->serial && x.revision == p.s_->adminRevision && x.size == p.s_->menu.size() && x.scope == scope
+            && x.baseRevision == p.s_->basePricesRevision)
             return x;
         remember(p);
+        x.baseRevision = p.s_->basePricesRevision;
         x.shared = p.s_->serial;
         x.revision = p.s_->adminRevision;
         x.size = p.s_->menu.size();
@@ -293,6 +303,9 @@ struct MassImpl {
             r.sub = path.size() > 2 ? ss(path[2]) : std::string();
             r.cost = costOf(it);
             r.price = it.price.cents();
+            if (!p.s_->basePrices.empty() && !r.upc.empty())
+                if (const auto b = p.s_->basePrices.find(BuilderIndex::codeKey(r.upc)); b != p.s_->basePrices.end())
+                    r.base = b->second;
             r.soldOut = soldOutOf(it);
             if (const auto s = m.firstSeen.find(it.id); s != m.firstSeen.end())
                 r.firstSeen = s->second;
@@ -464,6 +477,7 @@ struct MassImpl {
         case mass::Round::Up9: return PosService::tr("round 9 up");
         case mass::Round::Near9: return PosService::tr("round to nearest 9");
         case mass::Round::Up5or9: return PosService::tr("round 5 or 9 up");
+        case mass::Round::Up49or99: return PosService::tr("round up to .49 or .99");
         }
         return {};
     }
@@ -542,7 +556,7 @@ struct MassImpl {
         std::vector<mass::Change> done;
         std::unordered_set<std::uint32_t> touched;
         int logged = 0;
-        const QString area = PosService::tr("Menu");
+        const QString area = from.isEmpty() || from == p.storeName() ? PosService::tr("Menu") : PosService::tr("Menu, from %1").arg(from);
         for (const mass::Change &c : changes) {
             const auto at = placeOf.find(c.itemId);
             if (at == placeOf.end()) {
@@ -605,6 +619,9 @@ struct MassImpl {
                 if (o.id == undoOf)
                     o.undone = true;
         m.sets.push_back(info);
+        // Made here (not from another store, never sent back: no loops): to the stores ticked for price changes.
+        if (from.isEmpty())
+            p.sendChangeSetToStores(file);
         if (undoOf.isEmpty()) {
             m.lastId = info.id;
             m.lastLabel = label;
@@ -637,6 +654,7 @@ struct MassImpl {
                                        {u"brand"_s, qs(r.brand)}, {u"group"_s, qs(r.group)}, {u"sub"_s, qs(r.sub)},
                                        {u"cost"_s, r.cost > 0 ? qs(mass::centsText(r.cost)) : QString()},
                                        {u"price"_s, qs(mass::centsText(r.price))},
+                                       {u"base"_s, r.base >= 0 ? qs(mass::centsText(r.base)) : QString()},
                                        {u"margin"_s, std::isfinite(mg) ? QString::number(mg, 'f', 1) : QString()},
                                        {u"soldOut"_s, r.soldOut}, {u"chosen"_s, v.chosen.contains(r.id)}});
         }
@@ -678,6 +696,16 @@ struct MassImpl {
                                                {u"field"_s, v.field}, {u"from"_s, v.from}, {u"to"_s, v.to},
                                                {u"chosenOnly"_s, v.chosenOnly}}},
                         {u"message"_s, v.message}};
+        // The price source and this store's price zone (Mass Updates > Price zone…).
+        const QString source = qs(xfer::storeKey(p.s_->settings.storePricesFrom.empty() ? p.s_->basePricesFrom
+                                                                                       : p.s_->settings.storePricesFrom));
+        out.insert(u"priceSource"_s, source);
+        out.insert(u"baseLabel"_s, source.isEmpty() ? QString() : PosService::tr("%1 price").arg(source));
+        out.insert(u"zone"_s, QVariantMap{{u"name"_s, qs(p.s_->settings.priceZone.name)},
+                                          {u"markup"_s, p.s_->settings.priceZone.markupPercent},
+                                          {u"round"_s, qs(p.s_->settings.priceZone.round)}});
+        out.insert(u"basesKnown"_s, int(p.s_->basePrices.size()));
+        out.insert(u"waitingPrices"_s, int(p.s_->pricesWaiting.size()));
         if (v.preview) {
             const auto &pv = *v.preview;
             const int n = int(pv.changes.size());
@@ -688,6 +716,8 @@ struct MassImpl {
                 const mass::Change &c = pv.changes[std::size_t(k)];
                 QVariantMap l = changeMap(c);
                 l.insert(u"fieldLabel"_s, fieldLabel(c.field));
+                if (const auto b = pv.bases.find(BuilderIndex::codeKey(c.upc)); b != pv.bases.end())
+                    l.insert(u"base"_s, p.format(Money::fromCents(b->second)));
                 lines.append(l);
             }
             QVariantList skipped;
@@ -829,6 +859,8 @@ bool PosService::massPreview(const QVariantMap &action)
     // Costs are the price book's to see changed too (an admin, or an admin's PIN).
     if (kind == "cost" && !requirePriceBook([] { return true; }))
         return false;
+    if (kind == "zone")
+        return massZonePreview();
     const std::vector<std::uint32_t> chosen = MassImpl::chosenRows(*this);
     if (chosen.empty())
         return fail(tr("Tick the items to change first."));
@@ -950,11 +982,24 @@ bool PosService::massApply()
         return false;
     MassView::Preview pv = std::move(*v.preview);
     v.preview.reset();
+    if (!pv.newBases.empty()) {   // Price zone: the items' own prices kept as their base from now on
+        loadBasePrices();
+        for (const auto &[key, cents] : pv.newBases)
+            s_->basePrices.try_emplace(key, cents);
+        ++s_->basePricesRevision;
+        saveBasePrices();
+    }
+    // A retail price changed here at a store that takes its prices from another: the next change from there wins.
+    const bool overwritten = !s_->settings.storePricesFrom.empty() && pv.kind == u"here"
+                             && std::ranges::any_of(pv.changes, [](const mass::Change &c) { return c.field == "price"; });
     std::vector<mass::Skip> skipped;
     const std::vector<mass::Change> done = MassImpl::commit(*this, pv.label, pv.why, pv.kind == u"import" ? pv.from : QString(),
                                                            pv.changes, {}, skipped);
     v.message = skipped.empty() ? tr("%n item(s) changed.", "", int(done.size()))
                                 : tr("%n item(s) changed; %1 left as they were (changed since).", "", int(done.size())).arg(int(skipped.size()));
+    if (overwritten)
+        v.message += u' ' + tr("Note: %1's next price change for these items will replace these prices (Store Settings > Take retail prices from).")
+                                .arg(qs(xfer::storeKey(s_->settings.storePricesFrom)));
     emit notice(v.message);
     MassImpl::changed(*this, v);
     return true;
@@ -1052,6 +1097,186 @@ QStringList PosService::massChosenIds() const
             out << qs(id);
     out.sort();
     return out;
+}
+
+// --- prices from another store, and this store's price zone (owner 2026-11-26) -------------------------
+
+// The changes a change set from the price source makes here: retail items by UPC, prices under this store's
+// price zone (costs and categories as sent), each one's base price noted for the preview.
+std::vector<mass::Change> PosService::storeChanges(const QVariantMap &file, std::vector<mass::Skip> &skipped,
+                                                   std::unordered_map<std::string, std::int64_t> *bases)
+{
+    const auto &x = MassImpl::rows(*this, kScopeRetail);
+    const std::vector<MenuCategory> cats = s_->categories();
+    const auto round = mass::roundFrom(s_->settings.priceZone.round).value_or(mass::Round::None);
+    std::vector<mass::Change> out;
+    std::set<std::string> notFound;
+    for (const QVariant &cv : file.value(u"changes"_s).toList()) {
+        const QVariantMap c = cv.toMap();
+        const std::string upc = ss(c.value(u"upc"_s).toString().trimmed()), field = ss(c.value(u"field"_s).toString());
+        std::string after = ss(c.value(u"after"_s).toString());
+        if (field != "price" && field != "cost" && field != "category")
+            continue;   // (the price book's prices, costs and departments only)
+        const std::int64_t at = x.upc.find(upc);
+        if (at < 0 || !itemIsRetail(s_->menu[std::size_t(at)])) {
+            if (notFound.insert(upc).second)
+                skipped.push_back({upc, ss(c.value(u"item"_s).toString()), "not found"});
+            continue;
+        }
+        const MenuItem &m = s_->menu[std::size_t(at)];
+        if (field == "price" && mass::centsFrom(after) >= 0) {
+            const std::int64_t base = mass::centsFrom(after);
+            after = mass::centsText(xfer::markedUp(base, s_->settings.priceZone.markupPercent, round));
+            if (bases)
+                (*bases)[BuilderIndex::codeKey(upc)] = base;
+        }
+        if (const std::string why = MassImpl::problem(cats, field, after); !why.empty()) {
+            skipped.push_back({upc, m.name, why});
+            continue;
+        }
+        const std::string now = MassImpl::valueOf(cats, m, field);
+        if (now != after)
+            out.push_back({upc, m.id, m.name, field, now, after});
+    }
+    return out;
+}
+
+void PosService::noteBasePrices(const QVariantMap &file, const QString &from)
+{
+    loadBasePrices();
+    for (const QVariant &cv : file.value(u"changes"_s).toList()) {
+        const QVariantMap c = cv.toMap();
+        if (c.value(u"field"_s).toString() != u"price")
+            continue;
+        const std::int64_t cents = mass::centsFrom(ss(c.value(u"after"_s).toString()));
+        const std::string key = BuilderIndex::codeKey(ss(c.value(u"upc"_s).toString()));
+        if (cents >= 0 && !key.empty())
+            s_->basePrices[key] = cents;
+    }
+    s_->basePricesFrom = ss(from);
+    ++s_->basePricesRevision;
+    saveBasePrices();
+}
+
+QString PosService::takeStoreChangeSet(const QVariantMap &file, QString *why)
+{
+    const QString from = qs(xfer::storeKey(ss(file.value(u"store"_s).toString())));
+    const QString source = qs(xfer::storeKey(s_->settings.storePricesFrom));
+    if (from.isEmpty() || from != source) {
+        if (why)
+            *why = source.isEmpty() ? tr("price changes from %1, but this store takes its prices from no store (Store Settings > Other stores)").arg(from)
+                                    : tr("price changes from %1, but this store takes its prices from %2").arg(from, source);
+        return {};
+    }
+    noteBasePrices(file, from);
+    if (s_->settings.storePricesApply == "ask") {
+        s_->pricesWaiting.push_back(file);
+        emit notice(tr("Price changes from %1 are waiting: Menu Builder → Mass Updates.").arg(from));
+        emit s_->adminChanged();
+        return u"waiting"_s;
+    }
+    std::vector<mass::Skip> skipped;
+    const std::vector<mass::Change> changes = storeChanges(file, skipped, nullptr);
+    if (changes.empty())
+        return {};
+    std::vector<mass::Skip> later;
+    const std::vector<mass::Change> done = MassImpl::commit(*this, tr("From %1: %2").arg(from, file.value(u"label"_s).toString()),
+                                                           file.value(u"why"_s).toString(), from, changes, {}, later);
+    emit notice(tr("Price changes from %1: %n item(s) changed.", "", int(done.size())).arg(from));
+    return {};
+}
+
+bool PosService::massReviewWaiting()
+{
+    if (!MassImpl::mayLook(*this))
+        return false;
+    if (s_->pricesWaiting.empty())
+        return fail(tr("No price changes are waiting."));
+    MassView &v = MassImpl::view(*this);
+    const QVariantMap file = s_->pricesWaiting.front();
+    s_->pricesWaiting.erase(s_->pricesWaiting.begin());
+    if (const QString f = file.value(u"_file"_s).toString(); !f.isEmpty()) {   // reviewed: kept with the others done
+        QDir().mkpath(QFileInfo(f).dir().filePath(u"../done"_s));
+        QFile::rename(f, QFileInfo(f).dir().filePath(u"../done/"_s + QFileInfo(f).fileName()));
+    }
+    MassView::Preview pv;
+    pv.kind = u"import"_s;
+    pv.from = qs(xfer::storeKey(ss(file.value(u"store"_s).toString())));
+    pv.label = tr("From %1: %2").arg(pv.from, file.value(u"label"_s).toString());
+    pv.why = file.value(u"why"_s).toString();
+    pv.changes = storeChanges(file, pv.skipped, &pv.bases);
+    v.preview = std::move(pv);
+    v.message = v.preview->changes.empty() ? tr("Nothing would change.") : QString();
+    MassImpl::changed(*this, v);
+    return true;
+}
+
+bool PosService::massSetPriceZone(const QVariantMap &zone)
+{
+    if (!MassImpl::mayLook(*this))
+        return false;
+    bool ok = true;
+    const double pct = amountFrom(zone.value(u"markup"_s, 0), &ok);
+    if (!ok || pct < 0 || pct > 500)
+        return fail(tr("Type the markup as a percent, like 0 or 10."));
+    const QString round = zone.value(u"round"_s, u"none"_s).toString();
+    if (round != u"none" && round != u"49or99up")
+        return fail(tr("Choose how to round."));
+    const QString name = zone.value(u"name"_s).toString().trimmed().left(40);
+    if (!requirePriceBook([] { return true; }))
+        return false;
+    const PriceZone was = s_->settings.priceZone;
+    PriceZone z{name.isEmpty() ? std::string("Base") : ss(name), pct, ss(round)};
+    if (z == was)
+        return true;
+    s_->settings.priceZone = z;
+    logChange(tr("Store"), tr("Price zone"), QString(),
+              u"%1 +%2% %3"_s.arg(qs(was.name)).arg(was.markupPercent).arg(qs(was.round)),
+              u"%1 +%2% %3"_s.arg(qs(z.name)).arg(z.markupPercent).arg(qs(z.round)));
+    s_->saveSettings();
+    MassView &v = MassImpl::view(*this);
+    v.message = tr("Price zone %1: +%2%. New prices from %3 get it; Reapply to all retail items now to change the ones here.")
+                    .arg(qs(z.name)).arg(z.markupPercent).arg(qs(xfer::storeKey(s_->settings.storePricesFrom)));
+    MassImpl::changed(*this, v);
+    return true;
+}
+
+// Price zone > Reapply to all retail items now: every retail item's price from its base (the price source's
+// price; none received yet: its own price, kept as its base from Apply on) under the zone's rule.
+bool PosService::massZonePreview()
+{
+    MassView &v = MassImpl::view(*this);
+    loadBasePrices();
+    const auto &x = MassImpl::rows(*this, kScopeRetail);
+    const PriceZone &z = s_->settings.priceZone;
+    const auto round = mass::roundFrom(z.round).value_or(mass::Round::None);
+    MassView::Preview pv;
+    pv.kind = u"zone"_s;
+    pv.label = tr("Price zone %1: +%2%").arg(qs(z.name)).arg(z.markupPercent)
+               + (round == mass::Round::None ? QString() : u" · "_s + MassImpl::roundLabel(round));
+    int own = 0;
+    for (const mass::Row &r : x.rows) {
+        if (r.upc.empty())
+            continue;
+        const std::string key = BuilderIndex::codeKey(r.upc);
+        std::int64_t base = r.base;
+        if (base < 0) {
+            base = r.price;
+            pv.newBases.emplace_back(key, base);
+            ++own;
+        }
+        pv.bases[key] = base;
+        const std::int64_t now = xfer::markedUp(base, z.markupPercent, round);
+        if (now != r.price)
+            pv.changes.push_back({r.upc, r.id, r.name, "price", mass::centsText(r.price), mass::centsText(now)});
+    }
+    if (own > 0)
+        pv.why = tr("%n item(s) had no price from %1 yet: their price now is their base (kept from Apply on).", "", own)
+                     .arg(qs(xfer::storeKey(s_->settings.storePricesFrom)));
+    v.preview = std::move(pv);
+    v.message = v.preview->changes.empty() ? tr("Nothing would change.") : QString();
+    MassImpl::changed(*this, v);
+    return true;
 }
 
 QVariantMap PosService::massUpdate() const

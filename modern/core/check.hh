@@ -178,6 +178,11 @@ struct Tender {
     bool operator==(const Tender &) const = default;
 };
 
+// The bar's "<store> price" (owner 2026-11-26): a retail line back to the price its price source sells it for
+// (the price zone's markup taken off). Allowed on items marked No discounts too (cigarettes at the state
+// minimum: the source's price is the minimum or above), never more than the line.
+inline constexpr const char *kStorePriceTender = "store-price";
+
 struct Payment {
     std::int64_t id = 0;
     std::string tenderId;

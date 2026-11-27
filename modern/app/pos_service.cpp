@@ -73,6 +73,9 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
     , lastProblemId(data.lastProblemId)
     , now_([] { return QDateTime::currentMSecsSinceEpoch(); })
 {
+    transfers = std::move(data.transfers);
+    lastTransferId = data.lastTransferId;
+    retailStock = std::move(data.retailStock);
     // What goes to the kitchen and the expediter follows the menu and settings.
     connect(this, &PosShared::adminChanged, this, [this] {
         kitchenDone.clear();

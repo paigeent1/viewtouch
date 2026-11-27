@@ -203,6 +203,10 @@ class PosSession : public QObject {
     // Mass Updates > Buydowns / Promotions (PosService::buydownsOpen): the definitions, the one being edited, a
     // report shown. Sent to a tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap buydowns READ buydowns NOTIFY sessionChanged)
+    // Manager > Inventory > Transfers (PosService::transferOpen): {active, tab, storeCode, stores, to, note, lines,
+    // total, choices, message, incoming, outgoing, waitingIn, receiving, queued, link}. Sent to a tablet only
+    // while it shows the screen.
+    Q_PROPERTY(QVariantMap transfers READ transfers NOTIFY adminChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -473,6 +477,7 @@ public:
     virtual QVariantMap exceptionSearch() const = 0;
     virtual QVariantMap massUpdate() const = 0;
     virtual QVariantMap buydowns() const = 0;
+    virtual QVariantMap transfers() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -788,6 +793,29 @@ public:
     Q_INVOKABLE void massApply() { invoke(QStringLiteral("massApply")); }
     Q_INVOKABLE void massUndo() { invoke(QStringLiteral("massUndo")); }
     Q_INVOKABLE void massImport(const QVariantMap &file) { invoke(QStringLiteral("massImport"), {file}); }
+    Q_INVOKABLE void massReviewWaiting() { invoke(QStringLiteral("massReviewWaiting")); }
+    Q_INVOKABLE void massSetPriceZone(const QVariantMap &zone) { invoke(QStringLiteral("massSetPriceZone"), {zone}); }
+    // Inventory transfers (answers in transfers).
+    Q_INVOKABLE void storePriceDiscount() { invoke(QStringLiteral("storePriceDiscount")); }
+    Q_INVOKABLE void transferOpen(const QString &tab) { invoke(QStringLiteral("transferOpen"), {tab}); }
+    Q_INVOKABLE void transferClose() { invoke(QStringLiteral("transferClose")); }
+    Q_INVOKABLE void transferScan(const QString &code) { invoke(QStringLiteral("transferScan"), {code}); }
+    Q_INVOKABLE void transferFind(const QString &text) { invoke(QStringLiteral("transferFind"), {text}); }
+    Q_INVOKABLE void transferAddItem(const QString &itemId, double qty) { invoke(QStringLiteral("transferAddItem"), {itemId, qty}); }
+    Q_INVOKABLE void transferSetQty(int index, double qty) { invoke(QStringLiteral("transferSetQty"), {index, qty}); }
+    Q_INVOKABLE void transferSetTo(const QString &store) { invoke(QStringLiteral("transferSetTo"), {store}); }
+    Q_INVOKABLE void transferSetNote(const QString &note) { invoke(QStringLiteral("transferSetNote"), {note}); }
+    Q_INVOKABLE void transferClear() { invoke(QStringLiteral("transferClear")); }
+    Q_INVOKABLE void transferSend() { invoke(QStringLiteral("transferSend")); }
+    Q_INVOKABLE void transferVoid(qint64 id) { invoke(QStringLiteral("transferVoid"), {id}); }
+    Q_INVOKABLE void transferReprint(qint64 id) { invoke(QStringLiteral("transferReprint"), {id}); }
+    Q_INVOKABLE void transferStartReceive(qint64 id) { invoke(QStringLiteral("transferStartReceive"), {id}); }
+    Q_INVOKABLE void transferCount(int index, double qty, const QString &reason) { invoke(QStringLiteral("transferCount"), {index, qty, reason}); }
+    Q_INVOKABLE void transferCheck(int index, bool on) { invoke(QStringLiteral("transferCheck"), {index, on}); }
+    Q_INVOKABLE void transferAddMissing(int index, bool add) { invoke(QStringLiteral("transferAddMissing"), {index, add}); }
+    Q_INVOKABLE void transferReceive() { invoke(QStringLiteral("transferReceive")); }
+    Q_INVOKABLE void transferCancelReceive() { invoke(QStringLiteral("transferCancelReceive")); }
+    Q_INVOKABLE void transferRange(const QString &from, const QString &until) { invoke(QStringLiteral("transferRange"), {from, until}); }
     // Buydowns / Promotions (answers in buydowns).
     Q_INVOKABLE void buydownsOpen(bool on) { invoke(QStringLiteral("buydownsOpen"), {on}); }
     Q_INVOKABLE void buydownNew(const QString &type) { invoke(QStringLiteral("buydownNew"), {type}); }

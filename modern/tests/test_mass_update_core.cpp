@@ -26,12 +26,16 @@ TEST_CASE("Mass updates: every Round to, table by table", "[massupdate][core]")
         {1239, Round::Near9, 1239}, {1240, Round::Near9, 1239}, {4, Round::Near9, 9},
         {1231, Round::Up5or9, 1235}, {1235, Round::Up5or9, 1235}, {1236, Round::Up5or9, 1239}, {1239, Round::Up5or9, 1239},
         {1230, Round::Up5or9, 1235},
+        // .49 / .99 up (the bar's markup on the retail store's prices, owner 2026-11-26)
+        {1012, Round::Up49or99, 1049}, {1055, Round::Up49or99, 1099}, {1049, Round::Up49or99, 1049},
+        {1050, Round::Up49or99, 1099}, {1099, Round::Up49or99, 1099}, {1000, Round::Up49or99, 1049}, {0, Round::Up49or99, 49},
     };
     for (const Case &c : cases) {
         INFO(c.in << " " << toString(c.round));
         CHECK(roundCents(c.in, c.round) == c.out);
     }
     CHECK(roundFrom("9near") == Round::Near9);
+    CHECK(roundFrom("49or99up") == Round::Up49or99);
     CHECK(roundFrom("") == Round::None);
     CHECK_FALSE(roundFrom("7up"));
 }

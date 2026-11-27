@@ -1148,9 +1148,11 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
             for (int i = int(it - menu.begin()); i < int(menu.size()); ++i)
                 s_->sink->saveMenuItem(menu[i], i);
     } else {
+        const MenuItem was = *it;
         *it = item;
         if (s_->sink)
             s_->sink->saveMenuItem(*it, int(it - menu.begin()));
+        shareItemChange(was, item);   // a retail price or cost: to the stores that take their prices from here
     }
     slow.mark(u"store"_s);
     menuChanged();
@@ -2125,6 +2127,14 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
     }
 
     // The items here that ILSA has: price and new barcodes; the rest only reported.
+    QVariantList shareOut;   // the prices and costs changed, for the stores that take their prices from here
+    const auto share = [&](const MenuItem &m, const char *field, std::int64_t before, std::int64_t after) {
+        if (m.barcodes.empty() || !itemIsRetail(m))
+            return;
+        shareOut.append(QVariantMap{{u"upc"_s, qs(m.barcodes.front())}, {u"item"_s, qs(m.name)}, {u"field"_s, QString::fromLatin1(field)},
+                                    {u"before"_s, before > 0 || QLatin1StringView(field) == u"price" ? qs(core::mass::centsText(before)) : QString()},
+                                    {u"after"_s, qs(core::mass::centsText(after))}});
+    };
     for (std::size_t i = 0; i < had; ++i) {
         MenuItem &m = s_->menu[i];
         const auto &hits = filesFor[i];
@@ -2144,6 +2154,7 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             if (m.price != first.price) {
                 ++prices;
                 row(u"price"_s, m, upc, format(m.price), format(first.price));
+                share(m, "price", m.price.cents(), first.price.cents());
                 m.price = first.price;
                 changed = true;
             }
@@ -2161,6 +2172,7 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
             if (const std::int64_t was = costCents(m); was != cost) {
                 ++costs;
                 row(u"cost"_s, m, upc, was > 0 ? format(Money::fromCents(was)) : QString(), format(Money::fromCents(cost)));
+                share(m, "cost", was, cost);
                 setCostCents(m, cost);
                 changed = true;
             }
@@ -2223,6 +2235,11 @@ QVariantMap PosService::syncPriceBook(const QVariantMap &file)
     }
     if (logged > 40)
         change(QString(), QString(), QString(), tr("ILSA sync (and %1 more changes)").arg(logged - 40));
+    if (!shareOut.isEmpty())
+        sendChangeSetToStores({{u"format"_s, u"viewtouch-change-set"_s}, {u"version"_s, 1},
+                               {u"id"_s, QDateTime::fromMSecsSinceEpoch(now()).toString(u"yyyyMMdd-HHmmss-zzz"_s) + u"-ilsa"_s},
+                               {u"label"_s, tr("ILSA price book sync")}, {u"who"_s, u"ILSA sync"_s}, {u"why"_s, QString()},
+                               {u"at"_s, qint64(now())}, {u"undoOf"_s, QString()}, {u"changes"_s, shareOut}});
 
     // One save of what changed, one new menu for every screen.
     if (settingsDirty)

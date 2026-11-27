@@ -213,6 +213,21 @@ Item {
                     onClicked: { rangeFrom.text = ""; rangeTo.text = ""; w.setView({ field: "", from: "", to: "" }) }
                 }
                 Item { Layout.fillWidth: true }
+                // Prices from the price source waiting for a person (Store Settings: "When someone applies them").
+                Small { u: w.unit;
+                    objectName: "massWaitingPrices"
+                    visible: (w.info.waitingPrices ?? 0) > 0
+                    text: qsTr("Prices from %1 (%2)…").arg(w.info.priceSource ?? "").arg(w.info.waitingPrices ?? 0)
+                    palette.button: "#b35c00"; palette.buttonText: "white"
+                    onClicked: w.pos.massReviewWaiting()
+                }
+                // This store's price zone: its markup on the price source's prices.
+                Small { u: w.unit;
+                    objectName: "massPriceZone"
+                    text: qsTr("Price zone…")
+                    onClicked: { zoneName.text = w.info.zone ? w.info.zone.name : "Base"; zoneMarkup.text = w.info.zone ? String(w.info.zone.markup) : "0";
+                                 zonePop.round = w.info.zone ? w.info.zone.round : "none"; zonePop.open() }
+                }
                 // Manufacturer buydowns and promotions (BuydownsPanel.qml).
                 Small { u: w.unit;
                     objectName: "massBuydowns"
@@ -259,11 +274,13 @@ Item {
                 Layout.minimumHeight: w.touch * 3
                 color: "#f4f6fa"
                 radius: 4
+                // At a store that takes its prices from another: that store's price beside this one's ("BH price").
                 readonly property var columns: [["", qsTr("✓"), 2.8], ["upc", qsTr("UPC"), 8], ["name", qsTr("Description"), 0],
                                                 ["category", qsTr("Category"), 9], ["brand", qsTr("Brand"), 9],
-                                                ["group", qsTr("Product group"), 7], ["cost", qsTr("Cost"), 5],
-                                                ["price", qsTr("Price"), 5], ["margin", qsTr("Margin %"), 5],
-                                                ["soldOut", qsTr("Sold out"), 4.5]]
+                                                ["group", qsTr("Product group"), 7], ["cost", qsTr("Cost"), 5]]
+                                               .concat((w.info.baseLabel ?? "") !== "" ? [["base", w.info.baseLabel, 6]] : [])
+                                               .concat([["price", qsTr("Price"), 5], ["margin", qsTr("Margin %"), 5],
+                                                        ["soldOut", qsTr("Sold out"), 4.5]])
                 id: grid
                 ColumnLayout {
                     anchors.fill: parent
@@ -329,10 +346,10 @@ Item {
                                         Layout.preferredWidth: modelData[2] > 0 ? w.unit * modelData[2] : -1
                                         Layout.fillWidth: modelData[2] === 0
                                         text: key === "soldOut" ? (value ? qsTr("yes") : "")
-                                            : (key === "cost" || key === "price") && value !== "" ? w.money + value
+                                            : (key === "cost" || key === "price" || key === "base") && value !== "" ? w.money + value
                                             : key === "margin" && value !== "" ? value + "%" : (value ?? "")
                                         elide: Text.ElideRight
-                                        horizontalAlignment: key === "cost" || key === "price" || key === "margin" ? Text.AlignRight : Text.AlignLeft
+                                        horizontalAlignment: key === "cost" || key === "price" || key === "base" || key === "margin" ? Text.AlignRight : Text.AlignLeft
                                         font.pixelSize: w.unit * 0.68
                                         color: key === "soldOut" ? "#b91c1c" : "#111827"
                                     }
@@ -405,7 +422,8 @@ Item {
                         Label { text: qsTr("Round to:"); font.pixelSize: w.unit * 0.8 }
                         Repeater {   // ILSA's Round to (the manual price uses it too)
                             model: [["none", qsTr("None")], ["5up", qsTr("5 (up)")], ["9up", qsTr("9 (up)")],
-                                    ["9near", qsTr("9 (up/down)")], ["5or9up", qsTr("5 or 9 (up)")]]
+                                    ["9near", qsTr("9 (up/down)")], ["5or9up", qsTr("5 or 9 (up)")],
+                                    ["49or99up", qsTr(".49 / .99 (up)")]]
                             delegate: Pick {
                                 required property var modelData
                                 u: w.unit
@@ -639,6 +657,12 @@ Item {
                         Label { Layout.preferredWidth: w.unit * 8; text: modelData.upc; color: "#cbd5e1"; font.pixelSize: w.unit * 0.7 }
                         Label { Layout.fillWidth: true; text: modelData.item; elide: Text.ElideRight; color: "white"; font.pixelSize: w.unit * 0.7 }
                         Label { Layout.preferredWidth: w.unit * 6; text: modelData.fieldLabel; color: "#cbd5e1"; font.pixelSize: w.unit * 0.7 }
+                        Label {   // the price source's price a zone price is made from
+                            visible: modelData.base !== undefined
+                            text: qsTr("%1 %2 →").arg(w.info.baseLabel ?? "").arg(modelData.base ?? "")
+                            color: "#a5f3fc"
+                            font.pixelSize: w.unit * 0.7
+                        }
                         Label {
                             Layout.preferredWidth: w.unit * 16
                             readonly property bool cash: modelData.field === "price" || modelData.field === "cost"
@@ -708,6 +732,62 @@ Item {
             visible = false
             if (w.pos) { w.pos.buydownsOpen(false); if (w.buydownsWanted) w.pos.want("buydowns", false) }
             w.buydownsWanted = false
+        }
+    }
+
+    // Mass Updates > Price zone… (owner 2026-11-26): this store's rule on the prices it takes from its price
+    // source (Store Settings > Take retail prices from): + a percent (0: the same) and a rounding. New prices from
+    // there get it by themselves; Reapply shows every retail item's price from its base, then Apply.
+    Popup {
+        id: zonePop
+        objectName: "massZonePopup"
+        property string round: "none"
+        anchors.centerIn: parent
+        modal: true
+        padding: w.unit
+        ColumnLayout {
+            spacing: 8
+            Label { text: qsTr("Price zone"); font.pixelSize: w.unit; font.bold: true }
+            Label {
+                text: (w.info.priceSource ?? "") !== ""
+                      ? qsTr("Prices come from %1 (%2 received). Costs are never marked up.").arg(w.info.priceSource).arg(w.info.basesKnown ?? 0)
+                      : qsTr("This store takes its prices from no other store (Store Settings > Other stores).")
+                font.pixelSize: w.unit * 0.75
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: w.unit * 34
+            }
+            RowLayout {
+                spacing: 6
+                Label { text: qsTr("Zone name"); font.pixelSize: w.unit * 0.8 }
+                Field { u: w.unit; id: zoneName; objectName: "massZoneName"; Layout.preferredWidth: w.unit * 10 }
+                Label { text: qsTr("+"); font.pixelSize: w.unit * 0.8 }
+                Field { u: w.unit; id: zoneMarkup; objectName: "massZoneMarkup"; Layout.preferredWidth: w.unit * 5; inputMethodHints: Qt.ImhFormattedNumbersOnly }
+                Label { text: qsTr("%"); font.pixelSize: w.unit * 0.8 }
+            }
+            RowLayout {
+                spacing: 6
+                Label { text: qsTr("Round to:"); font.pixelSize: w.unit * 0.8 }
+                Repeater {
+                    model: [["none", qsTr("None")], ["49or99up", qsTr("Up to the next .49 or .99")]]
+                    delegate: Pick {
+                        required property var modelData
+                        u: w.unit
+                        objectName: "massZoneRound-" + modelData[0]
+                        text: modelData[1]
+                        checked: zonePop.round === modelData[0]
+                        onClicked: zonePop.round = modelData[0]
+                    }
+                }
+            }
+            RowLayout {
+                spacing: 6
+                Small { u: w.unit; objectName: "massZoneSave"; text: qsTr("Save")
+                        onClicked: w.pos.massSetPriceZone({ name: zoneName.text, markup: zoneMarkup.text, round: zonePop.round }) }
+                Small { u: w.unit; objectName: "massZoneReapply"; text: qsTr("Reapply to all retail items now…")
+                        onClicked: { w.pos.massSetPriceZone({ name: zoneName.text, markup: zoneMarkup.text, round: zonePop.round });
+                                     w.previewAction({ kind: "zone" }); zonePop.close() } }
+                Small { u: w.unit; text: qsTr("Close"); onClicked: zonePop.close() }
+            }
         }
     }
 }

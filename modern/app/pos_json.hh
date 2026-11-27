@@ -14,6 +14,7 @@
 #include "core/menu.hh"
 #include "core/report.hh"
 #include "core/settings.hh"
+#include "core/transfer.hh"
 #include "core/waitlist.hh"
 
 #include <QJsonArray>
@@ -50,6 +51,9 @@ QJsonObject toJson(const core::Waste &waste);
 QJsonObject toJson(const core::Problem &problem);
 core::Problem problemFromJson(const QJsonObject &o);
 core::Waste wasteFromJson(const QJsonObject &o);
+// Inventory transfers (defined in pos_transfers.cpp).
+QJsonObject toJson(const core::xfer::Transfer &t);
+core::xfer::Transfer transferFromJson(const QJsonObject &o);
 core::Change changeFromJson(const QJsonObject &o);
 std::optional<core::Check> checkFromJson(const QJsonObject &o);
 

@@ -1073,6 +1073,13 @@ QVariantList PosService::menuItemsAt(const std::vector<std::uint32_t> *places) c
                                }()},
                                {u"isEvent"_s, itemIsEvent(m)},
                                {u"isRetail"_s, itemIsRetail(m)},
+                               // The price source's price, read-only (a store taking its prices from another).
+                               {u"basePriceText"_s, [&] {
+                                   if (s_->settings.storePricesFrom.empty() || !itemIsRetail(m))
+                                       return QString();
+                                   const auto b = basePriceOf(m);
+                                   return b ? tr("%1 price: %2").arg(qs(s_->settings.storePricesFrom), format(Money::fromCents(*b))) : QString();
+                               }()},
                                {u"cost"_s, [&m] {
                                    for (const RecipeLine &rl : m.recipe)
                                        if (rl.ingredientId == "__cost__")

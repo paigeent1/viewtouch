@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "transfers",
+  "name": "Transfers",
+  "kind": "manager",
+  "canvas": {
+    "w": 1920,
+    "h": 1080
+  },
+  "grid": 8,
+  "permission": "manager",
+  "zones": [
+    {
+      "id": "title",
+      "kind": "label",
+      "rect": {
+        "x": 16,
+        "y": 16,
+        "w": 1632,
+        "h": 64
+      },
+      "shape": "rect",
+      "behavior": "none",
+      "label": "Transfers between stores"
+    },
+    {
+      "id": "close",
+      "kind": "button",
+      "rect": {
+        "x": 1664,
+        "y": 16,
+        "w": 240,
+        "h": 64
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "‹ Inventory",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "back"
+        }
+      ]
+    },
+    {
+      "id": "transfers-view",
+      "kind": "transfers",
+      "rect": {
+        "x": 16,
+        "y": 96,
+        "w": 1888,
+        "h": 968
+      },
+      "shape": "rect",
+      "behavior": "none"
+    }
+  ]
+}

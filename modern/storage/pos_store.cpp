@@ -281,6 +281,11 @@ bool PosStore::open(QString *error)
             || !run(q, u"UPDATE meta SET value = '17' WHERE key = 'pos_schema_version'"_s, error))
             return false;
     }
+    // Inventory transfers between stores and retail items' on hand (2026-11-26). New tables only, no new
+    // version: an older ViewTouch (a standby a version behind) opens the database the same and leaves them be.
+    if (!run(q, u"CREATE TABLE IF NOT EXISTS transfers (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"_s, error)
+        || !run(q, u"CREATE TABLE IF NOT EXISTS retail_stock (item_id TEXT PRIMARY KEY, on_hand REAL NOT NULL)"_s, error))
+        return false;
     // Indexes for what's looked up by time, so a store with years of data
     // doesn't read whole tables. An older ViewTouch opens the database the
     // same with them (a standby a version behind), so they aren't a version.
@@ -514,6 +519,20 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
     }
     if (q.exec(u"SELECT COALESCE(MAX(id), 0) FROM problems"_s) && q.next())
         data.lastProblemId = q.value(0).toLongLong();
+    // Transfers: the last 400 days, and any still open.
+    q.prepare(u"SELECT json FROM transfers WHERE at >= ? OR json LIKE '%\"status\":\"transit\"%' "
+              "OR json LIKE '%\"status\":\"waiting\"%' ORDER BY id"_s);
+    q.addBindValue(QDateTime::currentMSecsSinceEpoch() - 400LL * 24 * 3'600'000);
+    if (q.exec()) {
+        while (q.next())
+            data.transfers.push_back(app::transferFromJson(parse(q.value(0))));
+    }
+    if (q.exec(u"SELECT COALESCE(MAX(id), 0) FROM transfers"_s) && q.next())
+        data.lastTransferId = q.value(0).toLongLong();
+    if (q.exec(u"SELECT item_id, on_hand FROM retail_stock"_s)) {
+        while (q.next())
+            data.retailStock[q.value(0).toString().toStdString()] = q.value(1).toDouble();
+    }
     if (q.exec(u"SELECT id, opened_at, closed_at, reports FROM business_days WHERE closed_at != 0 "
                "ORDER BY id DESC LIMIT 60"_s)) {
         while (q.next()) {
@@ -705,6 +724,18 @@ void SqlPosSink::saveProblem(const core::Problem &pr)
 {
     writer_.upsert(u"problems"_s, QString::number(pr.id),
                    {{u"id"_s, qint64(pr.id)}, {u"at"_s, qint64(pr.at)}, {u"json"_s, compact(app::toJson(pr))}});
+}
+
+void SqlPosSink::saveTransfer(const core::xfer::Transfer &t)
+{
+    writer_.upsert(u"transfers"_s, QString::number(t.id),
+                   {{u"id"_s, qint64(t.id)}, {u"at"_s, qint64(t.at)}, {u"json"_s, compact(app::toJson(t))}});
+}
+
+void SqlPosSink::saveRetailStock(const std::string &itemId, double onHand)
+{
+    writer_.upsert(u"retail_stock"_s, QString::fromStdString(itemId),
+                   {{u"item_id"_s, QString::fromStdString(itemId)}, {u"on_hand"_s, onHand}});
 }
 
 void SqlPosSink::saveImage(const std::string &name, const QByteArray &data)

@@ -25,6 +25,7 @@ add_library(vtm_core STATIC
     core/builder_index.hh                        # Menu Builder's quick index: a department's tree, the search
     core/buydown.hh                              # manufacturer buydowns and promotions: definitions, the line, the reports
     core/mass_update.hh                          # Mass Updates: rounding, margin prices, the grid's narrowing, change sets
+    core/transfer.hh                             # inventory transfers between stores: lines, UPC matching, the markup
     core/core.cpp core/report.cpp
     core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
     core/scan_data.hh core/scan_data.cpp         # tobacco scan data for Altria (weekly file)
@@ -77,6 +78,7 @@ if(Qt6_FOUND)
         app/eod_archive.hh app/eod_archive.cpp app/pos_eod_archive.cpp   # the End of Day archive (write-once PDFs, hash chain)
         app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
         app/pos_mass_update.cpp   # Menu Builder > Mass Updates (core/mass_update.hh): grid, previews, change sets
+        app/pos_transfers.cpp     # Manager > Inventory > Transfers (core/transfer.hh): between stores, by UPC
         app/pos_buydowns.cpp   # Mass Updates > Buydowns / Promotions (core/buydown.hh): definitions, the register's line, reports
         app/pos_tv.cpp   # TV buttons (directv): the main computer runs vt-directv, for any screen
     )
@@ -211,6 +213,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetEodArchive.qml
             ui/qml/WidgetExceptionSearch.qml
             ui/qml/WidgetMassUpdates.qml
+            ui/qml/WidgetTransfers.qml
             ui/qml/BuydownsPanel.qml
             ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml

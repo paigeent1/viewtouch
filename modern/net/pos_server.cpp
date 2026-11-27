@@ -107,7 +107,8 @@ bool onRequest(const QString &key)
     // Mass Updates' grid (massUpdate) too, and its Buydowns (buydowns).
     // Quick Label's (quickLabel, with its picture) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"builderTree" || key == u"itemSearch"
-           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns";
+           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns"
+           || key == u"transfers";
 }
 
 // All a billboard is ever sent (the owner: signage only, never any customer or sale): who it is,

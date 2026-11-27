@@ -257,7 +257,7 @@ QStringList widgetKinds()
             u"guestOrder"_s, u"guestMessages"_s, u"guestMedia"_s, u"guestHeader"_s, u"loginPad"_s, u"guestCount"_s, u"checkList"_s,
             u"paymentPanel"_s, u"numPad"_s, u"keyboard"_s, u"splitCheck"_s, u"drawerPanel"_s,
             u"reportView"_s, u"endOfDay"_s, u"logoutPanel"_s, u"clock"_s, u"statusBar"_s,
-            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"barInventory"_s, u"draftTaps"_s, u"speedRow"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s, u"eodArchive"_s, u"exceptionSearch"_s, u"massUpdates"_s};
+            u"adminPanel"_s, u"kitchenDisplay"_s, u"customerInfo"_s, u"customerLookup"_s, u"giftCard"_s, u"waitlist"_s, u"schedule"_s, u"factoryReset"_s, u"messageComposer"_s, u"network"_s, u"receiveDelivery"_s, u"stockCount"_s, u"barInventory"_s, u"draftTaps"_s, u"speedRow"_s, u"wasteLog"_s, u"storeCheck"_s, u"prepLabels"_s, u"retailLabels"_s, u"checkSearch"_s, u"orderLater"_s, u"menuGrid"_s, u"menuCategories"_s, u"menuBuilder"_s, u"timeClock"_s, u"dashboard"_s, u"checklist"_s, u"hostStand"_s, u"deliveryBoard"_s, u"decor"_s, u"floorPlan"_s, u"siteSetup"_s, u"receiptLookup"_s, u"itemLookup"_s, u"findTablet"_s, u"eodArchive"_s, u"exceptionSearch"_s, u"massUpdates"_s, u"transfers"_s};
 }
 
 QStringList allKinds()
@@ -582,6 +582,7 @@ QJsonArray actionTypes()
                             {"cancelSale", "Cancel sale (asks why; Cancel #n, an exception)"},
                             {"priceCheck", "Price check on/off (scans show the item, not rung in)"},
                             {"itemReturn", "Item return (old sale or scan)"},
+                            {"storePrice", "Other store's price (retail lines at the price source's price)"},
                             {"openDepartment", "Open department: the amount typed, in args.department, taxed as args.tax"},
                             {"itemDiscount", "Item discount: args.percent (or \"typed\") off the last item"},
                             {"subtotalDiscount", "Subtotal discount: args.percent (or \"typed\") off the sale"},

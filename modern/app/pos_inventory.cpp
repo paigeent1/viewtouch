@@ -84,6 +84,7 @@ std::map<std::string, double> PosService::stockUse(const OrderLine &l) const
 
 void PosService::takeStock(const std::vector<OrderLine> &lines, int sign)
 {
+    retailStockSold(lines, sign);   // retail items with an on hand kept (pos_transfers.cpp)
     std::map<std::string, double> total;
     for (const OrderLine &l : lines) {
         if (l.voided && sign > 0)

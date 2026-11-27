@@ -188,6 +188,30 @@ inline CashMode cashModeFromString(const std::string &s)
 }
 
 // Store-wide POS settings, edited on the manager's admin screens.
+// Another store of the same owner (Store Settings > Other stores): its short name (as it calls itself:
+// Store short name there), the ssh address vt-update-stores uses for it ("pi@192.168.6.81"), whether transfers
+// go there, and whether this store's retail price changes are sent there (owner 2026-11-26: one way, the
+// retail store to the bar; never the bar's own).
+// The store's price zone (owner 2026-11-26): the rule it puts on the base retail prices it takes from its price
+// source (Store Settings > Take retail prices from: today the retail store, later a corporate office): a markup in
+// percent (0: the same) and a rounding (mass::Round names: "none", "49or99up"). Costs are never marked up. Kept
+// in the same JSON shape a corporate office would send ({name, markup, round}); per-category or per-item
+// overrides would come later as more fields. Mass Updates > Price zone… sets it.
+struct PriceZone {
+    std::string name = "Base";
+    double markupPercent = 0;
+    std::string round = "none";
+    bool operator==(const PriceZone &) const = default;
+};
+
+struct OtherStore {
+    std::string name;
+    std::string host;
+    bool on = true;
+    bool sendPrices = false;
+    bool operator==(const OtherStore &) const = default;
+};
+
 struct PosSettings {
     std::string storeName = "ViewTouch";
     bool setupDone = false;   // the setup guide was finished (it opens for managers until then)
@@ -235,6 +259,16 @@ struct PosSettings {
     // Whose ILSA history this site shows first (Reports > ILSA History, Look Up Checks > ILSA history):
     // its store's check prefix (BHDAN, BHNM; HCA has none). Its receipts show as BHDAN-836100.
     std::string ilsaHistoryStore = "BHDAN";
+    // Inventory transfers and price changes between stores (app/pos_transfers.cpp): this store's short name
+    // to the others (letters and digits: "HCA"), the other stores, and how price changes from the price source
+    // are taken: by themselves ("auto") or waiting for a person ("ask"), under this store's price zone.
+    std::string storeCode;
+    std::vector<OtherStore> otherStores;
+    // The store this one takes its retail prices from (today the retail store; later a corporate office):
+    // change sets from any other store are refused. Empty: none taken.
+    std::string storePricesFrom;
+    std::string storePricesApply = "auto";
+    PriceZone priceZone;
     std::string receiptFooter;
     // Reprint with the buyer's date of birth (Reprint Receipt): only with a manager's PIN when on.
     bool dobReprintNeedsManager = true;

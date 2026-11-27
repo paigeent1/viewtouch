@@ -44,12 +44,12 @@
       "rect": {
         "x": 16,
         "y": 944,
-        "w": 432,
+        "w": 368,
         "h": 120
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "\u2039 Manager",
+      "label": "‹ Manager",
       "actions": [
         {
           "type": "jump",
@@ -61,14 +61,14 @@
       "id": "count",
       "kind": "button",
       "rect": {
-        "x": 544,
+        "x": 396,
         "y": 944,
-        "w": 432,
+        "w": 368,
         "h": 120
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Count Stock\u2026",
+      "label": "Count Stock…",
       "actions": [
         {
           "type": "jump",
@@ -81,14 +81,14 @@
       "id": "vendors",
       "kind": "button",
       "rect": {
-        "x": 1008,
+        "x": 776,
         "y": 944,
-        "w": 432,
+        "w": 368,
         "h": 120
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Vendors\u2026",
+      "label": "Vendors…",
       "actions": [
         {
           "type": "command",
@@ -103,14 +103,14 @@
       "id": "receive",
       "kind": "button",
       "rect": {
-        "x": 1472,
+        "x": 1156,
         "y": 944,
-        "w": 432,
+        "w": 368,
         "h": 120
       },
       "shape": "rect",
       "behavior": "blink",
-      "label": "Receive a Delivery\u2026",
+      "label": "Receive a Delivery…",
       "actions": [
         {
           "type": "jump",
@@ -123,6 +123,26 @@
           "fill": "#1f8a4c"
         }
       }
+    },
+    {
+      "id": "transfers",
+      "kind": "button",
+      "rect": {
+        "x": 1536,
+        "y": 944,
+        "w": 368,
+        "h": 120
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Transfers…",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "transfers"
+        }
+      ]
     }
   ]
 }

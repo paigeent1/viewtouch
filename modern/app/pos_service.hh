@@ -14,6 +14,7 @@
 #include "core/report.hh"
 #include "core/scan_data.hh"
 #include "core/settings.hh"
+#include "core/transfer.hh"
 #include "core/waitlist.hh"
 #include "app/pos_session.hh"
 
@@ -76,6 +77,9 @@ public:
     virtual void saveStockCount(const core::StockCount &) {}
     virtual void saveWaste(const core::Waste &) {}
     virtual void saveProblem(const core::Problem &) {}
+    // Inventory transfers between stores (both ways), and a retail item's count on hand (pos_transfers.cpp).
+    virtual void saveTransfer(const core::xfer::Transfer &) {}
+    virtual void saveRetailStock(const std::string &itemId, double onHand) { Q_UNUSED(itemId) Q_UNUSED(onHand) }
     // The store's pictures (logo, buttons, backgrounds): name -> file bytes.
     virtual void saveImage(const std::string &name, const QByteArray &data) { Q_UNUSED(name) Q_UNUSED(data) }
     virtual void deleteImage(const std::string &name) { Q_UNUSED(name) }
@@ -213,6 +217,9 @@ struct PosData {
     std::int64_t lastWasteId = 0;
     std::vector<core::Problem> problems;          // the last 7 days, oldest first
     std::int64_t lastProblemId = 0;
+    std::vector<core::xfer::Transfer> transfers;  // the last 400 days and every open one, oldest first
+    std::int64_t lastTransferId = 0;
+    std::map<std::string, double> retailStock;    // retail item id -> on hand (items counted or transferred)
 };
 
 // State shared by every terminal of one store: open checks, today's closed
@@ -362,6 +369,26 @@ public:
     // managers have seen (problem ids up to settings.problemsSeen).
     std::vector<core::Problem> problems;
     std::int64_t lastProblemId = 0;
+    // Inventory transfers (pos_transfers.cpp): both ways, oldest first; a retail item's on hand (kept from its
+    // first transfer: there is no retail count before that); the folder the files go through,
+    // <data>/transfers (outbox/<STORE>/, inbox/; set by main; empty: kept in memory, tests), and the script
+    // that sends the outbox (vt-send-transfers; empty: none is started).
+    std::vector<core::xfer::Transfer> transfers;
+    std::int64_t lastTransferId = 0;
+    std::map<std::string, double> retailStock;
+    QString transferDir;
+    QString transferScript;
+    std::int64_t transferSentAt = 0;
+    // Files that went out when there's no folder (tests): store -> file names -> contents.
+    std::map<std::string, std::map<std::string, QByteArray>> transferMemoryOut;
+    // The base price received per UPC from the store that sends prices (the markup is on it).
+    std::map<std::string, std::int64_t> basePrices;   // BuilderIndex::codeKey(upc) -> cents
+    std::string basePricesFrom;                       // the store they came from
+    bool basePricesLoaded = false;
+    int basePricesRevision = 0;
+    // Price changes from another store waiting for a person (Store Settings: "ask").
+    std::vector<QVariantMap> pricesWaiting;   // ("_file": its file in inbox/waiting, removed once reviewed)
+    bool pricesWaitingLoaded = false;
     // Kept, unless the same thing was noted in the last 10 minutes.
     void noteProblem(const std::string &kind, const std::string &subject, const std::string &detail = {});
     // Guessing PINs: wrong ones in a row on each screen, and the store's
@@ -710,6 +737,19 @@ public:
     bool massUndo();
     // A change set file from another store (or this one): matched by UPC, shown as a preview.
     bool massImport(const QVariantMap &file);
+    // Prices from the price source (Store Settings > Take retail prices from) and this store's price zone:
+    // the oldest waiting change set as a preview (Store Settings says ask); the zone {name, markup, round}
+    // (price book permission); massPreview({kind: "zone"}) reapplies it to every retail item.
+    bool massReviewWaiting();
+    bool massSetPriceZone(const QVariantMap &zone);
+    bool massZonePreview();
+    std::vector<core::mass::Change> storeChanges(const QVariantMap &file, std::vector<core::mass::Skip> &skipped,
+                                                 std::unordered_map<std::string, std::int64_t> *bases);
+    void noteBasePrices(const QVariantMap &file, const QString &from);
+    void loadBasePrices() const;
+    void saveBasePrices() const;
+    // The price source's price for an item (its first UPC; none: not received).
+    std::optional<std::int64_t> basePriceOf(const core::MenuItem &m) const;
     // A change set applied here, as its file ({format: viewtouch-change-set, ...}); empty: none such.
     QVariantMap massChangeSetFile(const QString &id);
     QVariantMap massUpdate() const override;
@@ -1243,6 +1283,53 @@ public:
     // `vtmodern --export-reports` writes for the web reporting page.
     static QStringList endOfDayReportIds();
 
+    // --- Inventory transfers (pos_transfers.cpp; Manager > Inventory > Transfers, managers) ------
+    // Retail items to another store (Store Settings > Other stores), matched there by UPC. The screen's state
+    // is transfers(); tab "out" (the transfer being made), "in" (waiting to be received), "list".
+    bool transferOpen(const QString &tab);
+    bool transferClose();
+    bool transferScan(const QString &code);              // a scan or a typed UPC: +1 of it (receiving: ticked off)
+    bool transferFind(const QString &text);              // part of a name: choices (one: added)
+    bool transferAddItem(const QString &itemId, double qty);
+    bool transferSetQty(int index, double qty);          // 0: off the transfer
+    bool transferSetTo(const QString &store);
+    bool transferSetNote(const QString &note);
+    bool transferClear();
+    bool transferSend();                                 // off on hand here, the slip, the file (managers)
+    bool transferVoid(qint64 id);                        // not received yet: back on hand (managers)
+    bool transferReprint(qint64 id);
+    bool transferStartReceive(qint64 id);
+    bool transferCount(int index, double qty, const QString &reason);   // counted in (sent units), and why if different
+    bool transferCheck(int index, bool on);
+    bool transferAddMissing(int index, bool add);        // a UPC not on file: add it from the transfer, or leave it out
+    bool transferReceive();                              // on hand up here, the result back to the sender (managers)
+    bool transferCancelReceive();
+    bool transferRange(const QString &from, const QString &until);   // the list's dates, yyyy-MM-dd
+    // "<source> price" (the bar): each retail line on the sale back to the price source's price (a discount per
+    // line, named "<source> price"; discount permission; allowed on No discounts items).
+    bool storePriceDiscount();
+    QVariantMap transfers() const override;
+    // A file from another store (vt-send-transfers put it in <data>/transfers/inbox): a transfer, its result or
+    // void, or a change set. "waiting": kept for a person; `why`: refused.
+    QString transferIncoming(const QByteArray &bytes, QString *why = nullptr);
+    // The server's own service, every 20 seconds (main): the inbox read, sent files noticed, the outbox sent.
+    void transfersTick();
+    core::Report transfersReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx) const;
+    core::Report transferSlip(const core::xfer::Transfer &t) const;
+    // A retail item's on hand (none: not kept for it, no transfer or count yet).
+    std::optional<double> retailOnHand(const std::string &itemId) const;
+    void addRetailStock(const std::string &itemId, double delta);
+    QString storeCode() const;                           // this store's short name to the others ("HCA")
+    const core::OtherStore *otherStore(const QString &name) const;
+    // Retail price changes made here, to the stores ticked "Send price changes" (a change set file each).
+    void sendChangeSetToStores(const QVariantMap &changeSet);
+    // One item's price or cost changed on its card (or by an import): the same, as a change set of its own.
+    void shareItemChange(const core::MenuItem &before, const core::MenuItem &after);
+    // A change set from another store (pos_mass_update.cpp): marked up, applied by itself or kept to ask.
+    QString takeStoreChangeSet(const QVariantMap &file, QString *why);
+    bool putInOutbox(const QString &store, const QString &name, const QVariantMap &content);
+    bool inOutbox(const QString &store, const QString &name) const;
+    int waitingToSend() const;
     // --- admin (manager) -------------------------------------------------------------
     // panel: menu | employees | tenders | printers | taxes | store
     QVariantList adminFields(const QString &panel) override;
@@ -1967,6 +2054,22 @@ private:
     core::Report timeClockReport(const QString &id, std::int64_t from, std::int64_t to,
                                  const std::vector<core::TimePunch> &punches, bool paper) const;
     // Mass Updates' screen here (pos_mass_update.cpp).
+    struct TransferView;
+    struct TransferIndex;
+    mutable std::shared_ptr<TransferView> xfer_;
+    TransferView &transferView() const;
+    const TransferIndex &transferIndex() const;
+    const core::MenuItem *transferItemFor(const QString &code) const;
+    core::xfer::Line transferLineOf(const core::MenuItem &m, double qty) const;
+    core::xfer::Transfer *transferRecord(std::int64_t id);
+    QVariantMap transferFile(const QString &kind, const core::xfer::Transfer &t) const;
+    QString transferStatusText(const core::xfer::Transfer &t) const;
+    QString transferPath(const QString &sub) const;
+    QString sendStatus() const;
+    void writeStoreList();
+    void startSending(bool now);
+    void printTransferSlip(const core::xfer::Transfer &t);
+    void retailStockSold(const std::vector<core::OrderLine> &lines, int sign);
     friend struct MassImpl;
     struct MassView;
     mutable std::shared_ptr<MassView> mass_;

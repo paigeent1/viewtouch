@@ -54,7 +54,7 @@ const QStringList kReportIds = {u"sales"_s, u"items"_s, u"categories"_s, u"hourl
                                 u"labor"_s, u"drawer"_s, u"expenses"_s, u"purchases"_s, u"audit"_s, u"accounts"_s, u"gc_activated"_s, u"gc_balances"_s, u"gc_inactive"_s, u"gc_tx"_s, u"kitchen"_s, u"foodcost"_s, u"engineering"_s, u"turns"_s,
                                 u"exceptions"_s, u"deposit"_s, u"customers"_s,
                                 u"royalty"_s, u"accounting"_s, u"checklists"_s, u"drivers"_s, u"changes"_s, u"stock"_s, u"employee_items"_s, u"timeclock"_s, u"costdiffs"_s, u"barvariance"_s, u"kegs"_s,
-                                u"buydowns"_s};
+                                u"buydowns"_s, u"transfers"_s};
 
 // "buydowns|sonoma": the Buydowns report, only that buydown (its id, ID number or part of its name).
 bool isBuydowns(const QString &id) { return id == u"buydowns" || id.startsWith(u"buydowns|"); }
@@ -1582,6 +1582,8 @@ Report PosService::buildReport(const QString &id) const
         return costDifferencesReport(ctx);
     if (id == u"kegs")
         return kegReport(s_->day.openedAt, now() + 1, ctx);
+    if (id == u"transfers")   // between stores (pos_transfers.cpp)
+        return transfersReport(s_->day.openedAt, now() + 1, ctx);
     if (id == u"barvariance") {
         // Today's bar counts; none today: the latest one.
         std::int64_t from = s_->day.openedAt;
@@ -1781,6 +1783,15 @@ bool PosService::requestRangeReport(const QString &id, const QString &period, co
     emit sessionChanged();
 
     // The bar's bottle and keg variance: from the counts and kegs kept here.
+    if (id == u"transfers") {   // kept here, by date
+        const ReportContext ctx = reportContext(label);
+        QVariantMap out = rangeReport_;
+        out.insert(u"loading"_s, false);
+        out.insert(u"report"_s, toVariant(transfersReport(a, b, ctx)));
+        rangeReport_ = out;
+        emit sessionChanged();
+        return true;
+    }
     if (id == u"barvariance" || id == u"kegs") {
         const ReportContext ctx = reportContext(label);
         QVariantMap out = rangeReport_;
