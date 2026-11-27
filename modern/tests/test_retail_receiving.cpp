@@ -437,3 +437,90 @@ TEST_CASE("Receive retail: Unfinished > Delete; New invoice keeps the one on the
     CHECK(pos.retailOnHand("pack").value_or(0) == 0);
     CHECK(pos.retailOnHand("cigar").value_or(0) == 0);
 }
+
+TEST_CASE("Receive retail: an allowance on a line; net cost on Cost differences, Allowances on Purchases; an "
+          "allowance row in a file goes onto the item above; changed after receiving, no stock moves",
+          "[receiving]")
+{
+    PosService pos(store(), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.recvOpen(u"receive"_s));
+    REQUIRE(pos.recvSetHeader({{u"vendor"_s, u"acme-n"_s}, {u"invoice"_s, u"AL-1"_s}, {u"date"_s, u"11/27/2026"_s}}));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kCarton)));
+    REQUIRE(pos.recvScan(QString::fromLatin1(kCarton)));
+    // 2 cartons at 131.97, an allowance of .60 a carton: 263.94 - 1.20 = 262.74.
+    REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"131.97"_s}, {u"allowance"_s, u"0.60"_s}}));
+    CHECK_FALSE(pos.recvSetLine(0, {{u"allowance"_s, u"-1"_s}}));   // typed positive
+    REQUIRE(pos.recvSetHeader({{u"total"_s, u"262.74"_s}}));
+    CHECK(pos.retailReceiving()[u"ties"_s].toBool());
+    const QVariantMap line = lines(pos)[0].toMap();
+    CHECK(line[u"allowance"_s].toString() == u"0.60"_s);
+    CHECK(line[u"extended"_s].toString().contains(u"262.74"_s));
+    CHECK(pos.retailReceiving()[u"totals"_s].toMap()[u"allowances"_s].toString().contains(u"1.20"_s));
+    REQUIRE(pos.recvReceive(false));
+    CHECK(pos.retailOnHand("pack") == 20.0);
+    REQUIRE(pos.retailReceipts().size() == 1);
+    const std::int64_t id = pos.retailReceipts()[0].id;
+    CHECK(pos.retailReceipts()[0].totals().stock == 26394);
+    CHECK(pos.retailReceipts()[0].totals().allowances == -120);
+    // The vendor's last cost: the price and the allowance; the net per pack for comparisons.
+    const core::recv::VendorItem *vi = pos.vendorItemOf("acme-n", "pack");
+    REQUIRE(vi);
+    CHECK(vi->lastCostCents == 13197);
+    CHECK(vi->lastAllowanceCents == 60);
+    CHECK(*vi->lastUnitCents() == 1313.7);
+    // Cost differences: the net (13.14 a pack against 8.10), the allowance in it shown.
+    const core::Report cd = pos.buildReport(u"retailcostdiffs"_s);
+    CHECK(std::ranges::find(cd.columns, std::string("Allowance")) != cd.columns.end());
+    CHECK(reportHas(cd, "$13.14"));
+    CHECK(reportHas(cd, "-$0.06"));
+    CHECK(reportHas(cd, "+$5.04"));
+    // Purchases: Stock gross, Allowances apart.
+    const core::Report pr = pos.buildReport(u"retailpurchases"_s);
+    REQUIRE(pr.columns.size() > 2);
+    CHECK(pr.columns[2] == "Allowances");
+    CHECK(reportHas(pr, "$263.94"));
+    CHECK(reportHas(pr, "-$1.20"));
+    CHECK(reportHas(pr, "$262.74"));
+
+    // Open > Edit: the allowance changed; the total follows, on hand doesn't move.
+    REQUIRE(pos.recvOpen(u"list"_s));
+    REQUIRE(pos.recvShowReceived(id));
+    REQUIRE(pos.recvEditReceived(id));
+    REQUIRE(lines(pos).size() == 1);
+    CHECK(lines(pos)[0].toMap()[u"allowance"_s].toString() == u"0.60"_s);
+    REQUIRE(pos.recvSetLine(0, {{u"allowance"_s, u"0.70"_s}}));
+    REQUIRE(pos.recvReceive(true));
+    CHECK(pos.retailOnHand("pack") == 20.0);
+    REQUIRE(pos.retailReceipts().size() == 1);
+    const core::recv::Receipt &r = pos.retailReceipts()[0];
+    REQUIRE(r.edits.size() == 1);
+    CHECK(r.edits[0].totalBefore == 26274);
+    CHECK(r.edits[0].totalAfter == 26254);
+    CHECK(r.edits[0].unitsBefore == r.edits[0].unitsAfter);
+
+    // A file: the allowance row under its item; a quantity of 0 listed, nothing added.
+    const char *file =
+        "Ship To,Invoice #,Invoice Date,Item #,UPC,Description,UOM,Qty Shipped,Unit Price,Extended\n"
+        "1001,AL-2,11/28/2026,A100,012345000023,RED CARTON,CTN,2,131.97,263.94\n"
+        "1001,AL-2,11/28/2026,,,** Allowance on Above Item,,,.60,1.20-\n"
+        "1001,AL-2,11/28/2026,A300,077777000014,ROBUSTO,EA,0,5.00,0.00\n";
+    REQUIRE(pos.recvOpen(u"import"_s));
+    REQUIRE(pos.recvImportText(QString::fromLatin1(file), u"allow.csv"_s));
+    REQUIRE(pos.recvImportVendor(u"acme-n"_s));
+    const QVariantMap imp = pos.retailReceiving()[u"importFile"_s].toMap();
+    const QVariantList invs = imp[u"invoices"_s].toList();
+    REQUIRE(invs.size() == 1);
+    CHECK(invs[0].toMap()[u"lines"_s].toInt() == 2);   // the allowance isn't a line of its own
+    CHECK(invs[0].toMap()[u"ties"_s].toBool());
+    CHECK(invs[0].toMap()[u"total"_s].toString().contains(u"262.74"_s));
+    REQUIRE(pos.recvImportCommit());
+    REQUIRE(pos.retailReceipts().size() == 2);
+    const core::recv::Receipt &f = pos.retailReceipts()[1];
+    REQUIRE(f.lines.size() == 2);
+    CHECK(f.lines[0].allowanceCents == 60);
+    CHECK(f.lines[1].qty == 0);
+    CHECK(f.offBy() == 0);
+    CHECK(pos.retailOnHand("pack") == 40.0);
+    CHECK(pos.retailOnHand("cigar") == 0.0);
+}

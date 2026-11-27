@@ -169,3 +169,75 @@ TEST_CASE("Receiving: a file's rows grouped into invoices by account and number"
     f.prepaid = 400;
     CHECK(recv::lineOf(f).costCents == 6100);
 }
+
+TEST_CASE("Receiving: an allowance on a line lowers its cost, the tie-out and the vendor's last net cost",
+          "[receiving][core]")
+{
+    recv::Receipt r;
+    // 2 cartons at 131.97, an allowance of .60 a carton ("** Allowance on Above Item": 1.20-).
+    r.lines.push_back({.kind = recv::kStock, .itemId = "pack", .perUom = 10, .qty = 2, .costCents = 13197, .allowanceCents = 60});
+    // Out of stock: listed, adds nothing.
+    r.lines.push_back({.kind = recv::kStock, .itemId = "cigar", .perUom = 1, .qty = 0, .costCents = 500, .allowanceCents = 25});
+    const recv::Line &l = r.lines[0];
+    CHECK(l.allowanceTotal() == 120);
+    CHECK(l.extended() == 26274);
+    CHECK(r.lines[1].extended() == 0);
+    const recv::Totals t = r.totals();
+    CHECK(t.stock == 26394);        // gross: before the allowance
+    CHECK(t.allowances == -120);
+    CHECK(t.total == 26274);
+    CHECK(t.units == 20);
+    r.typedTotal = 26274;
+    CHECK(*r.offBy() == 0);
+    // Net cost per pack: (131.97 - .60) / 10.
+    CHECK(*l.unitCostCents() == (13197.0 - 60) / 10);
+    CHECK(l.unitAllowanceCents() == 6.0);
+    // The vendor's last cost: the price and the allowance both kept; comparisons use the net.
+    recv::VendorItem v{.vendorId = "acme", .itemId = "pack"};
+    recv::learn(v, l, "2026-11-20", "A1");
+    CHECK(v.lastCostCents == 13197);
+    CHECK(v.lastAllowanceCents == 60);
+    CHECK(*v.lastNetCents() == 13137);
+    CHECK(*v.lastUnitCents() == 1313.7);
+}
+
+TEST_CASE("Receiving: a file's allowance, a column or a row under its item; a quantity of 0", "[receiving][core]")
+{
+    // An allowance row under its item (no item # or UPC; it says allowance): onto the item above, never a line.
+    const auto rows = recv::readCsv(
+        "Invoice,Date,Item #,Description,Qty,Unit Price,Extended\n"
+        "A-1,11/20/2026,555,RED KING CTN,2,131.97,263.94\n"
+        "A-1,11/20/2026,,** Allowance on Above Item,,.60,1.20-\n"
+        "A-1,11/20/2026,556,GOLD KING CTN,0,131.97,0.00\n"     // out of stock
+        "A-1,11/20/2026,557,BLUE BOX,3,10.00,30.00\n"
+        "A-1,11/20/2026,,ALLOWANCE,,,0.75-\n");                // no unit price: .75 over the item's 3
+    const auto lines = recv::fileLines(rows, recv::headerRow(rows), recv::guessMapping(rows[0]));
+    const auto invs = recv::group(lines);
+    REQUIRE(invs.size() == 1);
+    REQUIRE(invs[0].lines.size() == 3);
+    CHECK(invs[0].lines[0].allowance == 60);
+    CHECK(invs[0].lines[2].allowance == 25);
+    CHECK(invs[0].typedTotal == 26394 - 120 + 3000 - 75);
+    recv::Receipt r;
+    for (const recv::FileLine &f : invs[0].lines)
+        r.lines.push_back(recv::lineOf(f));
+    r.typedTotal = invs[0].typedTotal;
+    CHECK(r.lines[0].allowanceCents == 60);
+    CHECK(r.lines[0].extended() == 26274);
+    CHECK(r.lines[1].qty == 0);
+    CHECK(r.lines[1].extended() == 0);
+    CHECK(r.totals().allowances == -120 - 75);
+    CHECK(*r.offBy() == 0);
+
+    // An Allowance column (per unit).
+    const auto rows2 = recv::readCsv(
+        "Invoice,Item #,Description,Qty,Unit Price,Allowance,Extended\n"
+        "B-1,555,RED KING CTN,2,131.97,0.60,263.94\n");
+    const auto m2 = recv::guessMapping(rows2[0]);
+    CHECK(m2.at("allowance") == 5);
+    const auto invs2 = recv::group(recv::fileLines(rows2, 0, m2));
+    REQUIRE(invs2.size() == 1);
+    REQUIRE(invs2[0].lines.size() == 1);
+    CHECK(recv::lineOf(invs2[0].lines[0]).extended() == 26274);
+    CHECK(invs2[0].typedTotal == 26274);
+}

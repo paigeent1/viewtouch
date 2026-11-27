@@ -8,7 +8,9 @@
 //  - stock: an item, its quantity in the vendor's unit (a carton, a box) and how many of the item one is
 //    (perUom: a carton of 10 packs: 10), the invoice's price per unit, OTP / excise per unit (part of the item's
 //    cost) and cigarette prepaid sales tax per unit (not cost: on the invoice so its total ties out, reported
-//    apart for the bookkeeper). Free goods: a quantity at no cost.
+//    apart for the bookkeeper), and an allowance per unit (an off-invoice manufacturer allowance, "** Allowance
+//    on Above Item": typed as a positive amount, it lowers what the line costs; net cost per unit = price + OTP
+//    - allowance). Free goods: a quantity at no cost.
 //  - storeuse: supplies the store uses itself: never on hand; their cost and the sales / use tax on them are
 //    store expenses.
 //  - delivery, credit, other: invoice-level amounts (freight is not spread into item costs; a later
@@ -61,6 +63,7 @@ struct Line {
     std::int64_t costCents = -1;   // the invoice's price per vendor unit, before OTP (-1: not typed)
     std::int64_t otpCents = 0;     // OTP / excise per vendor unit: part of the cost
     std::int64_t prepaidCents = 0; // prepaid sales tax per vendor unit: not cost
+    std::int64_t allowanceCents = 0;   // allowance per vendor unit (a positive amount): taken off the cost
     std::int64_t taxCents = 0;     // store use: the sales / use tax on the line (the line's)
     std::int64_t amountCents = 0;  // delivery / credit / other: the line's amount (a credit is taken off)
     std::int64_t systemCostCents = 0;   // the item's system cost each when it came (0: none)
@@ -72,26 +75,32 @@ struct Line {
     std::int64_t goodsCents() const { return costCents < 0 ? 0 : std::llround(qty * double(costCents)); }
     std::int64_t otpTotal() const { return std::llround(qty * double(otpCents)); }
     std::int64_t prepaidTotal() const { return std::llround(qty * double(prepaidCents)); }
-    // The line on the invoice: its goods, OTP, prepaid tax and tax; an amount line's amount (a credit: less).
+    // The allowance on the line (a positive amount, taken off).
+    std::int64_t allowanceTotal() const { return std::llround(qty * double(std::llabs(allowanceCents))); }
+    // The line on the invoice: its goods, OTP, prepaid tax and tax less its allowance; an amount line's amount
+    // (a credit: less).
     std::int64_t extended() const
     {
         if (itemKind(kind))
-            return goodsCents() + otpTotal() + prepaidTotal() + taxCents;
+            return goodsCents() + otpTotal() + prepaidTotal() + taxCents - allowanceTotal();
         if (kind == kCredit)
             return -std::llabs(amountCents);
         return amountCents;
     }
-    // Cost of one unit of the item, with OTP (none: no price typed).
+    // Net cost of one unit of the item: price with OTP, less the allowance (none: no price typed).
     std::optional<double> unitCostCents() const
     {
         if (costCents < 0 || !(perUom > 0))
             return std::nullopt;
-        return double(costCents + otpCents) / perUom;
+        return double(costCents + otpCents - std::llabs(allowanceCents)) / perUom;
     }
+    // The allowance on one unit of the item.
+    double unitAllowanceCents() const { return perUom > 0 ? double(std::llabs(allowanceCents)) / perUom : 0; }
 };
 
 struct Totals {
-    std::int64_t stock = 0;      // stock lines' goods and OTP
+    std::int64_t stock = 0;      // stock lines' goods and OTP (gross: before allowances)
+    std::int64_t allowances = 0; // allowances on the item lines (less than nothing)
     std::int64_t otp = 0;        // of which OTP / excise
     std::int64_t prepaid = 0;    // prepaid sales tax (any line)
     std::int64_t storeUse = 0;   // store use goods (with any OTP)
@@ -148,6 +157,8 @@ struct Receipt {
         Totals t;
         for (const Line &l : lines) {
             t.prepaid += l.prepaidTotal();
+            if (itemKind(l.kind))
+                t.allowances -= l.allowanceTotal();
             if (l.kind == kStock) {
                 t.stock += l.goodsCents() + l.otpTotal();
                 t.otp += l.otpTotal();
@@ -164,7 +175,7 @@ struct Receipt {
                 t.other += l.amountCents;
             }
         }
-        t.total = t.stock + t.prepaid + t.storeUse + t.useTax + t.delivery + t.credits + t.other;
+        t.total = t.stock + t.allowances + t.prepaid + t.storeUse + t.useTax + t.delivery + t.credits + t.other;
         return t;
     }
     // Typed total less the lines' (0: ties out); none when no total was typed.
@@ -241,17 +252,26 @@ struct VendorItem {
     std::string uom;               // their unit
     double perUom = 1;             // the item's units in it
     std::int64_t lastCostCents = -1;   // their last price per their unit, with OTP (-1: none yet)
+    std::int64_t lastAllowanceCents = 0;   // the allowance on it then, per their unit (taken off: the net cost)
     std::string lastDate;          // its invoice's date (yyyy-MM-dd)
     std::string lastInvoice;
     bool storeUse = false;         // it's always store use
     std::string description;       // their description
     bool operator==(const VendorItem &) const = default;
 
+    // Their last net cost per their unit: price with OTP, less the allowance.
+    std::optional<std::int64_t> lastNetCents() const
+    {
+        if (lastCostCents < 0)
+            return std::nullopt;
+        return lastCostCents - std::llabs(lastAllowanceCents);
+    }
+    // ...per unit of the item (what comparisons use).
     std::optional<double> lastUnitCents() const
     {
         if (lastCostCents < 0 || !(perUom > 0))
             return std::nullopt;
-        return double(lastCostCents) / perUom;
+        return double(*lastNetCents()) / perUom;
     }
 };
 
@@ -302,6 +322,7 @@ inline void learn(VendorItem &v, const Line &l, std::string_view date, std::stri
         v.description = l.name;
     if (l.costCents >= 0 && (v.lastDate.empty() || std::string_view(v.lastDate) <= date)) {
         v.lastCostCents = l.costCents + l.otpCents;
+        v.lastAllowanceCents = std::llabs(l.allowanceCents);
         v.lastDate = std::string(date);
         v.lastInvoice = std::string(invoice);
     }
@@ -521,7 +542,7 @@ inline std::vector<std::vector<std::string>> readCsv(std::string_view text)
 inline const std::vector<std::string> &fields()
 {
     static const std::vector<std::string> f = {"invoice", "date", "account", "itemNo", "upc", "description", "uom",
-                                               "perUom", "qty", "unitPrice", "otp", "prepaid", "extended", "lineType",
+                                               "perUom", "qty", "unitPrice", "otp", "prepaid", "allowance", "extended", "lineType",
                                                "delivery", "useTax", "invoiceTotal"};
     return f;
 }
@@ -584,6 +605,9 @@ inline std::pair<std::string, int> guessField(std::string_view header)
                  "other tobacco tax", "otp excise"}},
         {"prepaid", {"prepaid", "prepaid tax", "prepaid sales tax", "pre paid tax", "ppd tax", "sales tax prepaid",
                      "cig tax prepaid", "prepaid cig tax"}},
+        {"allowance", {"allowance", "allowance per unit", "allowance each", "allow", "allowances", "mfg allowance",
+                       "mfr allowance", "manufacturer allowance", "off invoice allowance", "off invoice", "oi allowance",
+                       "deal", "deal allowance", "allowance amount"}},
         {"extended", {"extended", "extended price", "ext price", "ext", "extension", "extended amount", "ext amount",
                       "line total", "amount", "net amount", "line amount", "total"}},
         {"lineType", {"line type", "type", "line kind", "kind", "store use", "use"}},
@@ -653,10 +677,32 @@ struct FileLine {
     bool hasQty = false;
     std::int64_t unitPrice = -1;   // -1: none
     std::int64_t otp = 0, prepaid = 0, useTax = 0, delivery = 0;
+    std::int64_t allowance = 0;    // per unit, a positive amount (an Allowance column, or the row under it)
+    std::int64_t allowanceRows = -1;   // allowance rows' extensions under it, a positive amount (-1: none)
     std::int64_t extended = 0;
     bool hasExtended = false;
     std::int64_t invoiceTotal = -1;
+
+    // The allowance on the whole line: the allowance rows' own extension, else per unit times the quantity.
+    std::int64_t allowanceTotal() const
+    {
+        if (allowanceRows >= 0)
+            return allowanceRows;
+        return std::llround((hasQty ? qty : 1) * double(allowance));
+    }
 };
+
+// A row that is an allowance on the item above it ("** Allowance on Above Item"): no item number or UPC, and
+// its description says allowance.
+inline bool allowanceRow(const FileLine &l)
+{
+    if (!l.itemNo.empty() || !l.upc.empty())
+        return false;
+    std::string d;
+    for (char c : l.description)
+        d += char(std::tolower(static_cast<unsigned char>(c)));
+    return d.find("allowance") != std::string::npos;
+}
 
 struct FileInvoice {
     std::string account, invoice, date;
@@ -695,7 +741,9 @@ inline std::string kindOf(const FileLine &l)
 }
 
 // The file's rows read by the mapping, from the row after the header; blank rows and rows with nothing to
-// count (no quantity, amount or delivery) are passed over.
+// count (no quantity, amount or delivery) are passed over. An allowance row (allowanceRow) goes onto the item
+// row directly above it, never a line of its own: per unit, its unit price, else its extension over that
+// item's quantity (with no item row above it, it stays a row: a credit).
 inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string>> &rows, int header, const Mapping &m)
 {
     std::vector<FileLine> out;
@@ -732,6 +780,7 @@ inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string
             l.unitPrice = std::llabs(*v);
         l.otp = centsOf(cell(r, "otp")).value_or(0);
         l.prepaid = centsOf(cell(r, "prepaid")).value_or(0);
+        l.allowance = std::llabs(centsOf(cell(r, "allowance")).value_or(0));
         l.useTax = centsOf(cell(r, "useTax")).value_or(0);
         l.delivery = centsOf(cell(r, "delivery")).value_or(0);
         if (const auto v = centsOf(cell(r, "extended"))) {
@@ -745,6 +794,27 @@ inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string
             continue;
         if (!something)
             continue;
+        if (allowanceRow(l) && !out.empty()) {
+            FileLine &item = out.back();
+            const bool itemRow = itemKind(kindOf(item)) && !allowanceRow(item);
+            const bool sameInvoice = l.invoice.empty() || numberKey(l.invoice) == numberKey(item.invoice);
+            if (itemRow && sameInvoice) {
+                std::int64_t perUnit = 0;
+                const double q = item.hasQty ? item.qty : 1;
+                if (l.unitPrice > 0)
+                    perUnit = l.unitPrice;
+                else if (l.hasExtended && q != 0)
+                    perUnit = std::llround(double(std::llabs(l.extended)) / q);
+                item.allowance += perUnit;
+                // The extension as the row has it (else per unit times the item's quantity), for the tie-out.
+                const std::int64_t ext = l.hasExtended ? std::llabs(l.extended) : std::llround(q * double(perUnit));
+                const std::int64_t before = item.allowanceRows >= 0 ? item.allowanceRows : std::llround(q * double(item.allowance - perUnit));
+                item.allowanceRows = before + ext;
+                if (item.invoiceTotal < 0 && l.invoiceTotal >= 0)
+                    item.invoiceTotal = l.invoiceTotal;
+                continue;
+            }
+        }
         out.push_back(std::move(l));
     }
     return out;
@@ -797,7 +867,7 @@ inline std::vector<FileInvoice> group(const std::vector<FileLine> &lines)
             if (!l.hasExtended)
                 continue;
             anyExtended = true;
-            sum += kindOf(l) == kCredit ? -std::llabs(l.extended) : l.extended;
+            sum += kindOf(l) == kCredit ? -std::llabs(l.extended) : l.extended - l.allowanceTotal();
         }
         if (anyExtended)
             inv.typedTotal = sum + inv.delivery;
@@ -806,7 +876,8 @@ inline std::vector<FileInvoice> group(const std::vector<FileLine> &lines)
 }
 
 // A file's row as an invoice line (the item it is found by the app: itemId, perUom when the file has none).
-// The price per unit: the file's, else its extended amount over the quantity less OTP and prepaid tax.
+// The price per unit: the file's, else its extended amount over the quantity less OTP and prepaid tax (the
+// extended amount is the item's own, before its allowance). A quantity of 0 (out of stock): listed, adds nothing.
 inline Line lineOf(const FileLine &f)
 {
     Line l;
@@ -824,6 +895,7 @@ inline Line lineOf(const FileLine &f)
             l.costCents = std::max<std::int64_t>(0, std::llround(double(f.extended) / l.qty) - f.otp - f.prepaid);
         l.otpCents = f.otp;
         l.prepaidCents = f.prepaid;
+        l.allowanceCents = f.allowance;
         l.taxCents = l.kind == kStoreUse ? f.useTax : 0;
     } else {
         const std::int64_t amount = f.hasExtended ? f.extended

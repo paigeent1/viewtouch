@@ -3348,7 +3348,8 @@ line, and the line says what goes on hand (<i>= 2 ctn</i>: sealed cartons; a pac
 <li>On each line: the quantity in the vendor's unit, the unit's name (CTN, BOX), how many of the item one unit
 is, the vendor's item #, the invoice's <b>price</b> per unit (optional), <b>OTP</b> / excise per unit (part of the
 item's cost) and <b>prepaid tax</b> per unit (cigarettes' prepaid sales tax: on the invoice so its total ties out,
-reported apart, never part of the cost). Free goods: their quantity with no price.</li>
+reported apart, never part of the cost), and the <b>allowance</b> per unit when the invoice has one (see
+below). Free goods: their quantity with no price.</li>
 <li><b>Stock</b> / <b>Store use</b> on a line: store use is supplies the store uses itself (bags, cleaning). It
 never goes into on hand; its cost and its <b>use tax</b> are reported as store expenses. <b>+ Store use</b> adds a
 supply line that isn't an item (type what it is).</li>
@@ -3362,6 +3363,17 @@ and last cost are kept, and the invoice is on the Changes report. If it doesn't 
 ViewTouch asks first: <i>Off by $x from the invoice's total. Receive anyway?</i> — <b>Go back</b> to fix it, or
 <b>Receive anyway</b>.</li>
 </ol>
+
+<h2>Allowances on the invoice</h2>
+<p>Some invoice lines are followed by <i>** Allowance on Above Item</i>: a manufacturer's off-invoice allowance per
+unit, printed with a minus (2 cartons at $131.97 = $263.94, then an allowance of .60 a carton = 1.20-). It lowers
+what you actually pay for that line, so type it in the line's <b>Allowance</b> box, as a positive amount per unit
+(.60). The line's total and the tie-out take it off (263.94 − 1.20 = <b>262.74</b>), and the line's cost each is the
+<b>net</b> cost: price + OTP − allowance (prepaid tax is still never cost). Retail Cost Diffs compares the net cost
+with the system cost and shows the allowance in it, so a line that came in cheaper this time is explained; the
+vendor's last cost keeps both the price and the allowance. Retail Purchases shows the stock at its full price
+(with OTP) and the allowances in their own <b>Allowances</b> column, so you can see what the allowances saved. An
+allowance can be changed on a received invoice like any price; it never changes on hand.</p>
 
 <h2>Unfinished invoices: Save for later</h2>
 <p>Nothing from an invoice is on hand until you press <b>Receive</b>. Until then it is an <i>unfinished</i>
@@ -3401,9 +3413,12 @@ save it as CSV first). One file can hold many invoices and both accounts of a di
 <ul>
 <li>The header row is found by itself (a title above it is passed over), and each column is guessed from its
 name: invoice #, invoice date, account or ship-to, vendor item #, UPC, description, unit (UOM), units per UOM,
-quantity (shipped), unit price, OTP / excise, prepaid tax, extended (the line's total), line type (store use,
-credit, delivery), delivery / freight, use tax, invoice total. Change any of them with its list; the columns are
-kept for that vendor's next file.</li>
+quantity (shipped), unit price, OTP / excise, prepaid tax, allowance (per unit), extended (the line's total), line
+type (store use, credit, delivery), delivery / freight, use tax, invoice total. Change any of them with its list; the
+columns are kept for that vendor's next file.</li>
+<li>An allowance row (no item # or UPC, and its description says <i>allowance</i>, like <i>** Allowance on Above
+Item</i>) goes onto the item row right above it, never a line of its own: per unit, its unit price, or else its
+extended amount over that item's quantity. A row with a quantity of 0 (out of stock) is listed and adds nothing.</li>
 <li>Rows are put together into invoices by account and invoice number. Each invoice goes to the vendor whose
 <b>account number</b> is in its account / ship-to column (leading zeros don't matter); without that column, to the
 vendor chosen.</li>
@@ -3420,9 +3435,9 @@ for the months before you started receiving here). An older invoice never replac
 <h2>The list and the reports</h2>
 <p><b>Invoices received</b>: by invoice date (the last 60 days, or From / to); <b>Open</b> on one shows it. <b>Reports → Retail Purchases</b>
 (today: the invoices received today; or any dates, by invoice date): by vendor group, by vendor and by invoice,
-the stock's cost (with OTP / excise), prepaid tax, delivery, store use, use tax, credits, other and the invoices'
-totals, and the invoices that don't tie out. <b>Reports → Retail Cost Diffs</b>: each line whose invoice cost per
-unit (with OTP) isn't the item's system cost, and the difference. This is a plain list for now; the full review (by
+the stock's cost (with OTP / excise, before allowances), allowances, prepaid tax, delivery, store use, use tax,
+credits, other and the invoices' totals, and the invoices that don't tie out. <b>Reports → Retail Cost Diffs</b>:
+each line whose invoice net cost per unit (with OTP, less any allowance) isn't the item's system cost, and the difference. This is a plain list for now; the full review (by
 brand, ticked Reviewed, and adjusting prices) comes later.</p>
 <div class="tip">Retail on hand is the same number Transfers keeps. Items get one from their first count, invoice or
 transfer.</div>

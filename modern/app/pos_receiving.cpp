@@ -63,11 +63,14 @@ bool looksLikeBarcode(const QString &code)
 
 QJsonObject lineJson(const Line &l)
 {
-    return {{u"kind"_s, qs(l.kind)}, {u"itemId"_s, qs(l.itemId)}, {u"upc"_s, qs(l.upc)}, {u"vendorItem"_s, qs(l.vendorItem)},
+    QJsonObject o{{u"kind"_s, qs(l.kind)}, {u"itemId"_s, qs(l.itemId)}, {u"upc"_s, qs(l.upc)}, {u"vendorItem"_s, qs(l.vendorItem)},
             {u"name"_s, qs(l.name)}, {u"uom"_s, qs(l.uom)}, {u"perUom"_s, l.perUom}, {u"qty"_s, l.qty},
             {u"cost"_s, qint64(l.costCents)}, {u"otp"_s, qint64(l.otpCents)}, {u"prepaid"_s, qint64(l.prepaidCents)},
             {u"tax"_s, qint64(l.taxCents)}, {u"amount"_s, qint64(l.amountCents)},
             {u"systemCost"_s, qint64(l.systemCostCents)}, {u"leftOut"_s, l.leftOut}};
+    if (l.allowanceCents)   // (only when there is one: a line saved before allowances reads the same)
+        o.insert(u"allowance"_s, qint64(l.allowanceCents));
+    return o;
 }
 
 Line lineFrom(const QJsonObject &o)
@@ -84,6 +87,7 @@ Line lineFrom(const QJsonObject &o)
     l.costCents = o.value(u"cost").toInteger(-1);
     l.otpCents = o.value(u"otp").toInteger();
     l.prepaidCents = o.value(u"prepaid").toInteger();
+    l.allowanceCents = std::llabs(o.value(u"allowance").toInteger());
     l.taxCents = o.value(u"tax").toInteger();
     l.amountCents = o.value(u"amount").toInteger();
     l.systemCostCents = o.value(u"systemCost").toInteger();
@@ -100,6 +104,7 @@ QString fieldLabel(const std::string &f)
         {"upc", QT_TR_NOOP("UPC")}, {"description", QT_TR_NOOP("Description")}, {"uom", QT_TR_NOOP("Unit (UOM)")},
         {"perUom", QT_TR_NOOP("Units per UOM")}, {"qty", QT_TR_NOOP("Quantity")}, {"unitPrice", QT_TR_NOOP("Unit price")},
         {"otp", QT_TR_NOOP("OTP / excise per unit")}, {"prepaid", QT_TR_NOOP("Prepaid sales tax per unit")},
+        {"allowance", QT_TR_NOOP("Allowance per unit")},
         {"extended", QT_TR_NOOP("Extended (line total)")}, {"lineType", QT_TR_NOOP("Line type / store use")},
         {"delivery", QT_TR_NOOP("Delivery / freight")}, {"useTax", QT_TR_NOOP("Use tax")},
         {"invoiceTotal", QT_TR_NOOP("Invoice total")}};
@@ -201,10 +206,13 @@ Receipt retailReceiptFromJson(const QJsonObject &o)
 
 QJsonObject toJson(const VendorItem &v)
 {
-    return {{u"vendorId"_s, qs(v.vendorId)}, {u"itemId"_s, qs(v.itemId)}, {u"vendorItem"_s, qs(v.vendorItem)},
+    QJsonObject o{{u"vendorId"_s, qs(v.vendorId)}, {u"itemId"_s, qs(v.itemId)}, {u"vendorItem"_s, qs(v.vendorItem)},
             {u"uom"_s, qs(v.uom)}, {u"perUom"_s, v.perUom}, {u"lastCost"_s, qint64(v.lastCostCents)},
             {u"lastDate"_s, qs(v.lastDate)}, {u"lastInvoice"_s, qs(v.lastInvoice)}, {u"storeUse"_s, v.storeUse},
             {u"description"_s, qs(v.description)}};
+    if (v.lastAllowanceCents)
+        o.insert(u"lastAllowance"_s, qint64(v.lastAllowanceCents));
+    return o;
 }
 
 VendorItem vendorItemFromJson(const QJsonObject &o)
@@ -216,6 +224,7 @@ VendorItem vendorItemFromJson(const QJsonObject &o)
     v.uom = ss(o.value(u"uom").toString());
     v.perUom = o.value(u"perUom").toDouble(1);
     v.lastCostCents = o.value(u"lastCost").toInteger(-1);
+    v.lastAllowanceCents = std::llabs(o.value(u"lastAllowance").toInteger());
     v.lastDate = ss(o.value(u"lastDate").toString());
     v.lastInvoice = ss(o.value(u"lastInvoice").toString());
     v.storeUse = o.value(u"storeUse").toBool();
@@ -669,7 +678,7 @@ bool PosService::recvSetLine(int index, const QVariantMap &f)
     if (f.contains(u"name"_s) && l.itemId.empty())
         l.name = ss(f.value(u"name"_s).toString().trimmed().left(80));
     if (!cents(u"cost"_s, l.costCents, true) || !cents(u"otp"_s, l.otpCents, false) || !cents(u"prepaid"_s, l.prepaidCents, false)
-        || !cents(u"tax"_s, l.taxCents, false))
+        || !cents(u"allowance"_s, l.allowanceCents, false) || !cents(u"tax"_s, l.taxCents, false))
         return fail(tr("Type an amount, like 12.34."));
     if (f.contains(u"amount"_s)) {
         const auto c = recv::centsOf(ss(f.value(u"amount"_s).toString()));
@@ -1731,7 +1740,11 @@ QVariantMap PosService::retailReceiving() const
         const Line &l = v.lines[i];
         QString last;
         if (const VendorItem *vi = vendorItemOf(ss(v.vendorId), l.itemId); vi && !l.itemId.empty() && vi->lastCostCents >= 0)
-            last = tr("last %1 per %2 (%3)").arg(money(vi->lastCostCents), vi->uom.empty() ? tr("unit") : qs(vi->uom), qs(vi->lastDate));
+            last = vi->lastAllowanceCents > 0
+                       ? tr("last %1 per %2 net (%3 less %4 allowance) (%5)")
+                             .arg(money(*vi->lastNetCents()), vi->uom.empty() ? tr("unit") : qs(vi->uom), money(vi->lastCostCents),
+                                  money(vi->lastAllowanceCents), qs(vi->lastDate))
+                       : tr("last %1 per %2 (%3)").arg(money(vi->lastCostCents), vi->uom.empty() ? tr("unit") : qs(vi->uom), qs(vi->lastDate));
         const auto unit = l.unitCostCents();
         lines.append(QVariantMap{
             {u"index"_s, int(i)}, {u"kind"_s, qs(l.kind)}, {u"kindText"_s, kindLabel(l.kind)}, {u"itemId"_s, qs(l.itemId)},
@@ -1739,6 +1752,7 @@ QVariantMap PosService::retailReceiving() const
             {u"upc"_s, qs(l.upc)}, {u"vendorItem"_s, qs(l.vendorItem)}, {u"uom"_s, qs(l.uom)}, {u"perUom"_s, l.perUom},
             {u"qty"_s, l.qty}, {u"units"_s, qtyText(l.units())}, {u"cost"_s, amount(l.costCents)},
             {u"otp"_s, l.otpCents ? amount(l.otpCents) : QString()}, {u"prepaid"_s, l.prepaidCents ? amount(l.prepaidCents) : QString()},
+            {u"allowance"_s, l.allowanceCents ? amount(l.allowanceCents) : QString()},
             {u"tax"_s, l.taxCents ? amount(l.taxCents) : QString()}, {u"amount"_s, amount(std::llabs(l.amountCents))},
             {u"extended"_s, money(l.extended())}, {u"onHand"_s, l.itemId.empty() ? QString() : retailOnHandText(l.itemId)},
             {u"stockAs"_s, [&] {   // what it puts on hand: "5 ctn" (sealed), "3 pk" (loose); "" not in a family
@@ -1758,6 +1772,7 @@ QVariantMap PosService::retailReceiving() const
     const recv::Totals t = draft.totals();
     const auto off = draft.offBy();
     const QVariantMap totals{{u"stock"_s, money(t.stock)}, {u"otp"_s, money(t.otp)}, {u"prepaid"_s, money(t.prepaid)},
+                             {u"allowances"_s, money(t.allowances)}, {u"hasAllowances"_s, t.allowances != 0},
                              {u"storeUse"_s, money(t.storeUse)}, {u"useTax"_s, money(t.useTax)}, {u"delivery"_s, money(t.delivery)},
                              {u"credits"_s, money(t.credits)}, {u"other"_s, money(t.other)}, {u"total"_s, money(t.total)},
                              {u"units"_s, qtyText(t.units)}};
@@ -1869,6 +1884,7 @@ QVariantMap PosService::retailReceiving() const
                                          {u"vendorItem"_s, qs(l.vendorItem)}, {u"qty"_s, qtyText(l.qty)},
                                          {u"perUom"_s, qtyText(l.perUom)}, {u"uom"_s, qs(l.uom)},
                                          {u"cost"_s, amount(l.costCents)}, {u"extended"_s, money(l.extended())},
+                                         {u"allowance"_s, l.allowanceCents ? amount(l.allowanceCents) : QString()},
                                          {u"found"_s, !l.itemId.empty()}, {u"leftOut"_s, l.leftOut},
                                          {u"unitCost"_s, unit ? money(std::llround(*unit)) : QString()},
                                          {u"systemCost"_s, l.systemCostCents > 0 ? money(l.systemCostCents) : QString()}});
@@ -1908,6 +1924,7 @@ QVariantMap PosService::retailReceiving() const
             rl.append(QVariantMap{{u"kind"_s, kindLabel(l.kind)}, {u"name"_s, qs(l.name.empty() ? l.upc : l.name)},
                                   {u"qty"_s, qtyText(l.qty)}, {u"uom"_s, qs(l.uom)}, {u"perUom"_s, qtyText(l.perUom)},
                                   {u"cost"_s, amount(l.costCents)}, {u"extended"_s, money(l.extended())},
+                                  {u"allowance"_s, l.allowanceCents ? amount(l.allowanceCents) : QString()},
                                   {u"isItem"_s, recv::itemKind(l.kind)}, {u"leftOut"_s, l.leftOut}});
         QVariantList el;
         for (auto e = rc.edits.rbegin(); e != rc.edits.rend(); ++e) {
@@ -1972,15 +1989,15 @@ std::int64_t dayStart(const std::string &ymd)
 } // namespace
 
 // Purchases (retail): the invoices dated in [from, to) (byReceived: received then), by vendor group, by vendor
-// and by invoice: the stock's cost with OTP, prepaid sales tax, delivery, store use and the tax on it,
-// credits, other and the invoices' totals.
+// and by invoice: the stock's cost with OTP (gross), the allowances taken off it, prepaid sales tax, delivery,
+// store use and the tax on it, credits, other and the invoices' totals.
 Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, const ReportContext &ctx, bool byReceived) const
 {
     Report r;
     r.id = "retailpurchases";
     r.title = "Purchases (retail)";
     r.subtitle = ctx.period;
-    r.columns = {"", "Stock", "Prepaid tax", "Delivery", "Store use", "Use tax", "Credits", "Other", "Total"};
+    r.columns = {"", "Stock", "Allowances", "Prepaid tax", "Delivery", "Store use", "Use tax", "Credits", "Other", "Total"};
     std::vector<const Receipt *> in;
     for (const Receipt &rc : s_->retailReceipts) {
         const std::int64_t at = byReceived ? rc.at : dayStart(rc.date) >= 0 ? dayStart(rc.date) : rc.at;
@@ -1993,7 +2010,8 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
         return r;
     }
     const auto row = [&](const std::string &label, const recv::Totals &t) {
-        return std::vector<std::string>{label, ctx.money(Money::fromCents(t.stock)), ctx.money(Money::fromCents(t.prepaid)),
+        return std::vector<std::string>{label, ctx.money(Money::fromCents(t.stock)), ctx.money(Money::fromCents(t.allowances)),
+                                        ctx.money(Money::fromCents(t.prepaid)),
                                         ctx.money(Money::fromCents(t.delivery)), ctx.money(Money::fromCents(t.storeUse)),
                                         ctx.money(Money::fromCents(t.useTax)), ctx.money(Money::fromCents(t.credits)),
                                         ctx.money(Money::fromCents(t.other)), ctx.money(Money::fromCents(t.total))};
@@ -2001,6 +2019,7 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
     const auto add = [](recv::Totals &a, const recv::Totals &b) {
         a.stock += b.stock;
         a.otp += b.otp;
+        a.allowances += b.allowances;
         a.prepaid += b.prepaid;
         a.storeUse += b.storeUse;
         a.useTax += b.useTax;
@@ -2024,6 +2043,10 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
         add(byVendor[rc->vendorName.empty() ? std::string("(no vendor)") : rc->vendorName], t);
         add(all, t);
     }
+    r.note("Stock: the items' cost with OTP / excise, before allowances (" + ctx.money(Money::fromCents(all.otp))
+           + " OTP / excise in it). Allowances: the off-invoice allowances on the items, taken off apart ("
+           + ctx.money(Money::fromCents(all.allowances)) + "); the stock's net cost is Stock plus Allowances ("
+           + ctx.money(Money::fromCents(all.stock + all.allowances)) + ").");
     if (groups) {
         r.section("By vendor group");
         for (const auto &[g, t] : byGroup)
@@ -2033,7 +2056,6 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
     for (const auto &[name, t] : byVendor)
         r.line(row(name, t));
     r.total(row("Total", all));
-    r.note("Stock: the items' cost with OTP / excise (" + ctx.money(Money::fromCents(all.otp)) + " OTP / excise in it).");
     r.section("Invoices");
     std::vector<std::string> offs;
     for (const Receipt *rc : in) {
@@ -2056,7 +2078,7 @@ Report PosService::retailPurchasesReport(std::int64_t from, std::int64_t to, con
     return r;
 }
 
-// Cost differences (retail): invoice cost per unit (with OTP) against the item's system cost when it came,
+// Cost differences (retail): invoice net cost per unit (with OTP, less the allowance) against the item's system cost when it came,
 // for the invoices received in [from, to). A plain list: the full review (by brand, Reviewed, Adjust prices)
 // is a later step.
 Report PosService::retailCostDiffsReport(std::int64_t from, std::int64_t to, const ReportContext &ctx, bool byReceived) const
@@ -2065,7 +2087,7 @@ Report PosService::retailCostDiffsReport(std::int64_t from, std::int64_t to, con
     r.id = "retailcostdiffs";
     r.title = "Cost differences (retail)";
     r.subtitle = ctx.period;
-    r.columns = {"Item", "Invoice", "System cost", "Invoice cost", "Difference", "Units", "Total"};
+    r.columns = {"Item", "Invoice", "System cost", "Invoice cost", "Allowance", "Difference", "Units", "Total"};
     std::int64_t sum = 0;
     int n = 0;
     for (const Receipt &rc : s_->retailReceipts) {
@@ -2088,6 +2110,7 @@ Report PosService::retailCostDiffsReport(std::int64_t from, std::int64_t to, con
             std::snprintf(units, sizeof units, "%g", std::round(l.units() * 1000) / 1000);
             r.line({l.name, rc.vendorName + " #" + rc.invoice + " " + rc.date, ctx.money(Money::fromCents(l.systemCostCents)),
                     ctx.money(Money::fromCents(std::llround(*unit))),
+                    l.allowanceCents ? "-" + ctx.money(Money::fromCents(std::llround(l.unitAllowanceCents()))) : std::string(),
                     (diff > 0 ? "+" : "") + ctx.money(Money::fromCents(std::llround(diff))), units,
                     (total > 0 ? "+" : "") + ctx.money(Money::fromCents(total))});
         }
@@ -2095,9 +2118,10 @@ Report PosService::retailCostDiffsReport(std::int64_t from, std::int64_t to, con
     if (n == 0)
         r.note("No invoice costs differed from the system cost in this period.");
     else
-        r.total({"Total", "", "", "", "", "", ctx.money(Money::fromCents(sum))});
-    r.note("Receiving never changes the system cost or the price. Invoice cost: the invoice's price per unit with "
-           "OTP / excise, over the units in the vendor's unit. The full Cost Differences review comes later.");
+        r.total({"Total", "", "", "", "", "", "", ctx.money(Money::fromCents(sum))});
+    r.note("Receiving never changes the system cost or the price. Invoice cost: the invoice's net price per unit, with "
+           "OTP / excise and less any allowance (Allowance: the allowance in it, per unit), over the units in the "
+           "vendor's unit. The full Cost Differences review comes later.");
     return r;
 }
 

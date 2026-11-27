@@ -7,8 +7,8 @@ import QtQuick.Layouts
 // retail items' on hand (PosService::recvOpen..., app/pos_receiving.cpp; the state is pos.retailReceiving).
 // Receive: the vendor, invoice # and date, the total from the paper; scan with the counter scanner (a repeat
 // scan is one more; a carton's UPC brings its packs), type a UPC or the vendor's item number, or part of a
-// name and Find; per line the quantity in the vendor's unit, units in it, the invoice's price, OTP and prepaid
-// tax; Store use lines; Delivery, Credit / return and Other amounts; the tie-out against the total. A code
+// name and Find; per line the quantity in the vendor's unit, units in it, the invoice's price, OTP, prepaid
+// tax and allowance (taken off the cost); Store use lines; Delivery, Credit / return and Other amounts; the tie-out against the total. A code
 // not on file: Link it to an item (its alt UPC), Add it, or Leave it out. The invoice is kept as it's worked on
 // (nothing on hand); Save for later sets it aside on Unfinished (Open, Delete; any screen, one at a time);
 // Receive puts it on hand, asking first when it doesn't tie out. Receiving never changes a system cost or a
@@ -319,6 +319,7 @@ Item {
                                    modelData.onHand !== "" ? qsTr("on hand %1").arg(modelData.onHand) : "",
                                    modelData.systemCost !== "" ? qsTr("system cost %1").arg(modelData.systemCost) : "",
                                    modelData.unitCost !== "" ? qsTr("invoice %1 each").arg(modelData.unitCost) : "",
+                                   (modelData.allowance ?? "") !== "" ? qsTr("less %1 allowance per unit").arg(modelData.allowance) : "",
                                    modelData.last].filter(s => s !== "").join("  ·  ")
                             color: modelData.different ? "#b35c00" : palette.windowText
                         }
@@ -408,6 +409,13 @@ Item {
                                 text: modelData.prepaid
                                 onEditingFinished: if (text !== modelData.prepaid) w.pos.recvSetLine(modelData.index, { prepaid: text })
                             }
+                            Amount {   // an off-invoice allowance ("** Allowance on Above Item"): typed as a positive amount, taken off
+                                visible: modelData.kind === "stock"
+                                objectName: "recvAllowance-" + modelData.index
+                                placeholderText: qsTr("Allowance")
+                                text: modelData.allowance ?? ""
+                                onEditingFinished: if (text !== (modelData.allowance ?? "")) w.pos.recvSetLine(modelData.index, { allowance: text })
+                            }
                             Amount {
                                 visible: modelData.kind === "storeuse"
                                 objectName: "recvTax-" + modelData.index
@@ -446,6 +454,7 @@ Item {
                 spacing: 14
                 readonly property var t: w.info.totals ?? ({})
                 Small { text: qsTr("Stock %1 (OTP %2)").arg(parent.t.stock ?? "").arg(parent.t.otp ?? "") }
+                Small { visible: parent.t.hasAllowances === true; text: qsTr("Allowances %1").arg(parent.t.allowances ?? "") }
                 Small { text: qsTr("Prepaid tax %1").arg(parent.t.prepaid ?? "") }
                 Small { text: qsTr("Store use %1 + tax %2").arg(parent.t.storeUse ?? "").arg(parent.t.useTax ?? "") }
                 Small { text: qsTr("Delivery %1").arg(parent.t.delivery ?? "") }
@@ -615,7 +624,8 @@ Item {
                 text: qsTr("A CSV file from the vendor (an Excel file: save it as CSV first): a header row, then one row per invoice line. "
                            + "Its columns are guessed from their names: invoice #, date, account or ship-to (routes each invoice to the vendor "
                            + "with that account number), item #, UPC, description, UOM, units per UOM, quantity, unit price, OTP / excise, "
-                           + "prepaid tax, extended, line type (store use, credit, delivery), delivery / freight, use tax, invoice total. "
+                           + "prepaid tax, allowance per unit, extended, line type (store use, credit, delivery), delivery / freight, use tax, invoice total. "
+                           + "A row with no item # or UPC whose description says allowance (\"** Allowance on Above Item\") goes onto the item above it. "
                            + "You can change them before importing; they're kept for the vendor's next file. "
                            + "History only loads past invoices to learn the vendor's item numbers and last costs, without changing on hand.")
             }
@@ -907,6 +917,7 @@ Item {
                     elide: Text.ElideRight
                     text: modelData.kind + "  " + modelData.name + "  " + [modelData.upc, modelData.vendorItem].filter(s => s !== "").join(" / ")
                           + "  ·  " + modelData.qty + " " + modelData.uom + " × " + modelData.perUom + "  @ " + modelData.cost
+                          + ((modelData.allowance ?? "") !== "" ? "  " + qsTr("less %1 allowance").arg(modelData.allowance) : "")
                           + "  =  " + modelData.extended
                           + (modelData.unitCost !== "" ? "  ·  " + qsTr("invoice %1 each").arg(modelData.unitCost) : "")
                           + (modelData.systemCost !== "" ? "  ·  " + qsTr("system cost %1").arg(modelData.systemCost) : "")
@@ -1020,6 +1031,7 @@ Item {
                     elide: Text.ElideRight
                     text: modelData.kind + "  " + modelData.name
                           + (modelData.isItem ? "  ·  " + modelData.qty + " " + modelData.uom + " × " + modelData.perUom + "  @ " + modelData.cost : "")
+                          + ((modelData.allowance ?? "") !== "" ? "  " + qsTr("less %1 allowance").arg(modelData.allowance) : "")
                           + "  =  " + modelData.extended + (modelData.leftOut ? "  ·  " + qsTr("skipped") : "")
                 }
             }
