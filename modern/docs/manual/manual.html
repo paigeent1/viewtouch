@@ -68,6 +68,7 @@
 <li>Store computer commands (owner appendix)</li>
 <li>Mass Updates: many items at once</li>
 <li>Buydowns and promotions</li>
+<li>Transfers and prices between stores</li>
 </ol>
 
 <!-- ======================================================================= -->
@@ -3238,6 +3239,73 @@ End of Day and in the report export.</li>
 <p><b>Send to stores (file)…</b> saves the buydown you touched in <i>ViewTouch Exports</i> (<i>Buydown - … .vtbuydown.json</i>), its items by UPC.
 At the other store, <b>Import…</b> opens it as a new buydown: its UPCs are found there, those not found are listed (and left out). Check it, then <b>Apply</b>.</p>
 <div class="tip">The old Menu Builder <i>Buydown</i> fields on each item were made into buydowns here once, by group and dates; they are no longer on the item card.</div>
+
+<!-- ======================================================================= -->
+<h1>34. Transfers and prices between stores</h1>
+<p>The owner's stores each have their own computer and their own items. Retail items can be sent from one store to
+another (a <b>transfer</b>), and the retail store's price changes reach the bar by themselves. Everything goes over
+the stores' own link (the one <i>vt-update-stores</i> uses); when the link is down, it waits and goes later. The
+register is never held up.</p>
+
+<h2>Setting it up (once at each store)</h2>
+<ol>
+<li><b>Store Settings → Other stores</b>: <b>This store's short name</b> (letters and digits, e.g. the retail store
+<i>BH</i>, the bar <i>HCA</i>).</li>
+<li><b>Other stores</b>: <b>+ Add a store</b> for the other one: its short name (as it calls itself), its ssh address
+(the one <i>vt-update-stores</i> uses, like <i>pi@192.168.6.81</i>), <b>Transfers</b> On, and <b>Price changes</b>:
+at the retail store <i>Sent there</i> for the bar; at the bar <i>Not sent</i>.</li>
+<li>At the bar: <b>Take retail prices from</b> = the retail store's short name, and <b>Its price changes are applied</b>:
+<i>Automatically</i> (the owner's choice) or <i>When someone applies them</i>.</li>
+</ol>
+
+<h2>Sending a transfer</h2>
+<p><b>Manager → Inventory → Transfers… → Transfer out</b>. Only retail items (with a UPC) can go.</p>
+<ol>
+<li>Scan each item with the counter scanner (again: one more), or type a UPC or part of a name and <b>Find</b>. A
+carton or box shows how many packs or singles are in it.</li>
+<li>Change a quantity with <b>−</b> / <b>+</b> or by typing it; <b>✕</b> takes a line off.</li>
+<li><b>To:</b> the store it goes to; a <b>Note</b> if you want.</li>
+<li><b>Send</b> (a manager). The items come off this store's on hand at once (at cost), the transfer is <i>in transit</i>,
+and a slip prints on the receipt printer: transfer number, from, to, date, who, each line (UPC, name, quantity),
+the total at cost and a signature line. Put the slip with the goods.</li>
+</ol>
+<p>On <b>Transfers</b> (the list) each one shows where it is: <i>Waiting to send</i> (the link is down: it goes by
+itself later), <i>In transit</i>, <i>Received</i> or <i>Received with differences</i>. <b>Void</b> (a manager, only before
+the other store receives it) puts the items back on hand here. <b>Reprint</b> prints the slip again.</p>
+
+<h2>Receiving a transfer</h2>
+<p><b>Manager → Inventory → Transfers… → Receive (n)</b> lists the transfers waiting from the other stores
+(<i>#12 From BH, 12 lines, $340.00 at cost</i>). <b>Open</b> one:</p>
+<ul>
+<li>Tick each line off as you check it, or scan it.</li>
+<li>A count that's different (short, over, damaged): type how many came and why.</li>
+<li>An item this store doesn't have yet: <b>Add it</b> (its name, price, cost and department from the transfer) or
+<b>Leave out</b>. A carton this store only sells as packs comes in as packs (10 packs a carton).</li>
+<li><b>Receive</b> (a manager): on hand goes up here, and the other store's transfer shows <i>Received</i> or
+<i>Received with differences</i>.</li>
+</ul>
+<p><b>Manager → Reports → Transfers</b> (both stores): sent, received, in transit and differences at cost, for today
+or any dates; it is kept with each End of Day. Sales and gross profit reports are not changed by transfers.</p>
+<div class="warn">Retail on hand is kept for an item from its first transfer (ViewTouch has no retail stock count
+yet). Until then, the sending store's numbers start at 0 and can go below it.</div>
+
+<h2>Prices from the retail store (the bar)</h2>
+<ul>
+<li>Every retail price, cost or department change at the retail store (Mass Updates, the item card, the ILSA price
+book sync) goes to the bar. The bar changes its own prices by itself; open checks keep their prices. The Changes
+report says <i>Menu, from BH</i>.</li>
+<li><b>Menu Builder → Mass Updates → Price zone…</b> (at the bar): the bar's zone name, <b>+ %</b> on the retail
+store's price (0: the same) and <b>Round to</b> <i>None</i> or <i>Up to the next .49 or .99</i>. Costs are never marked
+up. <b>Reapply to all retail items now…</b> shows every retail item's new price from the retail store's price, then
+<b>Apply</b> (an admin, as for any price change).</li>
+<li>The retail store's price shows as its own column on Mass Updates (<i>BH price</i>) and on the item card.</li>
+<li>If the bar is set to <i>When someone applies them</i>, <b>Prices from BH (n)…</b> on Mass Updates shows each change
+first; <b>Apply</b>.</li>
+<li>A retail price changed at the bar itself is kept until the retail store's next change for that item.</li>
+<li><b>OTHER STORE'S PRICE</b> on the retail <b>Discounts</b> page gives a regular customer the retail store's price:
+each retail item on the sale gets its own discount line (<i>BH price −$1.00</i>), on the receipt and the discount
+reports. It needs the discount permission.</li>
+</ul>
 
 </body>
 </html>

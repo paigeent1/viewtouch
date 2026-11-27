@@ -1740,6 +1740,49 @@ TEST_CASE("UI: Mass Updates: find by UPC, tick it, preview a Set price, apply it
     REQUIRE(by(u"massUndo"_s));
 }
 
+TEST_CASE("UI: Transfers: scan a retail item, choose the store, Send", "[flow][ui][transfers]")
+{
+    Screen s(false, 1600, 900);
+    s.pos.shared()->settings.storeCode = "BH";
+    s.pos.shared()->settings.otherStores = {{"HCA", "pi@hca.example", true, false}};
+    core::MenuItem pack;
+    pack.id = "xfer-pack";
+    pack.name = "XFER TEST PACK";
+    pack.family = "drinks";
+    pack.taxClass = core::TaxClass::Merchandise;
+    pack.barcodes = {"012345678905"};
+    pack.price = Money::fromCents(1000);
+    pack.recipe = {{"__retail__", 1.0}, {"__cost__", 7.5}};
+    s.pos.shared()->menu.push_back(pack);
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"transfers"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    const auto by = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    const auto tap = [&](const QString &name) {
+        QQuickItem *it = by(name);
+        REQUIRE(it);
+        s.tapItem(it);
+        QTest::qWait(80);
+    };
+    REQUIRE(by(u"transfers"_s));
+    QQuickItem *find = by(u"xferFind"_s);
+    REQUIRE(find);
+    find->setProperty("text", u"012345678905"_s);
+    QMetaObject::invokeMethod(find, "accepted");
+    QTest::qWait(150);
+    CHECK(s.pos.transfers()[u"lines"_s].toList().size() == 1);
+    REQUIRE(by(u"xferLine-0"_s));
+    tap(u"xferTo-HCA"_s);
+    CHECK(s.pos.transfers()[u"to"_s].toString() == u"HCA"_s);
+    s.shot("95-transfer-out");
+    tap(u"xferSend"_s);
+    REQUIRE(s.pos.shared()->transfers.size() == 1);
+    CHECK(s.pos.shared()->transfers.front().status == "transit");
+    CHECK(s.pos.retailOnHand("xfer-pack") == -1.0);
+    CHECK(s.pos.transfers()[u"lines"_s].toList().isEmpty());
+}
+
 TEST_CASE("UI: Buydowns: open the setup, Copy to New, change the amount, apply; a scanned pack gets the line",
           "[flow][ui][buydowns]")
 {

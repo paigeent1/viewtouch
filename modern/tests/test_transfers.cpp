@@ -306,6 +306,7 @@ TEST_CASE("Transfers: the retail store's price changes reach the bar under its p
 
     // Reapply the zone after changing it: 0% and no rounding gives BH's prices back.
     REQUIRE(hca.massView({{u"scope"_s, u"retail"_s}}));
+    hca.shared()->settings.otherStores.front().sendPrices = false;   // (the bar sends no prices: its own change stays)
     REQUIRE(hca.massSetPriceZone({{u"name"_s, u"Bar"_s}, {u"markup"_s, u"0"_s}, {u"round"_s, u"none"_s}}));
     REQUIRE(hca.massPreview({{u"kind"_s, u"zone"_s}, {u"round"_s, u"none"_s}}));
     REQUIRE(hca.massApply());

@@ -2,8 +2,8 @@
 
 Mass Updates (Menu Builder > Mass Updates…, `app/pos_mass_update.cpp`, `core/mass_update.hh`) changes many
 retail items at once. The owner asked to "plan for other stores now". This note covers what is built and
-what comes later. **Built:** change sets, export to a file, import at another store. **Not built:** sending
-a change set straight to another store over the network.
+what comes later. **Built:** change sets, export to a file, import at another store, and (2026-11-26) sending
+them straight to another store over the network, with inventory transfers on the same link (below).
 
 ## Who may change the price book
 
@@ -41,29 +41,71 @@ Store Updating > Export writes a copy to the device's "ViewTouch Exports" folder
 - Every applied change also goes to the Changes report (`logChange`): price and cost lines one by one, up
   to 2,000 per change set, then one summary line.
 
-## Later: sending to the other stores directly (not built)
+## Sending to the other stores directly (built 2026-11-26, branch helper/store-transfers)
 
-`vt-update-stores` already reaches the other Pis over ssh. Sending would work like this:
+Two stores of the same owner, each with its own Pi and database: the retail store (the price book) and the bar
+(which sells the same retail items, plus its own drinks and food). Owner's decisions: inventory transfers both
+ways; the retail store's price changes flow to the bar by themselves, **one way**; the bar's own hospitality
+prices never go anywhere.
 
-1. **Store list.** Store Settings would get a list of the other stores: name, the ssh host
-   `vt-update-stores` already uses, and on/off. ILSA's store checkboxes (and "Connect to Store") would be
-   this list on the Store Updating tab.
-2. **Send.** After Apply, "Send to the ticked stores" would copy the change set file to each store's
-   `~/.local/share/ViewTouch/ViewTouch/mass-updates/inbox/` with `scp` (the same keys `vt-update-stores`
-   uses; no new port, no new password). This would run from a script (`vt-send-changes`), not from inside
-   ViewTouch, so a slow link never holds up the register.
-3. **Receive.** Each store's ViewTouch would look in `inbox/` every minute or so. A file there would show
-   on Mass Updates as "Waiting from <store>" with the same preview. Someone at that store with `pricebook`
-   presses Apply, or, if Store Settings says so, it would apply by itself at a set time ("Apply Changes
-   Immediately to Connected Store(s)"). Applied or refused files would move to `inbox/done/`, and the
-   result would be written back to the sender's `outbox/<store>.result.json`.
-4. **Never over a sale.** Applying changes only the menu (like the Menu Builder). Open checks keep their
-   prices, as they already do.
-5. **The corporate office.** It would be a ViewTouch (or just the script) with the store list. It would
-   make change sets and send them. The stores would no longer give `pricebook` to their own staff.
+1. **Store list.** Store Settings > Other stores: *This store's short name* (letters and digits: the files name
+   the stores by it), the *Other stores* rows (short name as that store calls itself, the ssh address
+   `vt-update-stores` uses, Transfers on/off, Price changes *Not sent* / *Sent there*), *Take retail prices from*
+   (the one store this one takes prices from: the bar names the retail store) and *Its price changes are applied*
+   (Automatically, or When someone applies them on Mass Updates). No store name is in the code.
+2. **The link.** Everything goes as a file: ViewTouch writes it to `<data>/transfers/outbox/<STORE>/` (`<data>` is
+   the folder of `viewtouch.db`) and starts `scripts/bin/vt-send-transfers` detached (on each new file and about
+   once a minute while files wait), so a slow or down link never holds the register. The script copies each file
+   over ssh (the `vt-update-stores` keys; no new port or password) into the other Pi's `<data>/transfers/inbox/`
+   under a temporary name and renames it there, then moves it to `<data>/transfers/sent/<STORE>/`. A file that
+   can't go stays in the outbox (the screens say *Waiting to send* / *Couldn't reach X*). Addresses: ViewTouch
+   writes `<data>/transfers/stores.conf` from the store list; `OTHER_STORES` in `vt-site` is the fallback. The
+   store's ViewTouch server reads its inbox every 20 seconds (`PosService::transfersTick`); files read go to
+   `inbox/done/` (refused ones to `inbox/refused/`, change sets kept for a person to `inbox/waiting/`).
+3. **Inventory transfers** (Manager > Inventory > Transfers…, `app/pos_transfers.cpp`, `core/transfer.hh`):
+   retail items only (a UPC, `itemIsRetail`); scanned, typed or found; Send takes them off on hand at once, keeps a
+   transfer record (table `transfers`, both directions), prints a slip and sends `viewtouch-transfer` v1:
+   `{format, version: 1, kind: transfer | result | void, store: <sender's short name>, transfer: {key: "<FROM>-<n>",
+   number, from, to, who, note, at, status, lines: [{upc, name, qty, cost (cents each), price, packUpc, packSize,
+   category, received, reason}]}}`. The receiving store matches each line by UPC (leading zeros, 11-digit UPC-A),
+   else a carton by its pack's UPC times the pack size; a UPC not on file is added from the line (name, price,
+   cost, category) or left out. Receiving sends a `result` back; voiding a transfer not yet received sends a
+   `void` (or just removes the file when it hadn't gone yet). Retail on hand is kept per item (table
+   `retail_stock`) from an item's first transfer; sales take it down. There is no retail count yet, so the sending
+   store's numbers start at 0 and go negative until retail receiving / counting exists.
+4. **Price changes.** Every change set made at a store (Mass Updates Apply and Undo, the Menu Builder card's price or
+   cost save, the ILSA price book sync) goes to each store marked *Sent there*, as the same `viewtouch-change-set`
+   file with `store` and `from` the sender's short name: retail items' price, cost and category only. The
+   receiving store takes change sets only from its *Take retail prices from* store, keeps each UPC's **base price**
+   (`<data>/transfers/base-prices.json`), applies its **price zone** to the price and either applies by itself
+   (open checks keep their prices; the Changes report says *Menu, from <store>*) or keeps it for *Prices from X (n)…*
+   on Mass Updates. A change set applied from another store is never sent on (`from` set: no loops). A retail
+   price changed at the bar itself is not sent back; Mass Updates says the source's next change will replace it.
+5. **Price zone** (`PosSettings::priceZone`, Mass Updates > Price zone…): a name, a markup in percent (0 allowed)
+   and a rounding (None, or up to the next .49 / .99: 10.12 -> 10.49, 10.50 -> 10.99). Price = base x (1 + %/100),
+   then rounded; costs are never marked up. *Reapply to all retail items now* previews every retail item's price
+   from its base (an item with no base yet: its own price becomes its base at Apply), then Apply (price book
+   permission). The base shows as its own column on Mass Updates ("BH price") and on the Menu Builder card. The
+   bar's *OTHER STORE'S PRICE* (retail Discounts page, command `storePrice`) gives a regular the source's price:
+   one discount line per retail line, "<store> price", discount permission, allowed on No discounts items
+   (cigarettes: the source's price is at or above the state minimum).
+6. **Never over a sale.** Applying changes only the menu. Open checks keep their prices.
 
-Open questions for the owner: whether the stores apply automatically or wait for a person, and whether
-each store may keep its own price for some items (a "local price" mark that imports skip).
+## Corporate Pi later (not built)
+
+The corporate office would be one more entry in each store's Other stores list, and nothing else changes:
+
+- **Prices.** Each store's *Take retail prices from* would name the corporate Pi instead of the retail store; the
+  corporate Pi makes change sets (with `pricebook`, the one permission that gates price changes) and sends them to
+  every store marked *Sent there*. The files, the base prices and each store's price zone stay as they are. A
+  store's zone (`{name, markup, round}` in the settings) is the shape a corporate Pi would own and send later
+  (per-category or per-item overrides would be more fields of it).
+- **Transfers.** Every file names its sender (`store`) and the transfer its `from` and `to`, so a corporate Pi can
+  sit in the middle: receive from one store, keep the master record (every store's in transit), and pass the file
+  on unchanged. No format change.
+- **Customers.** The planned single customer list ("One customer across all stores" in the notes) would use the
+  same link. Anything built store-to-store for customers before then is a stand-in, to be removed when the
+  corporate customer list exists.
 
 ## Buydowns and promotions between stores (2026-11-25)
 
