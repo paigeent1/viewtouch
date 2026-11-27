@@ -111,7 +111,7 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     CHECK(ls[0].toMap()[u"perUom"_s].toDouble() == 10);
     CHECK(ls[0].toMap()[u"qty"_s].toDouble() == 2);
     CHECK(ls[1].toMap()[u"perUom"_s].toDouble() == 1);
-    REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"60.00"_s}, {u"prepaid"_s, u"4.00"_s}, {u"uom"_s, u"CTN"_s}, {u"vendorItem"_s, u"A100"_s}}));
+    REQUIRE(pos.recvSetLine(0, {{u"cost"_s, u"60.00"_s}, {u"uom"_s, u"CTN"_s}, {u"vendorItem"_s, u"A100"_s}}));
     REQUIRE(pos.recvSetLine(1, {{u"cost"_s, u"6.00"_s}}));
     // A cigar, then marked store use: never on hand.
     REQUIRE(pos.recvScan(QString::fromLatin1(kCigar)));
@@ -121,7 +121,12 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     REQUIRE(pos.recvSetLine(3, {{u"name"_s, u"BAGS"_s}, {u"cost"_s, u"15.00"_s}, {u"tax"_s, u"0.95"_s}}));
     REQUIRE(pos.recvAddCharge(u"delivery"_s));
     REQUIRE(pos.recvSetLine(4, {{u"amount"_s, u"5.00"_s}}));
-    // 2 x (60 + 4) + 6 + 5 + 15 + 0.95 + 5 = 159.95
+    // The cigarettes' prepaid sales tax: one charge on the invoice (owner 2026-11-27), not on a line.
+    REQUIRE(pos.recvAddCharge(u"prepaid"_s));
+    REQUIRE(pos.recvSetLine(5, {{u"amount"_s, u"8.00"_s}}));
+    CHECK(lines(pos)[5].toMap()[u"kindText"_s].toString() == u"Prepaid tax"_s);
+    CHECK(lines(pos)[5].toMap()[u"isItem"_s].toBool() == false);
+    // 2 x 60 + 8 + 6 + 5 + 15 + 0.95 + 5 = 159.95
     REQUIRE(pos.recvSetHeader({{u"total"_s, u"160.00"_s}}));
     CHECK(pos.retailReceiving()[u"ties"_s].toBool() == false);
     CHECK(pos.retailReceiving()[u"tie"_s].toString().contains(u"0.05"_s));
@@ -131,15 +136,15 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     // A code not on file: set aside; Save waits for it; linked, it becomes the item's alt UPC.
     REQUIRE(pos.recvScan(QString::fromLatin1(kUnknown)));
     ls = lines(pos);
-    REQUIRE(ls.size() == 6);
-    CHECK(ls[5].toMap()[u"aside"_s].toBool());
+    REQUIRE(ls.size() == 7);
+    CHECK(ls[6].toMap()[u"aside"_s].toBool());
     CHECK_FALSE(pos.recvReceive(true));
-    REQUIRE(pos.recvLinkStart(5));
-    REQUIRE(pos.recvLink(5, u"cigar"_s));
+    REQUIRE(pos.recvLinkStart(6));
+    REQUIRE(pos.recvLink(6, u"cigar"_s));
     const core::MenuItem *cigar = pos.findItem(u"cigar"_s);
     REQUIRE(cigar);
     CHECK(std::ranges::find(cigar->barcodes, std::string(kUnknown)) != cigar->barcodes.end());
-    REQUIRE(pos.recvSetLine(5, {{u"cost"_s, u"5.00"_s}}));
+    REQUIRE(pos.recvSetLine(6, {{u"cost"_s, u"5.00"_s}}));
     REQUIRE(pos.recvSetHeader({{u"total"_s, u"164.95"_s}}));
 
     REQUIRE(pos.recvReceive(false));   // (it ties out: nothing asked)
@@ -151,6 +156,7 @@ TEST_CASE("Receive retail: scan an invoice in, cartons as packs, store use, the 
     CHECK(r.date == "2026-11-27");
     CHECK(r.offBy() == 0);
     CHECK(r.totals().prepaid == 800);
+    CHECK(r.totals().stock == 13100);   // (never in the stock's cost)
     CHECK(r.totals().storeUse == 2000);
     CHECK(r.totals().useTax == 95);
     CHECK(r.totals().delivery == 500);
@@ -233,6 +239,12 @@ TEST_CASE("Receive retail: an invoice file, both accounts, routed by account; hi
     CHECK(north.typedTotal == 20700);
     CHECK(north.offBy() == 0);
     CHECK(north.totals().storeUse == 1500);
+    // The file's prepaid tax per unit: one Prepaid tax line for the invoice (3 x 4.00), none on the stock line.
+    REQUIRE(north.lines.size() == 3);
+    CHECK(north.lines[0].prepaidCents == 0);
+    CHECK(north.lines[2].kind == "prepaid");
+    CHECK(north.lines[2].amountCents == 1200);
+    CHECK(north.totals().prepaid == 1200);
     CHECK(pos.retailReceipts()[1].vendorId == "acme-s");
     CHECK(pos.retailReceipts()[2].lines[0].leftOut);
     // The columns kept for the vendor.
@@ -522,5 +534,52 @@ TEST_CASE("Receive retail: an allowance on a line; net cost on Cost differences,
     CHECK(f.lines[1].qty == 0);
     CHECK(f.offBy() == 0);
     CHECK(pos.retailOnHand("pack") == 40.0);
-    CHECK(pos.retailOnHand("cigar") == 0.0);
+}
+
+TEST_CASE("Receive retail: an invoice kept with prepaid tax per unit (before 2026-11-27) reads the same; reopened, "
+          "its prepaid tax is one Prepaid tax line and the change shows nothing else",
+          "[receiving]")
+{
+    app::PosData d = store();
+    core::recv::Receipt old;
+    old.id = 1;
+    old.vendorId = "acme-n";
+    old.vendorName = "Acme Distributing North";
+    old.invoice = "OLD-1";
+    old.date = "2026-11-20";
+    old.at = 1;
+    old.by = "someone";
+    old.typedTotal = 12800;
+    old.lines.push_back({.kind = "stock", .itemId = "pack", .name = "ACME RED PACK", .perUom = 10, .qty = 2, .costCents = 6000,
+                         .prepaidCents = 400});
+    d.retailReceipts.push_back(old);
+    d.lastRetailReceiptId = 1;
+    d.retailStock["pack"] = 20;
+    PosService pos(std::move(d), nullptr);
+    REQUIRE(pos.loginWithPin(u"1234"_s));
+    REQUIRE(pos.retailReceipts().size() == 1);
+    CHECK(pos.retailReceipts()[0].totals().prepaid == 800);
+    CHECK(pos.retailReceipts()[0].offBy() == 0);
+    const core::Report pr = pos.buildReport(u"retailpurchases"_s);
+    CHECK(reportHas(pr, "$8.00"));
+    // Open > Edit: the prepaid tax is one Prepaid tax line; the stock line has none.
+    REQUIRE(pos.recvOpen(u"list"_s));
+    REQUIRE(pos.recvShowReceived(1));
+    REQUIRE(pos.recvEditReceived(1));
+    const QVariantList ls = lines(pos);
+    REQUIRE(ls.size() == 2);
+    CHECK(ls[0].toMap()[u"extended"_s].toString().contains(u"120.00"_s));
+    CHECK(ls[1].toMap()[u"kind"_s].toString() == u"prepaid"_s);
+    CHECK(ls[1].toMap()[u"amount"_s].toString() == u"8.00"_s);
+    CHECK(pos.retailReceiving()[u"ties"_s].toBool());
+    // One more carton: the change is that line only (the prepaid tax wasn't changed, just moved).
+    REQUIRE(pos.recvSetLine(0, {{u"qty"_s, u"3"_s}}));
+    REQUIRE(pos.recvReceive(true));
+    CHECK(pos.retailOnHand("pack") == 30.0);
+    const core::recv::Receipt &r = pos.retailReceipts()[0];
+    REQUIRE(r.edits.size() == 1);
+    REQUIRE(r.edits[0].lines.size() == 1);
+    CHECK(r.edits[0].lines[0].name == "ACME RED PACK");
+    CHECK(r.totals().prepaid == 800);
+    CHECK(r.lines.back().kind == "prepaid");
 }

@@ -241,3 +241,70 @@ TEST_CASE("Receiving: a file's allowance, a column or a row under its item; a qu
     CHECK(recv::lineOf(invs2[0].lines[0]).extended() == 26274);
     CHECK(invs2[0].typedTotal == 26274);
 }
+
+TEST_CASE("Receiving: prepaid sales tax is one charge on the invoice; kept per unit before, lifted into one",
+          "[receiving][core]")
+{
+    recv::Receipt r;
+    r.lines.push_back({.kind = recv::kStock, .itemId = "pack", .perUom = 10, .qty = 2, .costCents = 6000});
+    r.lines.push_back({.kind = recv::kPrepaid, .name = "Prepaid tax", .amountCents = 800});
+    CHECK(recv::validKind(recv::kPrepaid));
+    CHECK_FALSE(recv::itemKind(recv::kPrepaid));
+    recv::Totals t = r.totals();
+    CHECK(t.stock == 12000);
+    CHECK(t.prepaid == 800);
+    CHECK(t.total == 12800);
+    CHECK(*r.lines[0].unitCostCents() == 600);   // never cost
+    // Kept per unit on a line (an invoice from before): counted the same; lifted into one Prepaid line.
+    std::vector<recv::Line> old = {{.kind = recv::kStock, .itemId = "pack", .perUom = 10, .qty = 2, .costCents = 6000, .prepaidCents = 400},
+                                   {.kind = recv::kStock, .itemId = "box", .qty = 1, .costCents = 500, .prepaidCents = 50}};
+    recv::Receipt before{.lines = old};
+    CHECK(before.totals().prepaid == 850);
+    recv::liftPrepaid(old);
+    REQUIRE(old.size() == 3);
+    CHECK(old[0].prepaidCents == 0);
+    CHECK(old[2].kind == recv::kPrepaid);
+    CHECK(old[2].amountCents == 850);
+    recv::Receipt after{.lines = old};
+    CHECK(after.totals().prepaid == 850);
+    CHECK(after.totals().total == before.totals().total);
+    recv::liftPrepaid(old);   // (nothing left to lift)
+    CHECK(old.size() == 3);
+
+    // A file: prepaid tax per unit, a prepaid total column, a prepaid tax row: one amount per invoice.
+    const auto rows = recv::readCsv(
+        "Invoice,Item #,Description,Qty,Unit Price,Prepaid Tax,Extended\n"
+        "P-1,555,RED KING CTN,2,60.00,4.00,128.00\n"
+        "P-1,556,GOLD KING CTN,1,60.00,4.00,64.00\n"
+        "P-2,555,RED KING CTN,1,60.00,,60.00\n"
+        "P-2,,PREPAID CIG TAX,,,,4.00\n");
+    const auto invs = recv::group(recv::fileLines(rows, 0, recv::guessMapping(rows[0])));
+    REQUIRE(invs.size() == 2);
+    CHECK(invs[0].lines.size() == 2);
+    CHECK(invs[0].prepaid == 1200);
+    CHECK(invs[0].typedTotal == 19200);
+    CHECK(recv::lineOf(invs[0].lines[0]).costCents == 6000);
+    CHECK(recv::lineOf(invs[0].lines[0]).prepaidCents == 0);
+    REQUIRE(recv::prepaidLine(invs[0]));
+    CHECK(recv::prepaidLine(invs[0])->amountCents == 1200);
+    CHECK(invs[1].lines.size() == 1);   // the row isn't a line of its own
+    CHECK(invs[1].prepaid == 400);
+    CHECK(invs[1].typedTotal == 6400);
+    recv::Receipt p2;
+    for (const recv::FileLine &f : invs[1].lines)
+        p2.lines.push_back(recv::lineOf(f));
+    p2.lines.push_back(*recv::prepaidLine(invs[1]));
+    p2.typedTotal = invs[1].typedTotal;
+    CHECK(*p2.offBy() == 0);
+    const auto rows2 = recv::readCsv(
+        "Invoice,Item #,Description,Qty,Unit Price,Extended,Prepaid Tax Total\n"
+        "Q-1,555,RED KING CTN,2,60.00,120.00,8.00\n"
+        "Q-1,556,GOLD KING CTN,1,60.00,60.00,8.00\n");
+    const auto m2 = recv::guessMapping(rows2[0]);
+    CHECK(m2.at("prepaidTotal") == 6);
+    const auto invs2 = recv::group(recv::fileLines(rows2, 0, m2));
+    REQUIRE(invs2.size() == 1);
+    CHECK(invs2[0].prepaid == 800);   // once, though on both rows
+    CHECK(invs2[0].typedTotal == 18800);
+    CHECK_FALSE(recv::prepaidLine(recv::FileInvoice{}));
+}

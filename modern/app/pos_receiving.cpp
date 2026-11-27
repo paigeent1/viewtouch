@@ -104,7 +104,7 @@ QString fieldLabel(const std::string &f)
         {"upc", QT_TR_NOOP("UPC")}, {"description", QT_TR_NOOP("Description")}, {"uom", QT_TR_NOOP("Unit (UOM)")},
         {"perUom", QT_TR_NOOP("Units per UOM")}, {"qty", QT_TR_NOOP("Quantity")}, {"unitPrice", QT_TR_NOOP("Unit price")},
         {"otp", QT_TR_NOOP("OTP / excise per unit")}, {"prepaid", QT_TR_NOOP("Prepaid sales tax per unit")},
-        {"allowance", QT_TR_NOOP("Allowance per unit")},
+        {"prepaidTotal", QT_TR_NOOP("Prepaid tax total (the invoice's)")}, {"allowance", QT_TR_NOOP("Allowance per unit")},
         {"extended", QT_TR_NOOP("Extended (line total)")}, {"lineType", QT_TR_NOOP("Line type / store use")},
         {"delivery", QT_TR_NOOP("Delivery / freight")}, {"useTax", QT_TR_NOOP("Use tax")},
         {"invoiceTotal", QT_TR_NOOP("Invoice total")}};
@@ -118,6 +118,8 @@ QString kindLabel(const std::string &k)
         return PosService::tr("Store use");
     if (k == recv::kDelivery)
         return PosService::tr("Delivery");
+    if (k == recv::kPrepaid)
+        return PosService::tr("Prepaid tax");
     if (k == recv::kCredit)
         return PosService::tr("Credit / return");
     if (k == recv::kOther)
@@ -677,7 +679,8 @@ bool PosService::recvSetLine(int index, const QVariantMap &f)
         l.vendorItem = ss(f.value(u"vendorItem"_s).toString().trimmed().left(40));
     if (f.contains(u"name"_s) && l.itemId.empty())
         l.name = ss(f.value(u"name"_s).toString().trimmed().left(80));
-    if (!cents(u"cost"_s, l.costCents, true) || !cents(u"otp"_s, l.otpCents, false) || !cents(u"prepaid"_s, l.prepaidCents, false)
+    // (Prepaid sales tax is the invoice's one charge, + Prepaid tax, owner 2026-11-27: not on a line.)
+    if (!cents(u"cost"_s, l.costCents, true) || !cents(u"otp"_s, l.otpCents, false)
         || !cents(u"allowance"_s, l.allowanceCents, false) || !cents(u"tax"_s, l.taxCents, false))
         return fail(tr("Type an amount, like 12.34."));
     if (f.contains(u"amount"_s)) {
@@ -942,6 +945,7 @@ void PosService::recvLoad(const Receipt &d)
     v.note = qs(d.note);
     v.typedTotal = d.typedTotal;
     v.lines = d.lines;
+    recv::liftPrepaid(v.lines, ss(tr("Prepaid tax")));   // (kept per unit before 2026-11-27: one charge now)
     v.confirm.clear();
     v.choices.clear();
     v.linking = -1;
@@ -1284,7 +1288,11 @@ bool PosService::recvFinishEdit()
     e.totalAfter = now_.totals().total;
     e.unitsBefore = was.totals().units;
     e.unitsAfter = now_.totals().units;
-    e.lines = recv::diffLines(was.lines, now_.lines);
+    {
+        std::vector<Line> wasLines = was.lines;   // (its prepaid tax per unit, kept before, as the one charge it is now)
+        recv::liftPrepaid(wasLines, ss(tr("Prepaid tax")));
+        e.lines = recv::diffLines(wasLines, now_.lines);
+    }
     const bool headerSame = was.invoice == now_.invoice && was.date == now_.date && was.note == now_.note && was.typedTotal == now_.typedTotal;
     QString done;
     if (e.lines.empty() && headerSame) {
@@ -1363,6 +1371,7 @@ bool PosService::recvEditReceived(std::int64_t id)
     v.note = qs(it->note);
     v.typedTotal = it->typedTotal;
     v.lines = it->lines;
+    recv::liftPrepaid(v.lines, ss(tr("Prepaid tax")));   // (kept per unit before 2026-11-27: one charge now)
     v.tab = u"receive"_s;
     v.showId = 0;
     v.message = tr("Changing invoice #%1 from %2, received before: Receive puts only the changes on hand.").arg(qs(it->invoice), qs(it->vendorName));
@@ -1639,6 +1648,10 @@ std::vector<PosService::RecvPreview> PosService::recvImportPreview() const
             }
             p.codes.push_back(code);
             p.receipt.lines.push_back(l);
+        }
+        if (auto pl = recv::prepaidLine(f, ss(tr("Prepaid tax")))) {   // the invoice's prepaid tax: one charge
+            p.codes.emplace_back();
+            p.receipt.lines.push_back(std::move(*pl));
         }
         out.push_back(std::move(p));
     }

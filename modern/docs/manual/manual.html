@@ -3347,14 +3347,15 @@ pack or single it holds, times its pack size (from the single's Parent UPC on it
 line, and the line says what goes on hand (<i>= 2 ctn</i>: sealed cartons; a pack scanned: <i>= 1 pk</i>, loose). You can also type a UPC, the vendor's item number, or part of a name and <b>Find</b>.</li>
 <li>On each line: the quantity in the vendor's unit, the unit's name (CTN, BOX), how many of the item one unit
 is, the vendor's item #, the invoice's <b>price</b> per unit (optional), <b>OTP</b> / excise per unit (part of the
-item's cost) and <b>prepaid tax</b> per unit (cigarettes' prepaid sales tax: on the invoice so its total ties out,
-reported apart, never part of the cost), and the <b>allowance</b> per unit when the invoice has one (see
-below). Free goods: their quantity with no price.</li>
+item's cost), and the <b>allowance</b> per unit when the invoice has one (see below). Free goods: their quantity
+with no price.</li>
 <li><b>Stock</b> / <b>Store use</b> on a line: store use is supplies the store uses itself (bags, cleaning). It
 never goes into on hand; its cost and its <b>use tax</b> are reported as store expenses. <b>+ Store use</b> adds a
 supply line that isn't an item (type what it is).</li>
-<li><b>+ Delivery</b>, <b>+ Credit / return</b> and <b>+ Other</b> add the invoice's own amounts. Delivery is not
-spread into the items' costs.</li>
+<li><b>+ Delivery</b>, <b>+ Prepaid tax</b>, <b>+ Credit / return</b> and <b>+ Other</b> add the invoice's own
+amounts. Delivery is not spread into the items' costs. <b>+ Prepaid tax</b> is the cigarettes' prepaid sales tax,
+typed once for the whole invoice (its total on the paper): it counts toward the tie-out, it is never part of an
+item's cost, and Retail Purchases shows it apart, in its Prepaid tax column.</li>
 <li>A code that isn't on file is set aside on its own line: <b>Link to an item…</b> (find it; the code becomes
 its alt UPC, so the next scan finds it), <b>Add it…</b> (a new retail item: UPC, name, category, cost, price and
 pack size), or <b>Leave it out</b> (not counted in; its amount still counts toward the invoice).</li>
@@ -3404,7 +3405,9 @@ as it was received. A received invoice keeps its vendor.</p>
 from Y was already received. Open it to add these lines to it?</i> — <b>Open it and add these lines</b> opens the
 received invoice with the new lines added; <b>Save changes</b> then puts only those on hand. The same offer shows
 above the lines as soon as you type an invoice # that was already received.</p>
-<div class="tip">Invoices received before this version stay received as they were; nothing needs doing.</div>
+<div class="tip">Invoices received before this version stay received as they were; nothing needs doing. One
+received with prepaid tax on its lines shows it the same on the reports; opened to change, its prepaid tax becomes
+one Prepaid tax line (the total doesn't change).</div>
 
 <h2>Importing an invoice file</h2>
 <p>Ask the vendor for a file of the invoices (for example the last 12 months). <b>Receive retail… → Import invoice
@@ -3413,12 +3416,15 @@ save it as CSV first). One file can hold many invoices and both accounts of a di
 <ul>
 <li>The header row is found by itself (a title above it is passed over), and each column is guessed from its
 name: invoice #, invoice date, account or ship-to, vendor item #, UPC, description, unit (UOM), units per UOM,
-quantity (shipped), unit price, OTP / excise, prepaid tax, allowance (per unit), extended (the line's total), line
+quantity (shipped), unit price, OTP / excise, prepaid tax (per unit) or prepaid tax total, allowance (per unit), extended (the line's total), line
 type (store use, credit, delivery), delivery / freight, use tax, invoice total. Change any of them with its list; the
 columns are kept for that vendor's next file.</li>
 <li>An allowance row (no item # or UPC, and its description says <i>allowance</i>, like <i>** Allowance on Above
 Item</i>) goes onto the item row right above it, never a line of its own: per unit, its unit price, or else its
 extended amount over that item's quantity. A row with a quantity of 0 (out of stock) is listed and adds nothing.</li>
+<li>Prepaid tax becomes one <b>Prepaid tax</b> line on each invoice: the prepaid tax total column (taken once), or
+else each row's prepaid tax per unit times its quantity, added up; a row with no item # or UPC whose description
+says <i>prepaid</i> is added to it too, never a line of its own.</li>
 <li>Rows are put together into invoices by account and invoice number. Each invoice goes to the vendor whose
 <b>account number</b> is in its account / ship-to column (leading zeros don't matter); without that column, to the
 vendor chosen.</li>

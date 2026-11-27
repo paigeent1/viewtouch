@@ -7,14 +7,16 @@
 // An invoice's lines:
 //  - stock: an item, its quantity in the vendor's unit (a carton, a box) and how many of the item one is
 //    (perUom: a carton of 10 packs: 10), the invoice's price per unit, OTP / excise per unit (part of the item's
-//    cost) and cigarette prepaid sales tax per unit (not cost: on the invoice so its total ties out, reported
-//    apart for the bookkeeper), and an allowance per unit (an off-invoice manufacturer allowance, "** Allowance
+//    cost), and an allowance per unit (an off-invoice manufacturer allowance, "** Allowance
 //    on Above Item": typed as a positive amount, it lowers what the line costs; net cost per unit = price + OTP
 //    - allowance). Free goods: a quantity at no cost.
 //  - storeuse: supplies the store uses itself: never on hand; their cost and the sales / use tax on them are
 //    store expenses.
-//  - delivery, credit, other: invoice-level amounts (freight is not spread into item costs; a later
-//    landed-cost step could spread it from these lines).
+//  - delivery, prepaid, credit, other: invoice-level amounts (freight is not spread into item costs; a later
+//    landed-cost step could spread it from these lines). Prepaid: the cigarettes' prepaid sales tax on the
+//    invoice (owner 2026-11-27: one charge, like delivery): it ties the invoice out, it's never cost, and it's
+//    reported apart for the bookkeeper. (Invoices kept before then can have it per unit on their stock lines
+//    (prepaidCents): still counted; liftPrepaid turns it into one Prepaid line when such an invoice is opened.)
 // The invoice's total, typed from the paper (or the file's), ties out against the lines.
 //
 // Invoice files (CSV): the columns guessed from their headers (guessField), the rows grouped into invoices by
@@ -41,12 +43,13 @@ namespace vt::core::recv {
 inline constexpr const char *kStock = "stock";
 inline constexpr const char *kStoreUse = "storeuse";
 inline constexpr const char *kDelivery = "delivery";
+inline constexpr const char *kPrepaid = "prepaid";
 inline constexpr const char *kCredit = "credit";
 inline constexpr const char *kOther = "other";
 
 inline bool validKind(std::string_view k)
 {
-    return k == kStock || k == kStoreUse || k == kDelivery || k == kCredit || k == kOther;
+    return k == kStock || k == kStoreUse || k == kDelivery || k == kPrepaid || k == kCredit || k == kOther;
 }
 // A line with an item (or a store-use description) and a quantity; the others are an amount.
 inline bool itemKind(std::string_view k) { return k == kStock || k == kStoreUse; }
@@ -62,10 +65,10 @@ struct Line {
     double qty = 0;                // in the vendor's units
     std::int64_t costCents = -1;   // the invoice's price per vendor unit, before OTP (-1: not typed)
     std::int64_t otpCents = 0;     // OTP / excise per vendor unit: part of the cost
-    std::int64_t prepaidCents = 0; // prepaid sales tax per vendor unit: not cost
+    std::int64_t prepaidCents = 0; // (before 2026-11-27) prepaid sales tax per vendor unit: not cost
     std::int64_t allowanceCents = 0;   // allowance per vendor unit (a positive amount): taken off the cost
     std::int64_t taxCents = 0;     // store use: the sales / use tax on the line (the line's)
-    std::int64_t amountCents = 0;  // delivery / credit / other: the line's amount (a credit is taken off)
+    std::int64_t amountCents = 0;  // delivery / prepaid / credit / other: the line's amount (a credit is taken off)
     std::int64_t systemCostCents = 0;   // the item's system cost each when it came (0: none)
     bool leftOut = false;          // not on file and left out: not in on hand (its amount still counts)
     bool operator==(const Line &) const = default;
@@ -102,7 +105,7 @@ struct Totals {
     std::int64_t stock = 0;      // stock lines' goods and OTP (gross: before allowances)
     std::int64_t allowances = 0; // allowances on the item lines (less than nothing)
     std::int64_t otp = 0;        // of which OTP / excise
-    std::int64_t prepaid = 0;    // prepaid sales tax (any line)
+    std::int64_t prepaid = 0;    // prepaid sales tax (its Prepaid lines, and any kept per unit on a line)
     std::int64_t storeUse = 0;   // store use goods (with any OTP)
     std::int64_t useTax = 0;     // tax on store use
     std::int64_t delivery = 0;
@@ -169,6 +172,8 @@ struct Receipt {
                 t.useTax += l.taxCents;
             } else if (l.kind == kDelivery) {
                 t.delivery += l.amountCents;
+            } else if (l.kind == kPrepaid) {
+                t.prepaid += l.amountCents;
             } else if (l.kind == kCredit) {
                 t.credits -= std::llabs(l.amountCents);
             } else {
@@ -186,6 +191,30 @@ struct Receipt {
         return typedTotal - totals().total;
     }
 };
+
+// An invoice kept with prepaid tax per unit on its lines (before 2026-11-27): that tax as one Prepaid line
+// (added to the first Prepaid line there is), the lines without it. The invoice's total doesn't change.
+inline void liftPrepaid(std::vector<Line> &lines, std::string_view name = "Prepaid tax")
+{
+    std::int64_t sum = 0;
+    for (Line &l : lines)
+        if (l.prepaidCents != 0) {
+            sum += l.prepaidTotal();
+            l.prepaidCents = 0;
+        }
+    if (sum == 0)
+        return;
+    for (Line &l : lines)
+        if (l.kind == kPrepaid) {
+            l.amountCents += sum;
+            return;
+        }
+    Line p;
+    p.kind = kPrepaid;
+    p.name = std::string(name);
+    p.amountCents = sum;
+    lines.push_back(std::move(p));
+}
 
 // What a line is, to compare an invoice before and after a change: its kind, its item (else the vendor's item
 // number, the code, the description) and its unit.
@@ -538,11 +567,12 @@ inline std::vector<std::vector<std::string>> readCsv(std::string_view text)
 
 // --- the columns -----------------------------------------------------------------------------------------
 
-// What a column can be. Amounts per unit are per the vendor's unit (the row's), use tax and extended the line's.
+// What a column can be. Amounts per unit are per the vendor's unit (the row's), use tax and extended the line's;
+// prepaid total, delivery and invoice total the invoice's (once).
 inline const std::vector<std::string> &fields()
 {
     static const std::vector<std::string> f = {"invoice", "date", "account", "itemNo", "upc", "description", "uom",
-                                               "perUom", "qty", "unitPrice", "otp", "prepaid", "allowance", "extended", "lineType",
+                                               "perUom", "qty", "unitPrice", "otp", "prepaid", "prepaidTotal", "allowance", "extended", "lineType",
                                                "delivery", "useTax", "invoiceTotal"};
     return f;
 }
@@ -605,6 +635,9 @@ inline std::pair<std::string, int> guessField(std::string_view header)
                  "other tobacco tax", "otp excise"}},
         {"prepaid", {"prepaid", "prepaid tax", "prepaid sales tax", "pre paid tax", "ppd tax", "sales tax prepaid",
                      "cig tax prepaid", "prepaid cig tax"}},
+        {"prepaidTotal", {"prepaid tax total", "total prepaid tax", "prepaid total", "total prepaid", "prepaid tax amount",
+                          "prepaid amount", "prepaid tax amt", "prepaid sales tax total", "total prepaid sales tax",
+                          "cig tax total", "prepaid tax due"}},
         {"allowance", {"allowance", "allowance per unit", "allowance each", "allow", "allowances", "mfg allowance",
                        "mfr allowance", "manufacturer allowance", "off invoice allowance", "off invoice", "oi allowance",
                        "deal", "deal allowance", "allowance amount"}},
@@ -677,6 +710,7 @@ struct FileLine {
     bool hasQty = false;
     std::int64_t unitPrice = -1;   // -1: none
     std::int64_t otp = 0, prepaid = 0, useTax = 0, delivery = 0;
+    std::int64_t prepaidTotal = -1;    // the invoice's prepaid tax, from a Prepaid total column (-1: none)
     std::int64_t allowance = 0;    // per unit, a positive amount (an Allowance column, or the row under it)
     std::int64_t allowanceRows = -1;   // allowance rows' extensions under it, a positive amount (-1: none)
     std::int64_t extended = 0;
@@ -708,6 +742,7 @@ struct FileInvoice {
     std::string account, invoice, date;
     std::vector<FileLine> lines;
     std::int64_t delivery = 0;     // from a Delivery column (once an invoice)
+    std::int64_t prepaid = 0;      // its prepaid sales tax: one Prepaid line (prepaidLine)
     std::int64_t typedTotal = -1;  // the file's invoice total, else its lines' extended plus delivery (-1: none)
 };
 
@@ -719,6 +754,8 @@ inline std::string kindOf(const FileLine &l)
     for (char c : l.lineType)
         t += char(std::tolower(static_cast<unsigned char>(c)));
     const auto has = [&](const char *w) { return t.find(w) != std::string::npos; };
+    if (has("prepaid") || has("pre paid") || t == "ppd")
+        return kPrepaid;
     if (has("store") || has("suppl") || t == "s" || t == "su" || t == "use" || t == "expense")
         return kStoreUse;
     if (has("credit") || has("return") || t == "cr" || t == "rtn")
@@ -734,6 +771,9 @@ inline std::string kindOf(const FileLine &l)
         if (d.find("freight") != std::string::npos || d.find("deliver") != std::string::npos
             || d.find("fuel") != std::string::npos)
             return kDelivery;
+        if (d.find("prepaid") != std::string::npos || d.find("pre paid") != std::string::npos
+            || d.find("pre-paid") != std::string::npos)
+            return kPrepaid;
     }
     if ((l.hasQty && l.qty < 0) || (l.hasExtended && l.extended < 0))
         return kCredit;
@@ -781,6 +821,8 @@ inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string
         l.otp = centsOf(cell(r, "otp")).value_or(0);
         l.prepaid = centsOf(cell(r, "prepaid")).value_or(0);
         l.allowance = std::llabs(centsOf(cell(r, "allowance")).value_or(0));
+        if (const auto v = centsOf(cell(r, "prepaidTotal")))
+            l.prepaidTotal = *v;
         l.useTax = centsOf(cell(r, "useTax")).value_or(0);
         l.delivery = centsOf(cell(r, "delivery")).value_or(0);
         if (const auto v = centsOf(cell(r, "extended"))) {
@@ -789,7 +831,8 @@ inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string
         }
         if (const auto v = centsOf(cell(r, "invoiceTotal")))
             l.invoiceTotal = *v;
-        const bool something = l.hasQty || l.hasExtended || l.unitPrice >= 0 || l.delivery != 0 || l.invoiceTotal >= 0;
+        const bool something = l.hasQty || l.hasExtended || l.unitPrice >= 0 || l.delivery != 0 || l.invoiceTotal >= 0
+                               || l.prepaidTotal >= 0;
         if (!something && l.itemNo.empty() && l.upc.empty())
             continue;
         if (!something)
@@ -822,10 +865,13 @@ inline std::vector<FileLine> fileLines(const std::vector<std::vector<std::string
 
 // The rows as invoices, by account and invoice number, in the file's order. A row without an invoice number
 // belongs to the invoice above it (a file that writes the number once). An invoice's date: its first row's.
+// Its prepaid sales tax is one amount (owner 2026-11-27): a Prepaid total column (once), else the rows' prepaid
+// tax per unit times their quantity, plus any prepaid tax rows (never lines of their own).
 inline std::vector<FileInvoice> group(const std::vector<FileLine> &lines)
 {
     std::vector<FileInvoice> out;
     std::map<std::string, std::size_t> at;
+    std::map<std::size_t, std::int64_t> prepaidColumn, prepaidRows;
     std::string lastKey;
     for (const FileLine &l0 : lines) {
         FileLine l = l0;
@@ -851,18 +897,36 @@ inline std::vector<FileInvoice> group(const std::vector<FileLine> &lines)
             inv.delivery = l.delivery;   // (a column repeated on every row: once)
         if (l.invoiceTotal >= 0 && inv.typedTotal < 0)
             inv.typedTotal = l.invoiceTotal;
+        if (l.prepaidTotal >= 0 && !prepaidColumn.contains(it->second))
+            prepaidColumn[it->second] = l.prepaidTotal;   // (repeated on every row: once)
         lastKey = key;
         // A row that only carries the delivery or the total adds no line.
         if (!l.hasQty && !l.hasExtended && l.unitPrice < 0)
             continue;
+        if (kindOf(l) == kPrepaid) {   // a prepaid tax row: into the invoice's one amount
+            prepaidRows[it->second] += l.hasExtended ? l.extended
+                                                     : std::llround(double(std::max<std::int64_t>(0, l.unitPrice)) * (l.hasQty ? l.qty : 1));
+            continue;
+        }
         inv.lines.push_back(std::move(l));
+    }
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        FileInvoice &inv = out[i];
+        std::int64_t perUnit = 0;
+        for (const FileLine &l : inv.lines)
+            if (itemKind(kindOf(l)))
+                perUnit += std::llround((l.hasQty ? l.qty : 1) * double(l.prepaid));
+        const auto col = prepaidColumn.find(i);
+        inv.prepaid = (col != prepaidColumn.end() ? col->second : perUnit) + prepaidRows[i];
     }
     // No total column: the lines' extended amounts (when the file has them) and the delivery.
     for (FileInvoice &inv : out) {
         if (inv.typedTotal >= 0)
             continue;
-        bool anyExtended = false;
-        std::int64_t sum = 0;
+        const std::size_t i = std::size_t(&inv - out.data());
+        bool anyExtended = prepaidRows[i] != 0;
+        // (prepaid tax per unit is in the rows' extended amounts; a column's or a row's is not)
+        std::int64_t sum = prepaidRows[i] + (prepaidColumn.contains(i) ? prepaidColumn[i] : 0);
         for (const FileLine &l : inv.lines) {
             if (!l.hasExtended)
                 continue;
@@ -877,7 +941,8 @@ inline std::vector<FileInvoice> group(const std::vector<FileLine> &lines)
 
 // A file's row as an invoice line (the item it is found by the app: itemId, perUom when the file has none).
 // The price per unit: the file's, else its extended amount over the quantity less OTP and prepaid tax (the
-// extended amount is the item's own, before its allowance). A quantity of 0 (out of stock): listed, adds nothing.
+// extended amount is the item's own, before its allowance). Its prepaid tax goes on the invoice's one Prepaid
+// line (prepaidLine), not on the line. A quantity of 0 (out of stock): listed, adds nothing.
 inline Line lineOf(const FileLine &f)
 {
     Line l;
@@ -894,7 +959,6 @@ inline Line lineOf(const FileLine &f)
         else if (f.hasExtended && l.qty != 0)
             l.costCents = std::max<std::int64_t>(0, std::llround(double(f.extended) / l.qty) - f.otp - f.prepaid);
         l.otpCents = f.otp;
-        l.prepaidCents = f.prepaid;
         l.allowanceCents = f.allowance;
         l.taxCents = l.kind == kStoreUse ? f.useTax : 0;
     } else {
@@ -904,6 +968,18 @@ inline Line lineOf(const FileLine &f)
         l.amountCents = l.kind == kCredit ? std::llabs(amount) : amount;
         l.qty = f.hasQty ? f.qty : 0;
     }
+    return l;
+}
+
+// The invoice's prepaid sales tax as its one Prepaid line (none: no prepaid tax in the file).
+inline std::optional<Line> prepaidLine(const FileInvoice &inv, std::string_view name = "Prepaid tax")
+{
+    if (inv.prepaid == 0)
+        return std::nullopt;
+    Line l;
+    l.kind = kPrepaid;
+    l.name = std::string(name);
+    l.amountCents = inv.prepaid;
     return l;
 }
 

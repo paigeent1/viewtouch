@@ -7,8 +7,9 @@ import QtQuick.Layouts
 // retail items' on hand (PosService::recvOpen..., app/pos_receiving.cpp; the state is pos.retailReceiving).
 // Receive: the vendor, invoice # and date, the total from the paper; scan with the counter scanner (a repeat
 // scan is one more; a carton's UPC brings its packs), type a UPC or the vendor's item number, or part of a
-// name and Find; per line the quantity in the vendor's unit, units in it, the invoice's price, OTP, prepaid
-// tax and allowance (taken off the cost); Store use lines; Delivery, Credit / return and Other amounts; the tie-out against the total. A code
+// name and Find; per line the quantity in the vendor's unit, units in it, the invoice's price, OTP and allowance
+// (taken off the cost); Store use lines; Delivery, Prepaid tax (the invoice's one amount), Credit / return and
+// Other amounts; the tie-out against the total. A code
 // not on file: Link it to an item (its alt UPC), Add it, or Leave it out. The invoice is kept as it's worked on
 // (nothing on hand); Save for later sets it aside on Unfinished (Open, Delete; any screen, one at a time);
 // Receive puts it on hand, asking first when it doesn't tie out. Receiving never changes a system cost or a
@@ -218,6 +219,8 @@ Item {
                 }
                 Big { objectName: "recvAddStoreUse"; text: qsTr("+ Store use"); onClicked: w.pos.recvAddCharge("storeuse") }
                 Big { objectName: "recvAddDelivery"; text: qsTr("+ Delivery"); onClicked: w.pos.recvAddCharge("delivery") }
+                // The cigarettes' prepaid sales tax: one amount for the invoice (owner 2026-11-27), never cost.
+                Big { objectName: "recvAddPrepaid"; text: qsTr("+ Prepaid tax"); onClicked: w.pos.recvAddCharge("prepaid") }
                 Big { objectName: "recvAddCredit"; text: qsTr("+ Credit / return"); onClicked: w.pos.recvAddCharge("credit") }
                 Big { objectName: "recvAddOther"; text: qsTr("+ Other"); onClicked: w.pos.recvAddCharge("other") }
             }
@@ -402,12 +405,6 @@ Item {
                                 placeholderText: qsTr("OTP")
                                 text: modelData.otp
                                 onEditingFinished: if (text !== modelData.otp) w.pos.recvSetLine(modelData.index, { otp: text })
-                            }
-                            Amount {
-                                objectName: "recvPrepaid-" + modelData.index
-                                placeholderText: qsTr("Prepaid tax")
-                                text: modelData.prepaid
-                                onEditingFinished: if (text !== modelData.prepaid) w.pos.recvSetLine(modelData.index, { prepaid: text })
                             }
                             Amount {   // an off-invoice allowance ("** Allowance on Above Item"): typed as a positive amount, taken off
                                 visible: modelData.kind === "stock"
@@ -624,7 +621,7 @@ Item {
                 text: qsTr("A CSV file from the vendor (an Excel file: save it as CSV first): a header row, then one row per invoice line. "
                            + "Its columns are guessed from their names: invoice #, date, account or ship-to (routes each invoice to the vendor "
                            + "with that account number), item #, UPC, description, UOM, units per UOM, quantity, unit price, OTP / excise, "
-                           + "prepaid tax, allowance per unit, extended, line type (store use, credit, delivery), delivery / freight, use tax, invoice total. "
+                           + "prepaid tax (per unit, or the invoice's total: one Prepaid tax amount for the invoice), allowance per unit, extended, line type (store use, credit, delivery), delivery / freight, use tax, invoice total. "
                            + "A row with no item # or UPC whose description says allowance (\"** Allowance on Above Item\") goes onto the item above it. "
                            + "You can change them before importing; they're kept for the vendor's next file. "
                            + "History only loads past invoices to learn the vendor's item numbers and last costs, without changing on hand.")
