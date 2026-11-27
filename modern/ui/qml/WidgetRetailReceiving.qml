@@ -227,10 +227,23 @@ Item {
                 Words { text: qsTr("Linking a code not on file: find its item and touch it."); color: "#b35c00"; Layout.fillWidth: true }
                 Big { text: qsTr("Stop linking"); onClicked: w.pos.recvLinkStart(-1) }
             }
-            Flow {
-                Layout.fillWidth: true
-                spacing: 6
+            // Find's matches: at most about three rows tall, scrolling when there are more, so the
+            // invoice's lines below always keep their room.
+            Flickable {
+                id: choiceFlick
+                objectName: "recvChoices"
                 visible: (w.info.choices ?? []).length > 0 && w.linkCode === ""
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(choiceFlow.implicitHeight, w.touch * 3 + 12 + w.touch / 2)
+                contentWidth: width
+                contentHeight: choiceFlow.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: TouchScrollBar { needed: choiceFlick.contentHeight > choiceFlick.height + 1 }
+              Flow {
+                id: choiceFlow
+                width: choiceFlick.width - 14
+                spacing: 6
                 Repeater {
                     model: w.linkCode === "" ? (w.info.choices ?? []) : []
                     delegate: Big {
@@ -240,6 +253,7 @@ Item {
                         onClicked: (w.info.linking ?? -1) >= 0 ? w.pos.recvLink(w.info.linking, modelData.id) : w.pos.recvAddItem(modelData.id, 1)
                     }
                 }
+              }
             }
             ListView {
                 id: lineList

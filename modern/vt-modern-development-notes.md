@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-27 17:11 ET — Bob (Claude) — Receive retail: Find's matches scroll in a short box
+- **What:** Tablet app: changed. Server: no change. WidgetRetailReceiving.qml: Find's matches (up to 30) sit in a box about three rows tall with a scroll bar, instead of a Flow that grew down the screen and pushed the invoice's lines out of view. (Also: the 2f3cf52b entry's 'Tablet app: no change' was wrong; it changed translations, which the tablet bundles.)
+- **Why:** Owner's photo (Nov 27, invoice 604700): typing MARLBORO filled the screen with matches and no scroll bar.
+- **Files:** (none)
+
 ### 2026-11-27 16:09 ET — Bob (Claude) helper — Receive retail: Cancel changes says the invoice stays as received
 - **What:** Tablet app: no change. Server: changed. Deleting the unfinished changes to a received invoice (Cancel changes) now says 'The changes to Invoice #x were not kept; it stays as it was received' and logs 'Changes not kept' instead of 'Unfinished invoice deleted'. es/fr/pt/zh for the 2 phrases.
 - **Why:** The old message said 'deleted (it was never received)', wrong for changes to a received invoice.
