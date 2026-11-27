@@ -110,6 +110,7 @@ Item {
         Words {
             objectName: "recvMessage"
             visible: text !== ""
+            Layout.preferredWidth: 1   // (wraps to the screen: its width from the layout)
             text: w.fileError !== "" ? w.fileError : (w.info.message ?? "")
             Layout.fillWidth: true
             color: w.fileError !== "" ? "#b00020" : palette.windowText
@@ -127,10 +128,11 @@ Item {
                 color: "#b00020"
                 Layout.fillWidth: true
             }
-            Words {
+            Words {   // (the only banner while changing a received invoice: it wraps, below the header row)
                 objectName: "recvEditingNote"
                 visible: w.isEditing
                 Layout.fillWidth: true
+                Layout.preferredWidth: 1   // (its width from the layout, not its text's one long line)
                 font.bold: true
                 color: "#1f5fa8"
                 text: qsTr("Changing invoice #%1 from %2 (received %3 by %4). Add, change or take off lines; Save changes puts only the difference on hand.")
@@ -217,6 +219,12 @@ Item {
                     text: qsTr("Find")
                     onClicked: { (w.info.linking ?? -1) >= 0 ? w.pos.recvSearch(findField.text) : w.pos.recvFind(findField.text); findField.text = "" }
                 }
+            }
+            // The invoice's own lines: their own row, wrapping, so every button shows on a narrow screen.
+            Flow {
+                objectName: "recvCharges"
+                Layout.fillWidth: true
+                spacing: 8
                 Big { objectName: "recvAddStoreUse"; text: qsTr("+ Store use"); onClicked: w.pos.recvAddCharge("storeuse") }
                 Big { objectName: "recvAddDelivery"; text: qsTr("+ Delivery"); onClicked: w.pos.recvAddCharge("delivery") }
                 // The cigarettes' prepaid sales tax: one amount for the invoice (owner 2026-11-27), never cost.
@@ -480,10 +488,12 @@ Item {
                 Big {
                     objectName: "recvCancelChanges"
                     visible: w.isEditing
-                    text: qsTr("Cancel changes")
+                    text: qsTr("Discard changes")
                     onClicked: {
                         if ((w.info.draftId ?? 0) > 0)
-                            w.deleting = { id: w.info.draftId, text: qsTr("Forget the changes to invoice #%1? The invoice stays as it was received.").arg(w.editing.invoice ?? "") }
+                            w.deleting = { id: w.info.draftId, title: qsTr("Discard your changes to invoice #%1?").arg(w.editing.invoice ?? ""),
+                                           text: qsTr("The invoice stays as it was received; nothing on hand changes."),
+                                           no: qsTr("Keep editing"), yes: qsTr("Discard changes") }
                     }
                 }
                 Big {
@@ -556,8 +566,9 @@ Item {
                         objectName: "recvDraftDelete-" + modelData.id
                         text: qsTr("Delete…")
                         enabled: modelData.openAt === ""
-                        onClicked: w.deleting = { id: modelData.id, text: qsTr("Delete unfinished invoice #%1 from %2? It was never received; nothing on hand changes.")
-                                                                         .arg(modelData.invoice).arg(modelData.vendor) }
+                        onClicked: w.deleting = { id: modelData.id, title: qsTr("Delete this unfinished invoice?"),
+                                                  text: qsTr("Invoice #%1 from %2. Nothing was put on hand.").arg(modelData.invoice).arg(modelData.vendor),
+                                                  no: qsTr("Keep it"), yes: qsTr("Delete it") }
                     }
                 }
                 Words {
@@ -1131,16 +1142,32 @@ Item {
                     color: "white"
                     font.pixelSize: w.unit * 1.1
                     font.bold: true
+                    text: w.deleting ? w.deleting.title : ""
+                }
+                Label {
+                    objectName: "recvDeleteText"
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: "white"
+                    font.pixelSize: w.unit
                     text: w.deleting ? w.deleting.text : ""
                 }
                 RowLayout {
                     spacing: 8
                     Item { Layout.fillWidth: true }
-                    Big { objectName: "recvDeleteNo"; text: qsTr("Keep it"); onClicked: w.deleting = null }
+                    // The safe one first (left) and the default; the one that throws something away in warning red.
+                    Big {
+                        objectName: "recvDeleteNo"
+                        highlighted: true
+                        focus: w.deleting !== null
+                        text: w.deleting ? w.deleting.no : ""
+                        onClicked: w.deleting = null
+                    }
                     Big {
                         objectName: "recvDeleteYes"
-                        highlighted: true
-                        text: qsTr("Delete")
+                        palette.button: "#b00020"
+                        palette.buttonText: "white"
+                        text: w.deleting ? w.deleting.yes : ""
                         onClicked: { w.pos.recvDeleteDraft(w.deleting.id); w.deleting = null }
                     }
                 }

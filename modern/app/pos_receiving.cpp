@@ -1061,8 +1061,8 @@ bool PosService::recvOpenDraft(std::int64_t id, bool takeOver)
     }
     recvLoad(*d);
     v.tab = u"receive"_s;
-    v.message = d->reopenOf ? tr("Changing invoice #%1 from %2, received before: Receive puts only the changes on hand.").arg(qs(d->invoice), qs(d->vendorName))
-                            : tr("Invoice #%1 opened. Nothing is on hand from it until you Receive it.").arg(qs(d->invoice));
+    // (Changing a received invoice: the screen's own banner says so; no second message.)
+    v.message = d->reopenOf ? QString() : tr("Invoice #%1 opened. Nothing is on hand from it until you Receive it.").arg(qs(d->invoice));
     emit s_->adminChanged();
     return true;
 }
@@ -1374,7 +1374,7 @@ bool PosService::recvEditReceived(std::int64_t id)
     recv::liftPrepaid(v.lines, ss(tr("Prepaid tax")));   // (kept per unit before 2026-11-27: one charge now)
     v.tab = u"receive"_s;
     v.showId = 0;
-    v.message = tr("Changing invoice #%1 from %2, received before: Receive puts only the changes on hand.").arg(qs(it->invoice), qs(it->vendorName));
+    v.message.clear();   // (the screen's banner says it's being changed: one banner, not two)
     recvTouched();   // (kept as unfinished from now on)
     return true;
 }

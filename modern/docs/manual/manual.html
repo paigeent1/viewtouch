@@ -3352,8 +3352,8 @@ with no price.</li>
 <li><b>Stock</b> / <b>Store use</b> on a line: store use is supplies the store uses itself (bags, cleaning). It
 never goes into on hand; its cost and its <b>use tax</b> are reported as store expenses. <b>+ Store use</b> adds a
 supply line that isn't an item (type what it is).</li>
-<li><b>+ Delivery</b>, <b>+ Prepaid tax</b>, <b>+ Credit / return</b> and <b>+ Other</b> add the invoice's own
-amounts. Delivery is not spread into the items' costs. <b>+ Prepaid tax</b> is the cigarettes' prepaid sales tax,
+<li><b>+ Delivery</b>, <b>+ Prepaid tax</b>, <b>+ Credit / return</b> and <b>+ Other</b> (the row
+under the scan box) add the invoice's own amounts. Delivery is not spread into the items' costs. <b>+ Prepaid tax</b> is the cigarettes' prepaid sales tax,
 typed once for the whole invoice (its total on the paper): it counts toward the tie-out, it is never part of an
 item's cost, and Retail Purchases shows it apart, in its Prepaid tax column.</li>
 <li>A code that isn't on file is set aside on its own line: <b>Link to an item…</b> (find it; the code becomes
@@ -3386,6 +3386,7 @@ screen is ready for the next invoice; nothing goes on hand.</li>
 <li><b>New invoice</b> starts another one; the one on the screen stays on Unfinished.</li>
 <li>The <b>Unfinished</b> tab lists them: vendor, invoice #, date, lines, units, who changed it last, and when and
 where. <b>Open</b> brings one back to Receive invoice (any screen can); <b>Delete…</b> throws one away after asking
+(<i>Delete this unfinished invoice?</i> — <b>Keep it</b> or <b>Delete it</b>)
 (it was never received, so on hand doesn't change).</li>
 <li>One screen at a time: an invoice open on another screen says <i>being edited at BAR2</i>. <b>Open here
 anyway</b> takes it over; the other screen is told and its next change isn't kept, so the two never overwrite each
@@ -3399,8 +3400,9 @@ lines off (✕). <b>Save changes</b> puts <b>only the difference</b> on hand: on
 carton, a pack line taken off takes its packs back off; lines that didn't change don't touch on hand. The change is
 kept on the invoice (who, when, at which screen, each line before and after, the total before and after), the
 vendor's last cost is updated when this invoice is the newest, and Retail Purchases and Retail Cost Diffs show the
-invoice as it is now (<i>(changed)</i> beside it on Purchases). <b>Cancel changes</b> forgets them; the invoice stays
-as it was received. A received invoice keeps its vendor.</p>
+invoice as it is now (<i>(changed)</i> beside it on Purchases). <b>Discard changes</b> asks <i>Discard your changes to
+invoice #x?</i> — <b>Keep editing</b>, or <b>Discard changes</b>: the invoice stays as it was received and nothing on
+hand changes. A received invoice keeps its vendor.</p>
 <p>The same vendor and invoice # can't be received twice as a new invoice. Instead, Receive offers: <i>Invoice #x
 from Y was already received. Open it to add these lines to it?</i> — <b>Open it and add these lines</b> opens the
 received invoice with the new lines added; <b>Save changes</b> then puts only those on hand. The same offer shows

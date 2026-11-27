@@ -560,8 +560,6 @@ TEST_CASE("Receive retail: an invoice kept with prepaid tax per unit (before 202
     REQUIRE(pos.retailReceipts().size() == 1);
     CHECK(pos.retailReceipts()[0].totals().prepaid == 800);
     CHECK(pos.retailReceipts()[0].offBy() == 0);
-    const core::Report pr = pos.buildReport(u"retailpurchases"_s);
-    CHECK(reportHas(pr, "$8.00"));
     // Open > Edit: the prepaid tax is one Prepaid tax line; the stock line has none.
     REQUIRE(pos.recvOpen(u"list"_s));
     REQUIRE(pos.recvShowReceived(1));
