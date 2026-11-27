@@ -101,23 +101,23 @@ void PosShared::migrateRetailFamilies()
         if (ps == retailStock.end() && ls == retailStock.end())
             continue;
         const stock::Counts was{ps == retailStock.end() ? 0 : ps->second, ls == retailStock.end() ? 0 : ls->second};
-        const stock::Counts now = stock::settle(was, f.packSize, f.parentUnit != u"box");
-        if (now == was)
+        const stock::Counts settled = stock::settle(was, f.packSize, f.parentUnit != u"box");
+        if (settled == was)
             continue;
-        retailStock[f.parentId] = now.sealed;
-        retailStock[f.singleId] = now.loose;
+        retailStock[f.parentId] = settled.sealed;
+        retailStock[f.singleId] = settled.loose;
         std::string name;
         for (const MenuItem &m : menu)
             if (m.id == f.parentId)
                 name = m.name;
         core::Change c{++lastChangeId, now(), day.id, "ViewTouch", ss(PosService::tr("Inventory")), name,
                  ss(PosService::tr("On hand: sealed and loose apart")),
-                 stock::text(was, ss(f.parentUnit), ss(f.singleUnit)), stock::text(now, ss(f.parentUnit), ss(f.singleUnit))};
+                 stock::text(was, ss(f.parentUnit), ss(f.singleUnit)), stock::text(settled, ss(f.parentUnit), ss(f.singleUnit))};
         changesToday.push_back(c);
         qInfo().noquote() << "retail stock:" << qs(name) << qs(c.before) << "->" << qs(c.after);
         if (sink) {
-            sink->saveRetailStock(f.parentId, now.sealed);
-            sink->saveRetailStock(f.singleId, now.loose);
+            sink->saveRetailStock(f.parentId, settled.sealed);
+            sink->saveRetailStock(f.singleId, settled.loose);
             sink->saveChange(c);
         }
     }
