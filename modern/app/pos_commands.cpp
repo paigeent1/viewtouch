@@ -341,6 +341,9 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"useCustomer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.useCustomer(a.value(0).toString())); }},
         {u"forgetCustomer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.forgetCustomer(a.value(0).toString())); }},
         {u"saveCustomer"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.saveCustomer(a.value(0).toMap())); }},
+        // TEMPORARY, remove when the corporate customer list exists (pos_customer_sync.cpp).
+        {u"customerSyncSendAll"_s, [](PosService &p, const QVariantList &) { return QVariant(p.customerSyncSendAll()); }},
+        {u"customerSyncResolve"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.customerSyncResolve(a.value(0).toString(), a.value(1).toString())); }},
         {u"resolveCustomerDuplicate"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.resolveCustomerDuplicate(a.value(0).toString(), a.value(1).toString())); }},
         {u"sellGiftCard"_s, [](PosService &p, const QVariantList &a) {
              return QVariant(p.sellGiftCard(a.value(0).toString(), a.value(1).toLongLong(), a.value(2).toString(), a.value(3).toString())); }},

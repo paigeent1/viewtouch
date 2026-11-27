@@ -180,6 +180,10 @@ struct PastDay {
 // may only order). Not one of the staff: it can't log in with a PIN.
 const core::Employee &kioskEmployee();
 
+// TEMPORARY (remove when the corporate customer list exists): customers shared store to store
+// (app/pos_customer_sync.cpp).
+struct CustomerSyncState;
+
 // Everything the running POS needs at startup.
 struct PosData {
     core::PosSettings settings;
@@ -389,6 +393,10 @@ public:
     // Price changes from another store waiting for a person (Store Settings: "ask").
     std::vector<QVariantMap> pricesWaiting;   // ("_file": its file in inbox/waiting, removed once reviewed)
     bool pricesWaitingLoaded = false;
+    // TEMPORARY, remove when the corporate customer list exists: customers shared with the other stores
+    // (pos_customer_sync.cpp): each field's last change, the other stores' customers linked to ours, the ones
+    // to check. Kept in <data>/transfers/customer-sync.json (in memory without a folder: tests).
+    std::shared_ptr<CustomerSyncState> customerSync;
     // Kept, unless the same thing was noted in the last 10 minutes.
     void noteProblem(const std::string &kind, const std::string &subject, const std::string &detail = {});
     // Guessing PINs: wrong ones in a row on each screen, and the store's
@@ -1333,6 +1341,21 @@ public:
     bool putInOutbox(const QString &store, const QString &name, const QVariantMap &content);
     bool inOutbox(const QString &store, const QString &name) const;
     int waitingToSend() const;
+    // --- TEMPORARY: customers shared store to store (pos_customer_sync.cpp; Store Settings > Other stores >
+    // Share customers). Remove all of it when the corporate customer list exists. -------------------------------
+    // Manager > Customers: {on, stores, storeCode, note, conflicts: [{key, from, phone, hereName, hereEmail,
+    // hereVisits, thereName, thereEmail, thereAddress, at}]} (managers; {} when no store shares customers).
+    QVariantMap customerSync() const override;
+    bool customerSyncSendAll();                                   // every customer with a phone, to each store
+    bool customerSyncResolve(const QString &key, const QString &choice);   // "merge" | "apart"
+    QString customerSyncIncoming(const QJsonObject &file, QString *why);   // a viewtouch-customers file
+    QStringList customerSyncStores() const;                       // the stores marked Share customers
+    void customerSyncNoteLocal(const core::CustomerRecord &c);    // saveCustomerRecord: a change made here
+    CustomerSyncState &customerSyncState(const std::string &skipId = {});
+    void customerSyncSave();
+    int customerSyncTake(CustomerSyncState &st, const QString &from, const QJsonObject &in, const std::string &intoId,
+                         bool apart);
+    QJsonObject customerSyncJson(const core::CustomerRecord &c, CustomerSyncState &st);
     // --- admin (manager) -------------------------------------------------------------
     // panel: menu | employees | tenders | printers | taxes | store
     QVariantList adminFields(const QString &panel) override;

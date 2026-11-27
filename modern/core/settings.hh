@@ -209,6 +209,9 @@ struct OtherStore {
     std::string host;
     bool on = true;
     bool sendPrices = false;
+    // TEMPORARY, remove when the corporate customer list exists: customers shared with this store both ways
+    // (app/pos_customer_sync.cpp).
+    bool shareCustomers = false;
     bool operator==(const OtherStore &) const = default;
 };
 

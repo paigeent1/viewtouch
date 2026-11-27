@@ -83,6 +83,7 @@ void PosService::saveCustomerRecord(const CustomerRecord &c)
 {
     if (s_->sink)
         s_->sink->saveCustomer(c);
+    customerSyncNoteLocal(c);   // TEMPORARY: shared with the other stores (remove with pos_customer_sync.cpp)
     emit s_->customersChanged();
 }
 

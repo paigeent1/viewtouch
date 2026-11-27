@@ -173,6 +173,7 @@ public:
     void setVideoCache(const QString &dir) { videoCache_ = dir; }
     QVariantMap customerPrompt() const override { return v(u"customerPrompt").toMap(); }
     QVariantMap customerDuplicate() const override { return v(u"customerDuplicate").toMap(); }
+    QVariantMap customerSync() const override { return v(u"customerSync").toMap(); }   // (temporary)
     QVariantMap ageAsk() const override { return v(u"ageAsk").toMap(); }
     QVariantMap serviceAsk() const override { return v(u"serviceAsk").toMap(); }
     QVariantMap mixerAsk() const override { return v(u"mixerAsk").toMap(); }

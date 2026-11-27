@@ -1249,7 +1249,8 @@ QJsonObject toJson(const PosSettings &s)
         {u"otherStores"_s, [&s] {
              QJsonArray a;
              for (const OtherStore &o : s.otherStores)
-                 a.append(QJsonObject{{u"name"_s, qs(o.name)}, {u"host"_s, qs(o.host)}, {u"on"_s, o.on}, {u"sendPrices"_s, o.sendPrices}});
+                 a.append(QJsonObject{{u"name"_s, qs(o.name)}, {u"host"_s, qs(o.host)}, {u"on"_s, o.on}, {u"sendPrices"_s, o.sendPrices},
+                                      {u"shareCustomers"_s, o.shareCustomers}});   // (shareCustomers: temporary)
              return a;
          }()},
         {u"storePricesFrom"_s, qs(s.storePricesFrom)}, {u"storePricesApply"_s, qs(s.storePricesApply)},
@@ -1555,7 +1556,8 @@ PosSettings settingsFromJson(const QJsonObject &o)
     for (const QJsonValue &v : o.value(u"otherStores").toArray()) {
         const QJsonObject x = v.toObject();
         s.otherStores.push_back({ss(x.value(u"name").toString()), ss(x.value(u"host").toString()), x.value(u"on").toBool(true),
-                                 x.value(u"sendPrices").toBool(false)});
+                                 x.value(u"sendPrices").toBool(false),
+                                 x.value(u"shareCustomers").toBool(false)});   // (temporary: pos_customer_sync.cpp)
     }
     s.storePricesFrom = ss(o.value(u"storePricesFrom").toString());
     s.storePricesApply = ss(o.value(u"storePricesApply").toString(qs(s.storePricesApply)));

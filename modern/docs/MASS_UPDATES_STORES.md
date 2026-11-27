@@ -91,6 +91,40 @@ prices never go anywhere.
    (cigarettes: the source's price is at or above the state minimum).
 6. **Never over a sale.** Applying changes only the menu. Open checks keep their prices.
 
+## Customers shared store to store (TEMPORARY, built 2026-11-26, branch helper/customer-sync)
+
+**Remove when the corporate customer list exists** ("One customer across all stores" in the notes): delete
+`app/pos_customer_sync.cpp`, `core/customer_sync.hh`, `ui/qml/CustomerSyncPanel.qml`, `tests/test_customer_sync.cpp`
+and every line marked *temporary* / *remove when the corporate customer list exists* (the `shareCustomers` flag
+of `OtherStore` and its Store Settings column, the hook in `saveCustomerRecord`, the `viewtouch-customers` case in
+`transferIncoming`, the `customerSync` property and its two commands), and `<data>/transfers/customer-sync.json`.
+
+- **Turned on** per store: Store Settings > Other stores > *Share customers* (*Not shared* / *Shared*), at both
+  stores for each other. It uses the same link as transfers (a store with Transfers off but Share customers on is
+  still written to `stores.conf` as `on`, so the script sends its files).
+- **What goes:** name, phone, email, address, note, the *"<store> price"* switch and the preferential percent, and
+  the numbers of the gift / subscription cards linked to the customer (the other store links its copy of a card,
+  if it has one and it isn't linked yet). **What never goes** (each store's own): the house account (on/off, limit,
+  balance, ledger), points, visits, spent, the last order, the privacy notice acceptance. Customers without a
+  phone number (fewer than 7 digits) aren't shared.
+- **When:** each save of a customer here that changes one of those fields (a visit or points don't) writes
+  `customers-<FROM>-<ms>-<n>.json` to `outbox/<STORE>/` for every store marked *Shared*; it waits there while the
+  link is down. *Send All Customers Now* (Manager > Customers, managers) is the first share: every customer with a
+  phone, in files of 500.
+- **The file:** `{format: "viewtouch-customers", version: 1, store: <sender>, at, all?, customers: [{id (the
+  sender's), version (goes up with each change there), changedAt, fields: {<field>: {value, at, from}}, cards}]}`.
+  Each field carries when it was last changed and at which store.
+- **The merge** (`core/customer_sync.hh`): by the phone's digits (a leading US 1 dropped), or the customer this
+  store linked to that sender's id before. Per field the newest change wins (a tie: the store name that sorts last);
+  a name or phone is never emptied; the same number written another way isn't a change; a version already taken is
+  skipped. Nothing is ever deleted (Forget at one store forgets there only; that customer stays forgotten there).
+  **Same phone, clearly different name** (no word in common, no first name the start of the other): nothing is
+  merged; it waits on *Manager > Customers > Check These Customers* for a manager: **Merge** (the same person: the
+  newest of each field) or **Keep Apart** (a customer of their own here; later changes go to that one).
+- **No loops:** a change taken from another store is never sent on (each store sends only changes made at it).
+- **State:** `<data>/transfers/customer-sync.json` (each field's last change, the links, the ones to check).
+  Customers already on file when it's first read count as changed when they were added.
+
 ## Corporate Pi later (not built)
 
 The corporate office would be one more entry in each store's Other stores list, and nothing else changes:
@@ -105,7 +139,7 @@ The corporate office would be one more entry in each store's Other stores list, 
   on unchanged. No format change.
 - **Customers.** The planned single customer list ("One customer across all stores" in the notes) would use the
   same link. Anything built store-to-store for customers before then is a stand-in, to be removed when the
-  corporate customer list exists.
+  corporate customer list exists (today: *Customers shared store to store* above).
 
 ## Buydowns and promotions between stores (2026-11-25)
 

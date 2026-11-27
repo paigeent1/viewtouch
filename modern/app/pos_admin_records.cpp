@@ -224,8 +224,10 @@ QVariantList PosService::adminRecords(const QString &panel)
              {u"otherStores"_s, [&] {
                   QStringList l;
                   for (const OtherStore &o : s_->settings.otherStores)
-                      l << u"%1 %2 %3 %4"_s.arg(qs(o.name), qs(o.host), o.on ? u"on"_s : u"off"_s,
-                                                 o.sendPrices ? u"prices"_s : u"no-prices"_s);
+                      // (the 5th, Share customers, is temporary: pos_customer_sync.cpp)
+                      l << u"%1 %2 %3 %4 %5"_s.arg(qs(o.name), qs(o.host), o.on ? u"on"_s : u"off"_s,
+                                                    o.sendPrices ? u"prices"_s : u"no-prices"_s,
+                                                    o.shareCustomers ? u"customers"_s : u"no-customers"_s);
                   return l.join(u'\n');
               }()},
              {u"storePricesFrom"_s, qs(s_->settings.storePricesFrom)},

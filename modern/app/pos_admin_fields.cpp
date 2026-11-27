@@ -434,12 +434,15 @@ QVariantList PosService::adminFields(const QString &panel)
             asRows(field(u"otherStores"_s, tr("Other stores"), u"text"_s,
                          tr("The owner's other stores: each one's short name (as it calls itself), the ssh address "
                             "vt-update-stores uses for it (pi@192.168.6.81), whether transfers go there, and whether this "
-                            "store's retail price changes are sent there (the retail store to the bar; never the other way).")),
+                            "store's retail price changes are sent there (the retail store to the bar; never the other way), "
+                            "and whether customers are shared with it (for now, until the corporate customer list).")),
                    tr("+ Add a store"),
                    {column(tr("Short name"), "string", 120, {}, u"HCA"_s), column(tr("ssh address"), "string", 0, {}, u"pi@192.168.6.81"_s),
                     column(tr("Transfers"), "enum", 130, options({{"on", "On"}, {"off", "Off"}})),
-                    column(tr("Price changes"), "enum", 190, options({{"no-prices", "Not sent"}, {"prices", "Sent there"}}))},
-                   uR"(^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$)"_s, u"%1 %2 %3 %4"_s),
+                    column(tr("Price changes"), "enum", 190, options({{"no-prices", "Not sent"}, {"prices", "Sent there"}})),
+                    // TEMPORARY, remove when the corporate customer list exists (pos_customer_sync.cpp).
+                    column(tr("Share customers"), "enum", 190, options({{"no-customers", "Not shared"}, {"customers", "Shared"}}))},
+                   uR"(^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?\s*$)"_s, u"%1 %2 %3 %4 %5"_s),
             field(u"storePricesFrom"_s, tr("Take retail prices from"), u"string"_s,
                   tr("The short name of the store whose retail price changes this store takes (the bar: the retail store). "
                      "Empty: none. Changes from any other store are refused. Markup: Mass Updates > Prices from…")),

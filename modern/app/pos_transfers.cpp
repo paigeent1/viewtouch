@@ -245,7 +245,8 @@ void PosService::writeStoreList()
     QByteArray text = "# Written by ViewTouch from Store Settings > Other stores; read by vt-send-transfers.\n";
     for (const OtherStore &o : s_->settings.otherStores)
         if (!xfer::storeKey(o.name).empty() && !o.host.empty())
-            text += QByteArray::fromStdString(xfer::storeKey(o.name) + ' ' + o.host + (o.on ? " on" : " off")) + '\n';
+            // (Share customers needs the link too; temporary, pos_customer_sync.cpp.)
+            text += QByteArray::fromStdString(xfer::storeKey(o.name) + ' ' + o.host + (o.on || o.shareCustomers ? " on" : " off")) + '\n';
     QDir().mkpath(s_->transferDir);
     const QString file = transferPath(u"stores.conf"_s);
     QFile was(file);
@@ -293,6 +294,9 @@ void PosService::transfersTick()
     if (s_->transferDir.isEmpty())
         return;
     writeStoreList();
+    // TEMPORARY (pos_customer_sync.cpp): what each customer was at startup, before anyone changes one.
+    if (!customerSyncStores().isEmpty())
+        customerSyncState();
     bool changedAny = false;
     const QDir in(transferPath(u"inbox"_s));
     // Price changes kept for a person, from before a restart.
@@ -350,6 +354,9 @@ QString PosService::transferIncoming(const QByteArray &bytes, QString *why)
     const QString format = o.value(u"format").toString();
     if (format == u"viewtouch-change-set")
         return takeStoreChangeSet(o.toVariantMap(), why);
+    // TEMPORARY, remove when the corporate customer list exists: customers from another store.
+    if (format == u"viewtouch-customers")
+        return customerSyncIncoming(o, why);
     if (format != QLatin1String(kFormat) || o.value(u"version").toInt() != 1) {
         if (why)
             *why = tr("not a ViewTouch transfer file");

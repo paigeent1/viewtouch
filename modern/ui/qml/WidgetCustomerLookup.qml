@@ -143,6 +143,11 @@ Item {
                     text: qsTr("Print Privacy Notice")
                     onClicked: w.pos.printPrivacyNotice()
                 }
+                // TEMPORARY (until the corporate customer list): sharing with the other stores, managers only.
+                CustomerSyncPanel {
+                    Layout.fillWidth: true
+                    pos: w.pos
+                }
                 Button {
                     Layout.fillWidth: true
                     implicitHeight: 48

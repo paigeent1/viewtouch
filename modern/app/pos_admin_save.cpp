@@ -534,6 +534,8 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
                 o.host = ss(parts.value(1));
                 o.on = parts.value(2, u"on"_s).toLower() != u"off";
                 o.sendPrices = parts.value(3).toLower() == u"prices";
+                // TEMPORARY, remove when the corporate customer list exists (pos_customer_sync.cpp).
+                o.shareCustomers = parts.value(4).toLower() == u"customers";
                 if (o.name.empty() || o.host.empty() || o.host.find_first_of(" ;|&$`'\"") != std::string::npos)
                     return fail(tr("Other stores: write each like \"HCA pi@192.168.6.81 on no-prices\" (its short name, its ssh address)."));
                 if (!s_->settings.storeCode.empty() && o.name == s_->settings.storeCode)

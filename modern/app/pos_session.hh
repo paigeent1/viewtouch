@@ -103,6 +103,9 @@ class PosSession : public QObject {
     // What the customer display asks the guest: {askingTip, tipChosen, tip, choices}.
     Q_PROPERTY(QVariantMap customerPrompt READ customerPrompt NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap customerDuplicate READ customerDuplicate NOTIFY checkChanged)
+    // TEMPORARY, remove when the corporate customer list exists: customers shared with the other stores
+    // (PosService::customerSync, pos_customer_sync.cpp), managers only.
+    Q_PROPERTY(QVariantMap customerSync READ customerSync NOTIFY checkChanged)
     Q_PROPERTY(QVariantMap ageAsk READ ageAsk NOTIFY checkChanged)
     // Responsible service: a drink waiting for the bartender (caution) or a manager (stop); staff screens only.
     Q_PROPERTY(QVariantMap serviceAsk READ serviceAsk NOTIFY checkChanged)
@@ -405,6 +408,7 @@ public:
     virtual QVariantMap waitlistInfo() const = 0;
     virtual QVariantMap customerPrompt() const = 0;
     virtual QVariantMap customerDuplicate() const = 0;
+    virtual QVariantMap customerSync() const = 0;   // (temporary: pos_customer_sync.cpp)
     virtual QVariantMap serviceAsk() const = 0;   // {level, guest, drinks, item, reasons...}; {} when none
     virtual QVariantMap mixerAsk() const = 0;     // {active, lineId, item, mixers: [{index, name, price}], notes, chosen}
     virtual QVariantMap ageAsk() const = 0;     // an item waiting for the buyer's ID: {item, name, age, handNeedsManager}
@@ -871,6 +875,9 @@ public:
     Q_INVOKABLE void useCustomer(const QString &id = {}) { invoke(QStringLiteral("useCustomer"), {id}); }
     Q_INVOKABLE void forgetCustomer(const QString &id) { invoke(QStringLiteral("forgetCustomer"), {id}); }
     Q_INVOKABLE void saveCustomer(const QVariantMap &record) { invoke(QStringLiteral("saveCustomer"), {record}); }
+    // TEMPORARY, remove when the corporate customer list exists (pos_customer_sync.cpp).
+    Q_INVOKABLE void customerSyncSendAll() { invoke(QStringLiteral("customerSyncSendAll")); }
+    Q_INVOKABLE void customerSyncResolve(const QString &key, const QString &choice) { invoke(QStringLiteral("customerSyncResolve"), {key, choice}); }
     Q_INVOKABLE void resolveCustomerDuplicate(const QString &choice, const QString &id = {}) { invoke(QStringLiteral("resolveCustomerDuplicate"), {choice, id}); }
     Q_INVOKABLE void sellGiftCard(const QString &number, qint64 amountCents = 0, const QString &purchasedBy = {}, const QString &issuedTo = {})
     {
