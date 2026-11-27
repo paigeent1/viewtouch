@@ -2000,6 +2000,11 @@ void LayoutController::scanned(const QString &code)
         pos_->invoke(u"transferScan"_s, {c});
         return;
     }
+    // Receive retail shown: the scan goes on the invoice (a repeat scan: one more).
+    if (std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"retailReceiving"; })) {
+        pos_->invoke(u"recvScan"_s, {c});
+        return;
+    }
     // Item Look Up shown: the scan is looked up there (it rings nothing by itself).
     if (std::ranges::any_of(shown().zones, [](const Layout::PlacedZone &pz) { return pz.zone->kind == u"itemLookup"; })) {
         keep(u"lookupScan"_s, c);

@@ -1472,7 +1472,8 @@ QJsonObject toJson(const PosSettings &s)
              QJsonArray a;
              for (const Vendor &v : s.vendors)
                  a.append(QJsonObject{{u"id"_s, qs(v.id)}, {u"name"_s, qs(v.name)}, {u"phone"_s, qs(v.phone)},
-                                      {u"account"_s, qs(v.account)}, {u"note"_s, qs(v.note)}});
+                                      {u"account"_s, qs(v.account)}, {u"note"_s, qs(v.note)}, {u"group"_s, qs(v.group)},
+                                      {u"importMap"_s, qs(v.importMap)}});
              return a;
          }()},
         {u"promotions"_s, [&] {
@@ -1866,7 +1867,8 @@ PosSettings settingsFromJson(const QJsonObject &o)
     for (const QJsonValue &v : o.value(u"vendors").toArray()) {
         const QJsonObject x = v.toObject();
         s.vendors.push_back({ss(x.value(u"id").toString()), ss(x.value(u"name").toString()), ss(x.value(u"phone").toString()),
-                             ss(x.value(u"account").toString()), ss(x.value(u"note").toString())});
+                             ss(x.value(u"account").toString()), ss(x.value(u"note").toString()),
+                             ss(x.value(u"group").toString()), ss(x.value(u"importMap").toString())});
     }
     for (const QJsonValue &v : o.value(u"promotions").toArray()) {
         const QJsonObject p = v.toObject();

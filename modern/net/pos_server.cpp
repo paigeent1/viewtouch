@@ -108,7 +108,7 @@ bool onRequest(const QString &key)
     // Quick Label's (quickLabel, with its picture) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"builderTree" || key == u"itemSearch"
            || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns"
-           || key == u"transfers";
+           || key == u"transfers" || key == u"retailReceiving";
 }
 
 // All a billboard is ever sent (the owner: signage only, never any customer or sale): who it is,

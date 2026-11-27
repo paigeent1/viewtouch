@@ -247,6 +247,12 @@ struct Vendor {
     std::string phone;
     std::string account;   // the store's account number with them
     std::string note;      // delivery days, the rep...
+    // Reports can put vendors together under one name (one distributor's two accounts / locations, each its
+    // own vendor with its own account number). Empty: the vendor alone.
+    std::string group;
+    // Receive retail > Import invoice file: the columns last used for this vendor's files (JSON: field ->
+    // header text). Kept by the import, not typed.
+    std::string importMap;
     bool operator==(const Vendor &) const = default;
 };
 

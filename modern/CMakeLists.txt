@@ -26,6 +26,7 @@ add_library(vtm_core STATIC
     core/buydown.hh                              # manufacturer buydowns and promotions: definitions, the line, the reports
     core/mass_update.hh                          # Mass Updates: rounding, margin prices, the grid's narrowing, change sets
     core/transfer.hh                             # inventory transfers between stores: lines, UPC matching, the markup
+    core/receiving.hh                            # retail receiving: invoice lines and totals, vendor items, invoice files
     core/customer_sync.hh                        # TEMPORARY customers shared store to store (until the corporate list)
     core/core.cpp core/report.cpp
     core/legacy_sales.hh core/legacy_sales.cpp   # ILSA's sales history: its reports
@@ -80,6 +81,7 @@ if(Qt6_FOUND)
         app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
         app/pos_mass_update.cpp   # Menu Builder > Mass Updates (core/mass_update.hh): grid, previews, change sets
         app/pos_transfers.cpp     # Manager > Inventory > Transfers (core/transfer.hh): between stores, by UPC
+        app/pos_receiving.cpp     # Manager > Inventory > Receive retail (core/receiving.hh): invoices, files, purchases
         app/pos_customer_sync.cpp   # TEMPORARY: customers shared store to store (remove with the corporate customer list)
         app/pos_customer_price.cpp   # a customer's own prices: the source store's price, a preferential percent
         app/pos_buydowns.cpp   # Mass Updates > Buydowns / Promotions (core/buydown.hh): definitions, the register's line, reports
@@ -217,6 +219,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetExceptionSearch.qml
             ui/qml/WidgetMassUpdates.qml
             ui/qml/WidgetTransfers.qml
+            ui/qml/WidgetRetailReceiving.qml
             ui/qml/BuydownsPanel.qml
             ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml

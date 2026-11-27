@@ -160,7 +160,10 @@ QVariantList PosService::adminFields(const QString &panel)
         return {
             field(u"name"_s, tr("Name"), u"string"_s), readonlyId,
             field(u"phone"_s, tr("Phone"), u"string"_s),
-            field(u"account"_s, tr("Our account number"), u"string"_s),
+            field(u"account"_s, tr("Our account number"), u"string"_s,
+                  tr("An invoice file's account or ship-to column goes to the vendor with this number.")),
+            field(u"group"_s, tr("Vendor group"), u"string"_s,
+                  tr("Optional: one name for vendors reported together (a distributor's two accounts or locations).")),
             field(u"note"_s, tr("Note"), u"text"_s, tr("Delivery days, the rep, order cut-off…")),
         };
     }

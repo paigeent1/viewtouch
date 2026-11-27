@@ -203,7 +203,7 @@ Item {
         "soldOutList", "orderList", "orderSummary", "guestOrder", "guestMessages", "guestMedia", "guestHeader", "loginPad", "guestCount", "numPad",
         "paymentPanel", "checkList", "keyboard", "clock", "logoutPanel", "statusBar",
         "adminPanel", "reportView", "drawerPanel", "endOfDay", "splitCheck", "kitchenDisplay", "customerInfo",
-        "customerLookup", "giftCard", "waitlist", "schedule", "factoryReset", "messageComposer", "network", "receiveDelivery", "stockCount", "barInventory", "draftTaps", "speedRow", "wasteLog", "storeCheck", "prepLabels", "retailLabels", "checkSearch", "orderLater", "menuGrid", "menuCategories", "menuBuilder", "timeClock", "dashboard", "checklist", "hostStand", "deliveryBoard", "decor", "floorPlan", "siteSetup", "screenCheck", "billboards", "receiptLookup", "itemLookup", "legacyReports", "findTablet", "eodArchive", "exceptionSearch", "massUpdates", "transfers"]
+        "customerLookup", "giftCard", "waitlist", "schedule", "factoryReset", "messageComposer", "network", "receiveDelivery", "stockCount", "barInventory", "draftTaps", "speedRow", "wasteLog", "storeCheck", "prepLabels", "retailLabels", "checkSearch", "orderLater", "menuGrid", "menuCategories", "menuBuilder", "timeClock", "dashboard", "checklist", "hostStand", "deliveryBoard", "decor", "floorPlan", "siteSetup", "screenCheck", "billboards", "receiptLookup", "itemLookup", "legacyReports", "findTablet", "eodArchive", "exceptionSearch", "massUpdates", "transfers", "retailReceiving"]
     readonly property bool hasWidget: isWidget && builtWidgets.includes(kind)
     readonly property bool interactive: zoneEnabled && behavior !== "passthrough"
                                         && (kind === "button" || kind === "image")

@@ -74,6 +74,8 @@ public:
     void saveProblem(const core::Problem &problem) override;
     void saveTransfer(const core::xfer::Transfer &transfer) override;
     void saveRetailStock(const std::string &itemId, double onHand) override;
+    void saveRetailReceipt(const core::recv::Receipt &receipt) override;
+    void saveVendorItem(const core::recv::VendorItem &item) override;
     void saveImage(const std::string &name, const QByteArray &data) override;
     void deleteImage(const std::string &name) override;
     void deleteShift(std::int64_t id) override;

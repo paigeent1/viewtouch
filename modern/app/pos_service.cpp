@@ -76,6 +76,10 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
     transfers = std::move(data.transfers);
     lastTransferId = data.lastTransferId;
     retailStock = std::move(data.retailStock);
+    retailReceipts = std::move(data.retailReceipts);
+    lastRetailReceiptId = data.lastRetailReceiptId;
+    for (core::recv::VendorItem &v : data.vendorItems)
+        vendorItems[core::recv::keyOf(v)] = std::move(v);
     // What goes to the kitchen and the expediter follows the menu and settings.
     connect(this, &PosShared::adminChanged, this, [this] {
         kitchenDone.clear();

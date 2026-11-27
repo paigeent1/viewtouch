@@ -302,7 +302,7 @@ QVariantList PosService::adminRecords(const QString &panel)
     } else if (panel == u"vendors") {
         for (const Vendor &v : s_->settings.vendors)
             add({{u"id"_s, qs(v.id)}, {u"name"_s, qs(v.name)}, {u"phone"_s, qs(v.phone)}, {u"account"_s, qs(v.account)},
-                 {u"note"_s, qs(v.note)}},
+                 {u"group"_s, qs(v.group)}, {u"note"_s, qs(v.note)}},
                 qs(v.name), qs(v.phone));
     } else if (panel == u"inventory") {
         for (const Ingredient &g : s_->ingredients)

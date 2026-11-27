@@ -16,7 +16,7 @@
       "rect": {
         "x": 16,
         "y": 16,
-        "w": 1888,
+        "w": 1480,
         "h": 80
       },
       "shape": "rect",
@@ -143,6 +143,31 @@
           "page": "transfers"
         }
       ]
+    },
+    {
+      "id": "receive-retail",
+      "kind": "button",
+      "rect": {
+        "x": 1512,
+        "y": 16,
+        "w": 392,
+        "h": 80
+      },
+      "shape": "rect",
+      "behavior": "blink",
+      "label": "Receive retail…",
+      "actions": [
+        {
+          "type": "jump",
+          "mode": "push",
+          "page": "retail-receiving"
+        }
+      ],
+      "style": {
+        "normal": {
+          "fill": "#1f8a4c"
+        }
+      }
     }
   ]
 }

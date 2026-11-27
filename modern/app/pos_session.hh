@@ -210,6 +210,10 @@ class PosSession : public QObject {
     // total, choices, message, incoming, outgoing, waitingIn, receiving, queued, link}. Sent to a tablet only
     // while it shows the screen.
     Q_PROPERTY(QVariantMap transfers READ transfers NOTIFY adminChanged)
+    // Manager > Inventory > Receive retail (PosService::recvOpen): {active, tab, vendors, categories, vendorId,
+    // invoice, date, total, note, lines, totals, tie, ties, last, linking, choices, message, recent, from, until,
+    // importFile}. Sent to a tablet only while it shows the screen.
+    Q_PROPERTY(QVariantMap retailReceiving READ retailReceiving NOTIFY adminChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -482,6 +486,7 @@ public:
     virtual QVariantMap massUpdate() const = 0;
     virtual QVariantMap buydowns() const = 0;
     virtual QVariantMap transfers() const = 0;
+    virtual QVariantMap retailReceiving() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -820,6 +825,32 @@ public:
     Q_INVOKABLE void transferReceive() { invoke(QStringLiteral("transferReceive")); }
     Q_INVOKABLE void transferCancelReceive() { invoke(QStringLiteral("transferCancelReceive")); }
     Q_INVOKABLE void transferRange(const QString &from, const QString &until) { invoke(QStringLiteral("transferRange"), {from, until}); }
+    // Retail receiving (answers in retailReceiving).
+    Q_INVOKABLE void recvOpen(const QString &tab) { invoke(QStringLiteral("recvOpen"), {tab}); }
+    Q_INVOKABLE void recvClose() { invoke(QStringLiteral("recvClose")); }
+    Q_INVOKABLE void recvSetHeader(const QVariantMap &header) { invoke(QStringLiteral("recvSetHeader"), {header}); }
+    Q_INVOKABLE void recvScan(const QString &code) { invoke(QStringLiteral("recvScan"), {code}); }
+    Q_INVOKABLE void recvFind(const QString &text) { invoke(QStringLiteral("recvFind"), {text}); }
+    Q_INVOKABLE void recvSearch(const QString &text) { invoke(QStringLiteral("recvSearch"), {text}); }
+    Q_INVOKABLE void recvAddItem(const QString &itemId, double perUom) { invoke(QStringLiteral("recvAddItem"), {itemId, perUom}); }
+    Q_INVOKABLE void recvSetLine(int index, const QVariantMap &fields) { invoke(QStringLiteral("recvSetLine"), {index, fields}); }
+    Q_INVOKABLE void recvRemoveLine(int index) { invoke(QStringLiteral("recvRemoveLine"), {index}); }
+    Q_INVOKABLE void recvAddCharge(const QString &kind) { invoke(QStringLiteral("recvAddCharge"), {kind}); }
+    Q_INVOKABLE void recvLinkStart(int index) { invoke(QStringLiteral("recvLinkStart"), {index}); }
+    Q_INVOKABLE void recvLink(int index, const QString &itemId) { invoke(QStringLiteral("recvLink"), {index, itemId}); }
+    Q_INVOKABLE void recvLeaveOut(int index, bool out) { invoke(QStringLiteral("recvLeaveOut"), {index, out}); }
+    Q_INVOKABLE void recvQuickAdd(const QVariantMap &item) { invoke(QStringLiteral("recvQuickAdd"), {item}); }
+    Q_INVOKABLE void recvClear() { invoke(QStringLiteral("recvClear")); }
+    Q_INVOKABLE void recvSave() { invoke(QStringLiteral("recvSave")); }
+    Q_INVOKABLE void recvRange(const QString &from, const QString &until) { invoke(QStringLiteral("recvRange"), {from, until}); }
+    Q_INVOKABLE void recvImportText(const QString &text, const QString &fileName) { invoke(QStringLiteral("recvImportText"), {text, fileName}); }
+    Q_INVOKABLE void recvImportVendor(const QString &vendorId) { invoke(QStringLiteral("recvImportVendor"), {vendorId}); }
+    Q_INVOKABLE void recvImportMap(const QString &field, int column) { invoke(QStringLiteral("recvImportMap"), {field, column}); }
+    Q_INVOKABLE void recvImportMode(const QString &mode) { invoke(QStringLiteral("recvImportMode"), {mode}); }
+    Q_INVOKABLE void recvImportShow(int invoice) { invoke(QStringLiteral("recvImportShow"), {invoice}); }
+    Q_INVOKABLE void recvImportDecide(const QString &code, const QString &action, const QString &itemId) { invoke(QStringLiteral("recvImportDecide"), {code, action, itemId}); }
+    Q_INVOKABLE void recvImportCommit() { invoke(QStringLiteral("recvImportCommit")); }
+    Q_INVOKABLE void recvImportCancel() { invoke(QStringLiteral("recvImportCancel")); }
     // Buydowns / Promotions (answers in buydowns).
     Q_INVOKABLE void buydownsOpen(bool on) { invoke(QStringLiteral("buydownsOpen"), {on}); }
     Q_INVOKABLE void buydownNew(const QString &type) { invoke(QStringLiteral("buydownNew"), {type}); }

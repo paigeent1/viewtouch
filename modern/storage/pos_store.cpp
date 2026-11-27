@@ -286,6 +286,10 @@ bool PosStore::open(QString *error)
     if (!run(q, u"CREATE TABLE IF NOT EXISTS transfers (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"_s, error)
         || !run(q, u"CREATE TABLE IF NOT EXISTS retail_stock (item_id TEXT PRIMARY KEY, on_hand REAL NOT NULL)"_s, error))
         return false;
+    // Retail receiving (2026-11-27): the invoices received, each vendor's items. New tables only, as above.
+    if (!run(q, u"CREATE TABLE IF NOT EXISTS retail_receipts (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"_s, error)
+        || !run(q, u"CREATE TABLE IF NOT EXISTS vendor_items (key TEXT PRIMARY KEY, json TEXT NOT NULL)"_s, error))
+        return false;
     // Indexes for what's looked up by time, so a store with years of data
     // doesn't read whole tables. An older ViewTouch opens the database the
     // same with them (a standby a version behind), so they aren't a version.
@@ -533,6 +537,17 @@ std::optional<app::PosData> PosStore::load(QStringList *errors) const
         while (q.next())
             data.retailStock[q.value(0).toString().toStdString()] = q.value(1).toDouble();
     }
+    // Retail invoices received: all (a duplicate invoice number is refused against every one).
+    if (q.exec(u"SELECT json FROM retail_receipts ORDER BY id"_s)) {
+        while (q.next())
+            data.retailReceipts.push_back(app::retailReceiptFromJson(parse(q.value(0))));
+    }
+    if (q.exec(u"SELECT COALESCE(MAX(id), 0) FROM retail_receipts"_s) && q.next())
+        data.lastRetailReceiptId = q.value(0).toLongLong();
+    if (q.exec(u"SELECT json FROM vendor_items"_s)) {
+        while (q.next())
+            data.vendorItems.push_back(app::vendorItemFromJson(parse(q.value(0))));
+    }
     if (q.exec(u"SELECT id, opened_at, closed_at, reports FROM business_days WHERE closed_at != 0 "
                "ORDER BY id DESC LIMIT 60"_s)) {
         while (q.next()) {
@@ -736,6 +751,18 @@ void SqlPosSink::saveRetailStock(const std::string &itemId, double onHand)
 {
     writer_.upsert(u"retail_stock"_s, QString::fromStdString(itemId),
                    {{u"item_id"_s, QString::fromStdString(itemId)}, {u"on_hand"_s, onHand}});
+}
+
+void SqlPosSink::saveRetailReceipt(const core::recv::Receipt &r)
+{
+    writer_.upsert(u"retail_receipts"_s, QString::number(r.id),
+                   {{u"id"_s, qint64(r.id)}, {u"at"_s, qint64(r.at)}, {u"json"_s, compact(app::toJson(r))}});
+}
+
+void SqlPosSink::saveVendorItem(const core::recv::VendorItem &v)
+{
+    const QString key = QString::fromStdString(core::recv::keyOf(v));
+    writer_.upsert(u"vendor_items"_s, key, {{u"key"_s, key}, {u"json"_s, compact(app::toJson(v))}});
 }
 
 void SqlPosSink::saveImage(const std::string &name, const QByteArray &data)

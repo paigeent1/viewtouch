@@ -49,6 +49,7 @@ Item {
         { id: "kitchen", label: qsTr("Kitchen") },
         { id: "foodcost", label: qsTr("Food Cost") },
         { id: "barvariance", label: qsTr("Bar Variance") }, { id: "kegs", label: qsTr("Kegs") }, { id: "transfers", label: qsTr("Transfers") },
+        { id: "retailpurchases", label: qsTr("Retail Purchases") }, { id: "retailcostdiffs", label: qsTr("Retail Cost Diffs") },
         { id: "engineering", label: qsTr("Menu Mix") },
         { id: "coach", label: qsTr("Profit Coach") },
         { id: "forecast", label: qsTr("Forecast") },

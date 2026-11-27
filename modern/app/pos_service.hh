@@ -15,6 +15,7 @@
 #include "core/scan_data.hh"
 #include "core/settings.hh"
 #include "core/transfer.hh"
+#include "core/receiving.hh"
 #include "core/waitlist.hh"
 #include "app/pos_session.hh"
 
@@ -80,6 +81,9 @@ public:
     // Inventory transfers between stores (both ways), and a retail item's count on hand (pos_transfers.cpp).
     virtual void saveTransfer(const core::xfer::Transfer &) {}
     virtual void saveRetailStock(const std::string &itemId, double onHand) { Q_UNUSED(itemId) Q_UNUSED(onHand) }
+    // Retail receiving (pos_receiving.cpp): an invoice received, and a vendor's item (its number, unit, last cost).
+    virtual void saveRetailReceipt(const core::recv::Receipt &) {}
+    virtual void saveVendorItem(const core::recv::VendorItem &) {}
     // The store's pictures (logo, buttons, backgrounds): name -> file bytes.
     virtual void saveImage(const std::string &name, const QByteArray &data) { Q_UNUSED(name) Q_UNUSED(data) }
     virtual void deleteImage(const std::string &name) { Q_UNUSED(name) }
@@ -224,6 +228,9 @@ struct PosData {
     std::vector<core::xfer::Transfer> transfers;  // the last 400 days and every open one, oldest first
     std::int64_t lastTransferId = 0;
     std::map<std::string, double> retailStock;    // retail item id -> on hand (items counted or transferred)
+    std::vector<core::recv::Receipt> retailReceipts;   // retail invoices received, oldest first
+    std::int64_t lastRetailReceiptId = 0;
+    std::vector<core::recv::VendorItem> vendorItems;  // each vendor's item numbers, units and last costs
 };
 
 // State shared by every terminal of one store: open checks, today's closed
@@ -380,6 +387,13 @@ public:
     std::vector<core::xfer::Transfer> transfers;
     std::int64_t lastTransferId = 0;
     std::map<std::string, double> retailStock;
+    // Retail receiving (pos_receiving.cpp): the invoices received (all of them: a duplicate invoice number is
+    // refused), and each vendor's items by recv::keyOf (vendor, item or their item number); vendorItemsRevision
+    // counts their changes (the lookups by item number are made again).
+    std::vector<core::recv::Receipt> retailReceipts;
+    std::int64_t lastRetailReceiptId = 0;
+    std::map<std::string, core::recv::VendorItem> vendorItems;
+    int vendorItemsRevision = 0;
     QString transferDir;
     QString transferScript;
     std::int64_t transferSentAt = 0;
@@ -1313,6 +1327,41 @@ public:
     bool transferReceive();                              // on hand up here, the result back to the sender (managers)
     bool transferCancelReceive();
     bool transferRange(const QString &from, const QString &until);   // the list's dates, yyyy-MM-dd
+    // --- Retail receiving (pos_receiving.cpp; Manager > Inventory > Receive retail…; no manager PIN) ------
+    // A vendor's invoice counted into the retail on hand; never changes an item's system cost or price. The
+    // screen's state is retailReceiving(); tab "receive" (the invoice), "import" (an invoice file), "list".
+    bool recvOpen(const QString &tab);
+    bool recvClose();
+    bool recvSetHeader(const QVariantMap &header);       // vendor, invoice, date, total (typed; "" none), note
+    bool recvScan(const QString &code);                  // a scan or a typed code: +1 (a carton: its pack size)
+    bool recvFind(const QString &text);                  // part of a name: choices (linking: they link)
+    bool recvSearch(const QString &text);                // choices only (nothing added)
+    bool recvAddItem(const QString &itemId, double perUom);
+    bool recvSetLine(int index, const QVariantMap &fields);   // qty, perUom, uom, vendorItem, name, cost, otp, prepaid, tax, amount, kind
+    bool recvRemoveLine(int index);
+    bool recvAddCharge(const QString &kind);             // delivery | credit | other | storeuse (a line of its own)
+    bool recvLinkStart(int index);                       // a code not on file: Find its item (-1: stop)
+    bool recvLink(int index, const QString &itemId);     // ...its alt UPC from now on
+    bool recvLeaveOut(int index, bool out);              // a code not on file: not counted in
+    bool recvQuickAdd(const QVariantMap &item);          // {index | code, upc, name, category, cost, price, packSize}
+    bool recvClear();
+    bool recvSave();                                     // on hand up, the vendor's items learned
+    bool recvRange(const QString &from, const QString &until);   // the list's dates, yyyy-MM-dd
+    bool recvImportText(const QString &text, const QString &fileName);   // a CSV's text: its columns guessed
+    bool recvImportVendor(const QString &vendorId);      // the file's vendor (its saved columns; no account column: all its)
+    bool recvImportMap(const QString &field, int column);   // -1: none
+    bool recvImportMode(const QString &mode);            // receive | history (item numbers and costs only)
+    bool recvImportShow(int invoice);                    // an invoice's lines shown (-1: none)
+    bool recvImportDecide(const QString &code, const QString &action, const QString &itemId);   // link | skip | storeuse | "" (undecided)
+    bool recvImportCommit();
+    bool recvImportCancel();
+    QVariantMap retailReceiving() const override;
+    // Purchases (retail) and Cost differences (retail): invoices dated in [from, to) (byReceived: saved then).
+    core::Report retailPurchasesReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
+    core::Report retailCostDiffsReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
+    const std::vector<core::recv::Receipt> &retailReceipts() const { return s_->retailReceipts; }
+    const core::recv::VendorItem *vendorItemOf(const std::string &vendorId, const std::string &itemId) const;
+    const core::recv::VendorItem *vendorItemByNumber(const std::string &vendorId, const std::string &number) const;
     // "<source> price" (the bar): each retail line on the sale back to the price source's price (a discount per
     // line, named "<source> price"; discount permission; allowed on No discounts items).
     bool storePriceDiscount();
@@ -2096,6 +2145,37 @@ private:
     void startSending(bool now);
     void printTransferSlip(const core::xfer::Transfer &t);
     void retailStockSold(const std::vector<core::OrderLine> &lines, int sign);
+    // Retail receiving's screen and lookups (pos_receiving.cpp).
+    struct RecvView;
+    struct RecvIndex;
+    struct RecvFound {
+        const core::MenuItem *item = nullptr;
+        double perUom = 1;
+        const core::recv::VendorItem *vendorItem = nullptr;
+        bool byPack = false;   // a carton's or box's UPC: its single
+    };
+    struct RecvPreview {
+        core::recv::FileInvoice file;
+        core::recv::Receipt receipt;
+        QString problem;
+        bool duplicate = false;
+        int unmatched = 0;
+        std::vector<std::string> codes;   // each line's code when it isn't on file (else empty)
+    };
+    mutable std::shared_ptr<RecvView> recv_;
+    RecvView &recvView() const;
+    const RecvIndex &recvIndex() const;
+    RecvFound recvResolve(const QString &code, const QString &vendorId) const;
+    const core::Vendor *vendorById(const QString &id) const;
+    bool recvDuplicate(const std::string &vendorId, const std::string &invoice) const;
+    core::recv::Line recvLineFor(const core::MenuItem &m, double perUom, const QString &vendorId) const;
+    bool recvAddCode(const std::string &itemId, const QString &code);
+    void recvLearn(const core::recv::Receipt &r);
+    void recvKeep(core::recv::Receipt r);
+    static std::string recvCodeKey(const core::recv::FileLine &f);
+    void recvApplySavedMap(const core::Vendor &vendor);
+    std::vector<core::recv::FileInvoice> recvImportInvoices() const;
+    std::vector<RecvPreview> recvImportPreview() const;
     friend struct MassImpl;
     struct MassView;
     mutable std::shared_ptr<MassView> mass_;

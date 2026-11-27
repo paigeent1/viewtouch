@@ -135,9 +135,11 @@ bool PosService::saveAdminRecord(const QString &panel, int index, const QVariant
         if (index >= int(list.size()))
             return false;
         Vendor v{std::string(), ss(name), ss(record.value(u"phone"_s).toString().trimmed()),
-                 ss(record.value(u"account"_s).toString().trimmed()), ss(record.value(u"note"_s).toString().trimmed())};
+                 ss(record.value(u"account"_s).toString().trimmed()), ss(record.value(u"note"_s).toString().trimmed()),
+                 ss(record.value(u"group"_s).toString().trimmed()), std::string()};
         if (index >= 0) {
             v.id = list[index].id;
+            v.importMap = list[index].importMap;   // (kept by Receive retail's import, not on the form)
             list[index] = v;
         } else {
             const QString wanted = record.value(u"id"_s).toString().trimmed();

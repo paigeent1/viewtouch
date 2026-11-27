@@ -220,6 +220,7 @@ public:
     QVariantMap massUpdate() const override { return v(u"massUpdate").toMap(); }
     QVariantMap buydowns() const override { return v(u"buydowns").toMap(); }
     QVariantMap transfers() const override { return v(u"transfers").toMap(); }
+    QVariantMap retailReceiving() const override { return v(u"retailReceiving").toMap(); }
     QVariantMap itemSearch() const override { return v(u"itemSearch").toMap(); }
     QVariantMap printerSearch() const override { return v(u"printerSearch").toMap(); }
     // Where pictures from the server are kept on this device (tests set it).

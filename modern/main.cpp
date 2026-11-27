@@ -1110,6 +1110,7 @@ int runStore(const Args &cli, const Options &o)
                 {u"reports", u"exceptions-search"},      // Exceptions search (from the database)
                 {u"menu-builder", u"mass-updates"},      // Mass Updates… (many items at once, owner 2026-11-24)
                 {u"admin-inventory", u"transfers"},      // Transfers… (between stores, owner 2026-11-26)
+                {u"admin-inventory", u"receive-retail"}, // Receive retail… (vendor invoices, owner 2026-11-27)
                 {u"retail-discounts", u"rds-store-price"},   // OTHER STORE'S PRICE (the price source's price, 2026-11-26)
                 {u"logout", u"find-tablet"},             // Find a Tablet… (End of shift: any staff)
                 {u"logout-phone", u"find-tablet"},       // ...and on phones
