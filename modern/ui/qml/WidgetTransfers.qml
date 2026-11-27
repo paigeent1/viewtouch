@@ -145,7 +145,8 @@ Item {
                             opacity: 0.75
                         }
                     }
-                    Big { text: "−"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, modelData.qty - 1) }
+                    // A carton and its packs (a box and its cigars) share a line: cartons, then loose packs.
+                    Big { text: "−"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, Math.max(0, modelData.qty - 1), -1) }
                     TextField {
                         objectName: "xferQty-" + modelData.index
                         text: String(modelData.qty)
@@ -154,11 +155,34 @@ Item {
                         font.pixelSize: w.unit
                         horizontalAlignment: Text.AlignHCenter
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        onEditingFinished: if (Number(text) !== modelData.qty) w.pos.transferSetQty(modelData.index, Number(text) || 0)
+                        onEditingFinished: if (Number(text) !== modelData.qty) w.pos.transferSetQty(modelData.index, Number(text) || 0, -1)
                     }
-                    Big { text: "+"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, modelData.qty + 1) }
+                    Big { text: "+"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, modelData.qty + 1, -1) }
+                    Label { visible: modelData.family === true; text: modelData.parentUnit ?? ""; font.pixelSize: w.unit }
+                    Big {
+                        visible: modelData.family === true
+                        text: "−"; implicitWidth: w.touch
+                        onClicked: w.pos.transferSetQty(modelData.index, modelData.qty, Math.max(0, (modelData.loose ?? 0) - 1))
+                    }
+                    TextField {
+                        objectName: "xferLoose-" + modelData.index
+                        visible: modelData.family === true
+                        text: String(modelData.loose ?? 0)
+                        implicitWidth: w.unit * 4
+                        implicitHeight: w.touch
+                        font.pixelSize: w.unit
+                        horizontalAlignment: Text.AlignHCenter
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        onEditingFinished: if (Number(text) !== modelData.loose) w.pos.transferSetQty(modelData.index, modelData.qty, Number(text) || 0)
+                    }
+                    Big {
+                        visible: modelData.family === true
+                        text: "+"; implicitWidth: w.touch
+                        onClicked: w.pos.transferSetQty(modelData.index, modelData.qty, (modelData.loose ?? 0) + 1)
+                    }
+                    Label { visible: modelData.family === true; text: modelData.singleUnit ?? ""; font.pixelSize: w.unit }
                     Label { text: modelData.lineCost; font.pixelSize: w.unit; Layout.preferredWidth: w.unit * 6; horizontalAlignment: Text.AlignRight }
-                    Big { objectName: "xferRemove-" + modelData.index; text: "✕"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, 0) }
+                    Big { objectName: "xferRemove-" + modelData.index; text: "✕"; implicitWidth: w.touch; onClicked: w.pos.transferSetQty(modelData.index, 0, 0) }
                 }
             }
             RowLayout {
@@ -262,7 +286,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 0
-                            Label { text: modelData.name + "  (" + qsTr("%1 sent").arg(modelData.qty) + ")"; font.pixelSize: w.unit; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Label { text: modelData.name + "  (" + qsTr("%1 sent").arg(String(modelData.qty) + ((modelData.unit ?? "") !== "" ? " " + modelData.unit : "")) + ")"; font.pixelSize: w.unit; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
                             Label {
                                 text: modelData.upc + "  ·  " + (modelData.found ? qsTr("here: %1").arg(modelData.here) : qsTr("not on file here"))
                                 color: modelData.found ? palette.windowText : "#b00020"

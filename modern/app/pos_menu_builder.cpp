@@ -1060,6 +1060,18 @@ bool PosService::saveMenuItemCard(const QVariantMap &card)
             }
         }
     }
+    // A single's units for its family's on hand ("box" / "ea"; empty: the defaults; pos_retail_stock.cpp).
+    if (card.contains(u"parentUnit"_s) || card.contains(u"singleUnit"_s)) {
+        std::erase_if(item.recipe, [](const RecipeLine &rl) { return rl.ingredientId.starts_with("__units__:"); });
+        const auto unit = [&](const QString &key) {
+            QString u = card.value(key).toString().trimmed().left(8);
+            u.remove(u'/');
+            return u;
+        };
+        const QString a = unit(u"parentUnit"_s), b = unit(u"singleUnit"_s);
+        if (!a.isEmpty() || !b.isEmpty())
+            item.recipe.push_back({"__units__:" + ss(a) + "/" + ss(b), 1.0});
+    }
     // (Buydowns are no longer on the item: Mass Updates > Buydowns / Promotions, app/pos_buydowns.cpp.)
     // Other prices: empty is the regular price.
     const auto otherPrice = [&](const QVariant &v, Money &into) {

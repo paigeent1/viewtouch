@@ -1347,6 +1347,8 @@ The new card opens with the cursor in its UPC field: scan the item. A single can
 <p>Reports → <b>Stock</b> then shows each item counted: what should have been there, what was counted, how far off and what that cost, the biggest losses first. <i>Should be</i> is the last count, plus the deliveries received, less what the sales used (by each item's recipe), plus any change made by hand to <b>On hand</b>. Coming up short again and again on one item means waste, portions bigger than the recipe, theft, or a recipe that needs fixing.</p>
 <p class="shot"><img src="shots/m141-stock-report.jpg" width="560" height="315"></p>
 <p>While counting, what should be there isn't shown, so it can't sway the count. Store Settings → <b>Inventory</b> can show it.</p>
+<p>Count Stock is for the kitchen's and the bar's ingredients. Retail items (cartons, packs, boxes, cigars) are
+counted on their Menu Builder card: see <a href="#cartons-loose">Cartons, boxes and loose singles</a> in chapter 35.</p>
 
 <h2>Logging waste</h2>
 <p>When something is thrown away, log it: <b>Manager → Log Waste…</b>, or <b>Waste…</b> on the kitchen screen. Touch the menu item (its recipe comes off the shelf: a dropped burger is a bun, a patty and some lettuce) or <b>Ingredient</b> and the ingredient, how much, and why (<i>Dropped or spilled</i>, <i>Expired or spoiled</i>, <i>Made wrong</i>…; Store Settings → <b>Inventory</b> sets the reasons), then <b>Log Waste</b>.</p>
@@ -3264,7 +3266,10 @@ at the retail store <i>Sent there</i> for the bar; at the bar <i>Not sent</i>.</
 <ol>
 <li>Scan each item with the counter scanner (again: one more), or type a UPC or part of a name and <b>Find</b>. A
 carton or box shows how many packs or singles are in it.</li>
-<li>Change a quantity with <b>−</b> / <b>+</b> or by typing it; <b>✕</b> takes a line off.</li>
+<li>Change a quantity with <b>−</b> / <b>+</b> or by typing it; <b>✕</b> takes a line off. A carton and its packs (a box
+and its cigars) share one line with two quantities: cartons, then loose packs (<i>3 ctn 4 pk</i>). Scanning the carton
+adds a carton; scanning a pack adds a loose pack. Sending takes them off the way a sale does (see
+<a href="#cartons-loose">Cartons, boxes and loose singles</a>).</li>
 <li><b>To:</b> the store it goes to; a <b>Note</b> if you want.</li>
 <li><b>Send</b> (a manager). The items come off this store's on hand at once (at cost), the transfer is <i>in transit</i>,
 and a slip prints on the receipt printer: transfer number, from, to, date, who, each line (UPC, name, quantity),
@@ -3281,14 +3286,17 @@ the other store receives it) puts the items back on hand here. <b>Reprint</b> pr
 <li>Tick each line off as you check it, or scan it.</li>
 <li>A count that's different (short, over, damaged): type how many came and why.</li>
 <li>An item this store doesn't have yet: <b>Add it</b> (its name, price, cost and department from the transfer) or
-<b>Leave out</b>. A carton this store only sells as packs comes in as packs (10 packs a carton).</li>
+<b>Leave out</b>. A carton this store only sells as packs comes in as packs (10 packs a carton); if this store has the
+carton too, linked to its packs, it comes in as a sealed carton. Counts are in the units sent (the line says
+<i>ctn</i> or <i>pk</i>).</li>
 <li><b>Receive</b> (a manager): on hand goes up here, and the other store's transfer shows <i>Received</i> or
 <i>Received with differences</i>.</li>
 </ul>
 <p><b>Manager → Reports → Transfers</b> (both stores): sent, received, in transit and differences at cost, for today
 or any dates; it is kept with each End of Day. Sales and gross profit reports are not changed by transfers.</p>
-<div class="warn">Retail on hand is kept for an item from its first transfer (ViewTouch has no retail stock count
-yet). Until then, the sending store's numbers start at 0 and can go below it.</div>
+<div class="warn">Retail on hand is kept for an item from its first count, invoice or transfer. Until then, the sending
+store's numbers start at 0 and can go below it. Count it on the item's Menu Builder card
+(<a href="#cartons-loose">Cartons, boxes and loose singles</a>).</div>
 
 <h2>Customers at both stores (for now)</h2>
 <p>Until the stores have one customer list for all of them, <b>Store Settings → Other stores → Share customers</b>
@@ -3336,7 +3344,7 @@ in one vendor group (the same name on both): the reports then show each one and 
 <b>total</b> from the paper. Beside it: <i>Ties out</i>, or <i>Off by $x</i> while the lines and the total differ.</li>
 <li>Scan each item with the counter scanner. Scanning it again is one more. A carton's or box's UPC brings the
 pack or single it holds, times its pack size (from the single's Parent UPC on its Menu Builder card): one carton
-line, 10 packs to stock. You can also type a UPC, the vendor's item number, or part of a name and <b>Find</b>.</li>
+line, and the line says what goes on hand (<i>= 2 ctn</i>: sealed cartons; a pack scanned: <i>= 1 pk</i>, loose). You can also type a UPC, the vendor's item number, or part of a name and <b>Find</b>.</li>
 <li>On each line: the quantity in the vendor's unit, the unit's name (CTN, BOX), how many of the item one unit
 is, the vendor's item #, the invoice's <b>price</b> per unit (optional), <b>OTP</b> / excise per unit (part of the
 item's cost) and <b>prepaid tax</b> per unit (cigarettes' prepaid sales tax: on the invoice so its total ties out,
@@ -3383,8 +3391,68 @@ the stock's cost (with OTP / excise), prepaid tax, delivery, store use, use tax,
 totals, and the invoices that don't tie out. <b>Reports → Retail Cost Diffs</b>: each line whose invoice cost per
 unit (with OTP) isn't the item's system cost, and the difference. This is a plain list for now; the full review (by
 brand, ticked Reviewed, and adjusting prices) comes later.</p>
-<div class="tip">Retail on hand is the same number Transfers keeps. Items get one from their first invoice or
-transfer; a stock count comes later.</div>
+<div class="tip">Retail on hand is the same number Transfers keeps. Items get one from their first count, invoice or
+transfer.</div>
+
+<h2 id="cartons-loose">Cartons, boxes and loose singles</h2>
+<p>Most cigarettes sell by the carton, and cigars sell by the box and one at a time. A carton and its pack (a box
+and its cigar) are linked on the pack's Menu Builder card: <b>Parent Master UPC</b> (the carton's UPC) and
+<b>Subunit Count in Parent</b> (10 packs, 20 cigars). Linked, the two share <b>one on hand made of two counts</b>:</p>
+<ul>
+<li><b>Sealed</b>: the cartons or boxes still closed.</li>
+<li><b>Loose</b>: the packs on the shelf, or the cigars in the humidor.</li>
+</ul>
+<p>It shows the same on both items, everywhere: <i>12 ctn 3 pk</i>, <i>4 box 27 ea</i>. The units are <i>ctn</i> /
+<i>pk</i> for cigarettes and <i>box</i> / <i>ea</i> for cigars; change them on the pack's card (<b>Units</b>, beside the
+Parent Master UPC). Loose is never turned into sealed by itself: 27 cigars loose stay 27 loose, even though that is
+more than a box.</p>
+<h3>Selling</h3>
+<ul>
+<li><b>A pack (or a cigar) sold</b> takes one loose. <b>Only when none is loose</b>, ViewTouch opens a sealed carton by
+itself: one carton less, the rest of its packs loose. There is no separate "break a carton" step; the Changes report
+notes each one (<i>opened by itself</i>).</li>
+<li><b>A carton (or a box) sold</b> takes one sealed. If none is sealed but a whole box's worth is loose, it takes that
+many loose instead (noted: <i>sold from loose</i>). If neither, sealed goes below 0 (noted: <i>below 0</i>), like
+any stock sold that wasn't counted.</li>
+<li><b>A void or a return</b> puts it back the way it was sold: a carton sealed, a pack loose.</li>
+</ul>
+<h3>Receiving and transfers</h3>
+<p>A carton or box received (its UPC scanned, or a vendor's unit of whole cartons such as a case of 6 cartons) goes
+on hand <b>sealed</b>; packs or cigars received go <b>loose</b>. Transfers work the same way: one line with cartons and
+loose packs, the cartons off sealed and the packs off loose (a carton is opened by itself only if no packs are
+loose).</p>
+<h3>Counting, and Open boxes</h3>
+<p>On the item's card in <b>Menu Builder</b> (the carton's or the pack's: the same count), <b>On hand</b>:</p>
+<ul>
+<li><b>Count: sealed</b> [ ] <b>loose</b> [ ], then <b>Save count</b> (a manager): count the closed cartons or boxes and the
+loose packs or cigars apart. What you type is what's on hand; nothing is converted.</li>
+<li><b>Open 2 box (into loose)</b>: when you stock the humidor, choose how many boxes with <b>−</b> / <b>+</b> and touch it.
+That many boxes come off sealed and their cigars go loose. It can't open more than are sealed.</li>
+<li>Items without a link (a lighter, a carton nobody linked to a pack) keep one simple count.</li>
+</ul>
+<p>Every count and every Open is on the Changes report (before and after).</p>
+<h3>What it's worth</h3>
+<p>Stock at cost is the sealed cartons or boxes at the carton's or box's cost plus the loose packs or cigars at the
+pack's or cigar's cost. The card shows it beside the count; Reports → Transfers (<i>Retail stock kept here</i>) adds
+it up for the store.</p>
+<h3>Two examples</h3>
+<table border="1" cellpadding="5" cellspacing="0" width="100%">
+<tr><th>Cigarettes (10 packs a carton)</th><th>On hand</th></tr>
+<tr><td>Counted: 10 cartons sealed, 0 loose</td><td>10 ctn</td></tr>
+<tr><td>Sell 1 pack: none loose, so a carton opens by itself</td><td>9 ctn 9 pk</td></tr>
+<tr><td>Sell 1 more pack: from the loose ones</td><td>9 ctn 8 pk</td></tr>
+<tr><td>Sell 1 carton</td><td>8 ctn 8 pk</td></tr>
+</table>
+<table border="1" cellpadding="5" cellspacing="0" width="100%">
+<tr><th>Cigars (20 a box)</th><th>On hand</th></tr>
+<tr><td>Counted: 6 boxes sealed, 5 cigars loose</td><td>6 box 5 ea</td></tr>
+<tr><td><b>Open 2 boxes</b> into the humidor</td><td>4 box 45 ea</td></tr>
+<tr><td>Sell 1 box: from the sealed ones (the 45 loose stay loose)</td><td>3 box 45 ea</td></tr>
+<tr><td>Sell 1 cigar: from the loose ones</td><td>3 box 44 ea</td></tr>
+</table>
+<div class="tip">When you start: the counts kept before this (when a received carton went on hand as 10 packs) were
+sorted into sealed and loose once, by themselves, and noted on the Changes report. Count each family once on its card
+to be sure.</div>
 
 </body>
 </html>

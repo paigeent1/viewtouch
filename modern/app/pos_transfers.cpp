@@ -119,8 +119,9 @@ struct PosService::TransferView {
     bool active = false;
     QString tab = u"out"_s;   // out | in | list
     struct Draft {
-        std::string itemId;
-        double qty = 1;
+        std::string itemId;   // a box / carton and its single: the box's (one line for both)
+        double qty = 1;       // (a family: sealed boxes / cartons)
+        double loose = 0;     // a family: loose singles
     };
     std::vector<Draft> lines;
     QString to, note;
@@ -174,8 +175,8 @@ void PosService::retailStockSold(const std::vector<OrderLine> &lines, int sign)
     for (const OrderLine &l : lines) {
         if ((l.voided && sign > 0) || l.isComment() || l.isGiftCard())
             continue;
-        if (s_->retailStock.contains(l.itemId))
-            addRetailStock(l.itemId, -double(l.counted()) * sign);
+        if (retailTracked(l.itemId))   // a box / carton and its single by their rules (pos_retail_stock.cpp)
+            retailTake(l.itemId, double(l.counted()) * sign);
     }
 }
 
@@ -411,7 +412,7 @@ QString PosService::transferIncoming(const QByteArray &bytes, QString *why)
         t->status = t->differences() > 0 ? "differences" : "received";
         if (wasVoid) {   // voided here after the other store had counted it in: it left after all
             for (const Line &l : t->lines)
-                addRetailStock(l.itemId, -l.qty);
+                retailTake(l.itemId, l.qty);
             t->note += t->note.empty() ? "" : " ";
             t->note += ss(tr("(Voided here, but %1 had already received it: taken out of stock again.)").arg(qs(t->to)));
         }
@@ -548,14 +549,18 @@ bool PosService::transferAddItem(const QString &itemId, double qty)
         return fail(tr("Type how many, like 1 or 10."));
     v.choices.clear();
     v.message.clear();
+    // A box / carton and its single share a line: cartons + loose packs (pos_retail_stock.cpp).
+    const RetailFamily *f = retailFamilyOf(m->id);
+    const std::string lineId = f ? f->parentId : m->id;
+    const bool loose = f && m->id == f->singleId;
     // The same item again: one more on its line (as a scan at the register).
     for (TransferView::Draft &d : v.lines)
-        if (d.itemId == m->id) {
-            d.qty += qty;
+        if (d.itemId == lineId) {
+            (loose ? d.loose : d.qty) += qty;
             emit adminChanged();
             return true;
         }
-    v.lines.push_back({m->id, qty});
+    v.lines.push_back({lineId, loose ? 0 : qty, loose ? qty : 0});
     emit adminChanged();
     return true;
 }
@@ -613,17 +618,24 @@ bool PosService::transferFind(const QString &text)
     return !v.choices.isEmpty();
 }
 
-bool PosService::transferSetQty(int index, double qty)
+bool PosService::transferSetQty(int index, double qty, double loose)
 {
     TransferView &v = transferView();
     if (index < 0 || index >= int(v.lines.size()))
         return false;
-    if (qty <= 0) {
-        v.lines.erase(v.lines.begin() + index);
-    } else if (qty > 100000) {
+    TransferView::Draft &d = v.lines[std::size_t(index)];
+    if (qty > 100000 || loose > 100000)
         return fail(tr("Type how many, like 1 or 10."));
+    if (retailFamilyOf(d.itemId)) {   // cartons + loose packs
+        d.qty = std::max(0.0, qty);
+        if (loose >= 0)
+            d.loose = loose;
+        if (d.qty <= 0 && d.loose <= 0)
+            v.lines.erase(v.lines.begin() + index);
+    } else if (qty <= 0) {
+        v.lines.erase(v.lines.begin() + index);
     } else {
-        v.lines[std::size_t(index)].qty = qty;
+        d.qty = qty;
     }
     emit adminChanged();
     return true;
@@ -692,14 +704,21 @@ bool PosService::transferSend()
     t.note = ss(v.note.trimmed());
     t.at = now();
     t.status = "transit";
-    for (const TransferView::Draft &d : v.lines)
-        if (const MenuItem *m = findItem(qs(d.itemId)))
+    for (const TransferView::Draft &d : v.lines) {
+        const MenuItem *m = findItem(qs(d.itemId));
+        if (!m)
+            continue;
+        if (d.qty > 0)
             t.lines.push_back(transferLineOf(*m, d.qty));
+        if (const RetailFamily *f = retailFamilyOf(d.itemId); f && d.loose > 0)   // the loose singles, a line of their own
+            if (const MenuItem *single = findItem(qs(f->singleId)))
+                t.lines.push_back(transferLineOf(*single, d.loose));
+    }
     if (t.lines.empty())
         return fail(tr("Scan or find the items first."));
-    // Off the shelf here at once.
+    // Off the shelf here at once (a pack with none loose opens a carton, as a sale does).
     for (const Line &l : t.lines)
-        addRetailStock(l.itemId, -l.qty);
+        retailTake(l.itemId, l.qty);
     t.delivered = false;
     s_->transfers.push_back(t);
     if (s_->sink)
@@ -779,7 +798,8 @@ Report PosService::transferSlip(const Transfer &t) const
         r.note(ss(tr("Note: %1").arg(qs(t.note))));
     double units = 0;
     for (const Line &l : t.lines) {
-        r.line({l.name, ss(qtyText(l.qty)), ctx.money(Money::fromCents(std::llround(l.qty * double(l.costCents))))});
+        const QString unit = retailUnitOf(l.itemId);
+        r.line({l.name, ss(qtyText(l.qty) + (unit.isEmpty() ? QString() : u" "_s + unit)), ctx.money(Money::fromCents(std::llround(l.qty * double(l.costCents))))});
         r.note(l.upc + (l.packSize > 0 ? ss(tr(" (%1 x %2)").arg(l.packSize).arg(qs(l.packUpc))) : std::string()));
         units += l.qty;
     }
@@ -935,7 +955,12 @@ bool PosService::transferReceive()
         }
         l.itemId = s_->menu[std::size_t(mt.at)].id;
         l.perUnit = mt.perUnit;
-        addRetailStock(l.itemId, l.received * mt.perUnit);
+        // A carton matched to its packs here: sealed, when the packs here are linked to a carton of that size.
+        const RetailFamily *f = retailFamilyOf(l.itemId);
+        if (f && mt.perUnit > 1 && l.itemId == f->singleId && std::abs(mt.perUnit - f->packSize) < 1e-9)
+            addRetailStock(f->parentId, l.received);
+        else
+            addRetailStock(l.itemId, l.received * mt.perUnit);
     }
     t->receivedAt = now();
     t->receivedBy = user() ? user()->name : ss(terminal_);
@@ -995,14 +1020,21 @@ QVariantMap PosService::transfers() const
         if (!m)
             continue;
         const Line l = transferLineOf(*m, v.lines[i].qty);
-        const std::int64_t c = std::llround(l.qty * double(l.costCents));
+        std::int64_t c = std::llround(l.qty * double(l.costCents));
+        const RetailFamily *f = retailFamilyOf(m->id);
+        const MenuItem *single = f ? findItem(qs(f->singleId)) : nullptr;
+        if (single)
+            c += std::llround(v.lines[i].loose * double(costCentsOf(*single)));
         total += c;
-        const auto onHand = retailOnHand(m->id);
-        lines.append(QVariantMap{{u"index"_s, int(i)}, {u"id"_s, qs(m->id)}, {u"upc"_s, qs(l.upc)}, {u"name"_s, qs(m->name)},
-                                 {u"qty"_s, l.qty}, {u"cost"_s, l.costCents > 0 ? format(Money::fromCents(l.costCents)) : tr("no cost")},
-                                 {u"lineCost"_s, format(Money::fromCents(c))},
-                                 {u"pack"_s, l.packSize > 0 ? tr("%1 in each").arg(l.packSize) : QString()},
-                                 {u"onHand"_s, onHand ? qtyText(*onHand) : QString()}});
+        QVariantMap row{{u"index"_s, int(i)}, {u"id"_s, qs(m->id)}, {u"upc"_s, qs(l.upc)}, {u"name"_s, qs(m->name)},
+                        {u"qty"_s, l.qty}, {u"cost"_s, l.costCents > 0 ? format(Money::fromCents(l.costCents)) : tr("no cost")},
+                        {u"lineCost"_s, format(Money::fromCents(c))},
+                        {u"pack"_s, l.packSize > 0 ? tr("%1 in each").arg(l.packSize) : QString()},
+                        {u"onHand"_s, retailOnHandText(m->id)}, {u"family"_s, f != nullptr}};
+        if (f)
+            row.insert(QVariantMap{{u"loose"_s, v.lines[i].loose}, {u"parentUnit"_s, f->parentUnit}, {u"singleUnit"_s, f->singleUnit},
+                                   {u"pack"_s, tr("%1 %2 in each %3").arg(f->packSize).arg(f->singleUnit, f->parentUnit)}});
+        lines.append(row);
     }
     QVariantList incoming, outgoing;
     std::int64_t from = 0, until = now() + 1;
@@ -1045,6 +1077,7 @@ QVariantMap PosService::transfers() const
                                            : qs(s_->menu[std::size_t(mt.at)].name);
                 const double counted = i < v.counts.size() ? v.counts[i] : l.qty;
                 rl.append(QVariantMap{{u"index"_s, int(i)}, {u"upc"_s, qs(l.upc)}, {u"name"_s, qs(l.name)}, {u"qty"_s, l.qty},
+                                      {u"unit"_s, mt.at >= 0 && mt.perUnit == 1 ? retailUnitOf(s_->menu[std::size_t(mt.at)].id) : QString()},
                                       {u"counted"_s, counted}, {u"reason"_s, i < v.reasons.size() ? v.reasons[i] : QString()},
                                       {u"found"_s, mt.at >= 0}, {u"here"_s, here},
                                       {u"add"_s, i < v.add.size() ? v.add[i] : -1},

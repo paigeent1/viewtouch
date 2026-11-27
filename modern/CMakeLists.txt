@@ -26,6 +26,7 @@ add_library(vtm_core STATIC
     core/buydown.hh                              # manufacturer buydowns and promotions: definitions, the line, the reports
     core/mass_update.hh                          # Mass Updates: rounding, margin prices, the grid's narrowing, change sets
     core/transfer.hh                             # inventory transfers between stores: lines, UPC matching, the markup
+    core/retail_stock.hh                         # a box / carton and its single: sealed + loose on hand, the break rules
     core/receiving.hh                            # retail receiving: invoice lines and totals, vendor items, invoice files
     core/customer_sync.hh                        # TEMPORARY customers shared store to store (until the corporate list)
     core/core.cpp core/report.cpp
@@ -81,6 +82,7 @@ if(Qt6_FOUND)
         app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
         app/pos_mass_update.cpp   # Menu Builder > Mass Updates (core/mass_update.hh): grid, previews, change sets
         app/pos_transfers.cpp     # Manager > Inventory > Transfers (core/transfer.hh): between stores, by UPC
+        app/pos_retail_stock.cpp  # retail on hand: a box / carton and its single as sealed + loose (core/retail_stock.hh)
         app/pos_receiving.cpp     # Manager > Inventory > Receive retail (core/receiving.hh): invoices, files, purchases
         app/pos_customer_sync.cpp   # TEMPORARY: customers shared store to store (remove with the corporate customer list)
         app/pos_customer_price.cpp   # a customer's own prices: the source store's price, a preferential percent
@@ -270,6 +272,7 @@ if(Qt6_FOUND)
             ui/qml/MenuBuilderSeveral.qml
             ui/qml/MenuBuilderPrices.qml
             ui/qml/MenuBuilderPriceCheck.qml
+            ui/qml/MenuBuilderStock.qml
             ui/qml/MenuBuilderLike.qml
             ui/qml/MenuBuilderAddItem.qml
             ui/qml/MenuBuilderPrint.qml

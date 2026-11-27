@@ -16,6 +16,7 @@
 #include "core/settings.hh"
 #include "core/transfer.hh"
 #include "core/receiving.hh"
+#include "core/retail_stock.hh"
 #include "core/waitlist.hh"
 #include "app/pos_session.hh"
 
@@ -187,6 +188,17 @@ const core::Employee &kioskEmployee();
 // TEMPORARY (remove when the corporate customer list exists): customers shared store to store
 // (app/pos_customer_sync.cpp).
 struct CustomerSyncState;
+
+// A box / carton and its single (pos_retail_stock.cpp): the single's Menu Builder link (__parent__:<box UPC>,
+// pack size); sealed on hand is kept on the box's item, loose on the single's. Units: the single's __units__:
+// "<box>/<single>" ("box/ea"), else "box"/"ea" for cigars and "ctn"/"pk" for the rest.
+struct RetailFamily {
+    std::string parentId, singleId;
+    int packSize = 1;
+    QString parentUnit, singleUnit;
+    bool unitsSet = false;   // set on the item (else the defaults)
+};
+std::vector<RetailFamily> retailFamiliesOf(const std::vector<core::MenuItem> &menu, const std::vector<core::MenuCategory> &categories);
 
 // Everything the running POS needs at startup.
 struct PosData {
@@ -538,6 +550,9 @@ public:
     void startDay();
     // The old per-item buydown tags made into definitions, once (pos_buydowns.cpp).
     void migrateBuydownTags();
+    // A carton's and its packs' counts kept before sealed and loose (receiving put cartons in as packs, a carton
+    // sold went below 0) settled once, logged (pos_retail_stock.cpp).
+    void migrateRetailFamilies();
 
     // Power (Store Settings > Billboards: Power the TV off outside its hours): what this computer
     // last did to each TV - put it to sleep, or woke it and opened the billboard again (then it
@@ -1313,7 +1328,7 @@ public:
     bool transferScan(const QString &code);              // a scan or a typed UPC: +1 of it (receiving: ticked off)
     bool transferFind(const QString &text);              // part of a name: choices (one: added)
     bool transferAddItem(const QString &itemId, double qty);
-    bool transferSetQty(int index, double qty);          // 0: off the transfer
+    bool transferSetQty(int index, double qty, double loose = -1);   // 0 (and 0 loose): off; a family's line: sealed, loose (-1: as it is)
     bool transferSetTo(const QString &store);
     bool transferSetNote(const QString &note);
     bool transferClear();
@@ -1356,6 +1371,7 @@ public:
     bool recvImportCommit();
     bool recvImportCancel();
     QVariantMap retailReceiving() const override;
+    void recvStock(const core::recv::Line &line);         // a stock line on hand (a carton sealed, packs loose)
     // Purchases (retail) and Cost differences (retail): invoices dated in [from, to) (byReceived: saved then).
     core::Report retailPurchasesReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
     core::Report retailCostDiffsReport(std::int64_t from, std::int64_t to, const core::ReportContext &ctx, bool byReceived = false) const;
@@ -1378,7 +1394,18 @@ public:
     core::Report transferSlip(const core::xfer::Transfer &t) const;
     // A retail item's on hand (none: not kept for it, no transfer or count yet).
     std::optional<double> retailOnHand(const std::string &itemId) const;
-    void addRetailStock(const std::string &itemId, double delta);
+    void addRetailStock(const std::string &itemId, double delta);   // the item's own count (a box: sealed)
+    // Boxes / cartons and their singles (pos_retail_stock.cpp; core/retail_stock.hh): one family, sealed + loose.
+    const RetailFamily *retailFamilyOf(const std::string &itemId) const;   // nullptr: not linked
+    core::stock::Counts retailCounts(const RetailFamily &f) const;
+    bool retailTracked(const std::string &itemId) const;                    // an on hand is kept (itself or its family)
+    QString retailOnHandText(const std::string &itemId) const;             // "4 box 27 ea", "12"; "" not kept
+    QString retailUnitOf(const std::string &itemId) const;                 // "ctn", "pk"; "" not in a family
+    void retailTake(const std::string &itemId, double qty);                // sold / sent (< 0: back), by the family's rules
+    bool retailSetCount(const QString &itemId, double sealed, double loose);   // managers; logged
+    bool retailOpenParents(const QString &itemId, int count);             // sealed -> loose (the humidor); logged
+    bool retailStockShow(const QString &itemId);                           // the item card's stock: retailStockCard()
+    QVariantMap retailStockCard() const override;
     QString storeCode() const;                           // this store's short name to the others ("HCA")
     const core::OtherStore *otherStore(const QString &name) const;
     // Retail price changes made here, to the stores ticked "Send price changes" (a change set file each).
@@ -2131,6 +2158,11 @@ private:
     // Mass Updates' screen here (pos_mass_update.cpp).
     struct TransferView;
     struct TransferIndex;
+    struct RetailFamilyIndex;
+    const RetailFamilyIndex &retailFamilyIndex() const;
+    void setRetailCounts(const RetailFamily &f, const core::stock::Counts &c);
+    QString retailFamilyText(const RetailFamily &f, const core::stock::Counts &c) const;
+    QString retailStockItem_, retailStockMessage_;
     mutable std::shared_ptr<TransferView> xfer_;
     TransferView &transferView() const;
     const TransferIndex &transferIndex() const;

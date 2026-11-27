@@ -1098,6 +1098,22 @@ QVariantList PosService::menuItemsAt(const std::vector<std::uint32_t> *places) c
                                            return QString::number(int(rl.quantity > 0 ? rl.quantity : 1));
                                    return QString();
                                }()},
+                               // A single's units for its family's on hand, as set ("" the defaults; pos_retail_stock.cpp).
+                               {u"parentUnit"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId.starts_with("__units__:"))
+                                           return qs(rl.ingredientId.substr(10).substr(0, rl.ingredientId.substr(10).find('/')));
+                                   return QString();
+                               }()},
+                               {u"singleUnit"_s, [&m] {
+                                   for (const RecipeLine &rl : m.recipe)
+                                       if (rl.ingredientId.starts_with("__units__:")) {
+                                           const std::string u = rl.ingredientId.substr(10);
+                                           const auto slash = u.find('/');
+                                           return slash == std::string::npos ? QString() : qs(u.substr(slash + 1));
+                                       }
+                                   return QString();
+                               }()},
                                // (The old per-item buydown fields are gone: Mass Updates > Buydowns / Promotions.)
                                {u"altupc"_s, [&m] { QStringList b; for (std::size_t i = 1; i < m.barcodes.size(); ++i) b << qs(m.barcodes[i]); return b.join(u", "_s); }()},
                                {u"buttonColor"_s, qs(m.buttonColor)},

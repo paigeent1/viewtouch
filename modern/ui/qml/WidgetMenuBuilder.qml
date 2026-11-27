@@ -351,7 +351,7 @@ Item {
         return i ? { id: i.id, name: i.name, price: i.priceValue.toFixed(2), family: i.family, image: i.image,
                      groups: i.groups.slice(), onIt: i.onIt.join(", "), available: i.availableSet,
                      kioskHide: i.kioskHide, description: i.description, favorite: i.favorite, noDiscount: i.noDiscount === true,
-                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", basePriceText: i.basePriceText ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", isRetail: i.isRetail ?? w.retailMode, isEvent: i.isEvent ?? w.eventMode,
+                     allergens: (i.allergens ?? []).slice(), kitchenName: i.kitchenName, number: i.number, barcodes: i.barcodes ?? "", upc: i.upc ?? ((i.barcodes ?? "").split(",")[0] ?? "").trim(), altupc: i.altupc ?? (i.barcodes ?? "").split(",").slice(1).join(", ").trim(), cost: i.cost ?? "", basePriceText: i.basePriceText ?? "", parentUpc: i.parentUpc ?? "", packSize: i.packSize ?? "", parentUnit: i.parentUnit ?? "", singleUnit: i.singleUnit ?? "", isRetail: i.isRetail ?? w.retailMode, isEvent: i.isEvent ?? w.eventMode,
                      length: i.length ?? "", ringGauge: i.ringGauge ?? "", ringGauge2: i.ringGauge2 ?? "",
                      abv: i.abv ?? "", pourOz: i.pourOz ?? "",
                      scanMaker: i.scanMaker ?? "", scanCategory: i.scanCategory ?? "", scanUom: i.scanUom ?? "", scanUnits: i.scanUnits ?? "",
@@ -362,7 +362,7 @@ Item {
                  : { id: "", name: "", price: "", family: categoryId, image: "", groups: [], onIt: "",
                      available: true, kioskHide: false, description: "", favorite: false, allergens: [],
                      noDiscount: category ? category.noDiscount === true : false,
-                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", isRetail: w.retailMode, isEvent: w.eventMode,
+                     kitchenName: "", number: "", barcodes: "", upc: "", altupc: "", cost: "", parentUpc: "", packSize: "", parentUnit: "", singleUnit: "", isRetail: w.retailMode, isEvent: w.eventMode,
                      length: "", ringGauge: "", ringGauge2: "", abv: "", pourOz: "", buttonColor: "", prepMinutes: "", takeoutPrice: "", periodPrices: {},
                      scanMaker: "", scanCategory: "", scanUom: "", scanUnits: "",
                      section: "", breakBefore: "",
@@ -581,6 +581,12 @@ Item {
         }
     }
     // The box this single comes in (by Parent Master UPC), when it's an item here.
+    // The on hand's units when none are typed: a box of cigars (box / ea), else a carton (ctn / pk).
+    readonly property var unitDefaults: {
+        const words = (String(parentItem ? parentItem.name : "") + " " + String(category ? category.name : "")).toLowerCase()
+        if (words.indexOf("carton") >= 0 || words.indexOf("ctn") >= 0 || words.indexOf("cigarette") >= 0) return ["ctn", "pk"]
+        return words.indexOf("box") >= 0 || words.indexOf("cigar") >= 0 ? ["box", "ea"] : ["ctn", "pk"]
+    }
     readonly property var parentItem: editingItem && String(draft.parentUpc ?? "").trim() !== ""
                                       ? findExistingItemByBarcode(draft.parentUpc) : null
     onParentItemChanged: childCost()
@@ -2012,13 +2018,26 @@ Item {
                                                 onTextEdited: w.set("parentUpc", text)
                                             }
 
-                                            Label { text: qsTr("Parent Unit:") }
+                                            // The units the on hand is shown in ("4 box 27 ea"); empty: box / ea for
+                                            // cigars, ctn / pk for the rest (pos_retail_stock.cpp).
+                                            Label { text: qsTr("Units:") }
                                             TextField {
-                                                Layout.preferredWidth: 60
-                                                readOnly: true
-                                                text: "1"
+                                                objectName: "builderParentUnit"
+                                                Layout.preferredWidth: 70
+                                                text: w.draft.parentUnit ?? ""
+                                                placeholderText: w.unitDefaults[0]
+                                                maximumLength: 8
                                                 horizontalAlignment: Text.AlignHCenter
-                                                palette.base: "#181d24"
+                                                onTextEdited: w.set("parentUnit", text)
+                                            }
+                                            TextField {
+                                                objectName: "builderSingleUnit"
+                                                Layout.preferredWidth: 70
+                                                text: w.draft.singleUnit ?? ""
+                                                placeholderText: w.unitDefaults[1]
+                                                maximumLength: 8
+                                                horizontalAlignment: Text.AlignHCenter
+                                                onTextEdited: w.set("singleUnit", text)
                                             }
 
                                             Label { text: qsTr("Subunit Count in Parent:") }
@@ -2079,6 +2098,9 @@ Item {
                                         }
                                     }
                                 }
+                                // The retail on hand: a box / carton and its single as sealed + loose; count, Open boxes.
+                                Label { text: qsTr("On hand"); font.bold: true; visible: w.draft.isRetail === true && (w.draft.id ?? "") !== ""; Layout.alignment: Qt.AlignTop }
+                                MenuBuilderStock { menu: w; visible: w.draft.isRetail === true && (w.draft.id ?? "") !== "" }
                                 // A cigar's size: length and ring gauge (a second gauge for a diadema, 52/60).
                                 Label { text: qsTr("Cigar size"); visible: w.draft.isRetail === true }
                                 RowLayout {

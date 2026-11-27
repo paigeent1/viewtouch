@@ -21,6 +21,7 @@ if(TARGET vtm_layout)
     test_mass_updates.cpp   # Menu Builder > Mass Updates: paging, previews, Apply/Undo, change sets by UPC, price book
     test_transfers.cpp   # Manager > Inventory > Transfers: out, receive, differences, void, offline outbox, price flow
     test_retail_receiving.cpp   # Manager > Inventory > Receive retail: scan in, store use, tie-out, invoice files, history only, reports
+    test_carton_stock.cpp   # retail on hand: a box / carton and its single as sealed + loose, breaks, Open boxes, settling once
     test_customer_sync.cpp   # TEMPORARY customers shared store to store: sent, merged by phone, to check, no loops
     test_buydowns.cpp   # Mass Updates > Buydowns / Promotions: the setup, the register's line, reports, scan data, a file for another store
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)

@@ -827,11 +827,24 @@ void PosService::recvKeep(Receipt r)
     if (!r.historyOnly)
         for (const Line &l : r.lines)
             if (l.kind == recv::kStock && !l.itemId.empty() && !l.leftOut)
-                addRetailStock(l.itemId, l.units());
+                recvStock(l);
     recvLearn(r);
     s_->retailReceipts.push_back(r);
     if (s_->sink)
         s_->sink->saveRetailReceipt(r);
+}
+
+// A stock line on hand: a box / carton and its single (pos_retail_stock.cpp) by what came, cartons sealed (a
+// carton's UPC, or a vendor's unit of whole cartons: a case of 6 cartons) and packs loose; else the item's count.
+void PosService::recvStock(const Line &l)
+{
+    const RetailFamily *f = retailFamilyOf(l.itemId);
+    if (f && l.itemId == f->singleId && f->packSize > 1 && l.perUom >= f->packSize
+        && std::abs(std::fmod(l.perUom, double(f->packSize))) < 1e-9) {
+        addRetailStock(f->parentId, l.units() / f->packSize);
+        return;
+    }
+    addRetailStock(l.itemId, l.units());
 }
 
 bool PosService::recvSave()
@@ -1231,9 +1244,6 @@ QVariantMap PosService::retailReceiving() const
     QVariantList lines;
     for (std::size_t i = 0; i < v.lines.size(); ++i) {
         const Line &l = v.lines[i];
-        std::optional<double> onHand;
-        if (!l.itemId.empty())
-            onHand = retailOnHand(l.itemId);
         QString last;
         if (const VendorItem *vi = vendorItemOf(ss(v.vendorId), l.itemId); vi && !l.itemId.empty() && vi->lastCostCents >= 0)
             last = tr("last %1 per %2 (%3)").arg(money(vi->lastCostCents), vi->uom.empty() ? tr("unit") : qs(vi->uom), qs(vi->lastDate));
@@ -1245,7 +1255,15 @@ QVariantMap PosService::retailReceiving() const
             {u"qty"_s, l.qty}, {u"units"_s, qtyText(l.units())}, {u"cost"_s, amount(l.costCents)},
             {u"otp"_s, l.otpCents ? amount(l.otpCents) : QString()}, {u"prepaid"_s, l.prepaidCents ? amount(l.prepaidCents) : QString()},
             {u"tax"_s, l.taxCents ? amount(l.taxCents) : QString()}, {u"amount"_s, amount(std::llabs(l.amountCents))},
-            {u"extended"_s, money(l.extended())}, {u"onHand"_s, onHand ? qtyText(*onHand) : QString()},
+            {u"extended"_s, money(l.extended())}, {u"onHand"_s, l.itemId.empty() ? QString() : retailOnHandText(l.itemId)},
+            {u"stockAs"_s, [&] {   // what it puts on hand: "5 ctn" (sealed), "3 pk" (loose); "" not in a family
+                const RetailFamily *f = retailFamilyOf(l.itemId);
+                if (!f || l.itemId != f->singleId)
+                    return QString();
+                if (f->packSize > 1 && l.perUom >= f->packSize && std::abs(std::fmod(l.perUom, double(f->packSize))) < 1e-9)
+                    return u"%1 %2"_s.arg(qtyText(l.units() / f->packSize), f->parentUnit);
+                return u"%1 %2"_s.arg(qtyText(l.units()), f->singleUnit);
+            }()},
             {u"systemCost"_s, l.systemCostCents > 0 ? money(l.systemCostCents) : QString()},
             {u"unitCost"_s, unit ? money(std::llround(*unit)) : QString()},
             {u"different"_s, unit && l.systemCostCents > 0 && std::llround(*unit) != l.systemCostCents},

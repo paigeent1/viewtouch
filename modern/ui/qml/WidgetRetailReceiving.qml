@@ -316,7 +316,7 @@ Item {
                                 text: String(modelData.perUom)
                                 onEditingFinished: if (Number(text) !== modelData.perUom) w.pos.recvSetLine(modelData.index, { perUom: text })
                             }
-                            Small { text: qsTr("= %1 units").arg(modelData.units); height: w.touch; verticalAlignment: Text.AlignVCenter }
+                            Small { text: (modelData.stockAs ?? "") !== "" ? qsTr("= %1").arg(modelData.stockAs) : qsTr("= %1 units").arg(modelData.units); height: w.touch; verticalAlignment: Text.AlignVCenter }
                             Field {
                                 objectName: "recvVendorItem-" + modelData.index
                                 implicitWidth: w.unit * 6

@@ -101,16 +101,18 @@ TEST_CASE("Transfers: out from the retail store, received at the bar with a diff
 
     REQUIRE(bh.transferOpen(u"out"_s));
     REQUIRE(bh.transferScan(QString::fromLatin1(kPack)));
-    REQUIRE(bh.transferSetQty(0, 5));
+    REQUIRE(bh.transferSetQty(0, 0, 5));   // the pack and its carton share a line: 0 cartons, 5 loose packs
     REQUIRE(bh.transferScan(QString::fromLatin1(kCarton)));
     REQUIRE(bh.transferScan(QString::fromLatin1(kCarton)));   // again: 2 cartons
     REQUIRE(bh.transferScan(QString::fromLatin1(kCigar)));
     // Hospitality items never go: a seed drink isn't a retail item.
     CHECK_FALSE(bh.transferAddItem(QString::fromStdString(bh.menu().front().id), 1));
     QVariantMap st = bh.transfers();
-    REQUIRE(st[u"lines"_s].toList().size() == 3);
-    CHECK(st[u"lines"_s].toList()[1].toMap()[u"qty"_s].toDouble() == 2);
-    CHECK(st[u"lines"_s].toList()[1].toMap()[u"pack"_s].toString().contains(u"10"_s));
+    REQUIRE(st[u"lines"_s].toList().size() == 2);   // the carton + its packs, the cigar
+    CHECK(st[u"lines"_s].toList()[0].toMap()[u"family"_s].toBool());
+    CHECK(st[u"lines"_s].toList()[0].toMap()[u"qty"_s].toDouble() == 2);
+    CHECK(st[u"lines"_s].toList()[0].toMap()[u"loose"_s].toDouble() == 5);
+    CHECK(st[u"lines"_s].toList()[0].toMap()[u"pack"_s].toString().contains(u"10"_s));
     REQUIRE(bh.transferSetTo(u"HCA"_s));
     REQUIRE(bh.transferSend());
 
@@ -145,14 +147,14 @@ TEST_CASE("Transfers: out from the retail store, received at the bar with a diff
     REQUIRE(hca.transferStartReceive(in.id));
     QVariantList lines = hca.transfers()[u"receiving"_s].toMap()[u"lines"_s].toList();
     REQUIRE(lines.size() == 3);
-    CHECK(lines[0].toMap()[u"found"_s].toBool());
-    CHECK(lines[1].toMap()[u"found"_s].toBool());   // the carton, as 10 packs each
-    CHECK(lines[1].toMap()[u"here"_s].toString().contains(u"10"_s));
+    CHECK(lines[0].toMap()[u"found"_s].toBool());   // the carton, as 10 packs each
+    CHECK(lines[0].toMap()[u"here"_s].toString().contains(u"10"_s));
+    CHECK(lines[1].toMap()[u"found"_s].toBool());
     CHECK_FALSE(lines[2].toMap()[u"found"_s].toBool());   // the cigar isn't on file here
     // A count that differs needs why; a UPC not on file needs Add or Leave out.
-    REQUIRE(hca.transferCount(0, 4, QString()));
+    REQUIRE(hca.transferCount(1, 4, QString()));
     CHECK_FALSE(hca.transferReceive());
-    REQUIRE(hca.transferCount(0, 4, u"one crushed"_s));
+    REQUIRE(hca.transferCount(1, 4, u"one crushed"_s));
     CHECK_FALSE(hca.transferReceive());
     REQUIRE(hca.transferAddMissing(2, true));
     REQUIRE(hca.transferReceive());

@@ -214,6 +214,9 @@ class PosSession : public QObject {
     // invoice, date, total, note, lines, totals, tie, ties, last, linking, choices, message, recent, from, until,
     // importFile}. Sent to a tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap retailReceiving READ retailReceiving NOTIFY adminChanged)
+    // Menu Builder's item card: the item's retail on hand (PosService::retailStockShow): {id, kept, family, text,
+    // sealed, loose, parentUnit, singleUnit, packSize, parentName, singleName, value, message}.
+    Q_PROPERTY(QVariantMap retailStockCard READ retailStockCard NOTIFY adminChanged)
     // Find My Printers (Manager -> Printers; findPrinters): {busy, done, found: [{host, port, answered,
     // printer, label}]} (printer: the name of the store's printer at that address, if one is; label: it's
     // one of the store's label printers, which is never sent anything), and slots: {receipt, kitchen, bar:
@@ -487,6 +490,7 @@ public:
     virtual QVariantMap buydowns() const = 0;
     virtual QVariantMap transfers() const = 0;
     virtual QVariantMap retailReceiving() const = 0;
+    virtual QVariantMap retailStockCard() const = 0;
     virtual QVariantMap itemSearch() const = 0;
     virtual QVariantMap printerSearch() const = 0;
     virtual QVariantMap networkInfo() const = 0;
@@ -811,7 +815,7 @@ public:
     Q_INVOKABLE void transferScan(const QString &code) { invoke(QStringLiteral("transferScan"), {code}); }
     Q_INVOKABLE void transferFind(const QString &text) { invoke(QStringLiteral("transferFind"), {text}); }
     Q_INVOKABLE void transferAddItem(const QString &itemId, double qty) { invoke(QStringLiteral("transferAddItem"), {itemId, qty}); }
-    Q_INVOKABLE void transferSetQty(int index, double qty) { invoke(QStringLiteral("transferSetQty"), {index, qty}); }
+    Q_INVOKABLE void transferSetQty(int index, double qty, double loose = -1) { invoke(QStringLiteral("transferSetQty"), {index, qty, loose}); }
     Q_INVOKABLE void transferSetTo(const QString &store) { invoke(QStringLiteral("transferSetTo"), {store}); }
     Q_INVOKABLE void transferSetNote(const QString &note) { invoke(QStringLiteral("transferSetNote"), {note}); }
     Q_INVOKABLE void transferClear() { invoke(QStringLiteral("transferClear")); }
@@ -825,6 +829,10 @@ public:
     Q_INVOKABLE void transferReceive() { invoke(QStringLiteral("transferReceive")); }
     Q_INVOKABLE void transferCancelReceive() { invoke(QStringLiteral("transferCancelReceive")); }
     Q_INVOKABLE void transferRange(const QString &from, const QString &until) { invoke(QStringLiteral("transferRange"), {from, until}); }
+    // Retail on hand, a box / carton and its single as sealed + loose (answers in retailStockCard).
+    Q_INVOKABLE void retailStockShow(const QString &itemId) { invoke(QStringLiteral("retailStockShow"), {itemId}); }
+    Q_INVOKABLE void retailSetCount(const QString &itemId, double sealed, double loose) { invoke(QStringLiteral("retailSetCount"), {itemId, sealed, loose}); }
+    Q_INVOKABLE void retailOpenParents(const QString &itemId, int count) { invoke(QStringLiteral("retailOpenParents"), {itemId, count}); }
     // Retail receiving (answers in retailReceiving).
     Q_INVOKABLE void recvOpen(const QString &tab) { invoke(QStringLiteral("recvOpen"), {tab}); }
     Q_INVOKABLE void recvClose() { invoke(QStringLiteral("recvClose")); }

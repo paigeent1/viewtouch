@@ -100,6 +100,7 @@ PosShared::PosShared(PosData data, PosSink *sink, QObject *parent)
         startDay();
     }
     migrateBuydownTags();   // the old per-item buydowns, once
+    migrateRetailFamilies();   // a carton's and its packs' counts settled into sealed and loose, once
 }
 
 const Employee *PosShared::employee(const std::string &id) const
