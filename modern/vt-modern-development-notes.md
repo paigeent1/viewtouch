@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-27 09:05 ET — Bob (Claude) — Store Settings rows: columns shrink to fit; ssh address visible
+- **What:** Tablet app: changed. Server: changed. Settings rows editor (FieldEditor.qml): every column fills and shrinks to a 60 px minimum instead of fixed widths pushing the last columns off a narrow screen; Other stores' ssh address column gets 220 px (it was a 0-width fill column squeezed to nothing, its header drawn over Transfers).
+- **Why:** Owner's photo at BHDAN (Nov 27): the ssh address column was invisible and Share customers off-screen, so a store row would be saved without its address.
+- **Files:** (none)
+
 ### 2026-11-26 20:41 ET — Bob (Claude) helper — Customers shared store to store (TEMPORARY, until the corporate customer list)
 - **What:** Tablet app: changed (Manager > Customers gets Send All Customers Now and Check These Customers; new customerSync state). Server: changed. Store Settings > Other stores gets a 5th column, Share customers (Not shared / Shared). A change to a customer's name, phone, email, address, note, <store> price switch or preferential % goes to each sharing store as a viewtouch-customers v1 file through the transfers outbox/inbox (vt-send-transfers unchanged). The receiver merges by phone digits, newest change per field wins, never deletes; same phone with a clearly different name waits for a manager (Merge / Keep Apart). Changes taken from another store are never sent on. House accounts, points, visits, spent, last order stay local; customers without a phone aren't shared. Gift/subscription card links travel when the other store has that card unlinked. State in <data>/transfers/customer-sync.json. New: app/pos_customer_sync.cpp, core/customer_sync.hh, ui/qml/CustomerSyncPanel.qml, tests/test_customer_sync.cpp; small marked hooks elsewhere. Docs: MASS_UPDATES_STORES.md, manual ch. 34, notes design section; es/fr/pt/zh translations.
 - **Why:** Owner wants one customer at both stores now; the corporate Pi customer list comes later. Kept isolated so it can be removed in one go.

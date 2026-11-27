@@ -689,8 +689,12 @@ ColumnLayout {
                         text: modelData.label ?? ""
                         color: EditorStyle.muted
                         font.pixelSize: 11
-                        Layout.fillWidth: !modelData.width
-                        Layout.preferredWidth: modelData.width ?? -1
+                        // Every column shares the row: its width is what it gets when there's room, and it
+                        // shrinks (to 60) on a narrow screen instead of pushing the last columns out of view.
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: modelData.width || 160
+                        Layout.minimumWidth: 60
+                        elide: Text.ElideRight
                     }
                 }
                 Item { implicitWidth: 44 }
@@ -714,8 +718,9 @@ ColumnLayout {
                                 rowsBox.rows[row][index] = String(v)
                                 rowsBox.save()
                             }
-                            Layout.fillWidth: !modelData.width
-                            Layout.preferredWidth: modelData.width ?? -1
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: modelData.width || 160
+                            Layout.minimumWidth: 60
                             sourceComponent: modelData.type === "enum" ? cellCombo
                                            : fe.field.addPicture && cell.cellValue.startsWith("image:") ? cellPicture
                                            : fe.field.addPicture && cell.cellValue.startsWith("video:") ? cellVideo : cellText

@@ -437,7 +437,7 @@ QVariantList PosService::adminFields(const QString &panel)
                             "store's retail price changes are sent there (the retail store to the bar; never the other way), "
                             "and whether customers are shared with it (for now, until the corporate customer list).")),
                    tr("+ Add a store"),
-                   {column(tr("Short name"), "string", 120, {}, u"HCA"_s), column(tr("ssh address"), "string", 0, {}, u"pi@192.168.6.81"_s),
+                   {column(tr("Short name"), "string", 120, {}, u"HCA"_s), column(tr("ssh address"), "string", 220, {}, u"pi@192.168.6.81"_s),
                     column(tr("Transfers"), "enum", 130, options({{"on", "On"}, {"off", "Off"}})),
                     column(tr("Price changes"), "enum", 190, options({{"no-prices", "Not sent"}, {"prices", "Sent there"}})),
                     // TEMPORARY, remove when the corporate customer list exists (pos_customer_sync.cpp).
