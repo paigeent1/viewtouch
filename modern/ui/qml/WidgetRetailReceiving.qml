@@ -263,9 +263,24 @@ Item {
                 clip: true
                 spacing: 4
                 model: w.info.lines ?? []
-                ScrollBar.vertical: TouchScrollBar { needed: lineList.contentHeight > lineList.height + 1 }
+                ScrollBar.vertical: TouchScrollBar { id: lineBar; needed: lineList.contentHeight > lineList.height + 1 }
                 readonly property int last: w.info.last ?? -1
-                onLastChanged: if (last >= 0) Qt.callLater(() => lineList.positionViewAtIndex(last, ListView.Contain))
+                // Every change (a − / + touch, a price typed) sends the whole list again, and a new list
+                // puts a ListView back at its top: keep the place the person scrolled to, and only bring a
+                // line into view when one was added (a scan or a pick), so the list holds still under a finger.
+                property real keptY: 0
+                property int keptCount: 0
+                onContentYChanged: if (moving || lineBar.pressed) keptY = contentY
+                onModelChanged: Qt.callLater(() => {
+                    const grew = count > keptCount
+                    keptCount = count
+                    if (grew && last >= 0) {
+                        positionViewAtIndex(last, ListView.Contain)
+                        keptY = contentY
+                    } else {
+                        contentY = Math.max(originY, Math.min(keptY, originY + contentHeight - height))
+                    }
+                })
                 delegate: Rectangle {
                     id: row
                     required property var modelData

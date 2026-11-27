@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-27 17:46 ET — Bob (Claude) — Receive retail: the invoice's lines hold still when − / + is touched
+- **What:** Tablet app: changed. Server: no change. WidgetRetailReceiving.qml lineList: every change re-sent the whole list, which put the ListView back at its top, and 'last' scrolled to the changed line; now the scrolled place is kept (from finger or scroll bar) and a line is brought into view only when one was added.
+- **Why:** Owner's video (Nov 27, invoice 604700): the list jumped around each time a − / + button was touched.
+- **Files:** (none)
+
 ### 2026-11-27 17:11 ET — Bob (Claude) — Receive retail: Find's matches scroll in a short box
 - **What:** Tablet app: changed. Server: no change. WidgetRetailReceiving.qml: Find's matches (up to 30) sit in a box about three rows tall with a scroll bar, instead of a Flow that grew down the screen and pushed the invoice's lines out of view. (Also: the 2f3cf52b entry's 'Tablet app: no change' was wrong; it changed translations, which the tablet bundles.)
 - **Why:** Owner's photo (Nov 27, invoice 604700): typing MARLBORO filled the screen with matches and no scroll bar.
