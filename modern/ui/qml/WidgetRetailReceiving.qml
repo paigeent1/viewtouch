@@ -20,8 +20,9 @@ Item {
     readonly property var info: pos ? pos.retailReceiving : ({})
     readonly property string tab: info.tab ?? "receive"
     readonly property var imp: info.importFile ?? ({})
-    readonly property real unit: Math.max(13, Math.min(width / 80, height / 36))
-    readonly property real touch: Math.max(44, unit * 2.5)
+    readonly property real unit: Math.max(14, Math.min(width / 76, height / 34))
+    // A finger's size on this screen (ZoneItem.touch: the zone's scale taken out), at the least.
+    readonly property real touch: Math.max(zone ? zone.touch(48) : 48, unit * 2.6)
     property string fileError: ""
     // The quick-add card: {index} (a line) or {code} (an import's code), with what's known.
     property var adding: null
@@ -57,7 +58,7 @@ Item {
         font.pixelSize: w.unit
         selectByMouse: true
     }
-    component Money: TextField {
+    component Amount: TextField {
         implicitHeight: w.touch
         implicitWidth: w.unit * 5.5
         font.pixelSize: w.unit
@@ -145,7 +146,7 @@ Item {
                     text: w.info.date ?? ""
                     onEditingFinished: if (text !== (w.info.date ?? "")) w.pos.recvSetHeader({ date: text })
                 }
-                Money {
+                Amount {
                     objectName: "recvTotal"
                     implicitWidth: w.unit * 8
                     placeholderText: qsTr("Invoice total")
@@ -292,7 +293,7 @@ Item {
                                 onEditingFinished: if (text !== modelData.name) w.pos.recvSetLine(modelData.index, { name: text })
                             }
                             Big { text: "−"; implicitWidth: w.touch; onClicked: w.pos.recvSetLine(modelData.index, { qty: String(Math.max(0, modelData.qty - 1)) }) }
-                            Money {
+                            Amount {
                                 objectName: "recvQty-" + modelData.index
                                 implicitWidth: w.unit * 4
                                 horizontalAlignment: Text.AlignHCenter
@@ -308,7 +309,7 @@ Item {
                                 onEditingFinished: if (text !== modelData.uom) w.pos.recvSetLine(modelData.index, { uom: text })
                             }
                             Label { text: "×"; height: w.touch; verticalAlignment: Text.AlignVCenter; font.pixelSize: w.unit }
-                            Money {
+                            Amount {
                                 objectName: "recvPer-" + modelData.index
                                 implicitWidth: w.unit * 3.5
                                 horizontalAlignment: Text.AlignHCenter
@@ -323,25 +324,25 @@ Item {
                                 text: modelData.vendorItem
                                 onEditingFinished: if (text !== modelData.vendorItem) w.pos.recvSetLine(modelData.index, { vendorItem: text })
                             }
-                            Money {
+                            Amount {
                                 objectName: "recvCost-" + modelData.index
                                 placeholderText: qsTr("Price")
                                 text: modelData.cost
                                 onEditingFinished: if (text !== modelData.cost) w.pos.recvSetLine(modelData.index, { cost: text })
                             }
-                            Money {
+                            Amount {
                                 objectName: "recvOtp-" + modelData.index
                                 placeholderText: qsTr("OTP")
                                 text: modelData.otp
                                 onEditingFinished: if (text !== modelData.otp) w.pos.recvSetLine(modelData.index, { otp: text })
                             }
-                            Money {
+                            Amount {
                                 objectName: "recvPrepaid-" + modelData.index
                                 placeholderText: qsTr("Prepaid tax")
                                 text: modelData.prepaid
                                 onEditingFinished: if (text !== modelData.prepaid) w.pos.recvSetLine(modelData.index, { prepaid: text })
                             }
-                            Money {
+                            Amount {
                                 visible: modelData.kind === "storeuse"
                                 objectName: "recvTax-" + modelData.index
                                 placeholderText: qsTr("Use tax")
@@ -359,7 +360,7 @@ Item {
                                 text: modelData.name
                                 onEditingFinished: if (text !== modelData.name) w.pos.recvSetLine(modelData.index, { name: text })
                             }
-                            Money {
+                            Amount {
                                 objectName: "recvAmount-" + modelData.index
                                 placeholderText: qsTr("Amount")
                                 text: modelData.amount
@@ -478,7 +479,7 @@ Item {
                         Small { text: modelData.label }
                         ComboBox {
                             objectName: "recvMap-" + modelData.field
-                            implicitHeight: w.touch * 0.85
+                            implicitHeight: w.touch
                             implicitWidth: w.unit * 10
                             font.pixelSize: w.unit * 0.85
                             model: [qsTr("(none)")].concat(w.imp.headers ?? [])
@@ -528,7 +529,7 @@ Item {
                             font.bold: true
                             color: modelData.ready ? "#1f8a4c" : "#b35c00"
                         }
-                        Big { text: qsTr("Lines"); implicitHeight: w.touch * 0.8; onClicked: w.pos.recvImportShow(modelData.index) }
+                        Big { text: qsTr("Lines"); implicitHeight: w.touch; onClicked: w.pos.recvImportShow(modelData.index) }
                     }
                 }
                 ListView {
@@ -561,15 +562,15 @@ Item {
                         Flow {
                             Layout.fillWidth: true
                             spacing: 4
-                            Big { objectName: "recvCodeLink-" + modelData.code; implicitHeight: w.touch * 0.8; text: qsTr("Link…"); onClicked: { w.linkCode = modelData.code; w.pos.recvSearch("") } }
+                            Big { objectName: "recvCodeLink-" + modelData.code; implicitHeight: w.touch; text: qsTr("Link…"); onClicked: { w.linkCode = modelData.code; w.pos.recvSearch("") } }
                             Big {
                                 objectName: "recvCodeAdd-" + modelData.code
-                                implicitHeight: w.touch * 0.8
+                                implicitHeight: w.touch
                                 text: qsTr("Add…")
                                 onClicked: w.adding = { code: modelData.code, upc: modelData.upc, name: modelData.description, cost: modelData.cost.replace(/[^0-9.]/g, ""), packSize: "" }
                             }
-                            Big { objectName: "recvCodeStoreUse-" + modelData.code; implicitHeight: w.touch * 0.8; text: qsTr("Store use"); onClicked: w.pos.recvImportDecide(modelData.code, "storeuse", "") }
-                            Big { objectName: "recvCodeSkip-" + modelData.code; implicitHeight: w.touch * 0.8; text: qsTr("Skip"); onClicked: w.pos.recvImportDecide(modelData.code, "skip", "") }
+                            Big { objectName: "recvCodeStoreUse-" + modelData.code; implicitHeight: w.touch; text: qsTr("Store use"); onClicked: w.pos.recvImportDecide(modelData.code, "storeuse", "") }
+                            Big { objectName: "recvCodeSkip-" + modelData.code; implicitHeight: w.touch; text: qsTr("Skip"); onClicked: w.pos.recvImportDecide(modelData.code, "skip", "") }
                         }
                     }
                     footer: ColumnLayout {
@@ -587,7 +588,7 @@ Item {
                                     text: modelData.code + ": " + (modelData.action === "link" ? qsTr("is %1").arg(modelData.item)
                                                                    : modelData.action === "storeuse" ? qsTr("store use") : qsTr("skipped"))
                                 }
-                                Big { implicitHeight: w.touch * 0.7; text: qsTr("Undo"); onClicked: w.pos.recvImportDecide(modelData.code, "", "") }
+                                Big { implicitHeight: w.touch; text: qsTr("Undo"); onClicked: w.pos.recvImportDecide(modelData.code, "", "") }
                             }
                         }
                     }
@@ -783,9 +784,9 @@ Item {
             }
             RowLayout {
                 spacing: 8
-                Money { id: addCost; objectName: "recvNewCost"; placeholderText: qsTr("Cost"); text: w.adding ? (w.adding.cost ?? "") : "" }
-                Money { id: addPrice; objectName: "recvNewPrice"; placeholderText: qsTr("Price") }
-                Money { id: addPack; objectName: "recvNewPack"; placeholderText: qsTr("Pack size"); text: w.adding ? (w.adding.packSize ?? "") : "" }
+                Amount { id: addCost; objectName: "recvNewCost"; placeholderText: qsTr("Cost"); text: w.adding ? (w.adding.cost ?? "") : "" }
+                Amount { id: addPrice; objectName: "recvNewPrice"; placeholderText: qsTr("Price") }
+                Amount { id: addPack; objectName: "recvNewPack"; placeholderText: qsTr("Pack size"); text: w.adding ? (w.adding.packSize ?? "") : "" }
             }
             Words { color: "white"; Layout.fillWidth: true; text: qsTr("Pack size: how many of the item one unit on the invoice is (a box of 20: 20). Empty: 1.") }
             RowLayout {

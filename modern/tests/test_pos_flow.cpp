@@ -1783,6 +1783,50 @@ TEST_CASE("UI: Transfers: scan a retail item, choose the store, Send", "[flow][u
     CHECK(s.pos.transfers()[u"lines"_s].toList().isEmpty());
 }
 
+TEST_CASE("UI: Receive retail: a carton's UPC typed brings its packs, the invoice total ties out, Save", "[flow][ui][receiving]")
+{
+    Screen s(false, 1600, 900);
+    core::MenuItem pack;
+    pack.id = "recv-pack";
+    pack.name = "RECV TEST PACK";
+    pack.family = "drinks";
+    pack.taxClass = core::TaxClass::Merchandise;
+    pack.barcodes = {"012345678905"};
+    pack.price = Money::fromCents(1000);
+    pack.recipe = {{"__retail__", 1.0}, {"__cost__", 7.5}, {"__parent__:012345000023", 10}};
+    s.pos.shared()->menu.push_back(pack);
+    s.pos.shared()->settings.vendors.push_back({"acme", "Acme Distributing", "", "1001", "", "", ""});
+    REQUIRE(s.pos.loginWithPin(u"1234"_s));
+    REQUIRE(s.c.jumpTo(u"retail-receiving"_s));
+    QTest::qWait(150);
+    QQuickItem *root = s.window->contentItem();
+    const auto by = [&](const QString &name) { return Screen::findBy(root, "objectName", name); };
+    const auto tap = [&](const QString &name) {
+        QQuickItem *it = by(name);
+        REQUIRE(it);
+        s.tapItem(it);
+        QTest::qWait(80);
+    };
+    REQUIRE(by(u"retailReceiving"_s));
+    REQUIRE(s.pos.recvSetHeader({{u"vendor"_s, u"acme"_s}, {u"invoice"_s, u"T-1"_s}, {u"total"_s, u"75.00"_s}}));
+    QQuickItem *find = by(u"recvFind"_s);
+    REQUIRE(find);
+    find->setProperty("text", u"012345000023"_s);
+    QMetaObject::invokeMethod(find, "accepted");
+    QTest::qWait(150);
+    REQUIRE(s.pos.retailReceiving()[u"lines"_s].toList().size() == 1);
+    REQUIRE(by(u"recvLine-0"_s));
+    REQUIRE(s.pos.recvSetLine(0, {{u"cost"_s, u"75.00"_s}}));
+    QTest::qWait(80);
+    CHECK(s.pos.retailReceiving()[u"ties"_s].toBool());
+    s.shot("96-receive-retail");
+    tap(u"recvSave"_s);
+    REQUIRE(s.pos.retailReceipts().size() == 1);
+    CHECK(s.pos.retailOnHand("recv-pack") == 10.0);
+    CHECK(s.pos.findItem(u"recv-pack"_s)->price.cents() == 1000);
+    CHECK(s.pos.retailReceiving()[u"lines"_s].toList().isEmpty());
+}
+
 TEST_CASE("UI: Buydowns: open the setup, Copy to New, change the amount, apply; a scanned pack gets the line",
           "[flow][ui][buydowns]")
 {

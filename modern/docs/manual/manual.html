@@ -69,6 +69,7 @@
 <li>Mass Updates: many items at once</li>
 <li>Buydowns and promotions</li>
 <li>Transfers and prices between stores</li>
+<li>Receiving retail: vendor invoices</li>
 </ol>
 
 <!-- ======================================================================= -->
@@ -3315,6 +3316,75 @@ first; <b>Apply</b>.</li>
 each retail item on the sale gets its own discount line (<i>BH price −$1.00</i>), on the receipt and the discount
 reports. It needs the discount permission.</li>
 </ul>
+
+<!-- ======================================================================= -->
+<h1>35. Receiving retail: vendor invoices</h1>
+<p>What a vendor delivers is counted into the retail items' on hand from the invoice and the box: there are no
+purchase orders, and no manager PIN (whoever is on duty receives; ViewTouch keeps who and when). <b>Receiving never
+changes an item's system cost or its price.</b> The invoice's cost is kept beside the system cost, and as that
+vendor's last cost, for the Cost differences report.</p>
+
+<h2>The vendors</h2>
+<p><b>Manager → Inventory → Vendors…</b>: each vendor's name, phone, <b>Our account number</b> and, if you like, a
+<b>Vendor group</b>. A distributor with two accounts or locations is two vendors, each with its own account number,
+in one vendor group (the same name on both): the reports then show each one and both together.</p>
+
+<h2>Receiving an invoice</h2>
+<p><b>Manager → Inventory → Receive retail…</b> (top right) <b>→ Receive invoice</b>:</p>
+<ol>
+<li>Choose the <b>vendor</b>; type the <b>invoice #</b>, its <b>date</b> (2026-11-27 or 11/27/2026) and its
+<b>total</b> from the paper. Beside it: <i>Ties out</i>, or <i>Off by $x</i> while the lines and the total differ.</li>
+<li>Scan each item with the counter scanner. Scanning it again is one more. A carton's or box's UPC brings the
+pack or single it holds, times its pack size (from the single's Parent UPC on its Menu Builder card): one carton
+line, 10 packs to stock. You can also type a UPC, the vendor's item number, or part of a name and <b>Find</b>.</li>
+<li>On each line: the quantity in the vendor's unit, the unit's name (CTN, BOX), how many of the item one unit
+is, the vendor's item #, the invoice's <b>price</b> per unit (optional), <b>OTP</b> / excise per unit (part of the
+item's cost) and <b>prepaid tax</b> per unit (cigarettes' prepaid sales tax: on the invoice so its total ties out,
+reported apart, never part of the cost). Free goods: their quantity with no price.</li>
+<li><b>Stock</b> / <b>Store use</b> on a line: store use is supplies the store uses itself (bags, cleaning). It
+never goes into on hand; its cost and its <b>use tax</b> are reported as store expenses. <b>+ Store use</b> adds a
+supply line that isn't an item (type what it is).</li>
+<li><b>+ Delivery</b>, <b>+ Credit / return</b> and <b>+ Other</b> add the invoice's own amounts. Delivery is not
+spread into the items' costs.</li>
+<li>A code that isn't on file is set aside on its own line: <b>Link to an item…</b> (find it; the code becomes
+its alt UPC, so the next scan finds it), <b>Add it…</b> (a new retail item: UPC, name, category, cost, price and
+pack size), or <b>Leave it out</b> (not counted in; its amount still counts toward the invoice).</li>
+<li><b>Save</b>. The stock lines go into on hand, each vendor's item number, unit and last cost are kept, and the
+invoice is on the Changes report. The same vendor's invoice number can't be received twice.</li>
+</ol>
+
+<h2>Importing an invoice file</h2>
+<p>Ask the vendor for a file of the invoices (for example the last 12 months). <b>Receive retail… → Import invoice
+file…</b>, choose the vendor, then <b>Choose invoice file…</b>. It must be a CSV file (an Excel file: open it and
+save it as CSV first). One file can hold many invoices and both accounts of a distributor.</p>
+<ul>
+<li>The header row is found by itself (a title above it is passed over), and each column is guessed from its
+name: invoice #, invoice date, account or ship-to, vendor item #, UPC, description, unit (UOM), units per UOM,
+quantity (shipped), unit price, OTP / excise, prepaid tax, extended (the line's total), line type (store use,
+credit, delivery), delivery / freight, use tax, invoice total. Change any of them with its list; the columns are
+kept for that vendor's next file.</li>
+<li>Rows are put together into invoices by account and invoice number. Each invoice goes to the vendor whose
+<b>account number</b> is in its account / ship-to column (leading zeros don't matter); without that column, to the
+vendor chosen.</li>
+<li>Each invoice shows its lines (<b>Lines</b>), whether it ties out (with the file's invoice total, or else its
+lines' extended amounts and delivery) and where it is: <i>ready</i>, <i>items not on file</i>, <i>already received</i>
+(refused) or a problem (an account no vendor has, no invoice number, no date).</li>
+<li>Items are found by the vendor's item number (once learned), by UPC, or by a carton's UPC. Each code not on
+file: <b>Link…</b>, <b>Add…</b>, <b>Store use</b> (that vendor item is store use from then on) or <b>Skip</b>.</li>
+<li><b>Receive these invoices</b>: the ready ones go into on hand, as if received on the screen. <b>History
+only</b>: past invoices teach ViewTouch the vendor's item numbers and last costs, and on hand doesn't change (use it
+for the months before you started receiving here). An older invoice never replaces a newer last cost.</li>
+</ul>
+
+<h2>The list and the reports</h2>
+<p><b>Invoices received</b>: by invoice date (the last 60 days, or From / to). <b>Reports → Retail Purchases</b>
+(today: the invoices received today; or any dates, by invoice date): by vendor group, by vendor and by invoice,
+the stock's cost (with OTP / excise), prepaid tax, delivery, store use, use tax, credits, other and the invoices'
+totals, and the invoices that don't tie out. <b>Reports → Retail Cost Diffs</b>: each line whose invoice cost per
+unit (with OTP) isn't the item's system cost, and the difference. This is a plain list for now; the full review (by
+brand, ticked Reviewed, and adjusting prices) comes later.</p>
+<div class="tip">Retail on hand is the same number Transfers keeps. Items get one from their first invoice or
+transfer; a stock count comes later.</div>
 
 </body>
 </html>
