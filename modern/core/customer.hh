@@ -50,6 +50,13 @@ struct CustomerRecord {
     int points = 0;            // loyalty points to spend
     int lifetimePoints = 0;
 
+    // Prices for this customer at this store (owner 2026-11-26; kept as plain fields a corporate customer list
+    // could sync): "<source> price" (the retail lines at the price source's base price, no zone markup), and a
+    // preferential percent off items in categories marked Preferential pricing (never No discounts items).
+    // Applied by themselves while the customer is on the check (PosService::applyCustomerPricing).
+    bool sourcePrice = false;
+    double preferentialPercent = 0;
+
     bool houseAccount = false;
     Money accountLimit;        // 0 = no limit
     Money accountBalance;      // what they owe

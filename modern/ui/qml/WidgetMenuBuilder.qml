@@ -374,11 +374,12 @@ Item {
         return c ? { id: c.id, name: c.name, color: c.color, periods: c.periods.slice(), printer: c.printer,
                      station: c.station, taxClass: c.taxClass, buttonSize: c.buttonSize ?? "", photos: c.photos === true,
                      hidePrice: c.hidePrice === true, shades: c.shades === true, noDiscount: c.noDiscount === true,
+                     preferential: c.preferential === true,
                      retailOnly: c.retailOnly === true, scope: c.scope || "hospitality" }
                  : { id: "", name: "", color: StoreColors.starters[categories.length % StoreColors.starters.length], periods: [],
                      printer: w.retailMode ? "" : "kitchen", station: "", taxClass: w.retailMode ? "merchandise" : "food",
                      buttonSize: "", photos: false, hidePrice: false, shades: false,
-                     noDiscount: false, retailOnly: w.retailMode, scope: w.builderScope }
+                     noDiscount: false, preferential: false, retailOnly: w.retailMode, scope: w.builderScope }
     }
     function groupDraft(g) {
         const kind = !g ? "one" : g.max === 1 ? "one" : g.max === 0 ? "any" : "upTo"
@@ -2996,6 +2997,14 @@ Item {
                                     onToggled: w.set("noDiscount", checked)
                                     ToolTip.visible: hovered
                                     ToolTip.text: qsTr("None of its items can be discounted or comped (cigarettes): set on all of them when saved.")
+                                }
+                                Label { text: qsTr("Preferential pricing applies") }
+                                Switch {
+                                    objectName: "builderCategoryPreferential"
+                                    checked: w.draft.preferential === true
+                                    onToggled: w.set("preferential", checked)
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Customers with a preferential discount get it on this category's items by themselves (never on No discounts items).")
                                 }
                                 // (Retail categories always are, hospitality ones never: an event's either.)
                                 Label { text: qsTr("🏷 Retail screen only"); visible: w.draft.scope === "event" }

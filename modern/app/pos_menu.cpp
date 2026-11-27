@@ -726,7 +726,7 @@ QVariantList PosService::menuCategoriesNow() const
                                {u"printer"_s, qs(c.printer)}, {u"station"_s, qs(c.station)},
                                {u"taxClass"_s, qs(c.taxClass)}, {u"buttonSize"_s, qs(c.buttonSize)},
                                {u"photos"_s, c.photos}, {u"hidePrice"_s, c.hidePrice}, {u"shades"_s, c.shades},
-                               {u"noDiscount"_s, c.noDiscount}, {u"retailOnly"_s, c.retailOnly},
+                               {u"noDiscount"_s, c.noDiscount}, {u"preferential"_s, c.preferential}, {u"retailOnly"_s, c.retailOnly},
                                {u"scope"_s, qs(scopes.at(c.id))}, {u"scopeChosen"_s, validScope(c.scope)},
                                {u"bar"_s, isBar}, {u"barGroups"_s, barGroups}});
     }

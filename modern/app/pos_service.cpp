@@ -846,6 +846,7 @@ void PosService::changed(Check &check)
 {
     applyDeliveryFee(check);
     applyPromotions(check);
+    applyCustomerPricing(check);   // a customer's own prices (pos_customer_price.cpp)
     if (s_->sink)
         s_->sink->saveCheck(check);
     emit checkChanged();

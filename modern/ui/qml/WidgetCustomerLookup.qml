@@ -25,7 +25,8 @@ Item {
         draft = {
             id: chosen.id ?? "", firstName: fn, lastName: ln, name: full, phone: chosen.phone ?? "", email: chosen.email ?? "",
             address: chosen.address ?? "", note: chosen.note ?? "", houseAccount: chosen.houseAccount ?? false,
-            limit: chosen.accountLimitCents ? (chosen.accountLimitCents / 100).toFixed(2) : ""
+            limit: chosen.accountLimitCents ? (chosen.accountLimitCents / 100).toFixed(2) : "",
+            sourcePrice: chosen.sourcePrice ?? false, preferentialPercent: chosen.preferentialPercent ? String(chosen.preferentialPercent) : ""
         }
     }
     onChosenChanged: if (!creating || chosen.id) { creating = false; reload() }
@@ -54,6 +55,8 @@ Item {
         if (manager) {
             r.houseAccount = draft.houseAccount
             r.accountLimit = cents(draft.limit)
+            r.sourcePrice = draft.sourcePrice ?? false
+            r.preferentialPercent = Number(draft.preferentialPercent || 0)
         }
         pos.saveCustomer(r)     // the form closes once it's saved (chosen changes)
     }
@@ -249,6 +252,35 @@ Item {
                     Entry { label: qsTr("Note (allergies, gate code…)"); key: "note" }
                     Entry { label: qsTr("Address (delivery)"); key: "address" }
 
+                    // Their prices (managers): the price source's price on retail items, a preferential percent.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: !w.creating || w.manager
+                        CheckBox {
+                            objectName: "customerSourcePrice"
+                            visible: (w.chosen.sourcePriceLabel ?? "") !== ""
+                            text: w.chosen.sourcePriceLabel ?? ""
+                            checked: w.draft.sourcePrice ?? false
+                            enabled: w.manager
+                            onToggled: w.setField("sourcePrice", checked)
+                        }
+                        Label { text: qsTr("Preferential discount %") }
+                        TextField {
+                            objectName: "customerPreferential"
+                            enabled: w.manager
+                            implicitWidth: 90
+                            placeholderText: "0"
+                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                            text: w.draft.preferentialPercent ?? ""
+                            onTextEdited: w.setField("preferentialPercent", text)
+                        }
+                        Label {
+                            text: qsTr("(categories marked Preferential pricing; never No discounts items)")
+                            opacity: 0.7
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                        }
+                    }
                     // House account: managers open it and set the limit.
                     Frame {
                         Layout.fillWidth: true

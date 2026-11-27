@@ -79,6 +79,7 @@ if(Qt6_FOUND)
         app/pos_exceptions.cpp   # Manager > Reports > Exceptions search (from the database)
         app/pos_mass_update.cpp   # Menu Builder > Mass Updates (core/mass_update.hh): grid, previews, change sets
         app/pos_transfers.cpp     # Manager > Inventory > Transfers (core/transfer.hh): between stores, by UPC
+        app/pos_customer_price.cpp   # a customer's own prices: the source store's price, a preferential percent
         app/pos_buydowns.cpp   # Mass Updates > Buydowns / Promotions (core/buydown.hh): definitions, the register's line, reports
         app/pos_tv.cpp   # TV buttons (directv): the main computer runs vt-directv, for any screen
     )

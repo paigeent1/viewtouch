@@ -1309,6 +1309,8 @@ QJsonObject toJson(const PosSettings &s)
                                {u"noDiscount"_s, c.noDiscount}};
                  if (!c.group.empty())
                      x.insert(u"group"_s, qs(c.group));
+                 if (c.preferential)
+                     x.insert(u"preferential"_s, true);
                  if (c.retailOnly)
                      x.insert(u"retailOnly"_s, true);
                  if (!c.scope.empty())
@@ -1971,6 +1973,7 @@ PosSettings settingsFromJson(const QJsonObject &o)
         cat.hidePrice = c.value(u"hidePrice").toBool();
         cat.shades = c.value(u"shades").toBool();
         cat.noDiscount = c.value(u"noDiscount").toBool();
+        cat.preferential = c.value(u"preferential").toBool();
         cat.group = ss(c.value(u"group").toString().trimmed());
         cat.retailOnly = c.value(u"retailOnly").toBool();
         // Its kind (older settings: none, worked out from the rest; see core::categoryScope).
@@ -2049,6 +2052,7 @@ QJsonObject toJson(const CustomerRecord &c)
         {u"address"_s, qs(c.address)}, {u"note"_s, qs(c.note)}, {u"createdAt"_s, qint64(c.createdAt)},
         {u"visits"_s, c.visits}, {u"spent"_s, qint64(c.spent.cents())}, {u"lastVisit"_s, qint64(c.lastVisit)},
         {u"houseAccount"_s, c.houseAccount}, {u"accountLimit"_s, qint64(c.accountLimit.cents())},
+        {u"sourcePrice"_s, c.sourcePrice}, {u"preferentialPercent"_s, c.preferentialPercent},
         {u"accountBalance"_s, qint64(c.accountBalance.cents())}, {u"account"_s, ledgerJson(c.account)},
         {u"points"_s, c.points}, {u"lifetimePoints"_s, c.lifetimePoints},
         {u"lastOrder"_s, [&] {
@@ -2075,6 +2079,8 @@ CustomerRecord customerFromJson(const QJsonObject &o)
     c.spent = money(o.value(u"spent"));
     c.lastVisit = i64(o.value(u"lastVisit"));
     c.houseAccount = o.value(u"houseAccount").toBool();
+    c.sourcePrice = o.value(u"sourcePrice").toBool();
+    c.preferentialPercent = o.value(u"preferentialPercent").toDouble();
     c.accountLimit = money(o.value(u"accountLimit"));
     c.accountBalance = money(o.value(u"accountBalance"));
     c.account = ledgerFromJson(o.value(u"account").toArray());

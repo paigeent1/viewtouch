@@ -221,6 +221,9 @@ struct MenuCategory {
     // Its items can't be discounted or comped (cigarettes at the state minimum):
     // set on all of them when saved, and new items in it start that way.
     bool noDiscount = false;
+    // Customers with a preferential percent (their customer record) get it on this category's items by
+    // themselves (owner 2026-11-26: cigars). Off by default; never on No discounts items.
+    bool preferential = false;
     // Its kind, the Menu Builder mode it's in: "retail" (the price book's departments), "hospitality"
     // (food and drink) or "event" (tickets). Empty: not chosen yet, worked out by categoryScope().
     // Retail is always retailOnly; hospitality never; an event category either (BH sells its tickets

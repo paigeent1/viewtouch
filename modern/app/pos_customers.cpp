@@ -113,6 +113,8 @@ QVariantMap PosService::customerSummary(const CustomerRecord &c) const
         {u"address"_s, qs(c.address)}, {u"note"_s, qs(c.note)}, {u"visits"_s, c.visits},
         {u"spent"_s, format(c.spent)}, {u"lastVisit"_s, whenText(c.lastVisit)},
         {u"houseAccount"_s, c.houseAccount}, {u"accountLimit"_s, format(c.accountLimit)},
+        {u"sourcePrice"_s, c.sourcePrice}, {u"preferentialPercent"_s, c.preferentialPercent},
+        {u"sourcePriceLabel"_s, s_->settings.storePricesFrom.empty() ? QString() : tr("%1 price").arg(qs(s_->settings.storePricesFrom))},
         {u"accountLimitCents"_s, qint64(c.accountLimit.cents())},
         {u"balance"_s, format(c.accountBalance)}, {u"balanceCents"_s, qint64(c.accountBalance.cents())},
         {u"points"_s, c.points}, {u"lifetimePoints"_s, c.lifetimePoints},
@@ -381,6 +383,22 @@ bool PosService::saveCustomer(const QVariantMap &record)
         c->address = text(u"address");
     if (record.contains(u"note"_s))
         c->note = text(u"note");
+    // Their prices are a manager's decision too.
+    if (record.contains(u"sourcePrice"_s) || record.contains(u"preferentialPercent"_s)) {
+        const bool src = record.value(u"sourcePrice"_s, c->sourcePrice).toBool();
+        const double pct = record.value(u"preferentialPercent"_s, c->preferentialPercent).toDouble();
+        if (!(pct >= 0 && pct <= 100))
+            return fail(tr("The preferential discount is a percent, 0 to 100."));
+        if (src != c->sourcePrice || pct != c->preferentialPercent) {
+            if (!require(perm::Manager, tr("Customer prices")))
+                return false;
+            logChange(tr("Customers"), qs(c->name), tr("Prices"),
+                      u"%1 / %2%"_s.arg(c->sourcePrice ? u"source price"_s : u"-"_s).arg(c->preferentialPercent),
+                      u"%1 / %2%"_s.arg(src ? u"source price"_s : u"-"_s).arg(pct));
+            c->sourcePrice = src;
+            c->preferentialPercent = pct;
+        }
+    }
     // House accounts are a manager's decision.
     if (record.contains(u"houseAccount"_s) || record.contains(u"accountLimit"_s)) {
         const bool wants = record.value(u"houseAccount"_s, c->houseAccount).toBool();

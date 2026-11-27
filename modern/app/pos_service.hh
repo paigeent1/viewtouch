@@ -1308,6 +1308,9 @@ public:
     // "<source> price" (the bar): each retail line on the sale back to the price source's price (a discount per
     // line, named "<source> price"; discount permission; allowed on No discounts items).
     bool storePriceDiscount();
+    // A customer on the check with "<source> price" or a preferential percent (their record): their discount
+    // lines, kept right by themselves as the check changes (and gone when the customer is taken off).
+    void applyCustomerPricing(core::Check &c);
     QVariantMap transfers() const override;
     // A file from another store (vt-send-transfers put it in <data>/transfers/inbox): a transfer, its result or
     // void, or a change set. "waiting": kept for a person; `why`: refused.

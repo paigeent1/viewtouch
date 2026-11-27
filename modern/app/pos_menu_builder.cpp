@@ -387,6 +387,8 @@ bool PosService::saveCategory(const QVariantMap &record)
         c.hidePrice = record.value(u"hidePrice"_s).toBool();
     if (record.contains(u"shades"_s))
         c.shades = record.value(u"shades"_s).toBool();
+    if (record.contains(u"preferential"_s))
+        c.preferential = record.value(u"preferential"_s).toBool();
     // No discounts for the whole category: on (or off) for every item in it.
     if (record.contains(u"noDiscount"_s)) {
         const bool was = c.noDiscount;

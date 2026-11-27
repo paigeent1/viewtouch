@@ -347,3 +347,58 @@ TEST_CASE("Transfers: asked, the price changes wait on Mass Updates; the bar's s
     CHECK(c.payments.front().tenderName == "BH price");
     CHECK_FALSE(hca.storePriceDiscount());   // once a line
 }
+
+TEST_CASE("Transfers: a customer's own prices: the source store's price and a preferential percent", "[transfers][prices][customers]")
+{
+    app::PosData d = store("HCA", "BH", false);
+    core::MenuCategory cigars;
+    cigars.id = "cigars";
+    cigars.name = "CIGARS";
+    cigars.scope = "retail";
+    cigars.retailOnly = true;
+    cigars.taxClass = "merchandise";
+    cigars.preferential = true;   // the owner turns it on for cigars
+    d.settings.menuCategories.push_back(cigars);
+    core::MenuItem cigar = retailItem("cigar", "PADRON 2000", kCigar, 1250, 6.25);
+    cigar.family = "cigars";
+    d.menu.push_back(cigar);
+    for (core::MenuItem &m : d.menu)
+        if (m.id == "pack") {
+            m.price = Money::fromCents(1149);
+            m.noDiscount = true;   // cigarettes: never a preferential discount
+        }
+    core::CustomerRecord regular;
+    regular.id = "c-1";
+    regular.name = "Pat Regular";
+    regular.phone = "2035550101";
+    regular.sourcePrice = true;
+    regular.preferentialPercent = 10;
+    d.customers.push_back(regular);
+    PosService hca(std::move(d), nullptr);
+    hca.shared()->basePrices[core::BuilderIndex::codeKey(kPack)] = 1000;   // BH sells the pack at 10.00
+    hca.shared()->basePrices[core::BuilderIndex::codeKey(kCigar)] = 1100;  // and the cigar at 11.00
+    hca.shared()->basePricesLoaded = true;
+    REQUIRE(hca.loginWithPin(u"1234"_s));
+    REQUIRE(hca.startCheck(core::CheckType::Quick));
+    core::Check &c = hca.shared()->open.begin()->second;
+    c.customerId = "c-1";
+    REQUIRE(hca.addItem(u"pack"_s));
+    REQUIRE(hca.addItem(u"cigar"_s));
+    const auto lineNamed = [&](const std::string &prefix) {
+        Money m;
+        for (const core::Payment &p : c.payments)
+            if (p.tenderName.starts_with(prefix))
+                m += c.totals(hca.shared()->settings.tax).discountBy[p.id];
+        return m.cents();
+    };
+    // The pack: back to BH's 10.00 (1.49 off), no percent (No discounts). The cigar: 12.50 -> 11.00 (1.50 off),
+    // then 10% of the 11.00 left (1.10).
+    CHECK(lineNamed("BH price") == 149 + 150);
+    CHECK(lineNamed("Pat Regular's price") == 110);
+    CHECK(c.totals(hca.shared()->settings.tax).discounts.cents() == 149 + 150 + 110);
+    // Off the check: they go.
+    c.customerId.clear();
+    REQUIRE(hca.addItem(u"pack"_s));
+    CHECK(c.totals(hca.shared()->settings.tax).discounts.cents() == 0);
+    CHECK(std::ranges::none_of(c.payments, [](const core::Payment &p) { return p.reference.starts_with("custprice:"); }));
+}
