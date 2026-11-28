@@ -952,6 +952,49 @@ bool PosService::massPreview(const QVariantMap &action)
     return true;
 }
 
+// One item's cost or price typed straight into the grid (owner 2026-11-28: "make the lines cell entries"):
+// saved at once as a Set of that one, the same way as Preview + Apply (the price book's permission, the Changes
+// report, a box's singles following its cost; a price with no rounding).
+bool PosService::massSetCell(const QString &itemId, const QString &field, const QString &value)
+{
+    if (!MassImpl::mayLook(*this))
+        return false;
+    const std::string f = ss(field);
+    if (f != "cost" && f != "price")
+        return fail(tr("Only the cost and the price are changed here."));
+    bool ok = false;
+    const double amount = amountFrom(QVariant(value.trimmed().remove(u'$')), &ok);
+    if (!ok || amount < 0)
+        return fail(tr("Type an amount, like 10 or 1.25."));
+    MassView &v = MassImpl::view(*this);
+    const auto &x = MassImpl::rows(*this, v.scope);
+    const auto at = x.rowOfId.find(ss(itemId));
+    if (at == x.rowOfId.end())
+        return fail(tr("That item is gone."));
+    if (!requirePriceBook([] { return true; }))
+        return false;
+    mass::Action a;
+    a.kind = f;
+    a.how = mass::How::Set;
+    a.amount = amount;
+    a.round = mass::Round::None;
+    mass::Plan plan = mass::plan(x.rows, {at->second}, a);
+    std::vector<mass::Change> changes = std::move(plan.changes);
+    if (f == "cost")
+        MassImpl::addCascades(*this, x, changes);
+    if (changes.empty())
+        return fail(tr("Nothing would change."));
+    const QString label = (f == "cost" ? tr("Cost") : tr("Price")) + u" "_s
+                          + tr("set to %1").arg(currencySymbol() + QString::number(amount, 'f', 2)) + u" "_s + tr("(typed in the grid)");
+    std::vector<mass::Skip> skipped;
+    const std::vector<mass::Change> done = MassImpl::commit(*this, label, {}, {}, changes, {}, skipped);
+    v.message = done.size() > 1 ? tr("%1 saved, and %n of its singles.", "", int(done.size()) - 1).arg(qs(x.rows[at->second].name))
+                                : tr("%1 saved.").arg(qs(x.rows[at->second].name));
+    emit notice(v.message);
+    MassImpl::changed(*this, v);
+    return true;
+}
+
 bool PosService::massPreviewPage(int page)
 {
     MassView &v = MassImpl::view(*this);

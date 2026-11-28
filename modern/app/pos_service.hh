@@ -782,6 +782,8 @@ public:
     // The preview applied as one change set (the price book permission: an admin, or an admin's PIN);
     // massUndo puts the last one back.
     bool massApply();
+    // One item's cost or price typed in the grid: saved at once (as Preview + Apply of that one).
+    bool massSetCell(const QString &itemId, const QString &field, const QString &value);
     bool massUndo();
     // A change set file from another store (or this one): matched by UPC, shown as a preview.
     bool massImport(const QVariantMap &file);

@@ -398,7 +398,13 @@ Item {
                                         elide: Text.ElideRight
                                         horizontalAlignment: key === "cost" || key === "price" || key === "base" || key === "margin" ? Text.AlignRight : Text.AlignLeft
                                         font.pixelSize: w.unit * 0.68
-                                        color: key === "soldOut" ? "#b91c1c" : "#111827"
+                                        color: key === "soldOut" ? "#b91c1c" : (key === "cost" || key === "price") ? "#1d3fb8" : "#111827"
+                                        font.underline: key === "cost" || key === "price"
+                                        // Cost and price: touch to type a new one for this item (owner 2026-11-28).
+                                        TapHandler {
+                                            enabled: parent.key === "cost" || parent.key === "price"
+                                            onTapped: cellPop.edit(row.modelData, parent.key)
+                                        }
                                     }
                                 }
                             }
@@ -847,6 +853,71 @@ Item {
             visible = false
             if (w.pos) { w.pos.kitsOpen(false); if (w.kitsWanted) w.pos.want("kits", false) }
             w.kitsWanted = false
+        }
+    }
+
+    // One cell: this item's cost or price typed here, saved at once (PosService::massSetCell). A box's cost
+    // changes its singles' too, as Cost Updates does.
+    Popup {
+        id: cellPop
+        objectName: "massCellPopup"
+        property string itemId: ""
+        property string field: ""
+        property string name: ""
+        property string was: ""
+        function edit(item, key) {
+            itemId = item.id
+            field = key
+            name = item.name
+            was = item[key] ?? ""
+            cellField.text = was
+            open()
+            cellField.forceActiveFocus()
+            cellField.selectAll()
+        }
+        function save() { if (w.pos) w.pos.massSetCell(itemId, field, cellField.text); close() }
+        anchors.centerIn: parent
+        modal: true
+        padding: w.unit
+        background: Rectangle { color: "white"; radius: 8; border.color: "#94a3b8" }
+        ColumnLayout {
+            spacing: 8
+            Label {
+                text: cellPop.name
+                font.pixelSize: w.unit * 0.9
+                font.bold: true
+                color: "#111827"
+            }
+            RowLayout {
+                spacing: 8
+                Label {
+                    text: (cellPop.field === "cost" ? qsTr("Cost") : qsTr("Price")) + (cellPop.was !== "" ? "  " + qsTr("(now %1)").arg(w.money + cellPop.was) : "")
+                    font.pixelSize: w.unit * 0.8
+                    color: "#111827"
+                }
+                Field {
+                    id: cellField
+                    u: w.unit
+                    objectName: "massCellField"
+                    Layout.preferredWidth: w.unit * 8
+                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                    onAccepted: cellPop.save()
+                }
+                Small { u: w.unit; objectName: "massCellSave"; text: qsTr("Save"); palette.button: "#15803d"; palette.buttonText: "white"; onClicked: cellPop.save() }
+                Small { u: w.unit; text: qsTr("Cancel"); onClicked: cellPop.close() }
+            }
+            Label {
+                visible: cellPop.field === "cost"
+                text: qsTr("A box's singles get their cost from it. The price stays as it is.")
+                font.pixelSize: w.unit * 0.7
+                color: "#4b5563"
+            }
+            Label {
+                visible: !(w.info.canApply ?? true)
+                text: qsTr("An admin's PIN will be asked for.")
+                font.pixelSize: w.unit * 0.7
+                color: "#4b5563"
+            }
         }
     }
 

@@ -811,6 +811,7 @@ public:
     Q_INVOKABLE void massPreviewPage(int page) { invoke(QStringLiteral("massPreviewPage"), {page}); }
     Q_INVOKABLE void massCancel() { invoke(QStringLiteral("massCancel")); }
     Q_INVOKABLE void massApply() { invoke(QStringLiteral("massApply")); }
+    Q_INVOKABLE void massSetCell(const QString &itemId, const QString &field, const QString &value) { invoke(QStringLiteral("massSetCell"), {itemId, field, value}); }
     Q_INVOKABLE void massUndo() { invoke(QStringLiteral("massUndo")); }
     Q_INVOKABLE void massImport(const QVariantMap &file) { invoke(QStringLiteral("massImport"), {file}); }
     Q_INVOKABLE void massReviewWaiting() { invoke(QStringLiteral("massReviewWaiting")); }

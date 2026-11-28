@@ -441,6 +441,7 @@ const QHash<QString, PosService::Command> &PosService::commandTable()
         {u"massPreviewPage"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.massPreviewPage(a.value(0).toInt())); }},
         {u"massCancel"_s, [](PosService &p, const QVariantList &) { return QVariant(p.massCancel()); }},
         {u"massApply"_s, [](PosService &p, const QVariantList &) { return QVariant(p.massApply()); }},
+        {u"massSetCell"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.massSetCell(a.value(0).toString(), a.value(1).toString(), a.value(2).toString())); }},
         {u"massUndo"_s, [](PosService &p, const QVariantList &) { return QVariant(p.massUndo()); }},
         {u"massImport"_s, [](PosService &p, const QVariantList &a) { return QVariant(p.massImport(a.value(0).toMap())); }},
         {u"massReviewWaiting"_s, [](PosService &p, const QVariantList &) { return QVariant(p.massReviewWaiting()); }},

@@ -375,3 +375,24 @@ TEST_CASE("Mass updates: backups take the mass-updates folder too", "[massupdate
     REQUIRE(copy.open(QIODevice::ReadOnly));
     CHECK(copy.readAll() == "{\"item-1\":1}");
 }
+
+TEST_CASE("Mass updates: a cost or price typed into the grid's cell is saved at once, for that item only", "[massupdates]")
+{
+    PosService pos(retailStore(30), nullptr);
+    REQUIRE(pos.loginWithPin(u"9999"_s));
+    REQUIRE(pos.massView({}));
+    REQUIRE(pos.massChoose({u"pb-1"_s}, true));   // ticks don't matter here
+    REQUIRE(pos.massSetCell(u"pb-0"_s, u"cost"_s, u"$5.70"_s));
+    CHECK(costCents(item(pos, u"pb-0"_s)) == 570);
+    CHECK(costCents(item(pos, u"pb-1"_s)) == 700);
+    REQUIRE(pos.massSetCell(u"pb-0"_s, u"price"_s, u"10.99"_s));
+    CHECK(item(pos, u"pb-0"_s).price.cents() == 1099);
+    CHECK(item(pos, u"pb-1"_s).price.cents() == 1100);
+    CHECK_FALSE(pos.massSetCell(u"pb-0"_s, u"price"_s, u"10.99"_s));   // nothing would change
+    CHECK_FALSE(pos.massSetCell(u"pb-0"_s, u"category"_s, u"X"_s));
+    CHECK_FALSE(pos.massSetCell(u"pb-0"_s, u"cost"_s, u"abc"_s));
+    // Recorded like any change set, and undone the same way.
+    REQUIRE(pos.massUndo());
+    CHECK(item(pos, u"pb-0"_s).price.cents() == 1000);
+    CHECK(costCents(item(pos, u"pb-0"_s)) == 570);
+}

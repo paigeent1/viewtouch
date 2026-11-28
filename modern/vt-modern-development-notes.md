@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-28 09:28 ET — Bob (Claude) — Mass Updates: the Cost and Price cells can be typed into
+- **What:** Tablet app: changed. Server: changed. In the Mass Updates grid the Cost and Price cells are now blue/underlined and touchable: a small editor opens (the item, its field, what it is now), type the amount, Save (or Enter). PosService::massSetCell(itemId, field, value) saves it at once as a Set of that one item, through the same commit as Preview + Apply: price book permission (an admin, or an admin's PIN), the Changes report, a change set Undo can take back, no rounding on a price; a box's cost also sets its singles' (box cost / how many in it), as Cost Updates does. Ticks are not needed and not affected. Test: tests/test_mass_updates.cpp.
+- **Why:** Owner 2026-11-28 9:27 AM: 'Can you make lines cell entries? So I can click on the Berk 114 and update there?'
+- **Files:** `modern/app/pos_commands.cpp`, `modern/app/pos_mass_update.cpp`, `modern/app/pos_service.hh`, `modern/app/pos_session.hh`, `modern/tests/test_mass_updates.cpp`, `modern/ui/qml/WidgetMassUpdates.qml`
+
 ### 2026-11-28 09:18 ET — Bob (Claude) — Mass Updates: the pricing and specials buttons get their own row, so the screen fits again
 - **What:** Tablet app: changed. Server: changed (same QML). Price zone…, Buydowns / Promotions, System Discounts, Mix-Match and Sampler Kits move off the Range row into their own row under it (a Flow: it wraps on a narrow screen). With all five on the Range row its minimum width was wider than the BHDAN register, which pushed the whole Mass Updates screen past its right edge (Sampler Kits, the page arrows and the grid's last column cut off).
 - **Why:** Owner 2026-11-28 9:17 AM (photo on BHDAN): 'Check screen width'.
