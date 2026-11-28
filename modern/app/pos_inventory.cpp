@@ -5,6 +5,7 @@
 #include "app/pos_json.hh"
 #include "app/i18n.hh"
 #include "app/pos_service.hh"
+#include "core/kit.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -293,6 +294,16 @@ void PosService::stampNewLine(OrderLine &l) const
         stampModifier(m);
     // A manufacturer buydown / promotion running now: its line goes under the item (pos_buydowns.cpp).
     buydownOnNewLine(l);
+    // A sampler kit: what's in it now, kept on the sale (and printed under it when the kit says so).
+    l.kitContents.clear();
+    l.kitPrint = false;
+    if (const MenuItem *item = l.isComment() ? nullptr : findItem(qs(l.itemId)); item && kit::isKit(*item)) {
+        for (const kit::Part &p : kit::partsOf(*item)) {
+            const MenuItem *part = findItem(qs(p.upc));
+            l.kitContents.push_back(kit::partText(p.qty, part ? part->name : p.upc));
+        }
+        l.kitPrint = kit::printsContents(*item);
+    }
 }
 
 Money PosService::lineCost(const OrderLine &l, int *source) const

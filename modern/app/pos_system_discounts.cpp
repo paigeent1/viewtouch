@@ -78,6 +78,8 @@ QString percentText(std::int64_t bp)
     QT_TR_NOOP("A level with a quantity needs its percent off."), QT_TR_NOOP("A level with a quantity needs its amount off."),
     QT_TR_NOOP("A percent off can't be more than 100."), QT_TR_NOOP("Each level needs a larger quantity than the one before it."),
     QT_TR_NOOP("Fill in level 1: its quantity and amount."), QT_TR_NOOP("Add the items it's for."),
+    QT_TR_NOOP("Fill in which item starts it and how many items it changes."), QT_TR_NOOP("Type a percent off from 1 to 100."),
+    QT_TR_NOOP("Type the amount."),
 };
 
 } // namespace
@@ -138,11 +140,12 @@ bool PosService::sysDiscOpen(bool on)
     return true;
 }
 
-bool PosService::sysDiscNew()
+bool PosService::sysDiscNew(const QString &kind)
 {
     if (!sysDiscMayLook())
         return false;
     SystemDiscount d;
+    d.kind = kind == QLatin1String(sysdisc::kMixMatch) ? sysdisc::kMixMatch : "";
     d.number = sysdisc::nextNumber(s_->settings.systemDiscounts);
     d.id = "sd-" + std::to_string(d.number);
     const QDate today = QDateTime::fromMSecsSinceEpoch(now()).date();
@@ -227,6 +230,33 @@ bool PosService::sysDiscSet(const QVariantMap &f)
         d.start = whenFrom(f.value(u"start"_s).toString(), false);
     if (f.contains(u"end"_s))
         d.end = whenFrom(f.value(u"end"_s).toString(), true);
+    // Mix-Match: starting with item #, how many change, how, the amount, the receipt line.
+    for (const auto &[key, field] : {std::pair{u"mixStart"_s, &d.mixStart}, {u"mixCount"_s, &d.mixCount}}) {
+        if (!f.contains(key))
+            continue;
+        bool ok = false;
+        const int v = f.value(key).toString().trimmed().toInt(&ok);
+        if (!ok || v < 1 || v > 999)
+            return fail(tr("Type a number of items, like 2."));
+        *field = v;
+    }
+    if (f.contains(u"mixHow"_s)) {
+        const QString how = f.value(u"mixHow"_s).toString();
+        d.mixHow = how == u"percent"_s || how == u"price"_s ? ss(how) : "off";
+    }
+    if (f.contains(u"mixAmount"_s)) {
+        QString a = f.value(u"mixAmount"_s).toString().trimmed();
+        a.remove(u'$');
+        a.remove(u'%');
+        bool ok = a.isEmpty();
+        const double v = a.isEmpty() ? 0.0 : a.toDouble(&ok);
+        if (!ok || v < 0 || v > 100000)
+            return fail(d.mixHow == "percent" ? tr("Type the percent off, like 50.") : tr("Type the amount, like 0.41."));
+        d.mixPercentBp = d.mixHow == "percent" ? std::llround(v * 100.0) : 0;
+        d.mixAmount = d.mixHow == "percent" ? Money() : Money::fromCents(std::llround(v * 100.0));
+    }
+    if (f.contains(u"mixText"_s))
+        d.mixText = ss(f.value(u"mixText"_s).toString().trimmed().left(SystemDiscount::kReceiptLength));
     sd_.message.clear();
     emit sessionChanged();
     return true;
@@ -635,15 +665,27 @@ QVariantMap PosService::sysDiscVariant(const SystemDiscount &d) const
     const sysdisc::State st = sysdisc::stateAt(d, buydownNow());
     const QString stateLabel = st == sysdisc::State::Coming ? tr("Coming") : st == sysdisc::State::Running ? tr("Running") : tr("Ended");
     QString level1, receipt;
+    const bool mix = sysdisc::isMixMatch(d);
+    if (mix) {
+        // "Item 2: 1 at $0.41"
+        const QString change = d.mixHow == "percent" ? percentText(d.mixPercentBp) + u"% off"_s
+                               : d.mixHow == "price" ? format(d.mixAmount) : format(d.mixAmount) + u" off"_s;
+        level1 = tr("Item %1: %2 at %3").arg(d.mixStart).arg(d.mixCount).arg(change);
+        receipt = qs(d.mixText);
+    }
     for (const SystemDiscountLevel &l : d.levels)
-        if (sysdisc::used(d, l)) {
+        if (!mix && sysdisc::used(d, l)) {
             level1 = QString::number(l.qty) + (l.orMore ? u"+"_s : QString()) + u"  "_s
                      + (d.percent ? percentText(l.percentBp) + u"%"_s : format(l.amount));
             receipt = qs(l.receiptText);
             break;
         }
     return {{u"id"_s, qs(d.id)}, {u"number"_s, d.number}, {u"name"_s, qs(d.name)}, {u"percent"_s, d.percent},
-            {u"typeLabel"_s, d.percent ? tr("% off each item") : tr("$ off each item")},
+            {u"typeLabel"_s, mix ? tr("Mix-Match") : d.percent ? tr("% off each item") : tr("$ off each item")},
+            {u"kind"_s, qs(d.kind)}, {u"mixStart"_s, QString::number(d.mixStart)}, {u"mixCount"_s, QString::number(d.mixCount)},
+            {u"mixHow"_s, qs(d.mixHow)},
+            {u"mixAmount"_s, d.mixHow == "percent" ? percentText(d.mixPercentBp) : QString::number(double(d.mixAmount.cents()) / 100.0, 'f', 2)},
+            {u"mixText"_s, qs(d.mixText)},
             {u"sameItemOnly"_s, d.sameItemOnly}, {u"taxBefore"_s, d.taxBefore},
             {u"start"_s, qs(d.start)}, {u"end"_s, qs(d.end)}, {u"startText"_s, whenText(d.start)}, {u"endText"_s, whenText(d.end)},
             {u"state"_s, QString::fromLatin1(sysdisc::stateName(st))}, {u"stateLabel"_s, stateLabel},

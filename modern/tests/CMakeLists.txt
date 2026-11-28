@@ -26,6 +26,7 @@ if(TARGET vtm_layout)
     test_customer_sync.cpp   # TEMPORARY customers shared store to store: sent, merged by phone, to check, no loops
     test_buydowns.cpp   # Mass Updates > Buydowns / Promotions: the setup, the register's line, reports, scan data, a file for another store
     test_system_discounts.cpp   # Mass Updates > System Discounts: setup, the register's lines, tax, receipt, Copy to New, import
+    test_kits.cpp   # sampler kits and Mix-Match at the store
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
     )
 endif()

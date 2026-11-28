@@ -107,7 +107,7 @@ bool onRequest(const QString &key)
     // Mass Updates' grid (massUpdate) too, and its Buydowns (buydowns) and System Discounts (systemDiscounts).
     // Quick Label's (quickLabel, with its picture) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"builderTree" || key == u"itemSearch"
-           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns" || key == u"systemDiscounts"
+           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns" || key == u"systemDiscounts" || key == u"kits"
            || key == u"transfers" || key == u"retailReceiving" || key == u"retailStockCard";
 }
 

@@ -2500,10 +2500,19 @@ Report systemDiscountDefinitionReport(const std::vector<const SystemDiscount *> 
     for (const SystemDiscount *d : defs) {
         r.section("DISCOUNT: " + d->name + "   ID: " + std::to_string(d->number)
                   + (d->ilsaId.empty() ? std::string() : "   (ILSA " + d->ilsaId + ")"));
-        r.line({std::string("Discount Type: ") + (d->percent ? "% Off of Each Item" : "$ Off of Each Item") + "   Counts: "
+        r.line({std::string("Discount Type: ") + (sysdisc::isMixMatch(*d) ? "Mix-Match" : d->percent ? "% Off of Each Item" : "$ Off of Each Item") + "   Counts: "
                 + (d->sameItemOnly ? "Same item only" : "Any mix of these items")});
         r.line({"Start Date: " + buydownWhen(d->start) + "   End Date: " + buydownWhen(d->end)});
         r.line({std::string("Taxes: ") + (d->taxBefore ? "Apply Taxes BEFORE Discount" : "Apply Taxes AFTER Discount")});
+        if (sysdisc::isMixMatch(*d)) {
+            char pct[24];
+            std::snprintf(pct, sizeof pct, "%.2f%%", double(d->mixPercentBp) / 100.0);
+            const std::string change = d->mixHow == "percent" ? std::string(pct) + " off"
+                                       : d->mixHow == "price" ? "price " + ctx.money(d->mixAmount)
+                                                              : ctx.money(d->mixAmount) + " off";
+            r.line({"Mix-Match: starting with the sale of item # " + std::to_string(d->mixStart) + ", "
+                    + std::to_string(d->mixCount) + " item(s) at " + change + "   Receipt: " + d->mixText});
+        }
         for (std::size_t i = 0; i < d->levels.size(); ++i) {
             const SystemDiscountLevel &l = d->levels[i];
             if (l.qty <= 0)

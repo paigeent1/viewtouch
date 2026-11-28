@@ -18,8 +18,12 @@ Rectangle {
     property var pos: null
     property real unit: 16
     property real touch: Math.max(44, unit * 2.6)
+    // "" System Discounts (quantity levels); "mixmatch": Mix-Match (Mass Updates' own button), its kind only.
+    property string mode: ""
+    readonly property bool mixMode: mode === "mixmatch"
     readonly property var info: pos ? pos.systemDiscounts : ({})
-    readonly property var list: info.list ?? []
+    readonly property var list: (info.list ?? []).filter(d => (d.kind ?? "") === mode)
+    readonly property bool mixDraft: !!draft && draft.kind === "mixmatch"
     readonly property var draft: info.draft ?? null
     readonly property var importing: info.importing ?? null
     readonly property var report: info.report ?? null
@@ -88,13 +92,13 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 6
             Label {
-                text: qsTr("System Discounts")
+                text: p.mixMode ? qsTr("Mix-Match") : qsTr("System Discounts")
                 font.pixelSize: p.unit * 1.1
                 font.bold: true
                 color: "#111827"
             }
-            Small { u: p.unit; objectName: "sysDiscAdd"; text: qsTr("Add"); enabled: !p.draft && !p.importing; onClicked: p.pos.sysDiscNew() }
-            Small { u: p.unit; objectName: "sysDiscImport"; text: qsTr("Import from ILSA…"); enabled: !p.draft && !p.importing; onClicked: importFile.open() }
+            Small { u: p.unit; objectName: "sysDiscAdd"; text: qsTr("Add"); enabled: !p.draft && !p.importing; onClicked: p.pos.sysDiscNew(p.mode) }
+            Small { u: p.unit; objectName: "sysDiscImport"; visible: !p.mixMode; text: qsTr("Import from ILSA…"); enabled: !p.draft && !p.importing; onClicked: importFile.open() }
             Item { Layout.fillWidth: true }
             Small { u: p.unit; objectName: "sysDiscPickItems"; visible: !!p.draft; text: qsTr("Tick items in Mass Updates"); onClicked: p.pickItems() }
             Small { u: p.unit; objectName: "sysDiscClose"; text: qsTr("Close"); onClicked: p.closed() }
@@ -129,7 +133,7 @@ Rectangle {
                 Head { u: p.unit; text: qsTr("Start"); Layout.preferredWidth: p.unit * 7 }
                 Head { u: p.unit; text: qsTr("End"); Layout.preferredWidth: p.unit * 7 }
                 Head { u: p.unit; text: qsTr("Tax before"); Layout.preferredWidth: p.unit * 4.5 }
-                Head { u: p.unit; text: qsTr("Level 1"); Layout.preferredWidth: p.unit * 5.5 }
+                Head { u: p.unit; text: p.mixMode ? qsTr("Mix-Match") : qsTr("Level 1"); Layout.preferredWidth: p.unit * 5.5 }
                 Head { u: p.unit; text: qsTr("Receipt"); Layout.preferredWidth: p.unit * 10 }
                 Head { u: p.unit; text: qsTr("Items"); Layout.preferredWidth: p.unit * 3 }
                 Head { u: p.unit; text: qsTr("Now"); Layout.preferredWidth: p.unit * 4.5 }
@@ -183,7 +187,8 @@ Rectangle {
                 Label {
                     visible: p.list.length === 0
                     anchors.centerIn: parent
-                    text: qsTr("No system discounts yet: touch Add, or Import from ILSA.")
+                    text: p.mixMode ? qsTr("No Mix-Match yet: touch Add (2 for $1.00, buy one get one, 50% off the third).")
+                                    : qsTr("No system discounts yet: touch Add, or Import from ILSA.")
                     font.pixelSize: p.unit * 0.9
                     color: "#6b7280"
                 }
@@ -223,7 +228,7 @@ Rectangle {
                     onClicked: p.pos.sysDiscShowReport(p.chosenIds())
                 }
                 Item { Layout.fillWidth: true }
-                Small { u: p.unit; objectName: "sysDiscPrintAll"; text: qsTr("Print all…"); enabled: p.list.length > 0; onClicked: p.pos.sysDiscShowReport(["*"]) }
+                Small { u: p.unit; objectName: "sysDiscPrintAll"; text: qsTr("Print all…"); enabled: p.list.length > 0; onClicked: p.pos.sysDiscShowReport(p.list.map(d => d.id)) }
             }
         }
 
@@ -322,8 +327,9 @@ Rectangle {
                     placeholderText: "D27 LA AURORA CTGTOR"
                     onEditingFinished: if (text !== serverValue) p.set("name", text)
                 }
-                Label { text: qsTr("Discount Type"); font.pixelSize: p.unit * 0.75 }
+                Label { visible: !p.mixDraft; text: qsTr("Discount Type"); font.pixelSize: p.unit * 0.75 }
                 ComboBox {
+                    visible: !p.mixDraft
                     objectName: "sysDiscType"
                     implicitHeight: p.touch
                     Layout.preferredWidth: p.unit * 11
@@ -375,8 +381,39 @@ Rectangle {
                     onClicked: p.set("taxBefore", checked)
                 }
             }
+            // Mix-Match (ILSA's price record): starting with the sale of item #, change the price of how many, how.
+            Flow {
+                objectName: "sysDiscMix"
+                visible: p.mixDraft
+                Layout.fillWidth: true
+                spacing: 8
+                Label { text: qsTr("Starting with the sale of item #"); font.pixelSize: p.unit * 0.8; height: p.touch; verticalAlignment: Text.AlignVCenter }
+                Field { u: p.unit; objectName: "sysDiscMixStart"; width: p.unit * 4; serverValue: p.draft ? (p.draft.mixStart ?? "") : ""
+                        inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: if (text !== serverValue) p.set("mixStart", text) }
+                Label { text: qsTr("change the price for"); font.pixelSize: p.unit * 0.8; height: p.touch; verticalAlignment: Text.AlignVCenter }
+                Field { u: p.unit; objectName: "sysDiscMixCount"; width: p.unit * 4; serverValue: p.draft ? (p.draft.mixCount ?? "") : ""
+                        inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: if (text !== serverValue) p.set("mixCount", text) }
+                Label { text: qsTr("item(s):"); font.pixelSize: p.unit * 0.8; height: p.touch; verticalAlignment: Text.AlignVCenter }
+                ComboBox {
+                    objectName: "sysDiscMixHow"
+                    implicitHeight: p.touch
+                    width: p.unit * 11
+                    font.pixelSize: p.unit * 0.75
+                    readonly property var keys: ["off", "percent", "price"]
+                    model: [qsTr("Discount Price ($ off)"), qsTr("Percent Discount"), qsTr("Replace Price With")]
+                    currentIndex: Math.max(0, keys.indexOf(p.draft ? p.draft.mixHow : "off"))
+                    onActivated: i => p.set("mixHow", keys[i])
+                }
+                Field { u: p.unit; objectName: "sysDiscMixAmount"; width: p.unit * 6; serverValue: p.draft ? (p.draft.mixAmount ?? "") : ""
+                        placeholderText: p.draft && p.draft.mixHow === "percent" ? "50" : "0.41"
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly; onEditingFinished: if (text !== serverValue) p.set("mixAmount", text) }
+                Label { text: qsTr("Receipt"); font.pixelSize: p.unit * 0.8; height: p.touch; verticalAlignment: Text.AlignVCenter }
+                Field { u: p.unit; objectName: "sysDiscMixText"; width: p.unit * 14; maximumLength: 40; serverValue: p.draft ? (p.draft.mixText ?? "") : ""
+                        placeholderText: "2 FOR $1.00"; onEditingFinished: if (text !== serverValue) p.set("mixText", text) }
+            }
             // The five levels.
             RowLayout {
+                visible: !p.mixDraft
                 objectName: "sysDiscLevels"
                 Layout.fillWidth: true
                 spacing: 8
@@ -387,7 +424,7 @@ Rectangle {
                 Head { u: p.unit; text: qsTr("Receipt Text"); Layout.fillWidth: true }
             }
             Repeater {
-                model: p.draft ? p.draft.levels : []
+                model: p.draft && !p.mixDraft ? p.draft.levels : []
                 RowLayout {
                     id: lvl
                     required property var modelData

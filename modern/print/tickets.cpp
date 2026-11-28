@@ -224,6 +224,9 @@ Document receipt(const Check &check, const TicketContext &ctx)
         // A manufacturer buydown / promotion: its own line under the item, the item at its regular price.
         if (l.hasBuydown())
             d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
+        if (l.kitPrint && !l.voided)   // a sampler kit's contents (core/kit.hh)
+            for (const std::string &part : l.kitContents)
+                d.text("    " + part);
         // A system discount: its own line under the item too ("DIRTY DOZEN SAVINGS!  -$25.00").
         std::vector<std::pair<std::string, Money>> sys;
         systemDiscountOn(check, t, l.id, &sys);
@@ -408,6 +411,9 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
         }
         if (l.hasBuydown())
             d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
+        if (l.kitPrint && !l.voided)
+            for (const std::string &part : l.kitContents)
+                d.text("    " + part);
         std::vector<std::pair<std::string, Money>> sys;
         systemDiscountOn(check, t, l.id, &sys);
         for (const auto &[text, off] : sys)

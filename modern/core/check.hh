@@ -118,6 +118,10 @@ struct OrderLine {
     std::string buydownText;
     Money buydownEach;
     bool buydownTaxBefore = false;
+    // A sampler kit (core/kit.hh): what was in it when it was rung ("2 x SAMPLE TORO 6X52"), kept as the
+    // sale's record; printed under it on the receipt when the kit says so. Old lines and other items: none.
+    std::vector<std::string> kitContents;
+    bool kitPrint = false;
 
     bool isComment() const { return itemId.empty(); }
     bool isReturn() const { return quantity < 0 && !isComment(); }

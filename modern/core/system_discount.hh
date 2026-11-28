@@ -69,12 +69,49 @@ struct SystemDiscount {
     std::vector<SystemDiscountLevel> levels;   // up to five, in order
     std::vector<SystemDiscountItem> items;
     std::string ilsaId;       // the ILSA discount's ID, when it came from ILSA
+    // Mix-Match (ILSA's price record "Mix-Match", owner 2026-11-27): kind "mixmatch" instead of the levels.
+    // Starting with the sale of item # `mixStart`, the price of `mixCount` items changes, over and over: "2 for
+    // $1.00" (59c items): start 2, change 1, replace price with $0.41; buy one get one: start 2, change 1, 100%
+    // off; 50% off the third: start 3, change 1, 50%. The cheapest units counted are the ones changed.
+    std::string kind;         // "" (quantity levels) or "mixmatch"
+    int mixStart = 2;
+    int mixCount = 1;
+    std::string mixHow = "off";   // "off" ($ off each changed item), "percent", "price" (replace the price with)
+    Money mixAmount;              // $ off, or the price it's replaced with
+    std::int64_t mixPercentBp = 0;
+    std::string mixText;          // the receipt line ("2 FOR $1.00"; empty: the name)
     std::string createdBy, changedBy;
     std::int64_t createdAt = 0, changedAt = 0;   // epoch ms
     bool operator==(const SystemDiscount &) const = default;
 };
 
 namespace sysdisc {
+
+constexpr const char *kMixMatch = "mixmatch";
+inline bool isMixMatch(const SystemDiscount &d) { return d.kind == kMixMatch; }
+
+// Mix-Match: of `count` units counted, how many get the changed price. Every (start - 1 + change) units: the last
+// `change` of them; a part group past item # start: as many as it reaches.
+inline int mixChanged(const SystemDiscount &d, int count)
+{
+    const int start = std::max(1, d.mixStart), change = std::max(1, d.mixCount), cycle = start - 1 + change;
+    if (count <= 0)
+        return 0;
+    const int rest = count % cycle;
+    return count / cycle * change + std::clamp(rest - (start - 1), 0, change);
+}
+
+// Mix-Match: the amount off one changed unit priced `unit`.
+inline Money mixOffEach(const SystemDiscount &d, Money unit)
+{
+    if (unit.cents() <= 0)
+        return Money();
+    if (d.mixHow == "percent")
+        return Money::fromCents(std::llround(double(unit.cents()) * double(std::min<std::int64_t>(d.mixPercentBp, 10000)) / 10000.0));
+    if (d.mixHow == "price")
+        return d.mixAmount < unit ? unit - d.mixAmount : Money();
+    return std::min(d.mixAmount, unit);
+}
 
 constexpr const char *kTender = "system-discount";   // the discount lines' tender id
 constexpr const char *kRef = "sysdisc:";            // their reference: sysdisc:<definition id>:<line id>
@@ -190,6 +227,31 @@ inline std::vector<LineOff> wanted(const std::vector<SystemDiscount> &defs, cons
             int count = 0;
             for (const OrderLine *l : group)
                 count += l->quantity;
+            if (isMixMatch(d)) {
+                // The cheapest units get the changed price (the lower id first on a tie).
+                std::vector<std::pair<Money, const OrderLine *>> units;
+                for (const OrderLine *l : group)
+                    for (int u = 0; u < l->quantity; ++u)
+                        units.emplace_back(Money::fromCents(l->total().cents() / std::max(1, l->quantity)), l);
+                std::ranges::stable_sort(units, [](const auto &a, const auto &b) { return a.first < b.first; });
+                std::map<const OrderLine *, Money> perLine;
+                const int changed = mixChanged(d, count);
+                for (int i = 0; i < changed && i < int(units.size()); ++i)
+                    perLine[units[std::size_t(i)].second] += mixOffEach(d, units[std::size_t(i)].first);
+                for (const auto &[l, total] : perLine) {
+                    Money off = total;
+                    const Money room = l->total() - l->buydownTotal();
+                    if (off > room)
+                        off = room;
+                    if (off.cents() <= 0)
+                        continue;
+                    LineOff lo{d.id, l->id, off, !d.mixText.empty() ? d.mixText : d.name, d.taxBefore, d.number};
+                    const auto it = best.find(l->id);
+                    if (it == best.end() || off > it->second.amount || (off == it->second.amount && d.number < it->second.number))
+                        best[l->id] = lo;
+                }
+                continue;
+            }
             const int li = levelFor(d, count);
             if (li < 0)
                 continue;
@@ -238,6 +300,16 @@ inline std::vector<std::string> problems(const SystemDiscount &d)
         out.push_back("The end date isn't a date.");
     if (!d.start.empty() && !d.end.empty() && d.end <= d.start)
         out.push_back("It ends before it starts.");
+    if (isMixMatch(d)) {
+        if (d.mixStart < 1 || d.mixCount < 1)
+            out.push_back("Fill in which item starts it and how many items it changes.");
+        else if (d.mixHow == "percent" ? (d.mixPercentBp <= 0 || d.mixPercentBp > 10000)
+                 : d.mixHow == "price" ? d.mixAmount.cents() < 0 : d.mixAmount.cents() <= 0)
+            out.push_back(d.mixHow == "percent" ? "Type a percent off from 1 to 100." : "Type the amount.");
+        if (d.items.empty())
+            out.push_back("Add the items it's for.");
+        return out;
+    }
     bool any = false;
     int lastQty = 0;
     for (const SystemDiscountLevel &l : d.levels) {

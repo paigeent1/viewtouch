@@ -209,6 +209,8 @@ class PosSession : public QObject {
     // Mass Updates > System Discounts (PosService::sysDiscOpen): the definitions, the one being edited, Find's
     // matches, a report shown. Sent to a tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap systemDiscounts READ systemDiscounts NOTIFY sessionChanged)
+    // Mass Updates > Sampler Kits (PosService::kitsOpen): the kits, one being made or changed, Find's matches.
+    Q_PROPERTY(QVariantMap kits READ kits NOTIFY sessionChanged)
     // Manager > Inventory > Transfers (PosService::transferOpen): {active, tab, storeCode, stores, to, note, lines,
     // total, choices, message, incoming, outgoing, waitingIn, receiving, queued, link}. Sent to a tablet only
     // while it shows the screen.
@@ -492,6 +494,7 @@ public:
     virtual QVariantMap massUpdate() const = 0;
     virtual QVariantMap buydowns() const = 0;
     virtual QVariantMap systemDiscounts() const = 0;
+    virtual QVariantMap kits() const = 0;
     virtual QVariantMap transfers() const = 0;
     virtual QVariantMap retailReceiving() const = 0;
     virtual QVariantMap retailStockCard() const = 0;
@@ -891,7 +894,7 @@ public:
     Q_INVOKABLE void buydownImport(const QVariantMap &file) { invoke(QStringLiteral("buydownImport"), {file}); }
     // System Discounts (answers in systemDiscounts).
     Q_INVOKABLE void sysDiscOpen(bool on) { invoke(QStringLiteral("sysDiscOpen"), {on}); }
-    Q_INVOKABLE void sysDiscNew() { invoke(QStringLiteral("sysDiscNew")); }
+    Q_INVOKABLE void sysDiscNew(const QString &kind = {}) { invoke(QStringLiteral("sysDiscNew"), {kind}); }
     Q_INVOKABLE void sysDiscEdit(const QString &id) { invoke(QStringLiteral("sysDiscEdit"), {id}); }
     Q_INVOKABLE void sysDiscCopy(const QStringList &ids, const QString &from, const QString &to, const QString &start, const QString &end) { invoke(QStringLiteral("sysDiscCopy"), {ids, from, to, start, end}); }
     Q_INVOKABLE void sysDiscSet(const QVariantMap &fields) { invoke(QStringLiteral("sysDiscSet"), {fields}); }
@@ -911,6 +914,17 @@ public:
     Q_INVOKABLE void sysDiscImport(const QVariantMap &file) { invoke(QStringLiteral("sysDiscImport"), {file}); }
     Q_INVOKABLE void sysDiscImportApply() { invoke(QStringLiteral("sysDiscImportApply")); }
     Q_INVOKABLE void sysDiscImportCancel() { invoke(QStringLiteral("sysDiscImportCancel")); }
+    // Sampler kits (answers in kits).
+    Q_INVOKABLE void kitsOpen(bool on) { invoke(QStringLiteral("kitsOpen"), {on}); }
+    Q_INVOKABLE void kitEdit(const QString &itemId) { invoke(QStringLiteral("kitEdit"), {itemId}); }
+    Q_INVOKABLE void kitFind(const QString &text) { invoke(QStringLiteral("kitFind"), {text}); }
+    Q_INVOKABLE void kitAddParts(const QStringList &codes) { invoke(QStringLiteral("kitAddParts"), {codes}); }
+    Q_INVOKABLE void kitAddChosen() { invoke(QStringLiteral("kitAddChosen")); }
+    Q_INVOKABLE void kitSetQty(const QString &upc, const QString &qty) { invoke(QStringLiteral("kitSetQty"), {upc, qty}); }
+    Q_INVOKABLE void kitSetPrint(bool on) { invoke(QStringLiteral("kitSetPrint"), {on}); }
+    Q_INVOKABLE void kitApply() { invoke(QStringLiteral("kitApply")); }
+    Q_INVOKABLE void kitAbort() { invoke(QStringLiteral("kitAbort")); }
+    Q_INVOKABLE void kitUnmake(const QString &itemId) { invoke(QStringLiteral("kitUnmake"), {itemId}); }
     Q_INVOKABLE void printEodArchive(qint64 seq) { invoke(QStringLiteral("printEodArchive"), {seq}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

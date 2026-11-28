@@ -25,6 +25,7 @@ add_library(vtm_core STATIC
     core/builder_index.hh                        # Menu Builder's quick index: a department's tree, the search
     core/buydown.hh                              # manufacturer buydowns and promotions: definitions, the line, the reports
     core/system_discount.hh                      # system discounts: levels by quantity, the lines' share, Copy to New
+    core/kit.hh                                  # sampler kits: contents by UPC on the kit item
     core/mass_update.hh                          # Mass Updates: rounding, margin prices, the grid's narrowing, change sets
     core/transfer.hh                             # inventory transfers between stores: lines, UPC matching, the markup
     core/retail_stock.hh                         # a box / carton and its single: sealed + loose on hand, the break rules
@@ -89,6 +90,7 @@ if(Qt6_FOUND)
         app/pos_customer_price.cpp   # a customer's own prices: the source store's price, a preferential percent
         app/pos_buydowns.cpp   # Mass Updates > Buydowns / Promotions (core/buydown.hh): definitions, the register's line, reports
         app/pos_system_discounts.cpp   # Mass Updates > System Discounts (core/system_discount.hh): definitions, the register's lines, import
+        app/pos_kits.cpp               # Mass Updates > Sampler Kits (core/kit.hh): contents, cost, stock when sold
         app/pos_tv.cpp   # TV buttons (directv): the main computer runs vt-directv, for any screen
     )
     target_link_libraries(vtm_pos PUBLIC vtm_core Qt6::Core Qt6::Sql)   # Sql: the Labels screen reads the ILSA price book
@@ -226,6 +228,7 @@ if(Qt6_FOUND)
             ui/qml/WidgetRetailReceiving.qml
             ui/qml/BuydownsPanel.qml
             ui/qml/SystemDiscountsPanel.qml
+            ui/qml/KitsPanel.qml
             ui/qml/StorePicker.qml
             ui/qml/WidgetGuestMedia.qml
             ui/qml/WidgetGuestHeader.qml

@@ -39,8 +39,18 @@ Item {
     }
     readonly property var sysDiscDraft: pos && pos.systemDiscounts ? (pos.systemDiscounts.draft ?? null) : null
     property bool sysDiscWanted: false
-    function openSysDisc() {
+    property bool kitsWanted: false
+    readonly property var kitDraft: pos && pos.kits ? (pos.kits.draft ?? null) : null
+    function openKits() {
         if (!pos) return
+        if (!kitsWanted) pos.want("kits", true)
+        kitsWanted = true
+        pos.kitsOpen(true)
+        kits.visible = true
+    }
+    function openSysDisc(mode) {
+        if (!pos) return
+        sysDisc.mode = mode ?? ""
         if (!sysDiscWanted) pos.want("systemDiscounts", true)
         sysDiscWanted = true
         pos.sysDiscOpen(true)
@@ -70,7 +80,7 @@ Item {
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); if (w.buydownsWanted) asked.want("buydowns", false); asked.buydownsOpen(false); if (w.sysDiscWanted) asked.want("systemDiscounts", false); asked.sysDiscOpen(false) }
+        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); if (w.buydownsWanted) asked.want("buydowns", false); asked.buydownsOpen(false); if (w.sysDiscWanted) asked.want("systemDiscounts", false); asked.sysDiscOpen(false); if (w.kitsWanted) asked.want("kits", false); asked.kitsOpen(false) }
     }
     Component.onCompleted: {
         if (!pos || !pos.loggedIn) return
@@ -249,7 +259,21 @@ Item {
                     objectName: "massSystemDiscounts"
                     text: qsTr("System Discounts")
                     palette.button: "#1d4ed8"; palette.buttonText: "white"
-                    onClicked: w.openSysDisc()
+                    onClicked: w.openSysDisc("")
+                }
+                // Mix-Match: 2 for $1.00, buy one get one, 50% off the third (the same screen, its own list).
+                Small { u: w.unit;
+                    objectName: "massMixMatch"
+                    text: qsTr("Mix-Match")
+                    palette.button: "#1d4ed8"; palette.buttonText: "white"
+                    onClicked: w.openSysDisc("mixmatch")
+                }
+                // Sampler kits: an item at its own price whose contents leave stock (KitsPanel.qml).
+                Small { u: w.unit;
+                    objectName: "massKits"
+                    text: qsTr("Sampler Kits")
+                    palette.button: "#1d4ed8"; palette.buttonText: "white"
+                    onClicked: w.openKits()
                 }
             }
             // --- how many, choosing, pages ---
@@ -399,6 +423,23 @@ Item {
                 }
                 Small { u: w.unit; objectName: "massBuydownAdd"; text: qsTr("Add the ticked items"); onClicked: { w.pos.buydownAddChosen(); buydowns.visible = true } }
                 Small { u: w.unit; objectName: "massBuydownBack"; text: qsTr("Back to the buydown"); onClicked: buydowns.visible = true }
+            }
+            // Ticking items for a kit's contents: back to it, with them.
+            RowLayout {
+                objectName: "massKitBar"
+                visible: !kits.visible && !!w.kitDraft
+                Layout.fillWidth: true
+                spacing: 6
+                Label {
+                    Layout.fillWidth: true
+                    text: w.kitDraft ? qsTr("Making %1: tick what's in it here, then add them.").arg(w.kitDraft.name) : ""
+                    font.pixelSize: w.unit * 0.85
+                    font.bold: true
+                    color: "#1d4ed8"
+                    elide: Text.ElideRight
+                }
+                Small { u: w.unit; objectName: "massKitAdd"; text: qsTr("Add the ticked items"); onClicked: { w.pos.kitAddChosen(); kits.visible = true } }
+                Small { u: w.unit; objectName: "massKitBack"; text: qsTr("Back to the kit"); onClicked: kits.visible = true }
             }
             // Ticking items for a system discount being edited: back to it, with them.
             RowLayout {
@@ -783,6 +824,22 @@ Item {
             visible = false
             if (w.pos) { w.pos.sysDiscOpen(false); if (w.sysDiscWanted) w.pos.want("systemDiscounts", false) }
             w.sysDiscWanted = false
+        }
+    }
+
+    KitsPanel {
+        id: kits
+        visible: false
+        anchors.fill: parent
+        z: 20
+        pos: w.pos
+        unit: w.unit
+        touch: w.touch
+        onPickItems: visible = false
+        onClosed: {
+            visible = false
+            if (w.pos) { w.pos.kitsOpen(false); if (w.kitsWanted) w.pos.want("kits", false) }
+            w.kitsWanted = false
         }
     }
 

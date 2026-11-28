@@ -180,6 +180,15 @@ QJsonObject toJson(const Check &c)
             if (l.buydownTaxBefore)
                 lo.insert(u"buydownTaxBefore"_s, true);
         }
+        // A sampler kit: what was in it (core/kit.hh).
+        if (!l.kitContents.empty()) {
+            QJsonArray kc;
+            for (const std::string &t : l.kitContents)
+                kc.append(qs(t));
+            lo.insert(u"kitContents"_s, kc);
+            if (l.kitPrint)
+                lo.insert(u"kitPrint"_s, true);
+        }
         // Responsible service: standard drinks in one, and the seats it is shared across.
         if (l.stdDrinks > 0)
             lo.insert(u"stdDrinks"_s, l.stdDrinks);
@@ -348,6 +357,9 @@ std::optional<Check> checkFromJson(const QJsonObject &o)
         l.buydownText = ss(lo.value(u"buydownText").toString());
         l.buydownEach = l.buydownId.empty() ? Money() : money(lo.value(u"buydownEach"));
         l.buydownTaxBefore = lo.value(u"buydownTaxBefore").toBool();
+        for (const QJsonValue &v : lo.value(u"kitContents").toArray())
+            l.kitContents.push_back(ss(v.toString()));
+        l.kitPrint = lo.value(u"kitPrint").toBool();
         l.stdDrinks = std::clamp(lo.value(u"stdDrinks").toDouble(0), 0.0, 1000.0);
         for (const QJsonValue &sv : lo.value(u"drinkSeats").toArray())
             l.drinkSeats.push_back(std::clamp(sv.toInt(), 0, 99));
@@ -1210,7 +1222,10 @@ QJsonObject toJson(const SystemDiscount &d)
                        {u"sameItemOnly"_s, d.sameItemOnly}, {u"taxBefore"_s, d.taxBefore}, {u"start"_s, qs(d.start)},
                        {u"end"_s, qs(d.end)}, {u"levels"_s, levels}, {u"items"_s, items}, {u"ilsaId"_s, qs(d.ilsaId)},
                        {u"createdBy"_s, qs(d.createdBy)}, {u"createdAt"_s, qint64(d.createdAt)},
-                       {u"changedBy"_s, qs(d.changedBy)}, {u"changedAt"_s, qint64(d.changedAt)}};
+                       {u"changedBy"_s, qs(d.changedBy)}, {u"changedAt"_s, qint64(d.changedAt)},
+                       {u"kind"_s, qs(d.kind)}, {u"mixStart"_s, d.mixStart}, {u"mixCount"_s, d.mixCount},
+                       {u"mixHow"_s, qs(d.mixHow)}, {u"mixAmount"_s, qint64(d.mixAmount.cents())},
+                       {u"mixPercentBp"_s, qint64(d.mixPercentBp)}, {u"mixText"_s, qs(d.mixText)}};
 }
 
 SystemDiscount systemDiscountFromJson(const QJsonObject &o)
@@ -1246,6 +1261,14 @@ SystemDiscount systemDiscountFromJson(const QJsonObject &o)
     d.createdAt = o.value(u"createdAt").toInteger();
     d.changedBy = ss(o.value(u"changedBy").toString());
     d.changedAt = o.value(u"changedAt").toInteger();
+    d.kind = o.value(u"kind").toString() == QLatin1String(sysdisc::kMixMatch) ? sysdisc::kMixMatch : "";
+    d.mixStart = std::clamp(o.value(u"mixStart").toInt(2), 1, 999);
+    d.mixCount = std::clamp(o.value(u"mixCount").toInt(1), 1, 999);
+    const QString how = o.value(u"mixHow").toString();
+    d.mixHow = how == u"percent"_s || how == u"price"_s ? ss(how) : "off";
+    d.mixAmount = Money::fromCents(std::clamp<qint64>(o.value(u"mixAmount").toInteger(), 0, 10'000'000));
+    d.mixPercentBp = std::clamp<qint64>(o.value(u"mixPercentBp").toInteger(), 0, 10000);
+    d.mixText = ss(o.value(u"mixText").toString().left(SystemDiscount::kReceiptLength));
     return d;
 }
 

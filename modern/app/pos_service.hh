@@ -14,6 +14,7 @@
 #include "core/report.hh"
 #include "core/scan_data.hh"
 #include "core/settings.hh"
+#include "core/kit.hh"
 #include "core/transfer.hh"
 #include "core/receiving.hh"
 #include "core/retail_stock.hh"
@@ -845,12 +846,13 @@ public:
     // orMore, amount, receiptText}], itemList: [{key, upc, name, price, found}], problems}, found: [{id, upc, name,
     // price, inIt}], importing: {count, notFound, skipped, from}, report, message, chosenInMass}.
     bool sysDiscOpen(bool on);
-    bool sysDiscNew();
+    bool sysDiscNew(const QString &kind = {});   // "mixmatch": a Mix-Match
     bool sysDiscEdit(const QString &id);
     // Copy to New for the ticked ones: names starting with `from` get `to` instead (D26 -> D27), new dates
     // (empty: kept); saved at once (each can be edited after).
     bool sysDiscCopy(const QStringList &ids, const QString &from, const QString &to, const QString &start, const QString &end);
-    // {name, percent, sameItemOnly, taxBefore, start, end}: those given.
+    // {name, percent, sameItemOnly, taxBefore, start, end; Mix-Match: mixStart, mixCount, mixHow (off, percent,
+    // price), mixAmount, mixText}: those given.
     bool sysDiscSet(const QVariantMap &fields);
     // Level 0-4: {qty, orMore, amount ("25.00" or "10" for 10%), receiptText}: those given.
     bool sysDiscSetLevel(int level, const QVariantMap &fields);
@@ -872,6 +874,20 @@ public:
     bool sysDiscImportApply();
     bool sysDiscImportCancel();
     QVariantMap systemDiscounts() const override;
+    // --- Sampler kits (pos_kits.cpp; Mass Updates > Sampler Kits, managers; saving: the price book permission).
+    // kits(): {active, canApply, list: [{id, name, upc, price, parts, value, cost, print}], draft: {id, name, upc,
+    // price, isNew, print, parts: [{upc, qty, name, found, price, onHand}], value, cost}, found, message}.
+    bool kitsOpen(bool on);
+    bool kitEdit(const QString &itemId);                 // the kit item (made first, with its UPC and price)
+    bool kitFind(const QString &text);                   // name or UPC: up to 200 matches
+    bool kitAddParts(const QStringList &codes);          // item ids, UPCs or names: one more each
+    bool kitAddChosen();                                 // the items ticked in Mass Updates
+    bool kitSetQty(const QString &upc, const QString &qty);   // 0: out
+    bool kitSetPrint(bool on);                           // its contents under it on the receipt
+    bool kitApply();
+    bool kitAbort();
+    bool kitUnmake(const QString &itemId);               // contents off; the item stays
+    QVariantMap kits() const override;
     bool printExceptionSearch();
     QVariantMap printerSearch() const override;
     bool findPrinters();
@@ -2352,6 +2368,19 @@ private:
         bool reportShown = false;
     };
     SysDiscView sd_;
+    struct KitView {
+        bool open = false;
+        struct Draft {
+            std::string itemId;
+            std::vector<core::kit::Part> parts;
+            bool print = false;
+            bool isNew = false;
+        };
+        std::optional<Draft> draft;
+        QVariantList found;
+        QString message;
+    };
+    KitView kit_;
     // Bar & Kegs -> Import costs: the file read, until applied or cancelled (barCostImport).
     struct BarCostImport {
         std::vector<BarCostRow> rows;

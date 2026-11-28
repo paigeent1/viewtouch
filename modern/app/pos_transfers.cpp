@@ -11,6 +11,7 @@
 #include "app/i18n.hh"
 #include "app/pos_json.hh"
 #include "app/pos_service.hh"
+#include "core/kit.hh"
 #include "core/mass_update.hh"
 #include "core/transfer.hh"
 
@@ -175,6 +176,13 @@ void PosService::retailStockSold(const std::vector<OrderLine> &lines, int sign)
     for (const OrderLine &l : lines) {
         if ((l.voided && sign > 0) || l.isComment() || l.isGiftCard())
             continue;
+        // A sampler kit: its contents leave stock, not the kit (core/kit.hh).
+        if (const MenuItem *m = findItem(qs(l.itemId)); m && kit::isKit(*m)) {
+            for (const kit::Part &p : kit::partsOf(*m))
+                if (const MenuItem *part = findItem(qs(p.upc)); part && retailTracked(part->id))
+                    retailTake(part->id, double(l.counted()) * p.qty * sign);
+            continue;
+        }
         if (retailTracked(l.itemId))   // a box / carton and its single by their rules (pos_retail_stock.cpp)
             retailTake(l.itemId, double(l.counted()) * sign);
     }

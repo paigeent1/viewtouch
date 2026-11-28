@@ -236,3 +236,76 @@ TEST_CASE("System discount core: a box and its sticks (Add Purchase/Subunits)", 
     CHECK(names(sysdisc::linkedItems(menu, {"stick"})) == std::vector<std::string>{"box"});
     CHECK(sysdisc::linkedItems(menu, {"other"}).empty());
 }
+
+TEST_CASE("Mix-Match core: 2 for $1.00, buy one get one, 50% off the third, the cheapest changed", "[sysdisc]")
+{
+    SystemDiscount mm;
+    mm.id = "sd-5";
+    mm.number = 5;
+    mm.name = "SAMPLE 2 FOR 1";
+    mm.kind = sysdisc::kMixMatch;
+    mm.items = {{"000000000017", "", ""}, {"000000000024", "", ""}};
+    // Which units change: start 2, change 1 -> every 2nd; start 3, change 1 -> every 3rd; start 2, change 2 -> 2 of each 3.
+    mm.mixStart = 2;
+    mm.mixCount = 1;
+    CHECK(sysdisc::mixChanged(mm, 1) == 0);
+    CHECK(sysdisc::mixChanged(mm, 2) == 1);
+    CHECK(sysdisc::mixChanged(mm, 5) == 2);
+    mm.mixStart = 3;
+    CHECK(sysdisc::mixChanged(mm, 2) == 0);
+    CHECK(sysdisc::mixChanged(mm, 3) == 1);
+    CHECK(sysdisc::mixChanged(mm, 7) == 2);
+    mm.mixStart = 2;
+    mm.mixCount = 2;
+    CHECK(sysdisc::mixChanged(mm, 2) == 1);
+    CHECK(sysdisc::mixChanged(mm, 3) == 2);
+    CHECK(sysdisc::mixChanged(mm, 4) == 2);
+    CHECK(sysdisc::mixChanged(mm, 5) == 3);
+
+    {   // Buy one get one (start 2, change 1, 100% off): a robusto and a toro -> the cheaper (robusto) free.
+        SystemDiscount bogo = mm;
+        bogo.mixStart = 2;
+        bogo.mixCount = 1;
+        bogo.mixHow = "percent";
+        bogo.mixPercentBp = 10000;
+        bogo.mixText = "BOGO";
+        Fixture f;
+        f.add("toro");
+        const std::int64_t robusto = f.add("robusto");
+        const auto want = sysdisc::wanted({bogo}, f.check.lines, f.itemOf(), kNow);
+        REQUIRE(want.size() == 1);
+        CHECK(want[0].lineId == robusto);
+        CHECK(want[0].amount == usd(999));
+        CHECK(want[0].text == "BOGO");
+    }
+    {   // 2 for $X by Replace Price With: the second at $5.00; 4 toros -> 2 at $5.00.
+        SystemDiscount two = mm;
+        two.mixStart = 2;
+        two.mixCount = 1;
+        two.mixHow = "price";
+        two.mixAmount = usd(500);
+        Fixture f;
+        f.add("toro", 4);
+        const auto want = sysdisc::wanted({two}, f.check.lines, f.itemOf(), kNow);
+        REQUIRE(want.size() == 1);
+        CHECK(want[0].amount == usd(2 * 599));
+        CHECK(want[0].text == "SAMPLE 2 FOR 1");   // no receipt text: the name
+    }
+    {   // $ off: never more than the unit.
+        SystemDiscount off = mm;
+        off.mixStart = 1;
+        off.mixCount = 1;
+        off.mixHow = "off";
+        off.mixAmount = usd(5000);
+        Fixture f;
+        f.add("robusto");
+        CHECK(sysdisc::wanted({off}, f.check.lines, f.itemOf(), kNow)[0].amount == usd(999));
+    }
+    SystemDiscount bad = mm;
+    bad.name = "X";
+    bad.mixHow = "percent";
+    bad.mixPercentBp = 0;
+    CHECK(sysdisc::problems(bad) == std::vector<std::string>{"Type a percent off from 1 to 100."});
+    bad.mixPercentBp = 5000;
+    CHECK(sysdisc::problems(bad).empty());
+}
