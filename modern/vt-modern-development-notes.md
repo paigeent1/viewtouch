@@ -144,6 +144,12 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-28 10:57 ET — Bob (Claude) — vt-pi-updates: each Pi sends its own report (pi-updates-<pi name>.txt)
+- **What:** Tablet app: no change. Server: no change. Scripts only. vt-pi-updates now copies its result to Google Drive 'POS project tmp/pi-output/' as pi-updates-<hostname, lower case>.txt (pi-updates-vt-hca-pi.txt, pi-updates-vt-bhdan-pi.txt; later Gaylordsville and the corporate Pi get their own the same way) instead of one shared pi-updates.txt. The local file stays ~/vt-output/pi-updates.txt. Manual ch 31 says so. The old shared pi-updates.txt on Drive is no longer written (last: HCA 2026-11-28 10:52).
+- **Why:** Owner 2026-11-28: HCA also needs to be checked; 'make change to distinguish which pi is reporting. future Gaylordsville location and corporate will be reporting'. Both Pis wrote the same Drive file, so one report replaced the other; HCA's daily run was also never set up (no crontab for pi).
+- **Files:** `modern/docs/manual/manual.html`, `scripts/bin/vt-pi-updates`
+- **Next person must know:** Each Pi needs the new script (git pull) and 'vt-pi-updates --daily; beep3' once; HCA has no daily run yet. The daily housekeeping task reads every pi-updates-*.txt in the folder and reports a Pi whose file is missing or older than ~30 hours.
+
 ### 2026-11-28 09:28 ET — Bob (Claude) — Mass Updates: the Cost and Price cells can be typed into
 - **What:** Tablet app: changed. Server: changed. In the Mass Updates grid the Cost and Price cells are now blue/underlined and touchable: a small editor opens (the item, its field, what it is now), type the amount, Save (or Enter). PosService::massSetCell(itemId, field, value) saves it at once as a Set of that one item, through the same commit as Preview + Apply: price book permission (an admin, or an admin's PIN), the Changes report, a change set Undo can take back, no rounding on a price; a box's cost also sets its singles' (box cost / how many in it), as Cost Updates does. Ticks are not needed and not affected. Test: tests/test_mass_updates.cpp.
 - **Why:** Owner 2026-11-28 9:27 AM: 'Can you make lines cell entries? So I can click on the Berk 114 and update there?'

@@ -3048,7 +3048,7 @@ If any checks are still open, it lists them. Close or cancel them in ViewTouch f
 <div class="warn">Don't share output that shows card numbers, IDs or customer details.</div>
 
 <h3>vt-pi-updates: what Pi updates are waiting</h3>
-<p>Lists the Raspberry Pi OS updates waiting, and which could change how ViewTouch runs. It never installs anything. The list also goes to Google Drive. <code>--daily</code> runs it every day at 4:50 AM; <code>--no-daily</code> stops that.</p>
+<p>Lists the Raspberry Pi OS updates waiting, and which could change how ViewTouch runs. It never installs anything. The list also goes to Google Drive, in a file named after the Pi (for example <i>pi-updates-vt-hca-pi.txt</i>), so each store's Pi has its own. <code>--daily</code> (once on each Pi) runs it every day at 4:50 AM; <code>--no-daily</code> stops that.</p>
 <pre>vt-pi-updates; beep3</pre>
 <div class="tip">Install updates that could touch ViewTouch only after checking them, and never during business hours.</div>
 
