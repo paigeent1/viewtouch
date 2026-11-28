@@ -854,6 +854,7 @@ void PosService::changed(Check &check)
 {
     applyDeliveryFee(check);
     applyPromotions(check);
+    applySystemDiscounts(check);   // money off by how many are on it (pos_system_discounts.cpp)
     applyCustomerPricing(check);   // a customer's own prices (pos_customer_price.cpp)
     if (s_->sink)
         s_->sink->saveCheck(check);
@@ -2729,7 +2730,16 @@ QVariantList PosService::lines() const
     const Check *c = currentCheck();
     if (!c)
         return out;
+    const Totals lineTotals = c->totals(s_->settings.tax);   // (what each system discount took off its line)
     for (const OrderLine &l : c->lines) {
+        QString sysText;
+        Money sysOff;
+        for (const Payment &p : c->payments)
+            if (p.lineId == l.id && p.kind == TenderKind::Discount && p.reference.starts_with(sysdisc::kRef))
+                if (const auto off = lineTotals.discountBy.find(p.id); off != lineTotals.discountBy.end()) {
+                    sysText = qs(p.tenderName);
+                    sysOff += off->second;
+                }
         QVariantList mods;
         for (const Modifier &m : l.modifiers) {
             mods.append(QVariantMap{{u"name"_s, qs(m.displayName())},
@@ -2745,6 +2755,9 @@ QVariantList PosService::lines() const
             // A manufacturer buydown / promotion: its own line under the item ("SONOMA SAVINGS!  -$0.41").
             {u"buydown"_s, l.hasBuydown() && !l.voided ? qs(l.buydownText) : QString()},
             {u"buydownPrice"_s, l.hasBuydown() && !l.voided ? format(-l.buydownTotal()) : QString()},
+            // A system discount: its own line under the item too ("DIRTY DOZEN SAVINGS!  -$25.00").
+            {u"sysDiscount"_s, sysOff.cents() > 0 && !l.voided ? sysText : QString()},
+            {u"sysDiscountPrice"_s, sysOff.cents() > 0 && !l.voided ? format(-sysOff) : QString()},
             {u"fee"_s, l.isFee()},
             {u"shared"_s, l.isShare()},
             {u"selected"_s, qint64(l.id) == selectedLine_},

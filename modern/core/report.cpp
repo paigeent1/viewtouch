@@ -2483,6 +2483,51 @@ Report buydownDefinitionReport(const std::vector<const Buydown *> &defs, const s
     return r;
 }
 
+// --- System discounts (core/system_discount.hh) ----------------------------------------------------------
+
+Report systemDiscountDefinitionReport(const std::vector<const SystemDiscount *> &defs, const std::vector<MenuItem> &menu,
+                                      const ReportContext &ctx)
+{
+    Report r;
+    r.id = "system_discount_definitions";
+    r.title = "System Discount Definition Report";
+    r.subtitle = defs.size() == 1 ? defs.front()->name : std::to_string(defs.size()) + " system discounts";
+    r.columns = {"UPC Number", "Description", "Price"};
+    storeHeading(r, ctx);
+    std::map<std::string, const MenuItem *> byId;
+    for (const MenuItem &m : menu)
+        byId[m.id] = &m;
+    for (const SystemDiscount *d : defs) {
+        r.section("DISCOUNT: " + d->name + "   ID: " + std::to_string(d->number)
+                  + (d->ilsaId.empty() ? std::string() : "   (ILSA " + d->ilsaId + ")"));
+        r.line({std::string("Discount Type: ") + (d->percent ? "% Off of Each Item" : "$ Off of Each Item") + "   Counts: "
+                + (d->sameItemOnly ? "Same item only" : "Any mix of these items")});
+        r.line({"Start Date: " + buydownWhen(d->start) + "   End Date: " + buydownWhen(d->end)});
+        r.line({std::string("Taxes: ") + (d->taxBefore ? "Apply Taxes BEFORE Discount" : "Apply Taxes AFTER Discount")});
+        for (std::size_t i = 0; i < d->levels.size(); ++i) {
+            const SystemDiscountLevel &l = d->levels[i];
+            if (l.qty <= 0)
+                continue;
+            char pct[24];
+            std::snprintf(pct, sizeof pct, "%.2f%%", double(l.percentBp) / 100.0);
+            r.line({"Level " + std::to_string(i + 1) + ": Qty " + std::to_string(l.qty) + (l.orMore ? " Or More" : "") + "   "
+                    + (d->percent ? std::string(pct) : ctx.money(l.amount)) + " off each   Receipt: " + l.receiptText});
+        }
+        for (const SystemDiscountItem &i : d->items) {
+            const auto it = byId.find(i.itemId);
+            const MenuItem *m = it == byId.end() ? nullptr : it->second;
+            if (!m)
+                r.line({i.upc, i.name + " (not in this store)", ""});
+            else
+                r.line({i.upc, m->name, ctx.money(m->price)});
+        }
+        r.line({"Num Items: " + std::to_string(d->items.size())});
+    }
+    if (defs.empty())
+        r.note("No system discounts chosen.");
+    return r;
+}
+
 Report buydownsReport(const std::vector<Check> &closed, const std::vector<Buydown> &defs, const std::vector<MenuItem> &menu,
                       const ReportContext &ctx, const std::string &only)
 {

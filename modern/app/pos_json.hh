@@ -46,6 +46,9 @@ void barSettingsFromJson(const QJsonObject &o, core::PosSettings &s);
 // A buydown / promotion definition (core/buydown.hh): in the settings and in an export file.
 QJsonObject toJson(const core::Buydown &b);
 core::Buydown buydownFromJson(const QJsonObject &o);
+// A system discount definition (core/system_discount.hh): in the settings and in an import file.
+QJsonObject toJson(const core::SystemDiscount &d);
+core::SystemDiscount systemDiscountFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::StockCount &count);
 core::StockCount stockCountFromJson(const QJsonObject &o);
 QJsonObject toJson(const core::Waste &waste);

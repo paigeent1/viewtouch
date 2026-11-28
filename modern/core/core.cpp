@@ -571,6 +571,7 @@ Totals Check::totals(const TaxRates &now) const
     std::map<TaxClass, Money> onLines;
     std::map<TaxClass, Money> storeOnLines;
     Money storePriceOff;   // (on lines that may not be discounted otherwise: not out of `discountable`)
+    Money taxBeforeOff;    // line discounts with tax on the price before them (out of no tax class)
     for (const Payment &p : payments) {
         if (p.kind != TenderKind::Discount)
             continue;
@@ -610,7 +611,9 @@ Totals Check::totals(const TaxRates &now) const
         t.discountBy[p.id] = off;
         if (p.staffMeal)
             t.staffMeals += off;
-        if (line)
+        if (line && p.taxBefore)
+            taxBeforeOff += off;   // tax stays on the price before it (it still comes off what may be discounted)
+        else if (line)
             onLines[line->taxClass] += off;
         else
             shared += off;
@@ -637,7 +640,7 @@ Totals Check::totals(const TaxRates &now) const
         sharedRoom += amount;
     for (const auto &[cls, off] : onLines)
         discountableByClass[cls] -= off;
-    sharedRoom = sharedRoom - (t.discounts - shared - storePriceOff);
+    sharedRoom = sharedRoom - (t.discounts - shared - storePriceOff - taxBeforeOff);
     Money allocated;
     TaxClass largest = TaxClass::None;
     Money largestAmount;

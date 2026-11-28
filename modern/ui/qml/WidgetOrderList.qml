@@ -602,6 +602,27 @@ Item {
                             font.pixelSize: w.unit * 0.8
                         }
                     }
+                    // A system discount: its own line under the item too ("DIRTY DOZEN SAVINGS!  -$25.00").
+                    RowLayout {
+                        visible: (row.modelData.sysDiscount ?? "") !== ""
+                        Layout.fillWidth: true
+                        Layout.leftMargin: w.unit * 1.6
+                        Text {
+                            objectName: "sysDiscountLine"
+                            Layout.fillWidth: true
+                            text: row.modelData.sysDiscount ?? ""
+                            color: "#7ee2a8"
+                            font.family: w.face
+                            font.pixelSize: w.unit * 0.8
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            text: row.modelData.sysDiscountPrice ?? ""
+                            color: "#7ee2a8"
+                            font.family: w.face
+                            font.pixelSize: w.unit * 0.8
+                        }
+                    }
                     // The touched line: − 2 + to change how many, Again for one
                     // more the same way (a sent line: only more, as a new line).
                     Row {

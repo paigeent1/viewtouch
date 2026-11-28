@@ -232,6 +232,10 @@ Report accountingReport(const std::vector<Check> &closed, const std::map<std::st
 // Part/Ctn, price, buydown amount, sale price).
 Report buydownDefinitionReport(const std::vector<const Buydown *> &defs, const std::vector<MenuItem> &menu,
                                const ReportContext &ctx);
+// System discounts (core/system_discount.hh): the System Discount Definition report, as ILSA's: each chosen one
+// (name, ID, type, counts, dates, taxes, its levels) and its items (UPC, description, price).
+Report systemDiscountDefinitionReport(const std::vector<const SystemDiscount *> &defs, const std::vector<MenuItem> &menu,
+                                      const ReportContext &ctx);
 // What the buydowns gave at the register on these checks: per definition (its dates, manufacturer, rpt code,
 // acct #), each UPC's units, packs, cartons, carton equivalents and amount, then by manufacturer and in all.
 // `only`: one definition (its id, ID number or part of its name; shown even with nothing sold); empty: every

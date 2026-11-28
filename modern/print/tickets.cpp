@@ -1,4 +1,5 @@
 #include "print/tickets.hh"
+#include "core/system_discount.hh"
 
 #include <QString>
 
@@ -115,6 +116,23 @@ static std::string serverFirstLastInitial(const std::string &full)
     return first;
 }
 
+// System discounts (core/system_discount.hh) print under their item, as buydowns do: what each line's took off.
+static Money systemDiscountOn(const Check &check, const Totals &t, std::int64_t lineId, std::vector<std::pair<std::string, Money>> *out = nullptr)
+{
+    Money all;
+    for (const Payment &p : check.payments) {
+        if (p.kind != TenderKind::Discount || !p.reference.starts_with(sysdisc::kRef) || (lineId != 0 && p.lineId != lineId))
+            continue;
+        const auto off = t.discountBy.find(p.id);
+        if (off == t.discountBy.end())
+            continue;
+        all += off->second;
+        if (out)
+            out->emplace_back(p.tenderName, off->second);
+    }
+    return all;
+}
+
 void receiptHeader(Document &d, const TicketContext &ctx)
 {
     if (ctx.logo)
@@ -206,14 +224,19 @@ Document receipt(const Check &check, const TicketContext &ctx)
         // A manufacturer buydown / promotion: its own line under the item, the item at its regular price.
         if (l.hasBuydown())
             d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
+        // A system discount: its own line under the item too ("DIRTY DOZEN SAVINGS!  -$25.00").
+        std::vector<std::pair<std::string, Money>> sys;
+        systemDiscountOn(check, t, l.id, &sys);
+        for (const auto &[text, off] : sys)
+            d.columns("  " + text, ctx.money(-off));
     }
     d.rule();
     // Prices include tax: the items as rung, the discounts, then the subtotal without tax, the tax
     // in it and the total (what the guest pays: the prices less the discounts).
-    // (Buydowns are on the lines above: the items less them.)
-    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns));
+    // (Buydowns and system discounts are on the lines above: the items less them.)
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns - systemDiscountOn(check, t, 0)));
     for (const Payment &p : check.payments) {
-        if (p.kind == TenderKind::Discount) {
+        if (p.kind == TenderKind::Discount && !p.reference.starts_with(sysdisc::kRef)) {
             const auto off = t.discountBy.find(p.id);
             if (off != t.discountBy.end())   // what it actually took off (not items marked No discounts)
                 d.columns(p.tenderName, ctx.money(-off->second));
@@ -385,12 +408,17 @@ Document orderSlip(const Check &check, bool sent, const TicketContext &ctx)
         }
         if (l.hasBuydown())
             d.columns("  " + l.buydownText, ctx.money(-l.buydownTotal()));
+        std::vector<std::pair<std::string, Money>> sys;
+        systemDiscountOn(check, t, l.id, &sys);
+        for (const auto &[text, off] : sys)
+            d.columns("  " + text, ctx.money(-off));
     }
     d.rule();
-    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns));
+    const Money sysOff = systemDiscountOn(check, t, 0);
+    d.columns(ctx.tr(t.taxIncluded ? "Items" : "Subtotal"), ctx.money(t.items - t.buydowns - sysOff));
     if (t.taxIncluded) {
-        if (t.discounts.cents() > 0)
-            d.columns(ctx.tr("Discounts & promotions"), ctx.money(-t.discounts));
+        if ((t.discounts - sysOff).cents() > 0)
+            d.columns(ctx.tr("Discounts & promotions"), ctx.money(-(t.discounts - sysOff)));
         d.columns(ctx.tr("Subtotal"), ctx.money(t.subtotal));
     }
     for (const auto &[cls, amount] : t.taxByClass)

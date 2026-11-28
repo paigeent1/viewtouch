@@ -7,6 +7,7 @@
 
 
 #include "core/buydown.hh"
+#include "core/system_discount.hh"
 #include "core/check.hh"
 #include "core/inventory.hh"
 #include "core/over_service.hh"
@@ -578,6 +579,9 @@ struct PosSettings {
     bool buydownTaxBefore = false;
     // The old per-item buydown fields were made into definitions (once).
     bool buydownTagsMigrated = false;
+    // System discounts (core/system_discount.hh; Menu Builder > Mass Updates > System Discounts): money off
+    // items by how many are on the check, up to five levels, the highest reached.
+    std::vector<SystemDiscount> systemDiscounts;
     int waitMinutesPerParty = 10;
     // Hosts take payments (and open the servers' checks to): Pay This Table on
     // the host stand, when a server is busy. A person's own permissions still win.

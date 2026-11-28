@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""ILSA's system discounts -> a file for ViewTouch (Mass Updates > System Discounts > Import from ILSA).
+
+  vt-ilsa-sysdisc [EXPORT] [--all]
+
+EXPORT: a folder of ILSA tables as CSV from vt-ilsa-export (default: the newest one in ~/ilsa-export that has
+SysDiscount). Reads SysDiscount (ID, Discount_Name, Tax_Before_Disc, Start_Date, End_Date and LEVEL1..5 _QTY,
+_OrMore, _TYPE, _AMT, _RECEIPT) and the items from PLU, whose Discount_Name names the discount an item is in
+(ILSA's way: "Discount Name" on the item; a discount made from Mass Updates is named by a UPC). TYPE 2 is
+"$ Off of Each Item", TYPE 1 "% Off of Each Item". Only discounts still running or coming are written (--all:
+every one). Nothing is changed in ViewTouch: the file is read on the System Discounts screen, shown, and added
+there (one whose ILSA ID is already in ViewTouch is replaced).
+
+Writes ~/ilsa-sysdisc/ILSA-system-discounts-<when>.vtsysdisc.json and prints a summary (names, dates,
+levels, item counts; no customer data).
+"""
+import csv, datetime, glob, io, json, os, re, sys
+
+csv.field_size_limit(1 << 30)
+OUT = os.path.expanduser("~/ilsa-sysdisc")
+
+
+def say(*a):
+    print(*a, flush=True)
+
+
+def table(d, t):
+    for f in os.listdir(d):
+        if f.lower() == (t + ".csv").lower():
+            data = open(os.path.join(d, f), "rb").read()
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = data.decode("cp1252", errors="replace")
+            return list(csv.DictReader(io.StringIO(text, newline="")))
+    return None
+
+
+def col(row, *names):
+    low = {k.lower(): v for k, v in row.items() if k}
+    for n in names:
+        v = low.get(n.lower())
+        if v is not None:
+            return v.strip()
+    return ""
+
+
+def num(s):
+    try:
+        return float((s or "").replace("$", "").replace(",", "").strip())
+    except ValueError:
+        return 0.0
+
+
+def yes(s):
+    return (s or "").strip().lower() in ("1", "-1", "true", "yes", "y")
+
+
+def code(s):
+    s = (s or "").strip()
+    return s[:-2] if s.endswith(".0") and s[:-2].isdigit() else s
+
+
+US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?)?", re.I)
+ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?")
+
+
+def when(s):
+    """ILSA's date/time -> "YYYY-MM-DD HH:MM" (empty: none)."""
+    s = (s or "").strip()
+    m = ISO.match(s)
+    if m:
+        y, mo, d, h, mi = m.groups()
+        return f"{y}-{mo}-{d} {h or '00'}:{mi or '00'}"
+    m = US.match(s)
+    if m:
+        mo, d, y, h, mi, ap = m.groups()
+        y = int(y)
+        y += (2000 if y < 70 else 1900) if y < 100 else 0
+        h = int(h or 0)
+        if ap:
+            h = h % 12 + (12 if ap.upper() == "PM" else 0)
+        return f"{y:04d}-{int(mo):02d}-{int(d):02d} {h:02d}:{int(mi or 0):02d}"
+    return ""
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    every = "--all" in sys.argv
+    if args:
+        export = os.path.expanduser(args[0])
+    else:
+        found = sorted((d for d in glob.glob(os.path.expanduser("~/ilsa-export/*")) if os.path.isdir(d) and table(d, "SysDiscount") is not None),
+                       key=os.path.getmtime)
+        if not found:
+            sys.exit("No ILSA export with SysDiscount in ~/ilsa-export: run vt-ilsa-export on the ILSA database first.")
+        export = found[-1]
+    say(f"Reading {export}")
+    discounts = table(export, "SysDiscount")
+    if discounts is None:
+        sys.exit(f"No SysDiscount table in {export}.")
+    plus = table(export, "PLU") or []
+    say(f"  SysDiscount: {len(discounts)} rows; PLU: {len(plus)} items")
+    if plus and not any(k and k.lower() == "discount_name" for k in plus[0]):
+        say("  PLU has no Discount_Name column here: no items can be matched. Columns: " + ", ".join(plus[0].keys()))
+
+    by_name = {}
+    for p in plus:
+        n = col(p, "Discount_Name").upper()
+        u = code(col(p, "PLU_NUM", "PLU"))
+        if n and u:
+            by_name.setdefault(n, []).append({"upc": u, "name": re.sub(r"\s+", " ", col(p, "POS_DESC", "DESCRIPTION", "PLU_DESC"))})
+
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    out, skipped, types = [], 0, {}
+    for r in discounts:
+        name = re.sub(r"\s+", " ", col(r, "Discount_Name"))
+        start, end = when(col(r, "Start_Date")), when(col(r, "End_Date"))
+        if not name:
+            continue
+        if not every and end and end <= now:
+            skipped += 1
+            continue
+        levels, percent = [], None
+        for i in range(1, 6):
+            qty = int(round(num(col(r, f"LEVEL{i}_QTY"))))
+            t = int(num(col(r, f"LEVEL{i}_TYPE")))
+            amt = num(col(r, f"LEVEL{i}_AMT"))
+            if qty <= 0:
+                levels.append({})
+                continue
+            types[t] = types.get(t, 0) + 1
+            is_pct = t == 1
+            if percent is None:
+                percent = is_pct
+            levels.append({"qty": qty, "orMore": yes(col(r, f"LEVEL{i}_OrMore")),
+                           "amount": 0 if is_pct else int(round(amt * 100)),
+                           "percentBp": int(round(amt * 100)) if is_pct else 0,
+                           "receiptText": col(r, f"LEVEL{i}_RECEIPT")[:40]})
+        items = by_name.get(name.upper(), [])
+        out.append({"ilsaId": code(col(r, "ID")), "name": name[:30], "percent": bool(percent), "sameItemOnly": False,
+                    "taxBefore": yes(col(r, "Tax_Before_Disc")), "start": start, "end": end, "levels": levels,
+                    "items": items})
+
+    os.makedirs(OUT, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    path = os.path.join(OUT, f"ILSA-system-discounts-{stamp}.vtsysdisc.json")
+    with open(path, "w") as f:
+        json.dump({"format": "viewtouch-system-discounts", "version": 1, "from": "ILSA " + os.path.basename(export.rstrip("/")),
+                   "exportedAt": now, "discounts": out}, f, indent=1)
+
+    say("")
+    say(f"{len(out)} discount(s) written; {skipped} over already (left out).  Level types seen: "
+        + ", ".join(f"{t}={'%' if t == 1 else '$' if t == 2 else '?'} x{n}" for t, n in sorted(types.items())))
+    no_items = [d["name"] for d in out if not d["items"]]
+    for d in out:
+        l1 = next((l for l in d["levels"] if l), {})
+        off = (f"{l1.get('percentBp', 0) / 100:g}%" if d["percent"] else f"${l1.get('amount', 0) / 100:.2f}") if l1 else "-"
+        say(f"  {d['ilsaId']:>10}  {d['name']:<30} {d['start'][:10]} to {d['end'][:10]}  L1 {l1.get('qty', '-')}"
+            f"{'+' if l1.get('orMore') else ''} {off:>8}  {len(d['items']):>3} item(s)  {l1.get('receiptText', '')}")
+    if no_items:
+        say(f"\n{len(no_items)} with no items matched (their Discount_Name is on no PLU): " + ", ".join(no_items))
+    say(f"\nFile: {path}")
+    say("Next: Menu Builder > Mass Updates > System Discounts > Import from ILSA..., choose that file, check, Add them.")
+
+
+if __name__ == "__main__":
+    main()

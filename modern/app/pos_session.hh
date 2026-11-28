@@ -206,6 +206,9 @@ class PosSession : public QObject {
     // Mass Updates > Buydowns / Promotions (PosService::buydownsOpen): the definitions, the one being edited, a
     // report shown. Sent to a tablet only while it shows the screen.
     Q_PROPERTY(QVariantMap buydowns READ buydowns NOTIFY sessionChanged)
+    // Mass Updates > System Discounts (PosService::sysDiscOpen): the definitions, the one being edited, Find's
+    // matches, a report shown. Sent to a tablet only while it shows the screen.
+    Q_PROPERTY(QVariantMap systemDiscounts READ systemDiscounts NOTIFY sessionChanged)
     // Manager > Inventory > Transfers (PosService::transferOpen): {active, tab, storeCode, stores, to, note, lines,
     // total, choices, message, incoming, outgoing, waitingIn, receiving, queued, link}. Sent to a tablet only
     // while it shows the screen.
@@ -488,6 +491,7 @@ public:
     virtual QVariantMap exceptionSearch() const = 0;
     virtual QVariantMap massUpdate() const = 0;
     virtual QVariantMap buydowns() const = 0;
+    virtual QVariantMap systemDiscounts() const = 0;
     virtual QVariantMap transfers() const = 0;
     virtual QVariantMap retailReceiving() const = 0;
     virtual QVariantMap retailStockCard() const = 0;
@@ -885,6 +889,28 @@ public:
     Q_INVOKABLE void buydownPrintReport() { invoke(QStringLiteral("buydownPrintReport")); }
     Q_INVOKABLE void buydownCloseReport() { invoke(QStringLiteral("buydownCloseReport")); }
     Q_INVOKABLE void buydownImport(const QVariantMap &file) { invoke(QStringLiteral("buydownImport"), {file}); }
+    // System Discounts (answers in systemDiscounts).
+    Q_INVOKABLE void sysDiscOpen(bool on) { invoke(QStringLiteral("sysDiscOpen"), {on}); }
+    Q_INVOKABLE void sysDiscNew() { invoke(QStringLiteral("sysDiscNew")); }
+    Q_INVOKABLE void sysDiscEdit(const QString &id) { invoke(QStringLiteral("sysDiscEdit"), {id}); }
+    Q_INVOKABLE void sysDiscCopy(const QStringList &ids, const QString &from, const QString &to, const QString &start, const QString &end) { invoke(QStringLiteral("sysDiscCopy"), {ids, from, to, start, end}); }
+    Q_INVOKABLE void sysDiscSet(const QVariantMap &fields) { invoke(QStringLiteral("sysDiscSet"), {fields}); }
+    Q_INVOKABLE void sysDiscSetLevel(int level, const QVariantMap &fields) { invoke(QStringLiteral("sysDiscSetLevel"), {level, fields}); }
+    Q_INVOKABLE void sysDiscFind(const QString &text) { invoke(QStringLiteral("sysDiscFind"), {text}); }
+    Q_INVOKABLE void sysDiscAddItems(const QStringList &codes) { invoke(QStringLiteral("sysDiscAddItems"), {codes}); }
+    Q_INVOKABLE void sysDiscAddChosen() { invoke(QStringLiteral("sysDiscAddChosen")); }
+    Q_INVOKABLE void sysDiscAddStartingWith(const QString &text) { invoke(QStringLiteral("sysDiscAddStartingWith"), {text}); }
+    Q_INVOKABLE void sysDiscAddLinked() { invoke(QStringLiteral("sysDiscAddLinked")); }
+    Q_INVOKABLE void sysDiscRemoveItems(const QStringList &keys) { invoke(QStringLiteral("sysDiscRemoveItems"), {keys}); }
+    Q_INVOKABLE void sysDiscApply() { invoke(QStringLiteral("sysDiscApply")); }
+    Q_INVOKABLE void sysDiscAbort() { invoke(QStringLiteral("sysDiscAbort")); }
+    Q_INVOKABLE void sysDiscDelete(const QStringList &ids) { invoke(QStringLiteral("sysDiscDelete"), {ids}); }
+    Q_INVOKABLE void sysDiscShowReport(const QStringList &ids) { invoke(QStringLiteral("sysDiscShowReport"), {ids}); }
+    Q_INVOKABLE void sysDiscPrintReport() { invoke(QStringLiteral("sysDiscPrintReport")); }
+    Q_INVOKABLE void sysDiscCloseReport() { invoke(QStringLiteral("sysDiscCloseReport")); }
+    Q_INVOKABLE void sysDiscImport(const QVariantMap &file) { invoke(QStringLiteral("sysDiscImport"), {file}); }
+    Q_INVOKABLE void sysDiscImportApply() { invoke(QStringLiteral("sysDiscImportApply")); }
+    Q_INVOKABLE void sysDiscImportCancel() { invoke(QStringLiteral("sysDiscImportCancel")); }
     Q_INVOKABLE void printEodArchive(qint64 seq) { invoke(QStringLiteral("printEodArchive"), {seq}); }
     // Orders for later: ready at this time (ms since 1970; 0 = as soon as possible).
     Q_INVOKABLE void setDueAt(double at) { invoke(QStringLiteral("setDueAt"), {qint64(at)}); }

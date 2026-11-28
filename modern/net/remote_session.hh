@@ -219,6 +219,7 @@ public:
     QVariantMap exceptionSearch() const override { return v(u"exceptionSearch").toMap(); }
     QVariantMap massUpdate() const override { return v(u"massUpdate").toMap(); }
     QVariantMap buydowns() const override { return v(u"buydowns").toMap(); }
+    QVariantMap systemDiscounts() const override { return v(u"systemDiscounts").toMap(); }
     QVariantMap transfers() const override { return v(u"transfers").toMap(); }
     QVariantMap retailReceiving() const override { return v(u"retailReceiving").toMap(); }
     QVariantMap retailStockCard() const override { return v(u"retailStockCard").toMap(); }

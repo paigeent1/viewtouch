@@ -1333,6 +1333,19 @@ QVariantMap LayoutController::readBuydownFile(const QUrl &file) const
     return b;
 }
 
+QVariantMap LayoutController::readSystemDiscountFile(const QUrl &file) const
+{
+    QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());
+    if (f.size() > 16 * 1024 * 1024)
+        return {{u"error"_s, tr("That file is too big for system discounts.")}};
+    if (!f.open(QIODevice::ReadOnly))
+        return {{u"error"_s, tr("Can't open it: %1").arg(f.errorString())}};
+    const QVariantMap d = QJsonDocument::fromJson(f.readAll()).object().toVariantMap();
+    if (d.value(u"format"_s) != u"viewtouch-system-discounts"_s)
+        return {{u"error"_s, tr("That isn't a ViewTouch system discount file.")}};
+    return d;
+}
+
 QVariantMap LayoutController::readCsvFile(const QUrl &file) const
 {
     QFile f(file.isLocalFile() ? file.toLocalFile() : file.toString());

@@ -836,6 +836,42 @@ public:
     core::Report buydownDefinitions(const QStringList &ids) const;
     // The store's time, "2026-11-25 10:00" (as definitions keep it).
     std::string buydownNow() const;
+    // --- System Discounts (pos_system_discounts.cpp; Mass Updates > System Discounts, managers; saving: the
+    // price book permission). The definitions list (tick several for Copy to New, Delete, Print), one being
+    // edited (Add / Edit, then Apply or Abort), Find's matches to add, the Definition report, an import file
+    // (ILSA's running discounts, from vt-ilsa-sysdisc). State in systemDiscounts(): {active, canApply, list: [{id,
+    // number, name, typeLabel, percent, sameItemOnly, taxBefore, start, end, startText, endText, state,
+    // stateLabel, level1 ("1+ $25.00"), receipt, items, ilsaId}], draft: {... the same, isNew, levels: [{qty,
+    // orMore, amount, receiptText}], itemList: [{key, upc, name, price, found}], problems}, found: [{id, upc, name,
+    // price, inIt}], importing: {count, notFound, skipped, from}, report, message, chosenInMass}.
+    bool sysDiscOpen(bool on);
+    bool sysDiscNew();
+    bool sysDiscEdit(const QString &id);
+    // Copy to New for the ticked ones: names starting with `from` get `to` instead (D26 -> D27), new dates
+    // (empty: kept); saved at once (each can be edited after).
+    bool sysDiscCopy(const QStringList &ids, const QString &from, const QString &to, const QString &start, const QString &end);
+    // {name, percent, sameItemOnly, taxBefore, start, end}: those given.
+    bool sysDiscSet(const QVariantMap &fields);
+    // Level 0-4: {qty, orMore, amount ("25.00" or "10" for 10%), receiptText}: those given.
+    bool sysDiscSetLevel(int level, const QVariantMap &fields);
+    bool sysDiscFind(const QString &text);              // name or UPC: up to 200 matches to add
+    bool sysDiscAddItems(const QStringList &codes);     // item ids, UPCs or item numbers
+    bool sysDiscAddChosen();                            // the items ticked in Mass Updates
+    bool sysDiscAddStartingWith(const QString &text);   // ILSA's "Add Items that start with:"
+    bool sysDiscAddLinked();                            // ILSA's "Add Purchase/Subunits": boxes and their sticks
+    bool sysDiscRemoveItems(const QStringList &keys);   // itemList's keys ("*": all)
+    bool sysDiscApply();
+    bool sysDiscAbort();
+    bool sysDiscDelete(const QStringList &ids);
+    bool sysDiscShowReport(const QStringList &ids);     // the System Discount Definition report (["*"]: all)
+    bool sysDiscPrintReport();
+    bool sysDiscCloseReport();
+    // {format: viewtouch-system-discounts, from, discounts: [...]}: read and shown (matched by UPC), then
+    // sysDiscImportApply adds them (one whose ILSA ID is already here is replaced) or Cancel drops them.
+    bool sysDiscImport(const QVariantMap &file);
+    bool sysDiscImportApply();
+    bool sysDiscImportCancel();
+    QVariantMap systemDiscounts() const override;
     bool printExceptionSearch();
     QVariantMap printerSearch() const override;
     bool findPrinters();
@@ -2298,6 +2334,24 @@ private:
         int request = 0;
     };
     BuydownView bd_;
+    // System discounts (pos_system_discounts.cpp): an open check's discount lines kept right by themselves.
+    void applySystemDiscounts(core::Check &c);
+    QVariantMap sysDiscVariant(const core::SystemDiscount &d) const;
+    bool sysDiscAddMenuItems(const std::vector<const core::MenuItem *> &items);
+    bool sysDiscMayLook();
+    struct SysDiscView {
+        bool open = false;
+        std::optional<core::SystemDiscount> draft;
+        bool isNew = false;
+        QVariantList found;
+        std::vector<core::SystemDiscount> importing;
+        QVariantList importNotFound;
+        int importSkipped = 0;
+        QString importFrom, message;
+        core::Report report;
+        bool reportShown = false;
+    };
+    SysDiscView sd_;
     // Bar & Kegs -> Import costs: the file read, until applied or cancelled (barCostImport).
     struct BarCostImport {
         std::vector<BarCostRow> rows;

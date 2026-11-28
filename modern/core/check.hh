@@ -191,6 +191,9 @@ struct Payment {
     Money amount;                 // Cash/Card: what it pays toward the check; Discount: a fixed amount off
     std::int64_t percentBp = 0;   // Discount, applied to the current items total (or to lineId's line)
     std::int64_t lineId = 0;      // Discount: only this line (an item discount); 0: the whole check
+    // Discount on a line: tax stays on the price before it (a system discount marked Tax Before Discount,
+    // core/system_discount.hh). Off: the line is taxed on its price less the discount.
+    bool taxBefore = false;
     Money tip;                    // Card: tip on top of the amount (owed to the server)
     std::string reference;        // GiftCard: the card number; HouseAccount: the customer id; staff meal: who ate;
                                   // a card through a reader: the processor's payment id (Stripe's pi_...)

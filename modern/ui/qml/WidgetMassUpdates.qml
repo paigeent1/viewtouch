@@ -37,6 +37,15 @@ Item {
         pos.buydownsOpen(true)
         buydowns.visible = true
     }
+    readonly property var sysDiscDraft: pos && pos.systemDiscounts ? (pos.systemDiscounts.draft ?? null) : null
+    property bool sysDiscWanted: false
+    function openSysDisc() {
+        if (!pos) return
+        if (!sysDiscWanted) pos.want("systemDiscounts", true)
+        sysDiscWanted = true
+        pos.sysDiscOpen(true)
+        sysDisc.visible = true
+    }
 
     function setView(changes) {
         const v = Object.assign({}, view, changes)
@@ -61,7 +70,7 @@ Item {
         }
         onPChanged: ask()
         Component.onCompleted: ask()
-        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); if (w.buydownsWanted) asked.want("buydowns", false); asked.buydownsOpen(false) }
+        Component.onDestruction: if (asked) { asked.want("massUpdate", false); asked.massClose(); if (w.buydownsWanted) asked.want("buydowns", false); asked.buydownsOpen(false); if (w.sysDiscWanted) asked.want("systemDiscounts", false); asked.sysDiscOpen(false) }
     }
     Component.onCompleted: {
         if (!pos || !pos.loggedIn) return
@@ -235,6 +244,13 @@ Item {
                     palette.button: "#1d4ed8"; palette.buttonText: "white"
                     onClicked: w.openBuydowns()
                 }
+                // System discounts: money off by how many are on the check (SystemDiscountsPanel.qml).
+                Small { u: w.unit;
+                    objectName: "massSystemDiscounts"
+                    text: qsTr("System Discounts")
+                    palette.button: "#1d4ed8"; palette.buttonText: "white"
+                    onClicked: w.openSysDisc()
+                }
             }
             // --- how many, choosing, pages ---
             RowLayout {
@@ -383,6 +399,23 @@ Item {
                 }
                 Small { u: w.unit; objectName: "massBuydownAdd"; text: qsTr("Add the ticked items"); onClicked: { w.pos.buydownAddChosen(); buydowns.visible = true } }
                 Small { u: w.unit; objectName: "massBuydownBack"; text: qsTr("Back to the buydown"); onClicked: buydowns.visible = true }
+            }
+            // Ticking items for a system discount being edited: back to it, with them.
+            RowLayout {
+                objectName: "massSysDiscBar"
+                visible: !sysDisc.visible && !!w.sysDiscDraft
+                Layout.fillWidth: true
+                spacing: 6
+                Label {
+                    Layout.fillWidth: true
+                    text: w.sysDiscDraft ? qsTr("Editing %1: tick its items here, then add them.").arg(w.sysDiscDraft.name || qsTr("a new system discount")) : ""
+                    font.pixelSize: w.unit * 0.85
+                    font.bold: true
+                    color: "#1d4ed8"
+                    elide: Text.ElideRight
+                }
+                Small { u: w.unit; objectName: "massSysDiscAdd"; text: qsTr("Add the ticked items"); onClicked: { w.pos.sysDiscAddChosen(); sysDisc.visible = true } }
+                Small { u: w.unit; objectName: "massSysDiscBack"; text: qsTr("Back to the system discount"); onClicked: sysDisc.visible = true }
             }
             Label {
                 objectName: "massMessage"
@@ -732,6 +765,24 @@ Item {
             visible = false
             if (w.pos) { w.pos.buydownsOpen(false); if (w.buydownsWanted) w.pos.want("buydowns", false) }
             w.buydownsWanted = false
+        }
+    }
+
+    // System Discounts: over the grid too; "Tick items in Mass Updates" shows the grid again.
+    SystemDiscountsPanel {
+        id: sysDisc
+        visible: false
+        anchors.fill: parent
+        z: 20
+        pos: w.pos
+        unit: w.unit
+        touch: w.touch
+        zoneController: w.zone ? w.zone.controller : null
+        onPickItems: visible = false
+        onClosed: {
+            visible = false
+            if (w.pos) { w.pos.sysDiscOpen(false); if (w.sysDiscWanted) w.pos.want("systemDiscounts", false) }
+            w.sysDiscWanted = false
         }
     }
 

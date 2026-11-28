@@ -104,10 +104,10 @@ bool onRequest(const QString &key)
     // Menu Builder's own list (builderItems) and its tree (builderTree) too.
     // Find's answer (itemSearch) too.
     // Find a Tablet's list (tablets) too.
-    // Mass Updates' grid (massUpdate) too, and its Buydowns (buydowns).
+    // Mass Updates' grid (massUpdate) too, and its Buydowns (buydowns) and System Discounts (systemDiscounts).
     // Quick Label's (quickLabel, with its picture) too.
     return key == u"closedChecks" || key == u"menuItems" || key == u"retailLabels" || key == u"quickLabel" || key == u"builderItems" || key == u"builderTree" || key == u"itemSearch"
-           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns"
+           || key == u"tablets" || key == u"exceptionSearch" || key == u"massUpdate" || key == u"buydowns" || key == u"systemDiscounts"
            || key == u"transfers" || key == u"retailReceiving" || key == u"retailStockCard";
 }
 

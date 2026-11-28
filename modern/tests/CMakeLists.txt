@@ -1,6 +1,7 @@
 set(VTM_TEST_SOURCES test_money.cpp test_check.cpp test_scan_data.cpp test_price_check.cpp
     test_builder_index.cpp   # Menu Builder's quick index (core/builder_index.hh)
     test_buydown_core.cpp   # manufacturer buydowns and promotions (core/buydown.hh)
+    test_system_discount_core.cpp   # system discounts (core/system_discount.hh)
     test_mass_update_core.cpp   # Mass Updates' rounding, margins, ranges (core/mass_update.hh)
     test_transfer_core.cpp   # transfers between stores: UPC matching with packs, totals, the markup (core/transfer.hh)
     test_receiving_core.cpp)   # retail receiving: invoice totals and tie-out, vendor items, invoice files (core/receiving.hh)
@@ -24,6 +25,7 @@ if(TARGET vtm_layout)
     test_carton_stock.cpp   # retail on hand: a box / carton and its single as sealed + loose, breaks, Open boxes, settling once
     test_customer_sync.cpp   # TEMPORARY customers shared store to store: sent, merged by phone, to check, no loops
     test_buydowns.cpp   # Mass Updates > Buydowns / Promotions: the setup, the register's line, reports, scan data, a file for another store
+    test_system_discounts.cpp   # Mass Updates > System Discounts: setup, the register's lines, tax, receipt, Copy to New, import
     test_legacy.cpp   # ILSA sales history (legacy_fixture.inc: vt-ilsa-history --self-test --write-fixture)
     )
 endif()
