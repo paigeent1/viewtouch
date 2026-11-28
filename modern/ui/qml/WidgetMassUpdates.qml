@@ -240,6 +240,13 @@ Item {
                     palette.button: "#b35c00"; palette.buttonText: "white"
                     onClicked: w.pos.massReviewWaiting()
                 }
+            }
+            // --- pricing and specials (their own row, wrapping on a narrow screen: owner 2026-11-28, they pushed the
+            // screen past its right edge on BHDAN) ---
+            Flow {
+                objectName: "massSpecialsRow"
+                Layout.fillWidth: true
+                spacing: 6
                 // This store's price zone: its markup on the price source's prices.
                 Small { u: w.unit;
                     objectName: "massPriceZone"
