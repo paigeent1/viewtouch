@@ -61,6 +61,57 @@ Item {
         font.pixelSize: w.unit * 0.9
         wrapMode: Text.WordWrap
     }
+    // --- Tab through what receiving needs typed (owner 2026-11-28): the scan box -> the line just scanned's
+    // quantity -> its vendor item # (only when it has none) -> its price -> the next item's quantity ... -> after
+    // the last line's price, the scan box again. Enter does the same; Shift+Tab goes back. Every change sends the
+    // lines again (the rows are made anew), so the field to go to is kept and found again when they come back.
+    property string pendingFocus: ""   // "recvQty-3"
+    function itemLines() { return (w.info.lines ?? []).filter(l => l.isItem) }
+    function chainOf(line) {
+        const c = ["recvQty-"]
+        if ((line.vendorItem ?? "") === "") c.push("recvVendorItem-")
+        c.push("recvCost-")
+        return c
+    }
+    function findIn(item, name) {
+        if (!item) return null
+        if (item.objectName === name) return item
+        for (let i = 0; i < item.children.length; ++i) {
+            const f = findIn(item.children[i], name)
+            if (f) return f
+        }
+        return null
+    }
+    function focusPending() {
+        if (w.pendingFocus === "") return
+        if (w.pendingFocus === "recvFind") { findField.forceActiveFocus(); return }
+        const index = Number(w.pendingFocus.split("-").pop())
+        const pos = (w.info.lines ?? []).findIndex(l => l.index === index)
+        if (pos < 0) return
+        lineList.positionViewAtIndex(pos, ListView.Contain)
+        const f = w.findIn(lineList.itemAtIndex(pos), w.pendingFocus)
+        if (f) { f.forceActiveFocus(); f.selectAll() }
+    }
+    function goTo(name) {
+        w.pendingFocus = name
+        focusKeep.restart()
+        Qt.callLater(w.focusPending)
+    }
+    // From a field of line `index` (its name's start: "recvQty-"), forward or back.
+    function tabFrom(index, prefix, back) {
+        const lines = w.itemLines()
+        const at = lines.findIndex(l => l.index === index)
+        if (at < 0) { w.goTo("recvFind"); return }
+        const chain = w.chainOf(lines[at])
+        const step = Math.max(0, chain.indexOf(prefix)) + (back ? -1 : 1)
+        if (step >= 0 && step < chain.length) { w.goTo(chain[step] + index); return }
+        const next = lines[at + (back ? -1 : 1)]
+        if (!next) { w.goTo("recvFind"); return }
+        const c = w.chainOf(next)
+        w.goTo((back ? c[c.length - 1] : c[0]) + next.index)
+    }
+    Timer { id: focusKeep; interval: 2000; onTriggered: w.pendingFocus = "" }   // (kept while the lines come back)
+
     component Field: TextField {
         implicitHeight: w.touch
         font.pixelSize: w.unit
@@ -213,6 +264,13 @@ Item {
                     placeholderText: (w.info.linking ?? -1) >= 0 ? qsTr("Part of the item's name, then touch it below")
                                                                   : qsTr("Scan, or type a UPC, the vendor's item # or part of a name")
                     onAccepted: { (w.info.linking ?? -1) >= 0 ? w.pos.recvSearch(text) : w.pos.recvFind(text); text = "" }
+                    // Tab: the line just scanned (or the first), its quantity.
+                    Keys.onTabPressed: e => {
+                        e.accepted = true
+                        const lines = w.itemLines()
+                        const last = lines.find(l => l.index === (w.info.last ?? -1)) ?? lines[0]
+                        if (last) w.goTo("recvQty-" + last.index)
+                    }
                 }
                 Big {
                     objectName: "recvFindGo"
@@ -291,6 +349,7 @@ Item {
                     } else {
                         contentY = Math.max(originY, Math.min(keptY, originY + contentHeight - height))
                     }
+                    w.focusPending()   // (Tab's next field, made anew with the lines)
                 })
                 delegate: Rectangle {
                     id: row
@@ -377,6 +436,10 @@ Item {
                                 horizontalAlignment: Text.AlignHCenter
                                 text: String(modelData.qty)
                                 onEditingFinished: if (Number(text) !== modelData.qty) w.pos.recvSetLine(modelData.index, { qty: text })
+                                Keys.onTabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvQty-", false) }
+                                Keys.onBacktabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvQty-", true) }
+                                Keys.onReturnPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvQty-", false) }
+                                Keys.onEnterPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvQty-", false) }
                             }
                             Big { text: "+"; implicitWidth: w.touch; onClicked: w.pos.recvSetLine(modelData.index, { qty: String(modelData.qty + 1) }) }
                             Field {
@@ -401,12 +464,20 @@ Item {
                                 placeholderText: qsTr("Vendor #")
                                 text: modelData.vendorItem
                                 onEditingFinished: if (text !== modelData.vendorItem) w.pos.recvSetLine(modelData.index, { vendorItem: text })
+                                Keys.onTabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvVendorItem-", false) }
+                                Keys.onBacktabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvVendorItem-", true) }
+                                Keys.onReturnPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvVendorItem-", false) }
+                                Keys.onEnterPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvVendorItem-", false) }
                             }
                             Amount {
                                 objectName: "recvCost-" + modelData.index
                                 placeholderText: qsTr("Price")
                                 text: modelData.cost
                                 onEditingFinished: if (text !== modelData.cost) w.pos.recvSetLine(modelData.index, { cost: text })
+                                Keys.onTabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvCost-", false) }
+                                Keys.onBacktabPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvCost-", true) }
+                                Keys.onReturnPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvCost-", false) }
+                                Keys.onEnterPressed: e => { e.accepted = true; w.tabFrom(modelData.index, "recvCost-", false) }
                             }
                             Amount {
                                 objectName: "recvOtp-" + modelData.index

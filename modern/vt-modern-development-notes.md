@@ -144,6 +144,11 @@ Not started unless a Log entry says otherwise; files named here (`CustomerReceip
 
 ## Log
 
+### 2026-11-28 11:24 ET — Bob (Claude) — Receive retail: Tab (and Enter) go through just what receiving needs typed
+- **What:** Tablet app: changed. Server: changed (same QML). Receive retail's Tab order: the scan box -> the quantity of the line just scanned (or the first) -> its vendor item # only when it has none -> its price -> the next item's quantity -> ... -> after the last line's price, back to the scan box for the next scan. Enter does the same as Tab; Shift+Tab goes back one step; the field's value comes up selected so typing replaces it. Unit, per-unit, OTP and allowance are skipped (still touchable). Because each change sends the lines again (rows made anew), the field to go to is kept (pendingFocus, for 2 s) and focused again when the lines come back; the list scrolls to show it.
+- **Why:** Owner 2026-11-28 11:22 AM: 'update retail receiving to use tab to advance through fields that need updating on receiving, i.e. quan, vendor item if blank, price, then next item.'
+- **Files:** `modern/ui/qml/WidgetRetailReceiving.qml`
+
 ### 2026-11-28 10:57 ET — Bob (Claude) — vt-pi-updates: each Pi sends its own report (pi-updates-<pi name>.txt)
 - **What:** Tablet app: no change. Server: no change. Scripts only. vt-pi-updates now copies its result to Google Drive 'POS project tmp/pi-output/' as pi-updates-<hostname, lower case>.txt (pi-updates-vt-hca-pi.txt, pi-updates-vt-bhdan-pi.txt; later Gaylordsville and the corporate Pi get their own the same way) instead of one shared pi-updates.txt. The local file stays ~/vt-output/pi-updates.txt. Manual ch 31 says so. The old shared pi-updates.txt on Drive is no longer written (last: HCA 2026-11-28 10:52).
 - **Why:** Owner 2026-11-28: HCA also needs to be checked; 'make change to distinguish which pi is reporting. future Gaylordsville location and corporate will be reporting'. Both Pis wrote the same Drive file, so one report replaced the other; HCA's daily run was also never set up (no crontab for pi).
