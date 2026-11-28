@@ -253,7 +253,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: choiceFlick.contentHeight > choiceFlick.height + 1 }
               Flow {
                 id: choiceFlow
-                width: choiceFlick.width - 14
+                width: choiceFlick.width - Math.max(14, choiceFlick.ScrollBar.vertical ? choiceFlick.ScrollBar.vertical.room : 0)
                 spacing: 6
                 Repeater {
                     model: w.linkCode === "" ? (w.info.choices ?? []) : []
@@ -296,7 +296,7 @@ Item {
                     id: row
                     required property var modelData
                     objectName: "recvLine-" + modelData.index
-                    width: lineList.width - 14
+                    width: lineList.width - Math.max(14, lineList.ScrollBar.vertical ? lineList.ScrollBar.vertical.room : 0)
                     height: lineCol.implicitHeight + 8
                     radius: 4
                     color: "transparent"
@@ -533,7 +533,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: draftList.contentHeight > draftList.height + 1 }
                 delegate: RowLayout {
                     required property var modelData
-                    width: draftList.width - 14
+                    width: draftList.width - Math.max(14, draftList.ScrollBar.vertical ? draftList.ScrollBar.vertical.room : 0)
                     spacing: 8
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -684,7 +684,7 @@ Item {
                     ScrollBar.vertical: TouchScrollBar { needed: invList.contentHeight > invList.height + 1 }
                     delegate: RowLayout {
                         required property var modelData
-                        width: invList.width - 14
+                        width: invList.width - Math.max(14, invList.ScrollBar.vertical ? invList.ScrollBar.vertical.room : 0)
                         spacing: 6
                         Label {
                             text: modelData.date + "  " + (modelData.vendor !== "" ? modelData.vendor : modelData.account) + "  #" + modelData.invoice
@@ -714,14 +714,14 @@ Item {
                     model: w.imp.unmatched ?? []
                     ScrollBar.vertical: TouchScrollBar { needed: codeList.contentHeight > codeList.height + 1 }
                     header: Words {
-                        width: codeList.width - 14
+                        width: codeList.width - Math.max(14, codeList.ScrollBar.vertical ? codeList.ScrollBar.vertical.room : 0)
                         font.bold: true
                         text: (w.imp.unmatchedCount ?? 0) > 0 ? qsTr("Not on file (%1): link, add, store use or skip").arg(w.imp.unmatchedCount)
                                                                : qsTr("Every item is on file.")
                     }
                     delegate: ColumnLayout {
                         required property var modelData
-                        width: codeList.width - 14
+                        width: codeList.width - Math.max(14, codeList.ScrollBar.vertical ? codeList.ScrollBar.vertical.room : 0)
                         spacing: 2
                         Label {
                             text: modelData.description + "  ·  " + [modelData.upc, modelData.itemNo !== "" ? "#" + modelData.itemNo : "", modelData.cost]
@@ -745,7 +745,7 @@ Item {
                         }
                     }
                     footer: ColumnLayout {
-                        width: codeList.width - 14
+                        width: codeList.width - Math.max(14, codeList.ScrollBar.vertical ? codeList.ScrollBar.vertical.room : 0)
                         spacing: 2
                         Words { visible: (w.imp.decided ?? []).length > 0; text: qsTr("Decided"); font.bold: true }
                         Repeater {
@@ -811,7 +811,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: recentList.contentHeight > recentList.height + 1 }
                 delegate: RowLayout {
                     required property var modelData
-                    width: recentList.width - 14
+                    width: recentList.width - Math.max(14, recentList.ScrollBar.vertical ? recentList.ScrollBar.vertical.room : 0)
                     spacing: 8
                     Label {
                         Layout.fillWidth: true
@@ -919,7 +919,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: shownList.contentHeight > shownList.height + 1 }
                 delegate: Label {
                     required property var modelData
-                    width: shownList.width - 14
+                    width: shownList.width - Math.max(14, shownList.ScrollBar.vertical ? shownList.ScrollBar.vertical.room : 0)
                     color: modelData.found || modelData.kind !== qsTr("Stock") ? "white" : "#ffb060"
                     font.pixelSize: w.unit * 0.85
                     elide: Text.ElideRight
@@ -1033,7 +1033,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: receivedLines.contentHeight > receivedLines.height + 1 }
                 delegate: Label {
                     required property var modelData
-                    width: receivedLines.width - 14
+                    width: receivedLines.width - Math.max(14, receivedLines.ScrollBar.vertical ? receivedLines.ScrollBar.vertical.room : 0)
                     color: "white"
                     font.pixelSize: w.unit * 0.85
                     elide: Text.ElideRight
@@ -1063,7 +1063,7 @@ Item {
                 ScrollBar.vertical: TouchScrollBar { needed: editList.contentHeight > editList.height + 1 }
                 delegate: Label {
                     required property var modelData
-                    width: editList.width - 14
+                    width: editList.width - Math.max(14, editList.ScrollBar.vertical ? editList.ScrollBar.vertical.room : 0)
                     color: "#d0d8e0"
                     font.pixelSize: w.unit * 0.8
                     wrapMode: Text.WordWrap
